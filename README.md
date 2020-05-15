@@ -240,7 +240,7 @@ END is the last index in byte-vector of the serialized object.
 
 In `./examples/math*` we give a simple example of creating a proto structure,
 populating its fields, serializing, then deserializing.
-All of the files listed below can be found in //depot/google3/third_party/lisp/cl_protobufs/example/.
+All of the files listed below can be found in ./cl_protobufs/example/.
 
 The proto file [`math.proto`](./example/math.proto) has two messages:
 `AddNumbersRequest` and `AddNumbersResponse`.
