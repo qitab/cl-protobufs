@@ -1,0 +1,18 @@
+// Copyright 2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package math;
+
+message AddNumbersRequest {
+  optional int32 number1 = 1;
+  optional int32 number2 = 2;
+}
+
+message AddNumbersResponse {
+  optional int32 response = 1;
+}

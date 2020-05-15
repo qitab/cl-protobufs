@@ -1,0 +1,33 @@
+// Copyright 2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package third_party.lisp.cl_protobufs.tests;
+
+message MyMessage {
+  enum MyEnum {
+    option allow_alias = true;
+    FOO = 1;
+    BAR = 2;
+    BAZ = 2;
+    ZAPHOD = 42;
+  }
+}
+
+enum OuterEnum {
+  option allow_alias = true;
+  FOO = 11;
+  BAR = 12;
+  BAZ = 12;
+  ZAPHOD = 142;
+}
+
+enum AnotherEnum {
+  ONE = 1;
+  TWO = 2;
+  THREE = 3;
+}

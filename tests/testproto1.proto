@@ -1,0 +1,77 @@
+// Copyright 2012-2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";      // for compatibility with internal Google compiler
+
+package protobuf_unittest;
+
+// dummy message to include in other messages.
+message Test1Msg {
+  optional int32 foo = 1;
+}
+
+message Test1Proto {
+
+  // test enums
+  enum EnumCode {
+    FOO = 0;
+    BAR = 1;
+    BAZ = 2;
+  }
+
+  // required vs. optional
+  required int64 o_a = 1;
+  optional int64 o_b = 2;
+
+  // all the types (non-repeated)
+  optional int32 u_int32 = 3;
+  optional int64 u_int64 = 4;
+  optional uint64 u_uint64 = 5;
+  optional fixed32 u_fixed32 = 6;
+  optional fixed64 u_fixed64 = 7;
+  optional bool u_bool = 8;
+  optional float u_float = 27;
+  optional double u_double = 28;
+  optional string u_string = 9;
+  optional string u_vardata = 10;
+  optional Test1Msg u_msg = 11;
+
+  // all the types (repeated)
+  repeated int32 r_int32 = 12;
+  repeated int64 r_int64 = 13;
+  repeated uint64 r_uint64 = 14;
+  repeated fixed32 r_fixed32 = 15;
+  repeated fixed64 r_fixed64 = 16;
+  repeated bool r_bool = 17;
+  repeated float r_float = 29;
+  repeated double r_double = 30;
+  repeated string r_string = 18;
+  repeated string r_vardata = 19;
+  repeated Test1Msg r_msg = 20;
+
+  // non-repeated group
+  repeated group TestGroup1 = 21 {
+    optional int32 a = 22;
+  };
+
+  // repeated group
+  repeated group TestGroup2 = 23 {
+    optional int32 b = 24;
+  };
+
+  // default settings
+  optional int32 d_int32 = 25 [default=12];
+  optional string d_string = 26 [default="foo"];
+  optional bool d_bool = 31 [default=true];
+  optional int32 dd_int32 = 32 [ default =  12 ];
+  optional string dd_string = 33 [ default =  " f oo " ];
+  optional bool dd_bool = 34 [ default = true ];
+
+  // enums
+  required EnumCode d_enum = 40 [ default = BAR ];
+  optional EnumCode o_enum = 41;
+  repeated EnumCode r_enum = 42;
+}

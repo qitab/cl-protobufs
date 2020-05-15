@@ -1,0 +1,165 @@
+// Copyright 2012-2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+// LINT: ALLOW_GROUPS
+// LINT: LEGACY_NAMES
+
+syntax = "proto2";
+
+package serialization_test;
+
+message OptionalMessage {
+  optional int32 optional_no_default = 1;
+  optional int32 optional_with_default = 2 [default = 2];
+}
+
+message RequiredMessage {
+  required int32 required_no_default = 1;
+  required int32 required_with_default = 2 [default = 2];
+}
+
+message MessageWithFloats {
+  optional float test_float = 1;
+  optional double test_double = 2;
+}
+
+
+message RepeatedMessage {
+  repeated int32 repeated_no_default = 1;
+}
+
+message BasicTest1 {
+  optional int32 intval = 1;
+}
+
+message BasicTest2 {
+  optional int32 intval = 1;
+  optional string strval = 2;
+}
+
+message BasicTest3 {
+  optional int32 intval = 1;
+  optional string strval = 2;
+  optional BasicTest1 recval = 3;
+}
+
+message BasicTest4 {
+  optional int32 intval = 1;
+  optional string strval = 2;
+  optional BasicTest2 recval = 3;
+}
+
+message BasicTest5 {
+  enum Color {
+    def = 0;
+    red = 1;
+    green = 2;
+    blue = 3;
+  }
+  optional Color color = 1;
+  repeated int32 intvals = 2;
+  repeated string strvals = 3;
+}
+
+message BasicTest6 {
+  repeated int32 intvals = 1;
+  repeated string strvals = 2;
+  repeated BasicTest2 recvals = 3;
+}
+
+message ColorWheel1 {
+  message Metadata1 {
+    optional string author = 1;
+    optional string revision = 2;
+    optional string date = 3;
+  }
+  required string name = 1;
+  repeated Color1 colors = 2;
+  optional Metadata1 metadata = 3;
+}
+
+message Color1 {
+  optional string name = 1;
+  required int32 r_value = 2;
+  required int32 g_value = 3;
+  required int32 b_value = 4;
+}
+
+message AddColor1 {
+  required ColorWheel1 wheel = 1;
+  required Color1 color = 2;
+}
+
+message ColorWheel2 {
+  required string name = 1;
+  repeated Color2 colors = 2;
+  optional group Metadata = 3 {
+    optional string author = 1;
+    optional string revision = 2;
+    optional string date = 3;
+  }
+}
+
+message Color2 {
+  optional string name = 1;
+  required int32 r_value = 2;
+  required int32 g_value = 3;
+  required int32 b_value = 4;
+}
+
+message AddColor2 {
+  required ColorWheel2 wheel = 1;
+  required Color2 color = 2;
+}
+
+message SpeedEmpty {
+}
+
+message SpeedOptional {
+  optional SpeedEmpty foo = 1;
+}
+
+message SpeedRepeated {
+  repeated SpeedEmpty foo = 1;
+}
+
+message SpaceEmpty {
+}
+
+message SpaceOptional {
+  optional SpaceEmpty foo = 1;
+}
+
+message SpaceRepeated {
+  repeated SpaceEmpty foo = 1;
+}
+
+message Inner {
+  optional int64 i = 1;
+}
+
+message Outer {
+  repeated Inner inner = 1;
+  optional Inner simple = 2;
+  optional int32 i = 3;
+}
+
+message Address {
+  required string street = 1;
+  required int64 s_number = 2;
+}
+
+message Person {
+  required int64 id = 1;
+  required string name =  2;
+  optional Address home =  3;
+  optional Person spouse = 4;
+  optional bool odd_p = 5;
+}
+
+message Population {
+  repeated Person people = 1;
+}

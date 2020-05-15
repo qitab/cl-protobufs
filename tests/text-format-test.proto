@@ -1,0 +1,44 @@
+// Copyright 2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+import "third_party/lisp/cl_protobufs/proto2-descriptor-extensions.proto";
+
+package travel.flights.qpx;
+
+option (lisp_package) = "PROTOBUFS-TEST-PROTO";
+
+message TextFormatTest {
+  optional int32 int_field = 1;
+  optional sint32 sint_field = 2;
+  optional uint32 uint_field = 3;
+  optional float float_field = 4;
+  optional double double_field = 5;
+  optional string string_field = 6;
+  repeated string string_fields = 7;
+  reserved 8;
+  reserved 9, 10;
+  /* comment */ optional uint32 embedded_comment_a = 11;
+  optional /* comment */ uint32 embedded_comment_b = 12;
+  optional uint32 /* comment */ embedded_comment_c = 13;
+  optional uint32 embedded_comment_d /* comment */ = 14;
+  optional uint32 embedded_comment_e = /* comment */ 15;
+  optional uint32 embedded_comment_f = 16 /* comment */;
+  optional uint32 embedded_comment_g = 17; /* comment */
+
+  message NestedMessage1 {
+    optional int32 int_field = 1;
+
+    message NestedMessage2 {
+      optional int32 int_field = 2;
+    }
+  }
+
+  optional NestedMessage1 one_level_nesting = 18;
+  // todo inner nesting doesn't work yet
+  // optional NestedMessage1.NestedMessage2 two_level_nesting = 19;
+}

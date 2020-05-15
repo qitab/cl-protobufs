@@ -1,0 +1,61 @@
+// Copyright 2010-2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";      // for compatibility with internal Google compiler
+
+package protobuf_unittest;
+
+message TimeProtocol {
+  repeated group G = 1 {
+    required int32 V1 = 2;
+    required int32 V2 = 3;
+  };
+  repeated string DebugString = 4;
+};
+
+message TestMessage {
+  optional int32 foo = 1;
+  optional int32 bar = 2;
+};
+
+message TestProtocol {
+  required string Zero  = 63;
+  required string One   = 1;
+  optional int64 Two = 2 [default=19];
+  repeated TimeProtocol TP2 = 113;
+  repeated int64 Test1 = 301;
+  repeated int32 Test2 = 302;
+  repeated float Test3 = 303;
+  repeated double Test4 = 304;
+  repeated string Test5 = 305;
+
+  required fixed64 FixedValue = 310;
+  required fixed32 FixedValue2 = 311;
+  optional string OptString = 299  [default="opt"];
+
+   enum DocInfo {
+    ENUM_ZERO = 0;
+    ENUM_ONE = 1;
+    ENUM_TWO_REALLY_LONG_NAME = 2;
+  };
+
+  optional TestMessage Eleven = 312;
+
+  enum AnotherEnum {
+    ENUM_WHATEVER = 0;
+  };
+  optional AnotherEnum Twelve = 313;
+  optional group Thirteen = 314 {
+    required AnotherEnum Fourteen = 315;
+  };
+
+  // Please keep this empty group at the end.  I've caught quite a few
+  // bugs this way: empty group is a degenerate case, but empty group
+  // not followed by anything is even more so!
+  repeated group Test6 = 306 {
+  };
+  required string StringWithDefault  = 316 [default="fish"];
+};

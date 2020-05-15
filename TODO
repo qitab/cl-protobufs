@@ -1,0 +1,160 @@
+TO DO
+
+- Address the remaining "---" issues
+
+- Use the package system for look-up instead of the find-foo insanity.
+- Get rid of any find-foo lookup at schema expansion/compilation time.
+
+- Get "namespaces" (i.e., nested classes) fully working
+[  - Messages and enums should have a 'fully-qualified-names' slot		]
+[    that records both symbols and strings, and in the correct package		]
+[  - Printers need to print qualified names, as needed				]
+[  - 'find-message' and 'find-enum' need to search namespaces			]
+[     if the quick compare against the name/class fails				]
+  - 'message Foo { message Bar { ... } ... }'
+    should not produce a Lisp class defaultly named 'foo.bar', but...
+    - Add a keyword arg, :class-name, that overrides this convention;
+      in .proto files this should be called lisp_class
+    - Also, add :slot-name for slots and :type-name for enums
+      (called lisp_slot and lisp_type in .proto files)
+    - Rationale: 'foo.bar' isn't very Lispy;
+      for the most part, packages provide enough namespaces to avoid clashes
+
+- Get 'merge-from-message' fully working
+  - See the place in 'deserialize-object' that needs to merge, too
+  - Maybe this isn't so useful in Lisp, where I'd prefer to encourage
+    a more function style
+
+- Lose 'proto-class', replace it with 'proto-type';
+    its type is (or null symbol)
+  'proto-type' should always be the name from the Lisp side
+[  All 'define-xxx' macros should have, as their first argument,		]
+[    a type (not a "name")							]
+[  In .proto files, there should be an 'option lisp_name="pkg:name"'		]
+[    which can be used to override the 'proto->class-name' default		]
+[    for messages and enums							]
+
+- Refactor 'protobuf-field' so the names are clearer:
+  - Lose the existing 'proto-type' slot,
+      then rename the 'proto-class' slot to 'proto-type';
+      this will hold the Lisp name of the slot type
+  - 'proto-name' will hold the Protobufs name of the field type
+      (this used to hold the Protobufs name of the field)
+[  - &key name should give the Protobufs name for the field			]
+[  - 'option lisp_name="pkg:name"' should give the Lisp name for the slot	]
+
+- Refactor 'define-message'/'define-extend'/'define-group'
+  to avoid so much duplicated code
+
+[- Need search paths in the ASDF .proto module					]
+
+[- Make 'import' really work							]
+[  - *all-protobufs* should record keyed by pathname, too			]
+[  - 'import' should not bother loading if the import is present,		]
+[    and should record the imported schema when it's done			]
+[  - 'find-message' and 'find-enum' should search imports, too			]
+
+[- 'package'/'lisp_package' should create the package, if necessary.		]
+
+[- Don't generate 'import "net/proto2/proto/descriptor.proto"' and		]
+[  'extend proto2.MessageOptions { ..}' lines unless we need to include		]
+[  one of the lisp_* options in the generated model				]
+
+[- Handle 'import'								]
+[  It should probably just compile/load the file when the import		]
+[    is seen									]
+[  - The Lisp macros should be able to import both .lisp and .proto files	]
+[  - The .proto parser should only be able to import .proto files		]
+
+[- Handle 'extension' and 'extends'						]
+[  - 'define-extension' just declares the extension within a message		]
+[      and adds it to 'proto-extensions' for the message			]
+[  - Easiest is to add an "extension-p" flag to 'protobuf-message'		]
+[  - Define new 'define-extends' macro						]
+[      which *copies* all slots from the message being extended,		]
+[      then just adds the extension fields as (flagged) ordinary fields		]
+[      with reader/writer function (see below)					]
+[      - Factor out field-processing code from 'define-message'			]
+[      - If we do it this way, no other special magic is needed			]
+[        Serialization, e.g., should just work					]
+[        Scoping should also just work						]
+[      - We will need 'proto-writer' as an analog to 'proto-reader'		]
+[  - Get deserialization working;						]
+[      Need to call the 'proto-writer' function if its around			]
+[      instead of just using (setf (slot-value ...) ...)			]
+[  - Don't forget to check that the "extends" indexes match			]
+[      what was declared by 'define-extension'					]
+[      - And don't allow overlapping extension indexes				]
+[  - Generate new getter and setter methods for each extended slot:		]
+[      (let ((an-int 10))							]
+[       (declare (type (or integer null) an-int))				]
+[       (defmethod an-int ((object extendable-foo))				]
+[         an-int)								]
+[       (defmethod (setf an-int) (val (object extendable-foo))			]
+[         (declare (type (or integer null) val)					]
+[         (setq an-int val))))							]
+[  - Handle "extends" in the parser, too					]
+
+[- Support "deprecated" groups. Sigh.						]
+[  - Need 'proto:define-group', which is like 'define-message'			]
+[  - Need to parse 'group' things						]
+[    - "option group Locator = 1 { ... }"					]
+[      means create a submessage (and class!) called "Locator"			]
+[      whose field is named "locator" (note lower case)				]
+[      then just treat it like a message					]
+[  - Need a printer for groups, too						]
+[  - Make 'proto-extension-p' be 'proto-message-type',				]
+[    which is one of :message, :extends or :group				]
+[  - (De)serialization of groups uses a start and end tag,			]
+[    and the end tag counts as part of the group length				]
+[    - Serialization uses the start-group wire type,				]
+[      then serializes the message,						]
+[      then writes the end-group tag						]
+[    - Deserialization works the usual way,					]
+[      except that it stops at a matching end-group tag				]
+[      (i.e., has the same field number as the start tag)			]
+[      - Add new 'end-tag' argument to 'serialize-object' and			]
+[        the 'serialize' internal function, it's the expected			]
+[        end tag value to indicate end-of-group; if the default			]
+[        value for this is 0, then the (i= tag 0) test can be			]
+[        changed to (i= tag end-tag) (sweet!)					]
+
+[- Speed up 'list-of' by shadowing the Quux version,				]
+[    and don't do any type-checking (!)						]
+[  Having done this, we can probably remove the hack of using map:map,		]
+[    which should make deserialization much faster				]
+
+[- 'proto-name' should always be the name from the Protobufs side;		]
+[    its type is (or null string)						]
+[  All 'define-xxx' macros should have '&key name' which gives the Protobufs	]
+[   name, which can be used to override the 'class-name->proto' default		]
+
+[- 'deserialize-object' uses the alias when it calls 'make-instance',		]
+[    or if there is no alias, 'proto-type'					]
+
+[- 'serialize-object' and 'object-size' never use the alias;			]
+[    instead all the "dispatching" should be done of off 'proto-type',		]
+[  Ditto, 'print-text-format'							]
+
+[- The "name" of a protobuf should be the camel-cased file name			]
+[  The "type" of a protobuf should just be the file name as a keyword symbol	]
+
+[- RPCs should have 'input-name', 'input-type', 'output-name' and 'output-type'	]
+[  The "name" ones are for the Protobufs side					]
+[  The "types" ones are for the Lisp side; we look up on "type" only		]
+[  In the Lisp, the RPC types can be either 'type' or '(type :name <name>)'	]
+[  In .proto files, there should be an 'option lisp_name="pkg:name"'		]
+[   which can be used to override the 'proto->class-name' default		]
+[   for the name of the RPC function						]
+
+[- Finishing eliminating 'protobuf' argument from the API			]
+[  - Lose it in 'serialize-object-to-stream' and 'deserialize-object-from-stream']
+[  - Rename it to 'trace' in '(de)serialize-object' and 'object-size',		]
+[      make it be the last supplied argument					]
+[  - Fix up the '(de)serialize-object' and 'object-size' generators, too	]
+[  - Apply the same fix to 'print-text-format'					]
+[  - Then make the compatibility API actuallty work				]
+
+[- Implement 'parse-text-format'						]
+
+[- Write documentation								]

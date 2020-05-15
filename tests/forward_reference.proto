@@ -1,0 +1,32 @@
+// Copyright 2012 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+import "third_party/lisp/cl_protobufs/proto2-descriptor-extensions.proto";
+
+package protobuf_forward_reference_unittest;
+
+message MessageWithForwardReference {
+  required MessageWithOverriddenLispClass foo = 1;
+  required EnumWithOverriddenLispClass bar = 2;
+}
+
+service ServiceWithForwardReference {
+  rpc Bloop(MessageWithOverriddenLispClass) returns (MessageWithForwardReference);
+  rpc Beep(MessageWithForwardReference) returns (MessageWithOverriddenLispClass);
+}
+
+message MessageWithOverriddenLispClass {
+  option (lisp_name) = "MSG-W-OVERRIDDEN-LISP-CLASS";
+  required int32 baz = 1;
+}
+
+enum EnumWithOverriddenLispClass {
+  // lisp_name does not work for enums.
+  // option (lisp_name) = "ENUM-W-OVERRIDDEN-LISP-CLASS";
+  BAA = 1;
+}

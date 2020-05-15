@@ -1,0 +1,66 @@
+// Copyright 2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package proto_nested_nested_test;
+
+message Nested {
+
+  message Nested2 {
+    required proto_nested_nested_test.Nested parent = 1;
+    required proto_nested_nested_test.Nested.Nested next_nested = 2;
+
+    required proto_nested_nested_test.Nested.Kind kind = 3 [default = CREATE];
+    required Nested.Kind method = 4 [default = GET];
+  }
+
+  required Kind kind = 1 [default = CREATE];
+
+  required Nested.Kind method = 2 [default = GET];
+
+  required proto_nested_nested_test.Nested next = 3;
+
+  required Nested sub = 4;
+
+  // Describes the REST method kind.
+  enum Kind {
+    CREATE = 1;
+    RETRIEVE = 2;
+    UPDATE = 3;
+    DELETE = 4;
+  }
+
+  message Nested {
+
+    message Nested {
+      required proto_nested_nested_test.Nested parent = 1;
+      required proto_nested_nested_test.Nested.Nested next_nested = 2;
+
+      required proto_nested_nested_test.Nested.Kind kind = 3 [default = CREATE];
+      required proto_nested_nested_test.Nested.Nested.Kind method = 4 [default = GET];
+
+      enum Kind {
+        FOO = 1;
+        BAR = 2;
+      }
+    }
+
+    required proto_nested_nested_test.Nested parent = 1;
+    required proto_nested_nested_test.Nested.Nested next = 2;
+    required Nested sub = 3;
+
+    required proto_nested_nested_test.Nested.Kind kind = 4 [default = CREATE];
+    required Kind method = 5 [default = GET];
+    required Nested.Kind baz = 6 [default = BAR];
+
+    // Describes the HTTP method kind.
+    enum Kind {
+      GET = 1;
+      POST = 2;
+    }
+  }
+}

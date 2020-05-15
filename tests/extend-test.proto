@@ -1,0 +1,43 @@
+// Copyright 2012 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+import "third_party/lisp/cl_protobufs/tests/extend-test-base.proto";
+
+package extend_test;
+
+message Foo {
+  extensions 200 to 299;
+}
+
+message Bar {
+  // Extend file-local Foo with this Bar.
+  extend Foo {
+    optional Bar foo_227 = 227;
+  }
+  // Extend file-local Foo with imported Bar.
+  extend Foo {
+    optional extend_base.Bar foo_228 = 228;
+  }
+  // Extend imported Foo with this Bar.
+  extend extend_base.Foo {
+    optional Bar foo_127 = 127;
+  }
+  // Extend imported Foo with imported Bar.
+  extend extend_base.Foo {
+    optional extend_base.Bar foo_128 = 128;
+  }
+}
+
+// NB: Unlike Foo and Bar, no Quux is defined in our import.
+//     Unlike Foo and Bar, no Baz is defined in this proto file.
+message Quux {
+  // Extend imported Baz with self.
+  extend extend_base.Baz {
+    optional Quux ext = 327;
+  }
+}

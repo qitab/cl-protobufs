@@ -1,0 +1,35 @@
+// Copyright 2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package third_party.lisp.cl_protobufs.tests;
+
+message Inner {
+  optional int32 value = 1;
+}
+
+message Container {
+  optional int32 value_before = 1;
+  optional Inner inner = 2 [lazy = true];
+  optional int32 value_after = 3;
+}
+
+message RecursivelyLazy {
+  optional Inner inner = 1 [lazy = true];
+}
+
+message Container2 {
+  optional RecursivelyLazy rec_lazy = 1 [lazy = true];
+}
+
+message RequiredLazy {
+  required Inner inner = 1 [lazy = true];
+}
+
+message RepeatedLazy {
+  repeated Inner inners = 1 [lazy = true];
+}

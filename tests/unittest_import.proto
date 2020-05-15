@@ -1,0 +1,33 @@
+// Copyright 2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+//
+// A proto file which is imported by unittest.proto to test importing.
+
+syntax = "proto2";      // for compatibility with internal Google compiler
+
+// We don't put this in a package within proto2 because we need to make sure
+// that the generated code doesn't depend on being in the proto2 namespace.
+// In test_util.h we do
+// "using namespace unittest_import = protobuf_unittest_import".
+package protobuf_unittest_import;
+
+//--- option optimize_for = SPEED;
+
+// Excercise the java_package option.
+option java_package = "com.google.protobuf.test";
+
+// Do not set a java_outer_classname here to verify that Proto2 works without
+// one.
+
+message ImportMessage {
+  optional int32 d = 1;
+}
+
+enum ImportEnum {
+  IMPORT_FOO = 7;
+  IMPORT_BAR = 8;
+  IMPORT_BAZ = 9;
+}

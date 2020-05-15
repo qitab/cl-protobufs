@@ -1,0 +1,22 @@
+// Copyright 2012 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package protobuf_package_unittest2;
+
+message MessageInOtherPackage {
+  required int32 foo = 1;
+  extensions 1000 to max;
+}
+
+enum EnumInOtherPackage {
+  BAR = 1;
+}
+
+message MessageDefinedInBothPackages {
+  required string bang = 1;
+}

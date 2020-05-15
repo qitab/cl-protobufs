@@ -1,0 +1,27 @@
+// Copyright 2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package third_party.lisp.cl_protobufs.tests;
+
+message BarRequest {
+}
+
+message BarResponse {
+}
+
+service FooService {
+  rpc BarMethod(BarRequest) returns (BarResponse) {
+    option protocol = UDP;
+    option deadline = 30.0;
+    option duplicate_suppression = true;
+    option client_logging = -123;
+    option security_level = PRIVACY_AND_INTEGRITY;
+    option security_label = "admin";
+    option legacy_client_initial_tokens = 42;
+  }
+}

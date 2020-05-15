@@ -1,0 +1,43 @@
+// Copyright 2012 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+import "third_party/lisp/cl_protobufs/tests/package_test2.proto";
+
+package protobuf_package_unittest1;
+
+message MessageDefinedInBothPackages {
+  required string boom = 1;
+}
+
+message MessageWithCrossPackageReference {
+  required protobuf_package_unittest2.MessageInOtherPackage baz = 1;
+  required protobuf_package_unittest2.EnumInOtherPackage bonk = 2;
+  required MessageDefinedInBothPackages bam = 3;
+  required protobuf_package_unittest2.MessageDefinedInBothPackages bing = 5;
+}
+
+message MessageWithCrossPackageExtension {
+  extend protobuf_package_unittest2.MessageInOtherPackage {
+    optional int32 baa = 1000;
+  }
+  required protobuf_package_unittest2.MessageInOtherPackage boo = 1;
+}
+
+service ServiceWithCrossPackageInputOutput {
+  rpc Bloop(protobuf_package_unittest2.MessageInOtherPackage) returns (MessageWithCrossPackageReference);
+  rpc Beep(MessageWithCrossPackageReference) returns (protobuf_package_unittest2.MessageInOtherPackage);
+}
+
+
+// These are "camel-spitting" names.
+message Record2fLookupRequest {}
+message Record2fLookupResponse {}
+
+service ServiceWithCamelSpittingInputOutput {
+  rpc Record2fLookup(Record2fLookupRequest) returns (Record2fLookupResponse);
+}
