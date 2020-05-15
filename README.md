@@ -1,5 +1,7 @@
 # cl-protobufs
 
+CL-Protobufs is a common lisp protocol buffer library.
+
 ## API
 
 All of the following interfaces are written for you by the protoc tool based
@@ -307,7 +309,7 @@ but only the wire-tests target is included in the tests because the
 
   ```shell
   $ cd ~/quicklisp/local-projects
-  $ ln -s $google3/third_party/lisp/cl_protobufs
+  $ ln -s $cl-protobufs
   ```
 
 * Start SBCL and evaluate `(ql:quickload :cl-protobufs)`.
