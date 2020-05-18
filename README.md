@@ -1,6 +1,12 @@
 # cl-protobufs
 
-CL-Protobufs is a common lisp protocol buffer library.
+BEGIN_INTERNAL
+Note that the reason why this is in `cl_protobufs/` instead of `cl-protobufs/`
+is that this package contains `proto_library` rules, which have effectively the
+same restriction as `py_library` rules about not having dashes in the path.
+That would cause a build error if the `proto_library` rule is anywhere in the
+transitive dependencies of a `py_proto_library` rule (as is the case here).
+END_INTERNAL
 
 ## API
 

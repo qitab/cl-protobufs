@@ -150,3 +150,9 @@ Parameters:
                  (proto:enum-values 'another-enum)))
   (assert-true (equal '(:eins :zwei :drei)
                  (proto:enum-values 'alias-enum))))
+
+(deftest test-enum-forward-decleration (enum-mapping-tests)
+  (let ((msg (make-my-other-message :other-enum :baz))
+        (msg-2 (make-my-other-message)))
+    (assert-true (eq (my-other-message.other-enum msg) :baz))
+    (assert-true (eq (my-other-message.other-enum msg-2) :foo))))

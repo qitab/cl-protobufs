@@ -8,6 +8,10 @@ syntax = "proto2";
 
 package third_party.lisp.cl_protobufs.tests;
 
+message MyOtherMessage {
+  optional MyMessage.MyEnum other_enum = 1;
+}
+
 message MyMessage {
   enum MyEnum {
     option allow_alias = true;
