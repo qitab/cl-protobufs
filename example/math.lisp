@@ -4,8 +4,6 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-;;; File: ./example/math.lisp
-
 (defpackage #:cl-protobufs.math-example
   (:use #:cl
         #:cl-protobufs
@@ -18,25 +16,25 @@
 
 (defun add-numbers (request)
   "Adds two numbers requested by an add-numbers-request.
-PARAMETERS:
-  REQUEST: An add-numbers-request protobuf object.
-RETURNS: An add-numbers-response protobuf object."
+   Parameters:
+     REQUEST: An add-numbers-request protobuf message.
+   Returns: An add-numbers-response protobuf message."
   (let ((number-1 (add-numbers-request.number1 request))
         (number-2 (add-numbers-request.number2 request)))
     (make-add-numbers-response :response (+ number-1 number-2))))
 
 (defun serialize-add-numbers-response (response)
-  "Serializes an add-numbers-response proto structure.
-PARAMETERS:
-  RESPONSE: An add-numers-response proto object.
-RETURNS: cl-protobufs:byte-vector"
+  "Serializes an add-numbers-response protobuf message.
+   Parameters:
+     RESPONSE: An add-numers-response protobuf message.
+   Returns: A cl-protobufs:byte-vector."
   (serialize-object-to-bytes response))
 
 (defun deserialize-add-numbers-request (buffer)
-  "Receives a cl-protobufs:byte-vector in BUFFER and parses
-it into an add-numbers-request object.
-PARAMETERS:
-  BUFFER: A cl-protobufs:byte-vector containing the serialized
-    add-numbers-request.
-RETURNS: The deserialized add-numbers-request object."
+  "Parses the cl-protobufs:byte-vector in BUFFER into an add-numbers-request
+   protobuf message.
+   Parameters:
+     BUFFER: A cl-protobufs:byte-vector containing the serialized
+       add-numbers-request.
+   Returns: The deserialized add-numbers-request protobuf message."
   (deserialize-object (find-message 'add-numbers-request) buffer))
