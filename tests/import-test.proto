@@ -8,8 +8,8 @@ syntax = "proto2";
 
 package third_party.lisp.cl_protobufs.tests;
 
-import "third_party/lisp/cl_protobufs/tests/import-test-import-1.proto";
-import "third_party/lisp/cl_protobufs/tests/import-test-import-2.proto";
+import "cl-protobufs/tests/import-test-import-1.proto";
+import "cl-protobufs/tests/import-test-import-2.proto";
 
 message ImportTest {
   optional Import1 import1 = 1;

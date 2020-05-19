@@ -4,61 +4,44 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT.
 
-# First install the latest protobuf from github.
-#
-#  https://github.com/google/protobuf
-#
-# The steps should be something like:
-#
-#    cd /tmp
-#    git clone https://github.com/google/protobuf google-protobuf
-#    cd google-protobuf
-#    ./autogen.sh
-#    ./configure --prefix=~/local/software/package/google-protobuf
-#    make
-#    make check
-#    make install
-#
-#  Locally clone this directory
-#  In the protoc directory call make.
 
-# Directory into which the Lisp protocol buffer plugin will be installed.
-INSTALL_ROOT ?= $(HOME)/local/software/package/protoc-gen-lisp
+# This Makefile depends on the Google protobuf library.
+# See ../README.md for information on installing that.
 
-# Directory where Google's protocol buffer compiler is installed.
-PROTOC_ROOT ?= $(HOME)/local/software/package/google-protobuf
 
-PROTOC ?= $(PROTOC_ROOT)/bin/protoc
+# Directory into which the Lisp protocol buffer plugin,
+# protoc-gen-lisp, will be installed.
+INSTALL_ROOT ?= /usr/local/bin
 
-PROTOC_INCLUDE = $(PROTOC_ROOT)/include
-PROTOC_LIB = $(PROTOC_ROOT)/lib
+# Directory where Google's protocol buffer compiler is installed. This
+# should be the same directory you gave as the --prefix option to
+# ./configure when installing protobuf.
+PROTOC_ROOT ?= /usr/local
+PROTOC      ?= $(PROTOC_ROOT)/bin/protoc
 
 OFILES = enum.o field.o file.o generator.o literals.o message.o \
-	 names.o service.o main.o
+	names.o service.o proto2-descriptor-extensions.o main.o
 
-CXXFLAGS = -std=c++14 -I$(PROTOC_INCLUDE) -I.
-LIBS = -Wl,-L$(PROTOC_LIB) -Wl,-rpath -Wl,$(PROTOC_LIB) -lprotoc -lprotobuf -lpthread
+CXXFLAGS = -std=c++14 -I$(PROTOC_ROOT)/include -I.
+LIBS = -Wl,-L$(PROTOC_ROOT)/lib -Wl,-rpath -Wl,$(PROTOC_ROOT)/lib -lprotoc -lprotobuf -lpthread
 
 protoc-gen-lisp: $(OFILES) Makefile
-	$(CXX) -o main $(OFILES) $(LIBS)
+	$(CXX) $(LIBS) -o protoc-gen-lisp $(OFILES)
 
 install: protoc-gen-lisp
-	mkdir -p $(INSTALL_ROOT)/bin
-	cp protoc-gen-lisp $(INSTALL_ROOT)/bin
+	mkdir -p $(INSTALL_ROOT)
+	cp protoc-gen-lisp $(INSTALL_ROOT)/
 
 clean: .
-	rm proto2-descriptor-extensions*
-	rm -f protoc_middleman
-	rm -f $(OFILES) protoc-gen-lisp
+	rm -f $(OFILES) protoc_middleman protoc-gen-lisp
 
-# Generate the proto2 description cpp files.
+# Generate the proto2 descriptor cpp files.
 protoc_middleman: ../proto2-descriptor-extensions.proto
 	$(PROTOC) -I=.. --cpp_out=. ../proto2-descriptor-extensions.proto
 	@touch protoc_middleman
 
 proto2-descriptor-extensions.o: protoc_middleman
-	pkg-config --cflags protobuf  # fails if protobuf is not installed
-	c++ -std=c++11  proto2-descriptor-extensions.pb.cc -o proto2-descriptor-extensions `pkg-config --cflags --libs protobuf`
+	$(CXX) $(CXXFLAGS) $(LIBS) -c -o proto2-descriptor-extensions.o proto2-descriptor-extensions.pb.cc
 
 names.o: names.h
 enum.o: enum.h enum.cc protoc_middleman
@@ -68,3 +51,4 @@ message.o:  message.h enum.h
 generator.o: generator.h
 literals.o: literals.h
 file.o: file.h enum.h message.h service.h
+main.o: main.cc

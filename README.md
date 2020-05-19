@@ -318,7 +318,7 @@ Optionally use TYPE to specify the type of object to serialize.
 (defun deserialize-object (type buffer &optional (start 0) (end (length buffer))))
 ```
 Deserialize a protobuf message returning the newly created structure.
-The TYPE is the symbol naming the protobuf message to deserialize.
-The BUFFER is the byte-vector containing the data to deserialize.
+The TYPE is the symbol of the protobuf message to deserialize.
+The BUFFER is the byte-vector containing the object to deserialize.
 START is the index in byte-vector at which the serialized object originates.
 END is the last index in byte-vector of the serialized object.

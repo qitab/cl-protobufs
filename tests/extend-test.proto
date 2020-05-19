@@ -6,7 +6,7 @@
 
 syntax = "proto2";
 
-import "third_party/lisp/cl_protobufs/tests/extend-test-base.proto";
+import "cl-protobufs/tests/extend-test-base.proto";
 
 package extend_test;
 
