@@ -155,8 +155,7 @@ e.g.:
       :deserializer date-to-integer)
 |#
 
-;; todo: remove this, we already have
-;; protobuf-field
+;; todo: remove this, we already have protobuf-field
 (defstruct field-data
   "Keep field metadata for making the structure object."
   (internal-slot-name nil :type symbol)
@@ -686,7 +685,7 @@ Arguments:
         (t `(enum-default-value ',type))))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields)
-  "Makes forms for a proto message using STRUCTURE-CLASS.
+  "Makes the definition forms for the define-group and define-message macros.
 
 Arguments:
   PROTO-TYPE: The Lisp type name of the proto message.

@@ -418,7 +418,7 @@
 (defun parse-proto-option (stream protobuf &optional (terminators '(#\;)))
   "Parse a Protobufs option line from 'stream'.
    Updates the 'protobuf-schema' (or message, service, method) to have the option."
-  (check-type protobuf (or null base-protobuf))
+  (check-type protobuf (or null descriptor))
   (let* (terminator
          (key (prog1 (parse-parenthesized-token stream)
                 (expect-char stream #\= () "option")))

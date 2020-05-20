@@ -53,42 +53,52 @@ Parameters:
   "Bound to the path to use to direct output during imports, etc.")
 
 
-;;; The model classes
+;;; Descriptor classes -- These classes taken together represent the contents of a .proto file.
 
-(defclass abstract-protobuf () ())
+(defclass abstract-descriptor () ()
+  (:documentation
+   "Base class of all protobuf descriptor classes, which describe the contents of .proto files."))
+
 
 ;; It would be nice if most of the slots had only reader functions, but
-;; that makes writing the Protobufs parser a good deal more complicated.
-;; Too bad Common Lisp exports '(setf foo)' when you only want to export 'foo'
-(defclass base-protobuf (abstract-protobuf)
-  ((class :type (or null symbol)                ;the Lisp name for this object
-          :accessor proto-class                 ;this often names a type or class
+;; that makes writing the protobuf parser a good deal more complicated.
+(defclass descriptor (abstract-descriptor)
+  ;; The Lisp name for this object. For messages and groups this is the name of a struct.
+  ((class :type (or null symbol)
+          :accessor proto-class
           :initarg :class
           :initform nil)
-   (name :type (or null string)                 ;the Protobufs name for this enum, message, etc
+   ;; The (unqualified) protobuf name for this enum, message, etc
+   (name :type (or null string)
          :reader proto-name
          :initarg :name
          :initform nil)
-   (qual-name :type string                      ;the fully qualified name, e.g., "proto2.MessageSet"
+   ;; The fully qualified name, e.g., "proto2.MessageSet"
+   ;; todo: rename this to qualified-name, to match the accessor
+   (qual-name :type string
               :accessor proto-qualified-name
               :initarg :qualified-name
               :initform "")
-   (parent :type (or null base-protobuf)        ;this object's parent
+   ;; This object's parent, e.g., for nested messages or enums.
+   (parent :type (or null descriptor)
            :accessor proto-parent
            :initarg :parent)
-   (options :type (list-of protobuf-option)     ;options, mostly just passed along
+   (options :type (list-of protobuf-option)
             :accessor proto-options
             :initarg :options
             :initform ())
-   (doc :type (or null string)                  ;documentation for this object
+   ;; todo: rename to documentation, to match the accessor
+   (doc :type (or null string)
         :accessor proto-documentation
         :initarg :documentation
         :initform nil)
-   (location :accessor proto-source-location    ;a list of (pathname start-pos end-pos)
+   ;; A list of (pathname start-pos end-pos) triples.
+   ;; todo: rename to source-location, to match the accessor
+   (location :accessor proto-source-location
              :initarg :source-location
              :initform nil))
   (:documentation
-   "The base class for all Protobufs model classes."))
+   "The base class for all protobufs descriptor classes."))
 
 (defstruct proto-base
   "Base structure for protobuf meta-objects."
@@ -110,7 +120,8 @@ Parameters:
 
 
 ;; A Protobufs schema, corresponds to one .proto file
-(defclass protobuf-schema (base-protobuf)
+;; todo: rename to file-descriptor
+(defclass protobuf-schema (descriptor)
   ((syntax :type (or null string)               ;syntax, passed on but otherwise ignored
            :accessor proto-syntax
            :initarg :syntax
@@ -280,7 +291,7 @@ Parameters:
 
 ;; We accept and store any option, but only act on a few: default, packed,
 ;; optimize_for, lisp_package, lisp_name, lisp_alias
-(defclass protobuf-option (abstract-protobuf)
+(defclass protobuf-option (abstract-descriptor)
   ((name :type string                           ;the key
          :reader proto-name
          :initarg :name)
@@ -292,7 +303,7 @@ Parameters:
          :initarg :type
          :initform 'string))
   (:documentation
-   "The model class that represents a Protobufs options, i.e., a keyword/value pair."))
+   "Model class to describe a protobuf option, i.e., a keyword/value pair."))
 
 (defmethod make-load-form ((o protobuf-option) &optional environment)
   (make-load-form-saving-slots o :environment environment))
@@ -314,8 +325,8 @@ Parameters:
     returns the value of the option and its (Lisp) type. The third value is
     true if an option was found, otherwise it is false."))
 
-(defmethod find-option ((protobuf base-protobuf) (name string))
-  (let ((option (find name (proto-options protobuf) :key #'proto-name :test #'option-name=)))
+(defmethod find-option ((desc descriptor) (name string))
+  (let ((option (find name (proto-options desc) :key #'proto-name :test #'option-name=)))
     (when option
       (values (proto-value option) (proto-type option) t))))
 
@@ -324,21 +335,19 @@ Parameters:
     (when option
       (values (proto-value option) (proto-type option) t))))
 
-(defgeneric add-option (protobuf name value &optional type)
+(defgeneric add-option (descriptor name value &optional type)
   (:documentation
-   "Given a Protobufs schema, message, enum, etc
-    add the option called 'name' with the value 'value' and type 'type'.
-    If the option was previoously present, it is replaced."))
+   "Given a protobuf descriptor (schema, message, enum, etc) add the option called 'name' with the
+    value 'value' and type 'type'.  If the option was previoously present, it is replaced."))
 
-(defmethod add-option ((protobuf base-protobuf) (name string) value &optional (type 'string))
-  (let ((option (find name (proto-options protobuf) :key #'proto-name :test #'option-name=)))
+(defmethod add-option ((desc descriptor) (name string) value &optional (type 'string))
+  (let ((option (find name (proto-options desc) :key #'proto-name :test #'option-name=)))
     (if option
-      ;; This side-effects the old option
+      ;; This side-effects the old option (meaning what? it's deprecated? --cgay)
       (setf (proto-value option) value
             (proto-type option)  type)
-      ;; This side-effects 'proto-options'
-      (setf (proto-options protobuf)
-            (append (proto-options protobuf)
+      (setf (proto-options desc)
+            (append (proto-options desc)
                     (list (make-option name value type)))))))
 
 (defmethod add-option ((options list) (name string) value &optional (type 'string))
@@ -346,17 +355,16 @@ Parameters:
     (append (remove option options)
             (list (make-option name value type)))))
 
-(defgeneric remove-options (protobuf &rest names)
+(defgeneric remove-options (descriptor &rest names)
   (:documentation
-   "Given a Protobufs schema, message, enum, etc and a set of option names,
-    remove all of those options from the set of options."))
+   "Given a protobuf descriptor (schema, message, enum, etc) and a set of option names,
+    remove all of those options from the set of options in the descriptor."))
 
-(defmethod remove-options ((protobuf base-protobuf) &rest names)
-  (dolist (name names (proto-options protobuf))
-    (let ((option (find name (proto-options protobuf) :key #'proto-name :test #'option-name=)))
+(defmethod remove-options ((desc descriptor) &rest names)
+  (dolist (name names (proto-options desc))
+    (let ((option (find name (proto-options desc) :key #'proto-name :test #'option-name=)))
       (when option
-        ;; This side-effects 'proto-options'
-        (setf (proto-options protobuf) (remove option (proto-options protobuf)))))))
+        (setf (proto-options desc) (remove option (proto-options desc)))))))
 
 (defmethod remove-options ((options list) &rest names)
   (dolist (name names options)
@@ -410,7 +418,8 @@ Parameters:
 ;; a Message is not its descriptor.
 ;; This would have been far less confusing if it sounded more obviously like a 'descriptor'
 ;; and not the contents of the message per se.
-(defclass protobuf-message (base-protobuf)
+;; todo: rename to message-descriptor
+(defclass protobuf-message (descriptor)
   ((conc :type (or null string)                 ;the conc-name used for Lisp accessors
          :accessor proto-conc-name
          :initarg :conc-name
@@ -546,9 +555,9 @@ in the hash-table indicated by TYPE."
 (defconstant $empty-list    'empty-list)
 (defconstant $empty-vector  'empty-vector)
 
-;; A Protobufs field within a message
+;; Describes a field within a protobuf message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
-(defclass protobuf-field (base-protobuf)
+(defclass protobuf-field (descriptor)
   ((type :type string                           ; The name of the Protobuf type for the field
          :accessor proto-type
          :initarg :type)
@@ -663,7 +672,7 @@ in the hash-table indicated by TYPE."
 
 
 ;; An extension range within a message
-(defclass protobuf-extension (abstract-protobuf)
+(defclass protobuf-extension (abstract-descriptor)
   ((from :type (integer 1 #.(1- (ash 1 29)))    ;the index number for this field
          :accessor proto-extension-from
          :initarg :from)
@@ -691,14 +700,13 @@ in the hash-table indicated by TYPE."
             (proto-extension-from e) (proto-extension-to e))))
 
 
-;; A Protobufs service
-(defclass protobuf-service (base-protobuf)
-  ((methods :type (list-of protobuf-method)     ;the methods in the service
+;; todo: rename to service-descriptor
+(defclass protobuf-service (descriptor)
+  ((methods :type (list-of protobuf-method)
             :accessor proto-methods
             :initarg :methods
             :initform ()))
-  (:documentation
-   "The model class that represents a Protobufs service."))
+  (:documentation "Model class to describe a protobuf service."))
 
 (defmethod make-load-form ((s protobuf-service) &optional environment)
   (make-load-form-saving-slots s :environment environment))
@@ -724,8 +732,7 @@ in the hash-table indicated by TYPE."
   (find index (proto-methods service) :key #'proto-index))
 
 
-;; A Protobufs method within a service
-(defclass protobuf-method (base-protobuf)
+(defclass protobuf-method (descriptor)
   ((client-fn :type symbol                      ;the Lisp name of the client stb
               :accessor proto-client-stub
               :initarg :client-stub)
@@ -766,7 +773,7 @@ in the hash-table indicated by TYPE."
           :accessor proto-index                 ; (used by the RPC implementation)
           :initarg :index))
   (:documentation
-   "The model class that represents one method with a Protobufs service."))
+   "Model class to describe one method in a protobuf service."))
 
 (defmethod make-load-form ((m protobuf-method) &optional environment)
   (make-load-form-saving-slots m :environment environment))
@@ -783,20 +790,19 @@ in the hash-table indicated by TYPE."
 
 ;;; Lisp-only extensions
 
-;; A Protobufs message
-(defclass protobuf-type-alias (base-protobuf)
-  ((lisp-type :reader proto-lisp-type           ;a Lisp type specifier
+(defclass protobuf-type-alias (descriptor)
+  ((lisp-type :reader proto-lisp-type   ; a Lisp type specifier
               :initarg :lisp-type)
-   (proto-type :reader proto-proto-type         ;a .proto type specifier
+   (proto-type :reader proto-proto-type ; a .proto type specifier
                :initarg :proto-type)
    (proto-type-str :reader proto-proto-type-str
-               :initarg :proto-type-str)
-   (serializer :reader proto-serializer         ;Lisp -> Protobufs conversion function
+                   :initarg :proto-type-str)
+   (serializer :reader proto-serializer ; Lisp -> bytes conversion function
                :initarg :serializer)
-   (deserializer :reader proto-deserializer     ;Protobufs -> Lisp conversion function
+   (deserializer :reader proto-deserializer ; bytes -> Lisp conversion function
                  :initarg :deserializer))
   (:documentation
-   "The model class that represents a Protobufs type alias."))
+   "Model class to describe a protobuf type alias."))
 
 (defmethod make-load-form ((m protobuf-type-alias) &optional environment)
   (make-load-form-saving-slots m :environment environment))

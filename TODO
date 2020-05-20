@@ -69,7 +69,7 @@ TO DO
 [- Handle 'extension' and 'extends'						]
 [  - 'define-extension' just declares the extension within a message		]
 [      and adds it to 'proto-extensions' for the message			]
-[  - Easiest is to add an "extension-p" flag to 'protobuf-message'		]
+[  - Easiest is to add an "extension-p" flag to 'message-descriptor'		]
 [  - Define new 'define-extends' macro						]
 [      which *copies* all slots from the message being extended,		]
 [      then just adds the extension fields as (flagged) ordinary fields		]

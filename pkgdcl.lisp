@@ -134,8 +134,8 @@
 
   (:export
    ;; Model class protocol
-   #:abstract-protobuf
-   #:base-protobuf
+   #:abstract-descriptor
+   #:descriptor
    #:proto-alias-for
    #:proto-class
    #:proto-client-stub
