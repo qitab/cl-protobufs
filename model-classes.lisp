@@ -213,6 +213,11 @@ class metaobject. If there is an 'extends' instance this will
 be the last (largest) defined extended version of the protobuf-message
 meta-object.")
 
+(defvar *qualified-messages* (make-hash-table :test 'equal)
+  "Map from the qualified-name to the protobuf-message
+class symbol.
+For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message.")
+
 (declaim (inline find-message))
 (defun find-message (type)
   "Return the protobuf-message instance either named by TYPE (a symbol)
@@ -221,6 +226,14 @@ or thats named by the class-name of TYPE."
                (class-name type)
                type)
            *messages*))
+
+(declaim (inline find-message))
+(defun find-message-by-qualified-name (qualified-name)
+  "Return the protobuf-message symbol named by qualified-name.
+   Parameters:
+     QUALIFIED-NAME: The qualified name of a protobuf message.
+       For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message."
+  (gethash qualified-name *qualified-messages*))
 
 ;; Do not use in production at run time.
 (defun find-message-with-string (message name)
@@ -449,7 +462,11 @@ in the hash-table indicated by TYPE."
   ;; No need to record an extension, it's already been recorded
   (ecase type
     (:enum (setf (gethash symbol *enums*) message))
-    (:message (setf (gethash symbol *messages*) message))
+    (:message
+     (setf (gethash symbol *messages*) message)
+     (when (and (slot-boundp message 'qual-name) (proto-qualified-name message))
+       (setf (gethash (proto-qualified-name message) *qualified-messages*)
+             (proto-class message))))
     (:alias (setf (gethash symbol *type-aliases*) message))))
 
 (defmethod print-object ((m protobuf-message) stream)

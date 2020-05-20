@@ -220,6 +220,29 @@ Object is the object which may have field defined.
 Clear the value of FIELD in OBJECT, setting it to the fields init state.
 Object is the lisp proto object.
 
+### Well Known Types
+
+In well-known-type.lisp we implement the handling for several
+protobuf well known types.
+
+A list of all well known types can be found:
+https://developers.google.com/protocol-buffers/docs/reference/google.protobuf
+
+
+```lisp
+(defun unpack-any (any-message))
+```
+Takes an Any protobuf message any-message and turns it into the stored protobuf
+message as long as the qualified-name given in the type-url corresponds to a
+loaded message type.
+The type-url must be of the form base-url/qualified-name.
+
+```lisp
+(defun pack-any (message &key (base-url "type.googleapis.com"))
+```
+Creates an any message protobuf message given a protobuf message
+and a base-url.
+
 ### Proto package-rpc2
 
 We will now discuss the api for  a protobuf service in a proto file.

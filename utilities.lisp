@@ -470,6 +470,29 @@ ADJUSTABLE."
     name))
 
 
+;; "foo.bar.Baz" -> 'FOO.BAR::BAZ
+;; "foo_bar.bar.Baz" -> 'FOO-BAR.BAR::BAZ
+(defun proto-to-class (proto-name &key (add-cl-protobufs t))
+  "Turn a proto name into a lisp structure class name.
+Parameters:
+  PROTO-NAME: A proto name will have a package seperated with '.', all
+    in lower case. The class name will be uppercase first, possibility
+    with '.'.
+  ADD-CL-PROTOBUFS: If true prepend 'CL-PROTOBUFS.' to the expected package
+    name found in proto name."
+  (let* ((first-upcase-position
+          (position-if #'upper-case-p proto-name))
+         (name
+          (subseq proto-name first-upcase-position))
+         (package
+          (substitute
+           #\- #\_
+           (string-upcase (subseq proto-name 0
+                                  (1- first-upcase-position))))))
+    (when add-cl-protobufs
+      (setf package (concatenate 'string "CL-PROTOBUFS." package)))
+    (proto-impl::proto->class-name name package)))
+
 ;; "ClassName" -> 'class-name
 ;; "cl-user.ClassName" -> 'cl-user::class-name
 ;; "cl-user.OuterClass.InnerClass" -> 'cl-user::outer-class.inner-class
