@@ -319,6 +319,6 @@ Optionally use TYPE to specify the type of object to serialize.
 ```
 Deserialize a protobuf message returning the newly created structure.
 The TYPE is the symbol naming the protobuf message to deserialize.
-The BUFFER is the byte-vector containing the object to deserialize.
+The BUFFER is the byte-vector containing the data to deserialize.
 START is the index in byte-vector at which the serialized object originates.
 END is the last index in byte-vector of the serialized object.
