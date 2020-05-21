@@ -22,8 +22,9 @@ Arguments
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-(defparameter $optimize-default     '(optimize (speed 1) (safety 3) (debug 3))
+(defparameter $optimize-default '(optimize (speed 1) (safety 3) (debug 3))
   "Compiler optimization settings for safe, debuggable code.")
+
 (defparameter $optimize-fast-unsafe '(optimize (speed 3) (safety 0) (debug 0))
   "Compiler optimization settings for fast, unsafe, hard-to-debug code.")
 
@@ -82,17 +83,19 @@ Arguments
 
 ;;; String utilities
 
-(defun starts-with (string prefix &key (start 0))
-  "Returns true if STRING matches PREFIX starting at index START (case insensitive)."
-  (and (i>= (length string) (i+ start (length prefix)))
-       (string-equal string prefix :start1 start :end1 (i+ start (length prefix)))
+(defun starts-with (string prefix)
+  "Returns true if STRING matches PREFIX (case insensitive)."
+  (and (i>= (length string) (length prefix))
+       (string-equal string prefix :end1 (length prefix))
        prefix))
 
-(defun ends-with (string suffix &key (end (length string)))
-  "Returns true if STRING matches SUFFIX ending at index END (case insensitive)."
-  (and (i>= end (length suffix))
-       (string-equal string suffix :start1 (i- end (length suffix)) :end1 end)
-       suffix))
+(defun ends-with (string suffix)
+  "Returns true if STRING matches SUFFIX (case insensitive)."
+  (let ((string-len (length string))
+        (suffix-len (length suffix)))
+    (and (i>= string-len suffix-len)
+         (string-equal string suffix :start1 (i- string-len suffix-len))
+         suffix)))
 
 (defun strcat (&rest strings)
   "Return the concatenation of STRINGS. If no arguments are passed, the empty string is returned."
@@ -235,16 +238,6 @@ Arguments
     (intern (format nil "~{~A~^.~}" symbols)
             (symbol-package (first symbols)))))
 
-(defun split-qualified-symbol-name (symbol)
-  "Given a SYMBOL named PKG::SYMBOL1.SYMBOL2....SYMBOLN, return a list of symbols
-   (PKG::SYMBOL1.SYMBOL2... PKG::SYMBOLN) splitting on the last dot (#\.) in the symbol name."
-  (let* ((symbol-string (string symbol))
-         (pkg (symbol-package symbol))
-         (symbol-strings (split-last symbol-string)))
-    (mapcar (lambda (string)
-              (intern string pkg))
-            symbol-strings)))
-
 ;;; Collectors, etc
 
 (defun proto-slot-function-name (proto-type slot function-type)
@@ -335,29 +328,6 @@ Arguments:
 (defmacro appendf (place tail)
   "Append TAIL to the list given by PLACE, then set the PLACE to the new list."
   `(setf ,place (append ,place ,tail)))
-
-
-;;; Functional programming, please
-
-(defun curry (function &rest args)
-  "Returns a function that applies FUNCTION to ARGS, plus any
-   additional arguments given at the call site."
-  (if (and args (null (cdr args)))                      ;fast test for length = 1
-    (let ((arg (car args)))
-      #'(lambda (&rest more-args)
-          (apply function arg more-args)))
-    #'(lambda (&rest more-args)
-        (apply function (append args more-args)))))
-
-(define-compiler-macro curry (&whole form function &rest args &environment env)
-  (declare (ignore env))
-  (if (and (listp function)
-           (eq (first function) 'function)
-           (symbolp (second function))
-           (and args (null (cdr args))))
-    `#'(lambda (&rest more-args)
-         (apply ,function ,(car args) more-args))
-    form))
 
 
 ;;; Types
