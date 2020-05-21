@@ -38,10 +38,10 @@
 
 ;;; Pretty print a schema as a .proto file
 
-(defmethod write-schema-as ((type (eql :proto)) (schema protobuf-schema) stream
+(defmethod write-schema-as ((type (eql :proto)) (file-desc file-descriptor) stream
                             &key (indentation 0))
   (with-prefixed-accessors (documentation syntax package imports lisp-package options)
-      (proto- schema)
+      (proto- file-desc)
     (when documentation
       (write-schema-documentation type documentation stream :indentation indentation))
     (when syntax
@@ -52,20 +52,20 @@
       (dolist (import imports)
         (format stream "~&import \"~A\";~%" import))
       (terpri stream))
-    (write-schema-header type schema stream)
+    (write-schema-header type file-desc stream)
     (when lisp-package
       (format stream "~&option (lisp_package) = \"~A\";~%~%" lisp-package))
     (when options
       (dolist (option options)
         (format stream "~&option ~:/protobuf-option/;~%" option))
       (terpri stream))
-    (loop for (enum . more) on (proto-enums schema) doing
+    (loop for (enum . more) on (proto-enums file-desc) doing
       (write-schema-as type enum stream :indentation indentation :more more)
       (terpri stream))
-    (loop for (alias . more) on (proto-type-aliases schema) doing
+    (loop for (alias . more) on (proto-type-aliases file-desc) doing
       (write-schema-as type alias stream :indentation indentation :more more)
       (terpri stream))
-    (loop for (svc . more) on (proto-services schema) doing
+    (loop for (svc . more) on (proto-services file-desc) doing
       (write-schema-as type svc stream :indentation indentation :more more)
       (terpri stream))))
 
@@ -107,25 +107,25 @@
                                ("py_api_version"       integer)
                                ("py_generic_services"   symbol)))
 
-(defmethod write-schema-header ((type (eql :proto)) (schema protobuf-schema) stream)
-  (when (any-lisp-option schema)
+(defmethod write-schema-header ((type (eql :proto)) (file-desc file-descriptor) stream)
+  (when (any-lisp-option file-desc)
     (format stream
             "~&import \"third_party/lisp/cl_protobufs/proto2-descriptor-extensions.proto\";~%~%")))
 
-(defgeneric any-lisp-option (schema)
+(defgeneric any-lisp-option (desc)
   (:documentation
-   "Returns true iff there is anything in the schema that would require that
+   "Returns true iff there is anything in the descriptor that would require that
     the .proto file include and extend 'MessageOptions'.")
-  (:method ((schema protobuf-schema))
+  (:method ((file-desc file-descriptor))
     (labels ((find-one (protobuf)
                (dolist (enum (proto-enums protobuf))
                  (with-prefixed-accessors (name class alias-for) (proto- enum)
                    (when (or alias-for
                              (and class (not (string-equal name (class-name->proto class))) class))
                      (return-from any-lisp-option t))))))
-      (if (proto-lisp-package schema)
+      (if (proto-lisp-package file-desc)
           t
-          (find-one schema)))))
+          (find-one file-desc)))))
 
 (defun cl-user::protobuf-option (stream option colon-p atsign-p)
   (let* ((type (or (second (find (proto-name option) *option-types* :key #'first :test #'string=))
@@ -438,18 +438,19 @@
           (or always-emit-in-package-p exports) package-name
           exports))
 
-(defmethod write-schema-as ((type (eql :lisp)) (schema protobuf-schema) stream
+(defmethod write-schema-as ((type (eql :lisp)) (file-desc file-descriptor) stream
                             &key (indentation 0)
                                  (show-field-indexes *show-lisp-field-indexes*)
                                  (show-enum-indexes *show-lisp-enum-indexes*)
                                  (use-common-lisp *use-common-lisp-package*))
-  (with-prefixed-accessors (name class documentation package lisp-package imports) (proto- schema)
-    (let* ((optimize (let ((opt (find-option schema "optimize_for")))
+  (with-prefixed-accessors (name class documentation package lisp-package imports)
+      (proto- file-desc)
+    (let* ((optimize (let ((opt (find-option file-desc "optimize_for")))
                        (cond ((null opt) nil)
                              ((string= opt "SPEED") :speed)
                              ((string= opt "CODE_SIZE") :space))))
            (options  (remove-if #'(lambda (x) (string= (proto-name x) "optimize_for"))
-                                (proto-options schema)))
+                                (proto-options file-desc)))
            (pkg      (and package (string package)))
            (lisp-pkg (and lisp-package (string lisp-package)))
            (canonical-pkg (or lisp-pkg pkg))
@@ -470,7 +471,7 @@
            (*package* (or *protobuf-package*
                           (when *use-common-lisp-package* (find-package :common-lisp))
                           (find-package :keyword)))
-           (exports (collect-exports schema)))
+           (exports (collect-exports file-desc)))
       (when rpc-pkg
         (let* ((pkg (string-upcase rpc-pkg))
                (rpc-exports (remove-if-not
@@ -484,7 +485,7 @@
                               (find-package :keyword))))
           (when rpc-exports
             (write-defpackage-form stream pkg rpc-exports))))
-      (dolist (alias-package (proto-alias-packages schema))
+      (dolist (alias-package (proto-alias-packages file-desc))
         (write-defpackage-form stream (package-name alias-package) nil))
       (when canonical-pkg
         (let ((pkg (string-upcase canonical-pkg)))
@@ -534,11 +535,11 @@
         (when documentation
           (format stream "~A:documentation ~S" spaces documentation)))
       (format stream ")")
-      (loop for (enum . more) on (proto-enums schema) doing
+      (loop for (enum . more) on (proto-enums file-desc) doing
         (write-schema-as type enum stream :indentation 2 :more more))
-      (loop for (alias . more) on (proto-type-aliases schema) doing
+      (loop for (alias . more) on (proto-type-aliases file-desc) doing
         (write-schema-as type alias stream :indentation 2 :more more))
-      (loop for (svc . more) on (proto-services schema) doing
+      (loop for (svc . more) on (proto-services file-desc) doing
         (write-schema-as type svc stream :indentation 2 :more more)))
     (format stream ")~%")))
 
@@ -549,7 +550,7 @@
       (format stream "~&~@[~VT~];; ~A~%"
               (and (not (zerop indentation)) indentation) line))))
 
-(defmethod write-schema-header ((type (eql :lisp)) (schema protobuf-schema) stream)
+(defmethod write-schema-header ((type (eql :lisp)) (file-desc file-descriptor) stream)
   (declare (ignorable type stream))
   nil)
 
@@ -849,15 +850,15 @@
 
 ;;; Collect symbols to be exported
 
-(defgeneric collect-exports (schema)
+(defgeneric collect-exports (descriptor)
   (:documentation
-   "Collect all the symbols that should be exported from a Protobufs package"))
+   "Collect all the symbols that should be exported from a protobuf package."))
 
-(defmethod collect-exports ((schema protobuf-schema))
+(defmethod collect-exports ((file-desc file-descriptor))
   (delete-duplicates
    (delete-if #'null
-    (append (mapcan #'collect-exports (proto-enums schema))
-            (mapcan #'collect-exports (proto-services schema))))
+              (append (mapcan #'collect-exports (proto-enums file-desc))
+                      (mapcan #'collect-exports (proto-services file-desc))))
    :from-end t))
 
 ;; Export just the type name

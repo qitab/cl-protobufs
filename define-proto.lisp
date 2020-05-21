@@ -197,7 +197,7 @@ e.g.:
                     "optimize_for" "lisp_package"))
          (imports  (if (listp import) import (list import)))
          (schema   (make-instance
-                    'protobuf-schema
+                    'file-descriptor
                     :class    type
                     :name     name
                     :syntax   (or syntax "proto2")

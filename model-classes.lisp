@@ -6,14 +6,15 @@
 
 (in-package "PROTO-IMPL")
 
+;;; Classes to represent the objects in a .proto file.
 
-;;; Protocol buffers model classes
 
 (defvar *all-schemas* (make-hash-table :test #'equal)
-  "A global table mapping names to 'protobuf-schema' objects.")
+  "A global table mapping names to file-descriptor objects.")
 
+;; todo: this should be find-file-descriptor now
 (defun find-schema (name)
-  "Find a protobuf-schema for the given name. Returns nil if non exist.
+  "Find a file-descriptor for the given name. Returns nil if not found.
 Parameters:
   NAME: A string, symbol, or pathname."
   (values (gethash name *all-schemas*)))
@@ -120,8 +121,7 @@ Parameters:
 
 
 ;; A Protobufs schema, corresponds to one .proto file
-;; todo: rename to file-descriptor
-(defclass protobuf-schema (descriptor)
+(defclass file-descriptor (descriptor)
   ((syntax :type (or null string)               ;syntax, passed on but otherwise ignored
            :accessor proto-syntax
            :initarg :syntax
@@ -137,35 +137,36 @@ Parameters:
    ;; LISP-PKG may be NIL when it's not specified or may not be a valid package name if that package
    ;; is not found.  In that case, the current package is used instead.  REAL-LISP-PKG stores the
    ;; package that's actually used.
-   (real-lisp-pkg :type (or null package)       ;actual lisp package
+   (real-lisp-pkg :type (or null package) ; actual lisp package
                   :accessor proto-real-lisp-package
                   :initarg :real-lisp-package
                   :initform nil)
-   (alias-packages :type list                   ;list of (non-proto) packages forward referenced
-                                                ;by aliases in this schema
-               :accessor proto-alias-packages
-               :initform nil)
-   (imports :type (list-of string)              ;the names of schemas to be imported
+   (alias-packages :type list           ; list of (non-proto) packages forward referenced
+                                        ; by aliases in this schema
+                   :accessor proto-alias-packages
+                   :initform nil)
+   (imports :type (list-of string)      ; the names of schemas to be imported
             :accessor proto-imports
             :initarg :imports
             :initform ())
-   (schemas :type (list-of protobuf-schema)     ;the schemas that were successfully imported
-            :accessor proto-imported-schemas    ;this gets used for chasing namespaces
+   ;; todo: rename to imported-files or just imports?
+   (schemas :type (list-of file-descriptor)  ; the schemas that were successfully imported
+            :accessor proto-imported-schemas ; this gets used for chasing namespaces
             :initform ())
    (services :type (list-of protobuf-service)
              :accessor proto-services
              :initarg :services
              :initform ()))
   (:documentation
-   "The model class that represents a Protobufs schema, i.e., one .proto file."))
+   "Model class to describe a protobuf file."))
 
-(defmethod make-load-form ((s protobuf-schema) &optional environment)
-  (with-slots (class) s
+(defmethod make-load-form ((file-desc file-descriptor) &optional environment)
+  (with-slots (class) file-desc
     (multiple-value-bind (constructor initializer)
-        (make-load-form-saving-slots s :environment environment)
+        (make-load-form-saving-slots file-desc :environment environment)
       (values `(or (gethash ',class *all-schemas*) ,constructor)
               `(unless (gethash ',class *all-schemas*)
-                 (record-schema ,s :symbol ',class)
+                 (record-schema ,file-desc :symbol ',class)
                  ,initializer)))))
 
 (defun record-schema (schema &key symbol)
@@ -182,31 +183,34 @@ Parameters:
                ;; was previously recorded. Remap that pathname onto this schema.
                (block nil
                  (maphash (lambda (key existing-schema)
-                            (when (and (pathnamep key) (eq (proto-class existing-schema) symbol))
+                            (when (and (pathnamep key)
+                                       (eq (proto-class existing-schema) symbol))
                               (return key)))
                           *all-schemas*)))))
       (when pathname
         ;; Record the file from which the Protobufs schema came
         (setf (gethash pathname *all-schemas*) schema)))))
 
-(defmethod print-object ((s protobuf-schema) stream)
+(defmethod print-object ((file-desc file-descriptor) stream)
   (if *print-escape*
-    (print-unreadable-object (s stream :type t :identity t)
-      (format stream "~@[~S~]~@[ (package ~A)~]"
-              (and (slot-boundp s 'class) (proto-class s)) (proto-package s)))
-    (format stream "~S" (and (slot-boundp s 'class) (proto-class s)))))
+      (print-unreadable-object (file-desc stream :type t :identity t)
+        (format stream "~@[~S~]~@[ (package ~A)~]"
+                (and (slot-boundp file-desc 'class)
+                     (proto-class file-desc))
+                (proto-package file-desc)))
+      (format stream "~S" (and (slot-boundp file-desc 'class)
+                               (proto-class file-desc)))))
 
 (defgeneric make-qualified-name (proto name)
   (:documentation
    "Give a schema or message and a name,
     generate a fully qualified name string for the name."))
 
-(defmethod make-qualified-name ((schema protobuf-schema) name)
-  ;; If we're at the schema, the qualified name is the schema's
-  ;; package "dot" the name
-  (if (proto-package schema)
-    (strcat (proto-package schema) "." name)
-    name))
+(defmethod make-qualified-name ((file-desc file-descriptor) name)
+  ;; If we're at the file level, the qualified name is the file's package "dot" the name.
+  (if (proto-package file-desc)
+      (strcat (proto-package file-desc) "." name)
+      name))
 
 ;; find-* functions for finding different proto meta-objects
 
@@ -276,11 +280,11 @@ Parameters:
   (:documentation
    "Given a Protobufs schema,returns the Protobufs service of the given name."))
 
-(defmethod find-service ((schema protobuf-schema) (name symbol))
-  (find name (proto-services schema) :key #'proto-class))
+(defmethod find-service ((file-desc file-descriptor) (name symbol))
+  (find name (proto-services file-desc) :key #'proto-class))
 
-(defmethod find-service ((schema protobuf-schema) (name string))
-  (find-qualified-name name (proto-services schema)))
+(defmethod find-service ((file-desc file-descriptor) (name string))
+  (find-qualified-name name (proto-services file-desc)))
 
 ;; Convenience function that accepts a schema name
 (defmethod find-service (schema-name name)

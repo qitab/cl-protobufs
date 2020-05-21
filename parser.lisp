@@ -13,6 +13,10 @@
 
 ;;; .proto file parsing
 
+;; Note: In May 2020 we switched from "schema" and "model" terminology to "descriptor" because
+;; that's what other languages call the internal representation of a parsed .proto file. There may
+;; be some references to the old terms that remain for a while.
+
 ;;; Parsing utilities
 
 (declaim (inline proto-whitespace-char-p))
@@ -296,10 +300,10 @@
        (%make-source-location :pathname *protobuf-pathname*
                               :start-pos start :end-pos end)))
 
-(defgeneric resolve-lisp-names (protobuf)
+(defgeneric resolve-lisp-names (descriptor)
   (:documentation
    "Second pass of schema parsing which recursively resolves Protobuf type names
-    to Lisp type names in all messages and services contained within 'protobuf'.
+    to Lisp type names in all messages and services contained within 'descriptor'.
     No return value."))
 
 ;; The syntax for Protocol Buffers is so simple that it doesn't seem worth
@@ -308,10 +312,10 @@
 (defun parse-schema-from-stream (stream &key name class (conc-name ""))
   "Parses a top-level .proto file from the stream 'stream'.
    Returns the protobuf schema that describes the .proto file."
-  (let* ((schema (make-instance 'protobuf-schema
-                   :class class
-                   :name  name))
-         (*protobuf* schema)
+  (let* ((file-desc (make-instance 'file-descriptor
+                                   :class class
+                                   :name  name))
+         (*protobuf* file-desc)
          *protobuf-package*
          *protobuf-rpc-package*
          (*protobuf-conc-name* conc-name))
@@ -320,9 +324,9 @@
                 * java_package
                 * *package*"
                (unless *protobuf-package*
-                 (let ((java-package (find-option schema "java_package")))
+                 (let ((java-package (find-option file-desc "java_package")))
                    (if java-package
-                       (set-lisp-package schema java-package)
+                       (set-lisp-package file-desc java-package)
                        (setq *protobuf-package* *package*)))))
              (ensure-rpc-package ()
                (ensure-package)
@@ -336,89 +340,91 @@
         (maybe-skip-comments stream)
         (let ((char (peek-char nil stream nil)))
           (cond ((null char)
-                 (remove-options schema "lisp_package")
-                 (resolve-lisp-names schema)
-                 (return-from parse-schema-from-stream schema))
+                 (remove-options file-desc "lisp_package")
+                 (resolve-lisp-names file-desc)
+                 (return-from parse-schema-from-stream file-desc))
                 ((proto-token-char-p char)
                  (let ((token (parse-token stream)))
                    (cond ((string= token "syntax")
-                          (parse-proto-syntax stream schema))
+                          (parse-proto-syntax stream file-desc))
                          ((string= token "package")
-                          (parse-proto-package stream schema))
+                          (parse-proto-package stream file-desc))
                          ((string= token "import")
-                          (parse-proto-import stream schema))
+                          (parse-proto-import stream file-desc))
                          ((string= token "option")
-                          (let* ((option (parse-proto-option stream schema))
+                          (let* ((option (parse-proto-option stream file-desc))
                                  (name   (and option (proto-name option)))
                                  (value  (and option (proto-value option))))
                             (when (and option (option-name= name "lisp_package"))
-                              (set-lisp-package schema value))))
+                              (set-lisp-package file-desc value))))
                          ((string= token "enum")
                           (ensure-package)
-                          (parse-proto-enum stream schema))
+                          (parse-proto-enum stream file-desc))
                          ((string= token "extend")
                           (ensure-package)
-                          (parse-proto-extend stream schema))
+                          (parse-proto-extend stream file-desc))
                          ((string= token "message")
                           (ensure-package)
-                          (parse-proto-message stream schema))
+                          (parse-proto-message stream file-desc))
                          ((string= token "service")
                           (ensure-rpc-package)
-                          (parse-proto-service stream schema)))))
+                          (parse-proto-service stream file-desc)))))
                 (t
                  (error "Syntax error at position ~D" (file-position stream)))))))))
 
-(defun set-lisp-package (schema lisp-package-name)
-  "Set the package for generated lisp names of 'schema'."
-  (check-type schema protobuf-schema)
+(defun set-lisp-package (file-desc lisp-package-name)
+  "Set the package for generated lisp names of FILE-DESC to LISP-PACKAGE-NAME."
+  (check-type file-desc file-descriptor)
   (check-type lisp-package-name string)
   (let ((package (or (find-proto-package lisp-package-name)
                      ;; Try to put symbols into the right package
                      (make-package (string-upcase lisp-package-name) :use ())
                      *protobuf-package*)))
-    (setf (proto-lisp-package schema) lisp-package-name)
+    (setf (proto-lisp-package file-desc) lisp-package-name)
     (setq *protobuf-package* package)))
 
-(defmethod resolve-lisp-names ((schema protobuf-schema))
-  "Recursively resolves Protobuf type names to Lisp type names in the messages and services in 'schema'."
-  (map () #'resolve-lisp-names (proto-services schema)))
+(defmethod resolve-lisp-names ((file-desc file-descriptor))
+  "Recursively resolves protobuf type names to Lisp type names in the messages and services in
+   FILE-DESC."
+  (map () #'resolve-lisp-names (proto-services file-desc)))
 
-(defun parse-proto-syntax (stream schema &optional (terminator #\;))
-  "Parse a Protobufs syntax line from 'stream'.
-   Updates the 'protobuf-schema' object to use the syntax."
+(defun parse-proto-syntax (stream file-desc &optional (terminator #\;))
+  "Parse a protobuf syntax line from STREAM. Stores the parsed syntax in FILE-DESC.
+   TERMINATOR is the character that is expected to terminate the syntax statement."
   (let ((syntax (prog2 (expect-char stream #\= () "syntax")
                     (parse-string stream)
                   (expect-char stream terminator () "syntax")
                   (maybe-skip-comments stream))))
-    (setf (proto-syntax schema) syntax)))
+    (setf (proto-syntax file-desc) syntax)))
 
-(defun parse-proto-package (stream schema &optional (terminator #\;))
-  "Parse a Protobufs package line from 'stream'.
-   Updates the 'protobuf-schema' object to use the package."
-  (check-type schema protobuf-schema)
+(defun parse-proto-package (stream file-desc &optional (terminator #\;))
+  "Parse a protobuf package line from STREAM and stores it in FILE-DESC.
+   TERMINATOR is the character that is expected to terminate the package statement."
+  (check-type file-desc file-descriptor)
   (let* ((package  (prog1 (parse-token stream)
                      (expect-char stream terminator () "package")
                      (maybe-skip-comments stream)))
-         (lisp-pkg (or (proto-lisp-package schema)
+         (lisp-pkg (or (proto-lisp-package file-desc)
                        (substitute #\- #\_ package))))
-    (setf (proto-package schema) package)
-    (unless (proto-lisp-package schema)
-      (set-lisp-package schema lisp-pkg))))
+    (setf (proto-package file-desc) package)
+    (unless (proto-lisp-package file-desc)
+      (set-lisp-package file-desc lisp-pkg))))
 
-(defun parse-proto-import (stream schema &optional (terminator #\;))
-  "Parse a Protobufs import line from 'stream'.
-   Updates the 'protobuf-schema' object to use the import."
-  (check-type schema protobuf-schema)
+(defun parse-proto-import (stream file-desc &optional (terminator #\;))
+  "Parse a protobuf import line from STREAM and store it in FILE-DESC.
+   TERMINATOR is the character that is expected to terminate the syntax statement."
+  (check-type file-desc file-descriptor)
   (let ((import (prog1 (parse-string stream)
                   (expect-char stream terminator () "import")
                   (maybe-skip-comments stream))))
-    (process-imports schema (list import))
-    (appendf (proto-imports schema) (list import))))
+    (process-imports file-desc (list import))
+    (appendf (proto-imports file-desc) (list import))))
 
-(defun parse-proto-option (stream protobuf &optional (terminators '(#\;)))
-  "Parse a Protobufs option line from 'stream'.
-   Updates the 'protobuf-schema' (or message, service, method) to have the option."
-  (check-type protobuf (or null descriptor))
+(defun parse-proto-option (stream desc &optional (terminators '(#\;)))
+  "Parse a protobuf option line from STREAM and stores it in DESC, which is a file-, message-,
+   service-, or method-descriptor. TERMINATORS is a list of characters that may terminate the
+   option. If DESC is nil, the option is just returned."
+  (check-type desc (or null descriptor))
   (let* (terminator
          (key (prog1 (parse-parenthesized-token stream)
                 (expect-char stream #\= () "option")))
@@ -443,8 +449,8 @@
                 (setq terminator (expect-char stream terminators () "option"))
                 (maybe-skip-comments stream)))
          (option (make-option key val)))
-    (cond (protobuf
-           (appendf (proto-options protobuf) (list option))
+    (cond (desc
+           (appendf (proto-options desc) (list option))
            (values option terminator))
           (t
            ;; If nothing to graft the option into, just return it as the value
@@ -454,18 +460,18 @@
   (:documentation
    "Add SYMBOL's package to protobuf's schema's alias-packages"))
 
-(defmethod add-alias-package-to-schema ((schema protobuf-schema) symbol)
+(defmethod add-alias-package-to-schema ((file-desc file-descriptor) symbol)
   (let* ((package (symbol-package symbol)))
-    (pushnew package (proto-alias-packages schema)))
+    (pushnew package (proto-alias-packages file-desc)))
   (values))
 
 (defmethod add-alias-package-to-schema ((protobuf protobuf-message) symbol)
   (add-alias-package-to-schema (proto-parent protobuf) symbol))
 
-(defun parse-proto-enum (stream protobuf)
-  "Parse a Protobufs 'enum' from 'stream'.
-   Updates the 'protobuf-schema' or 'protobuf-message' object to have the enum."
-  (check-type protobuf (or protobuf-schema protobuf-message))
+(defun parse-proto-enum (stream desc)
+  "Parse a protobuf enum from STREAM and store it in DESC, which may be a file-descriptor or
+   message-descriptor."
+  (check-type desc (or file-descriptor protobuf-message))
   (let* ((loc  (file-position stream))
          (name (prog1 (parse-token stream)
                  (expect-char stream #\{ () "enum")
@@ -475,15 +481,15 @@
          ;; An enum type may also be declared in one message as the type of a field in a different
          ;; message, using the syntax MessageType.EnumType.
          ;; In cl-protobufs, such an enum type is named as message-type.enum-type
-         (class (if (typep protobuf 'protobuf-message)
-                    (join-intern (proto-class protobuf) enum-name)
-                    ;; For an enum defined directly inside a schema, just use the enum name.
+         (class (if (typep desc 'protobuf-message)
+                    (join-intern (proto-class desc) enum-name)
+                    ;; For an enum defined at top-level, just use the enum name.
                     enum-name))
          (enum (make-instance 'protobuf-enum
                  :class class
                  :name name
-                 :qualified-name (make-qualified-name protobuf name)
-                 :parent protobuf
+                 :qualified-name (make-qualified-name desc name)
+                 :parent desc
                  :source-location (make-source-location stream loc (i+ loc (length name))))))
     (loop
       (let ((name (parse-token stream)))
@@ -500,16 +506,16 @@
             (when alias
               (let* ((symbol (make-lisp-symbol alias)))
                 (setf (proto-alias-for enum) symbol)
-                (add-alias-package-to-schema protobuf symbol))))
+                (add-alias-package-to-schema desc symbol))))
           (return-from parse-proto-enum enum))
         (if (string= name "option")
           (parse-proto-option stream enum)
-          (parse-proto-enum-value stream protobuf enum name))))))
+          (parse-proto-enum-value stream desc enum name))))))
 
-(defun parse-proto-enum-value (stream protobuf enum name)
-  "Parse a Protobufs enum value from 'stream'.
-   Updates the 'protobuf-enum' object to have the enum value."
-  (declare (ignore protobuf))
+(defun parse-proto-enum-value (stream desc enum name)
+  "Parse a protobuf enum value from STREAM and store it into ENUM, which is a protobuf-enum
+   object. NAME is the name associated with the value. DESC is ignored."
+  (declare (ignore desc))
   (check-type enum protobuf-enum)
   (expect-char stream #\= () "enum")
   (let* ((idx  (prog1 (parse-signed-int stream)
@@ -527,8 +533,8 @@
 
 
 (defun parse-proto-message (stream protobuf &optional name)
-  "Parse NAME with parent PROTOBUF (either a schema or a message) from STREAM."
-  (check-type protobuf (or protobuf-schema protobuf-message))
+  "Parse NAME with parent PROTOBUF (either a descriptor or a message) from STREAM."
+  (check-type protobuf (or file-descriptor protobuf-message))
   (let* ((loc  (file-position stream))
          (name (prog1 (or name (parse-token stream))
                  (expect-char stream #\{ () "message")
@@ -584,8 +590,8 @@
 
 (defun parse-proto-extend (stream protobuf)
   "Parse a Protobufs 'extend' from 'stream'.
-   Updates the 'protobuf-schema' or 'protobuf-message' object to have the message."
-  (check-type protobuf (or protobuf-schema protobuf-message))
+   Updates the 'file-descriptor' or 'protobuf-message' object to have the message."
+  (check-type protobuf (or file-descriptor protobuf-message))
   (let* ((loc  (file-position stream))
          (name (prog1 (parse-token stream)
                  (expect-char stream #\{ () "extend")
@@ -777,10 +783,9 @@
       extension)))
 
 
-(defun parse-proto-service (stream schema)
-  "Parse a Protobufs 'service' from 'stream'.
-   Updates the 'protobuf-schema' object to have the service."
-  (check-type schema protobuf-schema)
+(defun parse-proto-service (stream desc)
+  "Parse a protobuf service descriptor from STREAM and store it in DESC."
+  (check-type desc file-descriptor)
   (let* ((loc  (file-position stream))
          (name (prog1 (parse-token stream)
                  (expect-char stream #\{ () "service")
@@ -789,7 +794,7 @@
                     :class (proto->class-name name *protobuf-package*)
                     :name name
                     :qualified-name (make-qualified-name *protobuf* name)
-                    :parent schema
+                    :parent desc
                     :source-location (make-source-location stream loc (i+ loc (length name)))))
          (index 0))
     (loop
@@ -797,7 +802,7 @@
         (when (null token)
           (expect-char stream #\} '(#\;) "service")
           (maybe-skip-comments stream)
-          (appendf (proto-services schema) (list service))
+          (appendf (proto-services desc) (list service))
           (return-from parse-proto-service service))
         (cond ((string= token "option")
                (parse-proto-option stream service))

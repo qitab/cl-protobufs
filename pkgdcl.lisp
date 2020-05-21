@@ -32,7 +32,7 @@
 
    ;; Model classes -  aka proto descriptors.
    ;; todo: rename from protobuf-* to *-descriptor
-   #:protobuf-schema
+   #:file-descriptor
    #:protobuf-option
    #:protobuf-enum
    #:protobuf-enum-value
