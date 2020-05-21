@@ -22,62 +22,74 @@ Arguments
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-(defparameter $optimize-default '(optimize (speed 1) (safety 3) (debug 3))
+(defparameter *optimize-default* '(optimize (speed 1) (safety 3) (debug 3))
   "Compiler optimization settings for safe, debuggable code.")
 
-(defparameter $optimize-fast-unsafe '(optimize (speed 3) (safety 0) (debug 0))
+(defparameter *optimize-fast-unsafe* '(optimize (speed 3) (safety 0) (debug 0))
   "Compiler optimization settings for fast, unsafe, hard-to-debug code.")
 
 ) ; eval-when
 
 
 (defmacro i+ (&rest fixnums)
+  "Do fixnum addition on FIXNUMS."
   `(the fixnum (+ ,@(loop for n in fixnums collect `(the fixnum ,n)))))
 
 (defmacro i- (&rest fixnums)
+  "Do fixnum subtraction on FIXNUMS."
   `(the fixnum (- ,@(loop for n in fixnums collect `(the fixnum ,n)))))
 
 (defmacro i* (&rest fixnums)
+  "Do fixnum multiplication on FIXNUMS."
   `(the fixnum (* ,@(loop for n in fixnums collect `(the fixnum ,n)))))
 
 (defmacro i= (&rest fixnums)
+  "Check FIXNUMS for equality."
   `(= ,@(loop for n in fixnums collect `(the fixnum ,n))))
 
 (defmacro i< (&rest fixnums)
+  "Check that FIXNUMS are monotonically increasing left to right."
   `(< ,@(loop for n in fixnums collect `(the fixnum ,n))))
 
 (defmacro i<= (&rest fixnums)
+  "Check that FIXNUMS are not decreasing, left to right."
   `(<= ,@(loop for n in fixnums collect `(the fixnum ,n))))
 
 (defmacro i> (&rest fixnums)
+  "Check that FIXNUMS are monotonically decreasing, left to right."
   `(> ,@(loop for n in fixnums collect `(the fixnum ,n))))
 
 (defmacro i>= (&rest fixnums)
+  "Check that FIXNUMS are not increasing, left to right."
   `(>= ,@(loop for n in fixnums collect `(the fixnum ,n))))
 
 (defmacro iash (value count)
+  "Shift VALUE left by COUNT places, preserving sign. Negative COUNT shifts right."
   `(the fixnum (ash (the fixnum ,value) (the fixnum ,count))))
 
 (defmacro ilogior (&rest fixnums)
+  "Return the bit-wise or of FIXNUMS."
   (if (cdr fixnums)
-    `(the fixnum (logior (the fixnum ,(car fixnums))
-                         ,(if (cddr fixnums)
-                            `(ilogior ,@(cdr fixnums))
-                            `(the fixnum ,(cadr fixnums)))))
-    `(the fixnum ,(car fixnums))))
+      `(the fixnum (logior (the fixnum ,(car fixnums))
+                           ,(if (cddr fixnums)
+                                `(ilogior ,@(cdr fixnums))
+                                `(the fixnum ,(cadr fixnums)))))
+      `(the fixnum ,(car fixnums))))
 
 (defmacro ilogand (&rest fixnums)
+  "Return the bit-wise and of FIXNUMS."
   (if (cdr fixnums)
-    `(the fixnum (logand (the fixnum ,(car fixnums))
-                         ,(if (cddr fixnums)
-                            `(ilogand ,@(cdr fixnums))
-                            `(the fixnum ,(cadr fixnums)))))
-    `(the fixnum ,(car fixnums))))
+      `(the fixnum (logand (the fixnum ,(car fixnums))
+                           ,(if (cddr fixnums)
+                                `(ilogand ,@(cdr fixnums))
+                                `(the fixnum ,(cadr fixnums)))))
+      `(the fixnum ,(car fixnums))))
 
 (define-modify-macro iincf (&optional (delta 1)) i+)
 (define-modify-macro idecf (&optional (delta 1)) i-)
 
 (defmacro ildb (bytespec value)
+  "Extract the specified BYTESPEC from VALUE, and right justify result."
   `(the fixnum (ldb ,bytespec (the fixnum ,value))))
 
 
@@ -114,8 +126,8 @@ Arguments
     (format nil "~{~@(~A~)~}" words)))
 
 (defun camel-case-but-one (string &optional (separators '(#\-)))
-  "Convert STRING to camel-case by splitting on any of the SEPARATORS and then joining back to
-   gether after capitalizing all except the first part.
+  "Convert STRING to camel-case by splitting on any of the SEPARATORS and then joining back
+   together after capitalizing all except the first part.
    Ex: (camel-case-but-one \"camel-case\") => \"camelCase\""
   (let ((words (split-string string :separators separators)))
     (format nil "~(~A~)~{~@(~A~)~}" (car words) (cdr words))))
@@ -141,8 +153,8 @@ Arguments
                                  ((upper)
                                   ;; "TCPConnection" => "TCP-CONNECTION"
                                   (if (and (second chars) (lower-case-p (second chars)))
-                                    (list* ch #\- result)
-                                    (cons ch result)))
+                                      (list* ch #\- result)
+                                      (cons ch result)))
                                  ((lower digit) (list* ch #\- result))
                                  (otherwise (cons ch result)))))
                      ((lower-case-p ch)
@@ -160,7 +172,6 @@ Arguments
                      (t
                       (error "Invalid name character: ~A" ch))))))
     (strcat (nreverse (uncamel (concatenate 'list name) nil ())))))
-
 
 (defun split-string (line &key (start 0) (end (length line)) (separators '(#\-)))
   "Split LINE at each of the characters in SEPARATORS starting at START and ending before END.
@@ -184,8 +195,11 @@ Arguments
           (subseq string (1+ dot-pos)))))
 
 ;;; Managing symbols
+
 (defmacro with-gensyms ((&rest bindings) &body body)
-  `(let ,(mapcar #'(lambda (b) `(,b (gensym ,(string b)))) bindings)
+  "Bind each symbol in BINDINGS to a gensym'd symbol containing its name."
+  `(let ,(mapcar #'(lambda (b) `(,b (gensym ,(string b))))
+          bindings)
      ,@body))
 
 (defun make-lisp-symbol (string)
@@ -220,7 +234,7 @@ Arguments
   (intern (nstring-upcase (apply #'format nil format-string format-args)) "KEYWORD"))
 
 (defun keywordify (x)
-  "Given a symbol designator X, returns a keyword symbol whose name is X.
+  "Given a symbol designator X, returns a keyword symbol whose name is (symbol-name X).
    If X is nil, returns nil."
   (check-type x (or string symbol null))
   (cond ((null x) nil)
@@ -243,11 +257,11 @@ Arguments
 (defun proto-slot-function-name (proto-type slot function-type)
   "Create function names for proto fields given their slot name.
 Arguments:
-  PROTO-TYPE: The symbol for the type of proto.
-  SLOT: The symbol for the field.
-  FUNCTION-TYPE: The type of function name to retreive."
+  PROTO-TYPE: The symbol naming a protobuf message, group, etc.
+  SLOT: The symbol naming a protobuf field.
+  FUNCTION-TYPE: The type of function name to retrieve: :has, :get, or :clear"
   (declare (type symbol proto-type slot)
-           (type (member :has :get :clear)))
+           (type (member :has :get :clear) function-type))
   (let ((f-symbol (ecase function-type
                     (:has 'has)
                     (:clear 'clear)
@@ -266,8 +280,10 @@ Arguments:
 
 (defmacro with-collectors ((&rest collection-descriptions) &body body)
   "COLLECTION-DESCRIPTIONS is a list of clauses of the form (collection function).
-   The body can call 'function' to add a value to the corresponding 'collection'. 'function' runs in
-   constant time, regardless of the length of the list."
+   The body can call 'function' to add a value to the corresponding 'collection'. Elements are added
+   to the ends of the lists, in constant time. Example:
+     (with-collectors ((numbers collect-number))
+       ... (collect-number n) ...)"
   (let ((let-bindings  ())
         (flet-bindings ())
         (dynamic-extents ())
@@ -284,26 +300,22 @@ Arguments:
           (setq flet-bindings
                 (nconc flet-bindings
                        `((,name (,vobj)
-                           (setq ,vtail (if ,vtail
-                                          (setf (cdr ,vtail)  (list ,vobj))
-                                          (setf ,place (list ,vobj)))))))))))
+                                (setq ,vtail (if ,vtail
+                                                 (setf (cdr ,vtail)  (list ,vobj))
+                                                 (setf ,place (list ,vobj)))))))))))
     `(let (,@let-bindings)
        (flet (,@flet-bindings)
          ,@(and dynamic-extents
                 `((declare (dynamic-extent ,@dynamic-extents))))
          ,@body))))
 
-(defmacro with-prefixed-accessors (names (prefix object) &body body)
-  `(with-accessors (,@(loop for name in names
-                            collect `(,name ,(fintern "~A~A" prefix name))))
-       ,object
-     ,@body))
-
 (defmacro dovector ((var vector &optional result) &body body)
-  "Like DOLIST, but iterates over VECTOR binding VAR to each successive element."
+  "Like DOLIST, but iterates over VECTOR binding VAR to each successive element.
+   Returns RESULT."
   (with-gensyms (vidx vlen vvec)
     `(let* ((,vvec ,vector)
-            ;; todo: Added by me - the name of the function should change if it is goint to accept nil
+            ;; todo: Added by me - the name of the function should change if it is goint to
+            ;; accept nil
             (,vlen (if ,vvec (length (the vector ,vvec))
                        0)))
        ;; todo?
@@ -315,14 +327,14 @@ Arguments:
 (defmacro doseq ((var sequence &optional result) &body body)
   "Iterates over SEQUENCE, binding VAR to each element in turn. Uses DOLIST or DOVECTOR depending on
    the type of the sequence. In optimized code, this turns out to be faster than (map () #'f
-   sequence).  Note that the body gets expanded twice!" ;; FIXME
+   sequence). Returns RESULT. Note that the body gets expanded twice!" ;; todo: fix
   (with-gensyms (vseq)
     `(let ((,vseq ,sequence))
        (if (vectorp ,vseq)
-         (dovector (,var ,vseq ,result)
-           ,@body)
-         (dolist (,var ,vseq ,result)
-           ,@body)))))
+           (dovector (,var ,vseq ,result)
+             ,@body)
+           (dolist (,var ,vseq ,result)
+             ,@body)))))
 
 
 (defmacro appendf (place tail)
@@ -332,30 +344,28 @@ Arguments:
 
 ;;; Types
 
-;; A parameterized list type for repeated fields
-;; The elements aren't type-checked
+;; A parameterized list type for repeated fields.  The elements aren't type-checked.
 (deftype list-of (type)
-  (if (eq type 'nil)      ; a list that cannot have any element (element-type nil) is null
-    'null
-    'list))
+  (if (eq type 'nil)                ; a list that cannot have any element (element-type nil) is null
+      'null
+      'list))
 
-;; The same, but use a (stretchy) vector
+;; A parameterized vector type for repeated fields.  The elements aren't type-checked.
 (deftype vector-of (type)
-  (if (eq type 'nil)      ; an array that cannot have any element (element-type nil) is of size 0
-    '(array * (0))
-    '(array * (*))))      ; a 1-dimensional array of any type
+  (if (eq type 'nil)        ; an array that cannot have any element (element-type nil) is of size 0
+      '(array * (0))
+      '(array * (*))))      ; a 1-dimensional array of any type
 
 
-;; This corresponds to the :bytes Protobufs type
+;; This corresponds to the :bytes protobuf type
 (deftype byte-vector () '(array (unsigned-byte 8) (*)))
 
 (defun make-byte-vector (size &key adjustable)
-  "Make a byte vector of length SIZE, optionally
-ADJUSTABLE."
+  "Make a byte vector of length SIZE, optionally ADJUSTABLE."
   (make-array size :element-type '(unsigned-byte 8)
                    :adjustable adjustable))
 
-;; The Protobufs integer types
+;; The protobuf integer types
 (deftype    int32 () '(signed-byte 32))
 (deftype    int64 () '(signed-byte 64))
 (deftype   uint32 () '(unsigned-byte 32))
@@ -367,14 +377,16 @@ ADJUSTABLE."
 (deftype sfixed32 () '(signed-byte 32))
 (deftype sfixed64 () '(signed-byte 64))
 
-(defun fixed-width-integer-proto-typep (type)
+(defun fixed-width-integer-type-p (type)
+  "Check whether TYPE can be serialized in a fixed number of bits."
   (member type '(fixed32 fixed64 sfixed32 sfixed64)))
 
-(defun zigzag-encoded-proto-typep (type)
+(defun zigzag-encoded-type-p (type)
+  "Check whether TYPE should be zigzag encoded on the wire."
   (member type '(sint32 sint64)))
 
-;; Type expansion
 (defun type-expand (type)
+  "Convert TYPE into an equivalent type, removing all references to derived types."
   #+(or abcl xcl) (system::expand-deftype type)
   #+allegro (excl:normalize-type type :default type)
   #+ccl (ccl::type-expand type)
@@ -388,18 +400,21 @@ ADJUSTABLE."
 
 ;;; Code generation utilities
 
-(defparameter *proto-name-separators* '(#\- #\_ #\/ #\space))
-(defparameter *camel-case-field-names* nil)
+(defparameter *proto-name-separators* '(#\- #\_ #\/ #\space)
+  "List of characters to use when splitting Lisp names apart to convert to protobuf names.")
+
+(defparameter *camel-case-field-names* nil
+  "If true, generate camelCase field names, otherwise generate snake_case field names.")
 
 (defun find-proto-package (name)
   "Find a package named NAME, using various heuristics."
   (typecase name
     ((or string symbol)
-     ;; Try looking under the given name and the all-uppercase name
+     ;; Try looking under the given name and the all-uppercase name.
      (or (find-package (string name))
          (find-package (string-upcase (string name)))))
     (cons
-     ;; If 'name' is a list, it's actually a fully-qualified path
+     ;; If 'name' is a list, it's actually a fully-qualified path.
      (or (find-proto-package (first name))
          (find-proto-package (format nil "~{~A~^.~}" name))))))
 
@@ -414,11 +429,14 @@ ADJUSTABLE."
 ;; "enum-value" -> "ENUM_VALUE", ("ENUM_VALUE")
 ;; "class-name.enum-value" -> "ENUM_VALUE", ("ClassName" "ENUM_VALUE")
 (defun enum-name->proto (enum-value-name &optional prefix)
-  "Returns the protobuf enum value name associated with the Lisp ENUM-VALUE-NAME (a string)."
+  "Returns the protobuf enum value name associated with the Lisp ENUM-VALUE-NAME (a string).
+   Strip PREFIX from the returned name, if supplied."
   (let* ((xs (split-string (string enum-value-name) :separators '(#\.)))
          (nx (string-upcase (car (last xs))))
-         (nx (if (and prefix (starts-with nx prefix)) (subseq nx (length prefix)) nx))
-         ;; Keep underscores, they are standard separators in Protobufs enum names
+         (nx (if (and prefix (starts-with nx prefix))
+                 (subseq nx (length prefix))
+                 nx))
+         ;; Keep underscores, they are standard separators in Protobufs enum names.
          (name (remove-if-not #'(lambda (x) (or (alphanumericp x) (eql x #\_)))
                               (format nil "~{~A~^_~}"
                                       (split-string nx :separators *proto-name-separators*)))))
@@ -433,17 +451,16 @@ ADJUSTABLE."
          (name (if *camel-case-field-names*
                    (remove-if-not #'alphanumericp
                                   (camel-case-but-one (format nil "~A" nx) *proto-name-separators*))
-                   ;; Keep underscores, they are standard separators in Protobufs field names
+                   ;; Keep underscores, they are standard separators in Protobufs field names.
                    (remove-if-not #'(lambda (x) (or (alphanumericp x) (eql x #\_)))
                                   (format nil "~{~A~^_~}"
                                           (split-string nx :separators *proto-name-separators*))))))
     name))
 
-
 ;; "foo.bar.Baz" -> 'FOO.BAR::BAZ
 ;; "foo_bar.bar.Baz" -> 'FOO-BAR.BAR::BAZ
 (defun proto-to-class (proto-name &key (add-cl-protobufs t))
-  "Turn a proto name into a lisp structure class name.
+  "Turn a proto name into a Lisp structure class name.
 Parameters:
   PROTO-NAME: A proto name will have a package seperated with '.', all
     in lower case. The class name will be uppercase first, possibility
@@ -531,19 +548,21 @@ Parameters:
 (define-condition protobufs-warning (warning simple-condition) ())
 
 (defun protobufs-warn (format-control &rest format-arguments)
-  (warn 'protobufs-warning
+  "Signal a protobufs-warning condition using FORMAT-CONTROL and FORMAT-ARGUMENTS
+   to generate the warning message."
+  (warn 'protobufs-warning              ; NOLINT
         :format-control format-control
         :format-arguments format-arguments))
 
 
 #-(or allegro lispworks)
-(defmacro without-redefinition-warnings (() &body body)
+(defmacro without-redefinition-warnings (() &body body) ; lint: disable=MISSING-DOCUMENTATION
   `(progn ,@body))
 
 #+allegro
-(defmacro without-redefinition-warnings (() &body body)
+(defmacro without-redefinition-warnings (() &body body) ; lint: disable=MISSING-DOCUMENTATION
   `(excl:without-redefinition-warnings ,@body))
 
 #+lispworks
-(defmacro without-redefinition-warnings (() &body body)
+(defmacro without-redefinition-warnings (() &body body) ; lint: disable=MISSING-DOCUMENTATION
   `(let ((dspec:*redefinition-action* :quiet)) ,@body))

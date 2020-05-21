@@ -21,17 +21,17 @@
 
 (declaim (inline proto-whitespace-char-p))
 (defun proto-whitespace-char-p (ch)
-  (declare #.$optimize-fast-unsafe)
+  (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\space #\tab #\return #\newline))))
 
 (declaim (inline proto-eol-char-p))
 (defun proto-eol-char-p (ch)
-  (declare #.$optimize-fast-unsafe)
+  (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\return #\newline))))
 
 (declaim (inline proto-token-char-p))
 (defun proto-token-char-p (ch)
-  (declare #.$optimize-fast-unsafe)
+  (declare #.*optimize-fast-unsafe*)
   (and ch (or (alpha-char-p ch)
               (digit-char-p ch)
               (member ch '(#\_ #\.)))))

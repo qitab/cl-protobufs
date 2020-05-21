@@ -59,7 +59,7 @@
    #:find-schema
    #:find-service
 
-   ;; .proto parsing
+   ;; Parser
    #:parse-schema-from-file
    #:parse-schema-from-stream
 

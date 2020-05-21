@@ -152,8 +152,8 @@
       ;; section.
       ((not (or looks-like-alias-for-p
                 type-enum
-                (fixed-width-integer-proto-typep type)
-                (zigzag-encoded-proto-typep type)
+                (fixed-width-integer-type-p type)
+                (zigzag-encoded-type-p type)
                 (equal type expanded-type)))
        (clos-type-to-protobuf-type expanded-type))
       (t
