@@ -37,8 +37,7 @@
     :pathname ""
     :depends-on ("models")
     :components
-    ((:file "printer")
-     (:file "parser")))
+    ((:file "parser")))
    (:module "schema"
     :serial t
     :pathname ""

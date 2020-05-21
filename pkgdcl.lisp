@@ -59,10 +59,9 @@
    #:find-schema
    #:find-service
 
-   ;; .proto parsing and printing
+   ;; .proto parsing
    #:parse-schema-from-file
    #:parse-schema-from-stream
-   #:write-schema
 
    ;; Code generation
    #:define-schema

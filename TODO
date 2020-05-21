@@ -102,7 +102,6 @@ TO DO
 [      means create a submessage (and class!) called "Locator"			]
 [      whose field is named "locator" (note lower case)				]
 [      then just treat it like a message					]
-[  - Need a printer for groups, too						]
 [  - Make 'proto-extension-p' be 'proto-message-type',				]
 [    which is one of :message, :extends or :group				]
 [  - (De)serialization of groups uses a start and end tag,			]
