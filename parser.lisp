@@ -303,7 +303,7 @@
 (defgeneric resolve-lisp-names (descriptor)
   (:documentation
    "Second pass of schema parsing which recursively resolves Protobuf type names
-    to Lisp type names in all messages and services contained within 'descriptor'.
+    to Lisp type names in all messages and services contained within DESCRIPTOR.
     No return value."))
 
 ;; The syntax for Protocol Buffers is so simple that it doesn't seem worth
@@ -465,13 +465,13 @@
     (pushnew package (proto-alias-packages file-desc)))
   (values))
 
-(defmethod add-alias-package-to-schema ((protobuf protobuf-message) symbol)
-  (add-alias-package-to-schema (proto-parent protobuf) symbol))
+(defmethod add-alias-package-to-schema ((msg-desc message-descriptor) symbol)
+  (add-alias-package-to-schema (proto-parent msg-desc) symbol))
 
 (defun parse-proto-enum (stream desc)
   "Parse a protobuf enum from STREAM and store it in DESC, which may be a file-descriptor or
    message-descriptor."
-  (check-type desc (or file-descriptor protobuf-message))
+  (check-type desc (or file-descriptor message-descriptor))
   (let* ((loc  (file-position stream))
          (name (prog1 (parse-token stream)
                  (expect-char stream #\{ () "enum")
@@ -481,16 +481,17 @@
          ;; An enum type may also be declared in one message as the type of a field in a different
          ;; message, using the syntax MessageType.EnumType.
          ;; In cl-protobufs, such an enum type is named as message-type.enum-type
-         (class (if (typep desc 'protobuf-message)
+         (class (if (typep desc 'message-descriptor)
                     (join-intern (proto-class desc) enum-name)
                     ;; For an enum defined at top-level, just use the enum name.
                     enum-name))
-         (enum (make-instance 'protobuf-enum
-                 :class class
-                 :name name
-                 :qualified-name (make-qualified-name desc name)
-                 :parent desc
-                 :source-location (make-source-location stream loc (i+ loc (length name))))))
+         (enum (make-instance
+                'protobuf-enum
+                :class class
+                :name name
+                :qualified-name (make-qualified-name desc name)
+                :parent desc
+                :source-location (make-source-location stream loc (i+ loc (length name))))))
     (loop
       (let ((name (parse-token stream)))
         (when (null name)
@@ -509,8 +510,8 @@
                 (add-alias-package-to-schema desc symbol))))
           (return-from parse-proto-enum enum))
         (if (string= name "option")
-          (parse-proto-option stream enum)
-          (parse-proto-enum-value stream desc enum name))))))
+            (parse-proto-option stream enum)
+            (parse-proto-enum-value stream desc enum name))))))
 
 (defun parse-proto-enum-value (stream desc enum name)
   "Parse a protobuf enum value from STREAM and store it into ENUM, which is a protobuf-enum
@@ -532,85 +533,90 @@
     value))
 
 
-(defun parse-proto-message (stream protobuf &optional name)
-  "Parse NAME with parent PROTOBUF (either a descriptor or a message) from STREAM."
-  (check-type protobuf (or file-descriptor protobuf-message))
+(defun parse-proto-message (stream desc &optional name)
+  "Parse NAME with parent DESC from STREAM."
+  (check-type desc (or file-descriptor message-descriptor))
   (let* ((loc  (file-position stream))
          (name (prog1 (or name (parse-token stream))
                  (expect-char stream #\{ () "message")
                  (maybe-skip-comments stream)))
-         (qualified-name (make-qualified-name protobuf name))
+         (qualified-name (make-qualified-name desc name))
          ;; todo s/name/qualified-name/ in next line
          (class (proto->class-name name *protobuf-package*))
-         (message (make-instance 'protobuf-message
+         (msg-desc (make-instance
+                    'message-descriptor
                     :class class
                     :name  name
                     :qualified-name qualified-name
-                    :parent protobuf
+                    :parent desc
                     ;; Maybe force accessors for all slots
                     :conc-name (conc-name-for-type class *protobuf-conc-name*)
                     :source-location (make-source-location stream loc (i+ loc (length name)))))
-         (*protobuf* message))
+         (*protobuf* msg-desc))
     (loop
       (let ((token (parse-token stream)))
         (when (null token)
           (expect-char stream #\} '(#\;) "message")
           (maybe-skip-comments stream)
-          (record-protobuf-object name message :message)
-          (let ((type (find-option message "lisp_name")))
+          (record-protobuf-object name msg-desc :message)
+          (let ((type (find-option msg-desc "lisp_name")))
             (when type
-              (setf (proto-class message) (make-lisp-symbol type))))
-          (let ((alias (find-option message "lisp_alias")))
+              (setf (proto-class msg-desc) (make-lisp-symbol type))))
+          (let ((alias (find-option msg-desc "lisp_alias")))
             (when alias
               (let* ((symbol (make-lisp-symbol alias)))
-                (setf (proto-alias-for message) symbol)
-                (add-alias-package-to-schema protobuf symbol))))
-          (return-from parse-proto-message message))
+                (setf (proto-alias-for msg-desc) symbol)
+                (add-alias-package-to-schema desc symbol))))
+          (return-from parse-proto-message msg-desc))
         (cond ((string= token "enum")
-               (parse-proto-enum stream message))
+               (parse-proto-enum stream msg-desc))
               ((string= token "extend")
-               (parse-proto-extend stream message))
+               (parse-proto-extend stream msg-desc))
               ((string= token "message")
-               (parse-proto-message stream message))
+               (parse-proto-message stream msg-desc))
               ((member token '("required" "optional" "repeated") :test #'string=)
-               (parse-proto-field stream message token))
+               (parse-proto-field stream msg-desc token))
               ((string= token "option")
-               (parse-proto-option stream message))
+               (parse-proto-option stream msg-desc))
               ((string= token "extensions")
-               (parse-proto-extension stream message))
+               (parse-proto-extension stream msg-desc))
               ((string= token "reserved")
                (parse-proto-ignore stream))
               (t
                (error "Unrecognized token ~A at position ~D"
                       token (file-position stream))))))))
 
-(defmethod resolve-lisp-names ((message protobuf-message))
-  "Recursively resolves protobuf type names to lisp type names in nested messages and fields of 'message'."
-  (map () #'resolve-lisp-names (proto-fields message)))
+(defmethod resolve-lisp-names ((msg-desc message-descriptor))
+  "Recursively resolves protobuf type names to lisp type names in nested messages and fields of
+   MSG-DESC."
+  (map () #'resolve-lisp-names (proto-fields msg-desc)))
 
-(defun parse-proto-extend (stream protobuf)
-  "Parse a Protobufs 'extend' from 'stream'.
-   Updates the 'file-descriptor' or 'protobuf-message' object to have the message."
-  (check-type protobuf (or file-descriptor protobuf-message))
+(defun parse-proto-extend (stream desc)
+  "Parse a protobuf 'extend' statement from STREAM, storing it in DESC, which is a file-descriptor
+   or message-descriptor. Returns a message-descriptor that is the same as the message type being
+   extended but with extension fields added."
+  (check-type desc (or file-descriptor message-descriptor))
   (let* ((loc  (file-position stream))
          (name (prog1 (parse-token stream)
                  (expect-char stream #\{ () "extend")
                  (maybe-skip-comments stream)))
          ;; Is 'extend' allowed to use a forward reference to a message?
          (message (find-message name))
-         (extends (and message
-                       (make-instance 'protobuf-message
+         (extended (and message
+                        (make-instance
+                         'message-descriptor
                          :class (proto-class message)
                          :name  (proto-name message)
                          :qualified-name (proto-qualified-name message)
-                         :parent protobuf
+                         :parent desc
                          :alias-for (proto-alias-for message)
                          :conc-name (proto-conc-name message)
                          :fields   (copy-list (proto-fields message))
                          :extensions (copy-list (proto-extensions message))
-                         :message-type :extends         ;this message is an extension
-                         :source-location (make-source-location stream loc (i+ loc (length name))))))
-         (*protobuf* extends))
+                         :message-type :extends ; this message is an extension
+                         :source-location (make-source-location stream loc (i+ loc (length name)))
+                         )))
+         (*protobuf* extended))
     (assert message ()
             "There is no message named ~A to extend" name)
     (loop
@@ -618,32 +624,33 @@
         (when (null token)
           (expect-char stream #\} '(#\;) "extend")
           (maybe-skip-comments stream)
-          (record-protobuf-object name extends :message)
-          (let ((type (find-option extends "lisp_name")))
+          (record-protobuf-object name extended :message)
+          (let ((type (find-option extended "lisp_name")))
             (when type
-              (setf (proto-class extends) (make-lisp-symbol type))))
-          (let ((alias (find-option extends "lisp_alias")))
+              (setf (proto-class extended) (make-lisp-symbol type))))
+          (let ((alias (find-option extended "lisp_alias")))
             (when alias
               (let* ((symbol (make-lisp-symbol alias)))
-                (setf (proto-alias-for extends) symbol)
-                (add-alias-package-to-schema protobuf symbol))))
-          (return-from parse-proto-extend extends))
+                (setf (proto-alias-for extended) symbol)
+                (add-alias-package-to-schema desc symbol))))
+          (return-from parse-proto-extend extended))
         (cond ((member token '("required" "optional" "repeated") :test #'string=)
-               (let ((field (parse-proto-field stream extends token message)))
-                 (appendf (proto-extended-fields extends) (list field))))
+               (let ((field (parse-proto-field stream extended token message)))
+                 (appendf (proto-extended-fields extended) (list field))))
               ((string= token "option")
-               (parse-proto-option stream extends))
+               (parse-proto-option stream extended))
               (t
                (error "Unrecognized token ~A at position ~D"
                       token (file-position stream))))))))
 
-(defun parse-proto-field (stream message required &optional extended-from)
-  "Parse a Protobufs field from 'stream'.
-   Updates the 'protobuf-message' object to have the field."
-  (check-type message protobuf-message)
+(defun parse-proto-field (stream msg-desc required &optional extended-from)
+  "Parse a protobuf field from STREAM and store it in MSG-DESC, a message-descriptor.
+   REQUIRED (a string) is the label on the field: required, optional, repeated.
+   EXTENDED-FROM is the message-descriptor for the message being extended."
+  (check-type msg-desc message-descriptor)
   (let ((type (parse-token stream)))
     (if (string= type "group")
-      (parse-proto-group stream message required extended-from)
+      (parse-proto-group stream msg-desc required extended-from)
       (let* ((name (prog1 (parse-token stream)
                      (expect-char stream #\= () "message")
                      (maybe-skip-comments stream)))
@@ -664,15 +671,15 @@
                        :name  name
                        :type  type
                        :lisp-type lisp-type-option
-                       :qualified-name (make-qualified-name message name)
-                       :parent message
+                       :qualified-name (make-qualified-name msg-desc name)
+                       :parent msg-desc
                        :label label
                        :index idx
                        ;; todo: why isn't :external-field-name set here too?  Also in
                        ;; parse-proto-group.
                        :internal-field-name slot
                        ;; Fields parsed from .proto files usually get an accessor
-                       :reader (let ((conc-name (proto-conc-name message)))
+                       :reader (let ((conc-name (proto-conc-name msg-desc)))
                                  (and conc-name
                                       (intern (format nil "~A~A" conc-name slot) *protobuf-package*)))
                        :default (multiple-value-bind (default type default-p)
@@ -686,7 +693,7 @@
                                          $empty-list))
                                     (t $empty-default)))
                        :packed  (and packed (boolean-true-p packed))
-                       :message-type (proto-message-type message)
+                       :message-type (proto-message-type msg-desc)
                        :options (remove-options opts "default" "packed" "lisp_type" "lisp_slot"
                                                 "lisp_container"))))
         (when extended-from
@@ -696,11 +703,11 @@
         (let ((slot (find-option opts "lisp_name")))
           (when slot
             (setf (proto-value field) (make-lisp-symbol type))))
-        (appendf (proto-fields message) (list field))
+        (appendf (proto-fields msg-desc) (list field))
         field))))
 
 (defmethod resolve-lisp-names ((field protobuf-field))
-  "Resolves the field's protobuf type to a lisp type and sets `proto-class' for 'field'."
+  "Resolves the protobuf type of FIELD to a Lisp type and stores it in the field's proto-class."
   (let* ((type  (proto-type field))
          (ptype (when (member type +PRIMITIVE-TYPES+ :test #'string=)
                   (kintern type)))
@@ -714,26 +721,27 @@
     (setf (proto-class field) (or ptype (proto-class message))))
   nil)
 
-(defun parse-proto-group (stream message required &optional extended-from)
-  "Parse a (deprecated) Protobufs group from 'stream'.
-   Updates the 'protobuf-message' object to have the group type and field."
-  (check-type message protobuf-message)
+(defun parse-proto-group (stream msg-desc required &optional extended-from)
+  "Parse a protobuf group from STREAM and store it in MSG-DESC. EXTENDED-FROM
+   REQUIRED (a string) is the label on the group: required, optional, repeated.
+   EXTENDED-FROM is the message-descriptor being extended, if any."
+  (check-type msg-desc message-descriptor)
   (let* ((type (prog1 (parse-token stream)
                  (expect-char stream #\= () "message")))
          (name (slot-name->proto (proto->slot-name type)))
          (idx  (parse-unsigned-int stream))
-         (msg  (parse-proto-message stream message type))
+         (msg  (parse-proto-message stream msg-desc type))
          (slot  (proto->slot-name name *protobuf-package*))
          (field (make-instance 'protobuf-field
                   :name  name
                   :type  type
-                  :qualified-name (make-qualified-name message name)
-                  :parent message
+                  :qualified-name (make-qualified-name msg-desc name)
+                  :parent msg-desc
                   :label (kintern required)
                   :index idx
                   :internal-field-name slot
                   ;; Groups parsed from .proto files usually get an accessor
-                  :reader (let ((conc-name (proto-conc-name message)))
+                  :reader (let ((conc-name (proto-conc-name msg-desc)))
                             (and conc-name
                                  (intern (format nil "~A~A" conc-name slot) *protobuf-package*)))
                   :message-type :group)))
@@ -742,7 +750,7 @@
       (assert (index-within-extensions-p idx extended-from) ()
               "The index ~D is not in range for extending ~S"
               idx (proto-class extended-from)))
-    (appendf (proto-fields message) (list field))
+    (appendf (proto-fields msg-desc) (list field))
     field))
 
 (defun parse-proto-field-options (stream)
@@ -761,8 +769,10 @@
           (setq terminator term)
           (collect-option option))))))
 
-(defun parse-proto-extension (stream message)
-  (check-type message protobuf-message)
+(defun parse-proto-extension (stream msg-desc)
+  "Parse a protobuf 'extensions' statement (e.g., 'extensions 100 to 199;') from STREAM and stores
+   the result in MSG-DESC."
+  (check-type msg-desc message-descriptor)
   (let* ((from  (parse-unsigned-int stream))
          (token (parse-token stream))
          (to    (let ((ch (peek-char nil stream nil)))
@@ -779,7 +789,7 @@
     (let ((extension (make-instance 'protobuf-extension
                        :from from
                        :to   (if (integerp to) to #.(1- (ash 1 29))))))
-      (appendf (proto-extensions message) (list extension))
+      (appendf (proto-extensions msg-desc) (list extension))
       extension)))
 
 

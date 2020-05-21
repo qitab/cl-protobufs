@@ -9,7 +9,7 @@
 
 ;;; Protobuf serialization from Lisp objects
 
-;;; When optimize speed option is used we avoid using DEFMETHOD, which generates
+;;; When the optimize speed option is used we avoid using DEFMETHOD, which generates
 ;;; generic functions that are costly to lookup at runtime.  Instead, we define
 ;;; the "methods" as functions that are attached to the symbol naming the class,
 ;;; so we can easily locate them using GET at runtime.
@@ -28,7 +28,7 @@
 (defun def-pseudo-method (method-name meta-message args body)
   (let ((name (etypecase meta-message
                 (symbol meta-message)
-                (protobuf-message (proto-class meta-message)))))
+                (message-descriptor (proto-class meta-message)))))
     #+sbcl `(defun (:protobuf ,method-name ,name) ,args ,@body)
     #-sbcl `(setf (get ',name ',method-name) (lambda ,args ,@body))))
 
@@ -75,7 +75,7 @@
   (:documentation
    "Serialize OBJECT of type TYPE into BUFFER using wire format.
     TYPE is either a symbol naming a Protobufs message (usually the name of a
-    Lisp class) or the protobuf-message object itself.
+    Lisp class) or the message-descriptor object itself.
     The returned value is the number of octets written to BUFFER."))
 
 (defun serialize-object-to-stream (stream object &optional (type (type-of object)))
@@ -114,8 +114,8 @@
 
 ;; Serialize the object using the given protobuf type
 
-;; The default method uses metadata from the protobuf "schema" for the message
-(defmethod serialize-object (object (message protobuf-message) buffer)
+;; The default method uses metadata from the message descriptor.
+(defmethod serialize-object (object (msg-desc message-descriptor) buffer)
   (declare (buffer buffer))
   (macrolet ((read-slot (object slot reader)
                ;; Don't do a boundp check, we assume the object is fully populated
@@ -159,7 +159,7 @@
                        ((typep (setq msg (and type (or (find-message type)
                                                        (find-enum type)
                                                        (find-type-alias type))))
-                               'protobuf-message)
+                               'message-descriptor)
                         (if (eq (proto-message-type msg) :group)
                             (doseq (v (if slot (read-slot object slot reader) (list object)))
                               ;; To serialize a group, we encode a start tag,
@@ -221,7 +221,7 @@
                        ((typep (setq msg (and type (or (find-message type)
                                                        (find-enum type)
                                                        (find-type-alias type))))
-                               'protobuf-message)
+                               'message-descriptor)
                         (let ((v (if slot (read-slot object slot reader) object)))
                           (cond ((not v) 0)
                                 ((eq (proto-message-type msg) :group)
@@ -270,7 +270,7 @@
                         (undefined-field-type "While serializing ~S,"
                                               object type field)))))))
       (let ((size 0))
-        (dolist (field (proto-fields message) size)
+        (dolist (field (proto-fields msg-desc) size)
           (iincf size (emit-field object field)))))))
 
 ;;; Deserialization
@@ -296,7 +296,7 @@
    array of (unsigned-byte 8).
 
    TYPE is the Lisp name of a Protobufs message (usually the name of a
-   Lisp class) or a 'protobuf-message'.
+   Lisp class) or a 'message-descriptor'.
    The primary return value is the new object,
    and the secondary value is the final index into BUFFER."
   (assert (symbolp type))
@@ -329,7 +329,7 @@
   (:documentation
    "Deserialize an object of type TYPE from BUFFER between indices START and END.
     TYPE is the Lisp name of a Protobufs message (usually the name of a
-    Lisp class) or a 'protobuf-message'.
+    Lisp class) or a 'message-descriptor'.
     END-TAG is used internally to handle the (deprecated) \"group\" feature.
     The return values are the object and the index at which deserialization stopped."))
 
@@ -339,14 +339,14 @@
             "There is no Protobuf message having the type ~S" type)
     (%deserialize-object message buffer start end end-tag)))
 
-;; The default method uses metadata from the protobuf "schema" for the message
-(defmethod %deserialize-object ((message protobuf-message) buffer start end
-                               &optional (end-tag 0))
+;; The default method uses metadata from the message descriptor.
+(defmethod %deserialize-object ((msg-desc message-descriptor) buffer start end
+                                &optional (end-tag 0))
   (let* ((class-name
-           (or (proto-alias-for message) (proto-class message)))
+           (or (proto-alias-for msg-desc) (proto-class msg-desc)))
          (class (find-class class-name)))
     (deserialize-structure-object
-     message buffer start end end-tag class)))
+     msg-desc buffer start end end-tag class)))
 
 (defstruct (field (:constructor make-field (index offset bool-index initarg complex-field))
                   (:print-object
@@ -646,7 +646,7 @@ See protobuf-field for the distinction between index, offset, and bool-number."
                        `(when ,boundp
                           (,iterator (,vval ,reader)
                                      (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf))))))
-                    ((typep msg 'protobuf-message)
+                    ((typep msg 'message-descriptor)
                      (if (eq (proto-message-type msg) :group)
                          ;; The end tag for a group is the field index shifted and
                          ;; and-ed with a constant.
@@ -692,7 +692,7 @@ See protobuf-field for the distinction between index, offset, and bool-number."
                      `(when ,boundp
                         (let ((,vval ,reader))
                           (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf))))))
-                  ((typep msg 'protobuf-message)
+                  ((typep msg 'message-descriptor)
                    (if (eq (proto-message-type msg) :group)
                        (let ((tag1 (make-tag $wire-type-start-group index))
                              (tag2 (make-tag $wire-type-end-group   index)))
@@ -818,7 +818,7 @@ Parameters:
                             (ret-list (list tag packed-tag)
                                       (list non-packed-form packed-form))
                             (ret tag non-packed-form))))
-                     ((typep msg 'protobuf-message)
+                     ((typep msg 'message-descriptor)
                       (when (eq (proto-message-type msg) :group)
                         (error "deserialize: unhandled repeated group"))
                       (ret (make-tag $wire-type-string index)
@@ -872,7 +872,7 @@ Parameters:
                       (ret (make-tag class index)
                            `(multiple-value-setq (,temp ,vidx)
                               (deserialize-prim ,class ,vbuf ,vidx))))
-                     ((typep msg 'protobuf-message)
+                     ((typep msg 'message-descriptor)
                       (when (eq (proto-message-type msg) :group)
                            (error "deserialize: unhandled group"))
                       (ret (make-tag $wire-type-string index)

@@ -52,7 +52,7 @@ Parameters:
                                   ((typep (setq msg (and type (or (find-message type)
                                                                   (find-enum type)
                                                                   (find-type-alias type))))
-                                          'protobuf-message)
+                                          'message-descriptor)
                                    (let ((values (if slot (read-slot object slot reader) (list object))))
                                      (when values
                                        (let ((indent (+ indent 2)))
@@ -86,7 +86,7 @@ Parameters:
                                   ((typep (setq msg (and type (or (find-message type)
                                                                   (find-enum type)
                                                                   (find-type-alias type))))
-                                          'protobuf-message)
+                                          'message-descriptor)
                                    (let ((v (if slot (read-slot object slot reader) object)))
                                      (when v
                                        (let ((indent (+ indent 2)))
@@ -183,16 +183,17 @@ Parameters:
             "There is no Protobuf message having the type ~S" type)
     (parse-text-format message :stream stream :parse-name parse-name)))
 
-(defmethod parse-text-format ((message protobuf-message)
+(defmethod parse-text-format ((msg-desc message-descriptor)
                               &key (stream *standard-input*) (parse-name t))
   (when parse-name
     (let ((name (parse-token stream)))
-      (assert (string= name (proto-name message)) ()
-              "The message is not of the expected type ~A" (proto-name message))))
+      (assert (string= name (proto-name msg-desc)) ()
+              "The message is not of the expected type ~A" (proto-name msg-desc))))
   (labels ((deserialize (type)
-             (let* ((message (find-message type))
-                    (object  (and message
-                                  (make-instance (or (proto-alias-for message) (proto-class message)))))
+             (let* ((msg-desc (find-message type))
+                    (object  (and msg-desc
+                                  (make-instance (or (proto-alias-for msg-desc)
+                                                     (proto-class msg-desc)))))
                     (rslots ()))
                (expect-char stream #\{)
                (loop
@@ -204,7 +205,7 @@ Parameters:
                            (nreverse (proto-slot-value object slot))))
                    (return-from deserialize object))
                  (let* ((name  (parse-token stream))
-                        (field (and name (find-field message name)))
+                        (field (and name (find-field msg-desc name)))
                         (type  (and field (if (eq (proto-class field) 'boolean)
                                               :bool (proto-class field))))
                         (slot  (and field (proto-external-field-name field)))
@@ -226,7 +227,7 @@ Parameters:
                                   ((typep (setq msg (and type (or (find-message type)
                                                                   (find-enum type)
                                                                   (find-type-alias type))))
-                                          'protobuf-message)
+                                          'message-descriptor)
                                    (when (eql (peek-char nil stream nil) #\:)
                                      (read-char stream))
                                    (let ((obj (deserialize type)))
@@ -257,7 +258,7 @@ Parameters:
                                                (proto-slot-value object slot))))))
                                   (t
                                    (undefined-field-type "While parsing ~S from text format,"
-                                                         message type field))))
+                                                         msg-desc type field))))
                            (t
                             (cond ((keywordp type)
                                    (expect-char stream #\:)
@@ -272,7 +273,7 @@ Parameters:
                                   ((typep (setq msg (and type (or (find-message type)
                                                                   (find-enum type)
                                                                   (find-type-alias type))))
-                                          'protobuf-message)
+                                          'message-descriptor)
                                    (when (eql (peek-char nil stream nil) #\:)
                                      (read-char stream))
                                    (let ((obj (deserialize type)))
@@ -300,9 +301,9 @@ Parameters:
                                                (funcall (proto-deserializer msg) val))))))
                                   (t
                                    (undefined-field-type "While parsing ~S from text format,"
-                                                         message type field)))))))))))
+                                                         msg-desc type field)))))))))))
     (declare (dynamic-extent #'deserialize))
-    (deserialize (proto-class message))))
+    (deserialize (proto-class msg-desc))))
 
 (defun skip-field (stream)
   "Skip either a token or a balanced {}-pair."

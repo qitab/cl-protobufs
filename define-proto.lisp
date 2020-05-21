@@ -796,20 +796,20 @@ Arguments:
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
          (conc-name (conc-name-for-type type conc-name))
-         (message (make-instance 'protobuf-message
-                    :class type
-                    :name  name
-                    :qualified-name (make-qualified-name *protobuf* name)
-                    :parent *protobuf*
-                    :alias-for alias-for
-                    :conc-name conc-name
-                    :options   (remove-options options "default" "packed")
-                    :documentation documentation
-                    :source-location source-location))
+         (msg-desc (make-instance 'message-descriptor
+                                  :class type
+                                  :name  name
+                                  :qualified-name (make-qualified-name *protobuf* name)
+                                  :parent *protobuf*
+                                  :alias-for alias-for
+                                  :conc-name conc-name
+                                  :options   (remove-options options "default" "packed")
+                                  :documentation documentation
+                                  :source-location source-location))
          (index 0)
          (field-offset 0)
          (proto-parent *protobuf*)
-         (*protobuf* message)
+         (*protobuf* msg-desc)
          (bool-count (count-if #'non-repeated-bool-field fields))
          (bool-index -1)
          (bool-values (make-array bool-count :element-type 'bit :initial-element 0)))
@@ -836,15 +836,15 @@ Arguments:
              (map () #'collect-form definers)
              (case model-type
                ((define-group)
-                (setf (proto-parent model) message)
+                (setf (proto-parent model) msg-desc)
                 (when extra-slot
                   (collect-slot extra-slot))
                 (setf (proto-field-offset extra-field) field-offset)
                 (incf field-offset)
                 (collect-non-lazy-field extra-field)
-                (push extra-field (proto-fields message)))
+                (push extra-field (proto-fields msg-desc)))
                ((define-extension)
-                (push model (proto-extensions message))))))
+                (push model (proto-extensions msg-desc))))))
           (otherwise
            (multiple-value-bind (field slot idx lazy-reader)
                (process-field field :conc-name conc-name
@@ -858,20 +858,20 @@ Arguments:
              (if (proto-lazy-p field)
                  (collect-lazy-field field)
                  (collect-non-lazy-field field))
-             (assert (not (find-field message (proto-index field))) ()
+             (assert (not (find-field msg-desc (proto-index field))) ()
                      "The field ~S overlaps with another field in ~S"
                      ;; todo: this should probably refer to the external field name but I'll
                      ;; wait since I've no idea if that slot is bound at this point.
-                     (proto-internal-field-name field) (proto-class message))
+                     (proto-internal-field-name field) (proto-class msg-desc))
              (setq index idx)
              (when slot
                (collect-slot slot))
-             (push field (proto-fields message))
+             (push field (proto-fields msg-desc))
              (when lazy-reader
                (collect-form (make-lazy-reader-form type field lazy-reader)))))))
-      ;; Not required, but this swill have the proto-fields serialized
+      ;; Not required, but this will have the proto-fields serialized
       ;; in the order they were defined.
-      (setf (proto-fields message) (nreverse (proto-fields message)))
+      (setf (proto-fields msg-desc) (nreverse (proto-fields msg-desc)))
       ;; One extra slot for the deserialize-object-to-bytes feature
       (collect-slot
        (make-field-data
@@ -896,12 +896,12 @@ Arguments:
       ;; the memory reads by 1 per slot access.
       (collect-slot
        (make-field-data
-          :internal-slot-name 'proto-impl::%%is-set
-          :external-slot-name 'proto-impl::%%is-set
-          :type `(bit-vector ,(length fields))
-          :initarg :%%is-set
-          :initform `(make-array ,(length fields) :element-type 'bit
-                                                  :initial-element 0)))
+        :internal-slot-name 'proto-impl::%%is-set
+        :external-slot-name 'proto-impl::%%is-set
+        :type `(bit-vector ,(length fields))
+        :initarg :%%is-set
+        :initform `(make-array ,(length fields) :element-type 'bit
+                                                :initial-element 0)))
       (if alias-for
           ;; If we've got an alias, define a type that is the subtype of the Lisp class so that
           ;; typep and subtypep work.  Unless alias-for is a type which is not yet defined (as is
@@ -911,24 +911,24 @@ Arguments:
                    (alias-type (or (and alias-class (class-name alias-class))
                                    t)))
               (collect-type-form `(deftype ,type () ',alias-type))
-              (collect-form `(record-protobuf-object ',alias-for ,message :message))))
+              (collect-form `(record-protobuf-object ',alias-for ,msg-desc :message))))
           ;; If no alias, define the class now
           (collect-type-form
            (make-structure-class-forms type slots non-lazy-fields lazy-fields)))
       ;; Register it by the full symbol name.
-      (record-protobuf-object type message :message)
+      (record-protobuf-object type msg-desc :message)
       ;; Add its parent
-      (setf (proto-parent message) proto-parent)
-      (collect-form `(record-protobuf-object ',type ,message :message))
+      (setf (proto-parent msg-desc) proto-parent)
+      (collect-form `(record-protobuf-object ',type ,msg-desc :message))
       (let ((common-form
              `(progn
                 ,@type-forms
                 ,@forms
-                (setf (proto-parent ,message) ,proto-parent))))
+                (setf (proto-parent ,msg-desc) ,proto-parent))))
         `(progn
            ,(if source-location
                 `(progn
-                   (with-proto-source-location (,type ,name protobuf-message ,@source-location)
+                   (with-proto-source-location (,type ,name message-descriptor ,@source-location)
                      ,common-form))
                 `,common-form))))))
 
@@ -977,7 +977,7 @@ Arguments:
          (alias-for (and message (proto-alias-for message)))
          (extends (and message
                        (make-instance
-                        'protobuf-message
+                        'message-descriptor
                         :class  (proto-class message)
                         :name   (proto-name message)
                         :qualified-name (proto-qualified-name message)
@@ -989,7 +989,7 @@ Arguments:
                         :options  (remove-options
                                    (or options (copy-list (proto-options message)))
                                    "default" "packed")
-                        :message-type :extends         ;this message is an extension
+                        :message-type :extends ; this message is an extension
                         :documentation documentation)))
          ;; Only now can we bind *protobuf* to the new extended message
          (*protobuf* extends)
@@ -1212,7 +1212,7 @@ Arguments:
                     :external-field-name slot
                     :reader reader
                     :message-type :group))
-         (message (make-instance 'protobuf-message
+         (message (make-instance 'message-descriptor
                     :class type
                     :name  name
                     :qualified-name (make-qualified-name *protobuf* name)
@@ -1315,7 +1315,7 @@ Arguments:
          define-group
          ,message
          ,(if source-location
-              `((with-proto-source-location (,type ,name protobuf-message ,@source-location))
+              `((with-proto-source-location (,type ,name message-descriptor ,@source-location))
                 ,@type-forms
                 ,@forms)
               `(

@@ -99,7 +99,7 @@ Parameters:
              :initarg :source-location
              :initform nil))
   (:documentation
-   "The base class for all protobufs descriptor classes."))
+   "Shared attributes for most kinds of protobuf objects."))
 
 (defstruct proto-base
   "Base structure for protobuf meta-objects."
@@ -223,20 +223,21 @@ Parameters:
   (gethash alias *type-aliases*))
 
 (defvar *messages* (make-hash-table :test 'eq)
-  "Map from the protobuf message or schema symbol to the protobuf-message
-class metaobject. If there is an 'extends' instance this will
-be the last (largest) defined extended version of the protobuf-message
-meta-object.")
+  "Map from the protobuf message name symbol to the message-descriptor instance. If there is an
+'extends' instance this will be the last (largest) defined extended version of the
+message-descriptor.")
 
 (defvar *qualified-messages* (make-hash-table :test 'equal)
   "Map from the qualified-name to the protobuf-message
 class symbol.
 For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message.")
 
+;; todo: Rename to find-message-descriptor
 (declaim (inline find-message))
 (defun find-message (type)
-  "Return the protobuf-message instance either named by TYPE (a symbol)
-or thats named by the class-name of TYPE."
+  "Return the message-descriptor instance either named by TYPE (a symbol)
+or that's named by the class-name of TYPE."
+  ;; todo: I suspect this is left over from before the switch to structs.
   (gethash (if (typep type 'standard-object)
                (class-name type)
                type)
@@ -252,7 +253,7 @@ or thats named by the class-name of TYPE."
 
 ;; Do not use in production at run time.
 (defun find-message-with-string (message name)
-  "Return the protobuf-message instance in the package of
+  "Return the message-descriptor instance in the package of
 MESSAGE named by NAME (a string)."
   (declare (type string name))
   (find-message (intern (uncamel-case name)
@@ -422,8 +423,8 @@ Parameters:
 ;; a Message is not its descriptor.
 ;; This would have been far less confusing if it sounded more obviously like a 'descriptor'
 ;; and not the contents of the message per se.
-;; todo: rename to message-descriptor
-(defclass protobuf-message (descriptor)
+(defclass message-descriptor (descriptor)
+  ;; todo: would it be too obvious if we called this accessor-prefix?
   ((conc :type (or null string)                 ;the conc-name used for Lisp accessors
          :accessor proto-conc-name
          :initarg :conc-name
@@ -458,15 +459,15 @@ Parameters:
   (:documentation
    "The model class that represents a Protobufs message."))
 
-(defmethod make-load-form ((m protobuf-message) &optional environment)
-  (with-slots (class message-type alias) m
+(defmethod make-load-form ((msg-desc message-descriptor) &optional environment)
+  (with-slots (class message-type alias) msg-desc
     (multiple-value-bind (constructor initializer)
-        (make-load-form-saving-slots m :environment environment)
+        (make-load-form-saving-slots msg-desc :environment environment)
       (values (if (eq message-type :extends)
                 constructor
-                `(let ((m ,constructor))
-                   (record-protobuf-object ',message-type m :message)
-                   m))
+                `(let ((msg-desc ,constructor))
+                   (record-protobuf-object ',message-type msg-desc :message)
+                   msg-desc))
               initializer))))
 
 (defun record-protobuf-object (symbol message type)
@@ -482,35 +483,39 @@ in the hash-table indicated by TYPE."
              (proto-class message))))
     (:alias (setf (gethash symbol *type-aliases*) message))))
 
-(defmethod print-object ((m protobuf-message) stream)
+(defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*
-    (print-unreadable-object (m stream :type t :identity t)
+    (print-unreadable-object (msg-desc stream :type t :identity t)
       (format stream "~S~@[ (alias for ~S)~]~@[ (group~*)~]~@[ (extended~*)~]"
-              (and (slot-boundp m 'class) (proto-class m))
-              (and (slot-boundp m 'alias) (proto-alias-for m))
-              (and (slot-boundp m 'message-type) (eq (proto-message-type m) :group))
-              (and (slot-boundp m 'message-type) (eq (proto-message-type m) :extends))))
-    (format stream "~S" (and (slot-boundp m 'class) (proto-class m)))))
+              (and (slot-boundp msg-desc 'class)
+                   (proto-class msg-desc))
+              (and (slot-boundp msg-desc 'alias)
+                   (proto-alias-for msg-desc))
+              (and (slot-boundp msg-desc 'message-type)
+                   (eq (proto-message-type msg-desc) :group))
+              (and (slot-boundp msg-desc 'message-type)
+                   (eq (proto-message-type msg-desc) :extends))))
+    (format stream "~S" (and (slot-boundp msg-desc 'class) (proto-class msg-desc)))))
 
-(defmethod proto-package ((message protobuf-message))
-  (and (proto-parent message)
-       (proto-package (proto-parent message))))
+(defmethod proto-package ((msg-desc message-descriptor))
+  (and (proto-parent msg-desc)
+       (proto-package (proto-parent msg-desc))))
 
-(defmethod proto-lisp-package ((message protobuf-message))
-  (and (proto-parent message)
-       (proto-lisp-package (proto-parent message))))
+(defmethod proto-lisp-package ((msg-desc message-descriptor))
+  (and (proto-parent msg-desc)
+       (proto-lisp-package (proto-parent msg-desc))))
 
-(defmethod proto-real-lisp-package ((message protobuf-message))
-  (and (proto-parent message)
-       (proto-real-lisp-package (proto-parent message))))
+(defmethod proto-real-lisp-package ((msg-desc message-descriptor))
+  (and (proto-parent msg-desc)
+       (proto-real-lisp-package (proto-parent msg-desc))))
 
-(defmethod make-qualified-name ((message protobuf-message) name)
+(defmethod make-qualified-name ((msg-desc message-descriptor) name)
   ;; The qualified name is the message name "dot" the name
-  (let ((qual-name (strcat (proto-name message) "." name)))
-    (if (proto-parent message)
-      ;; If there's a parent for this message (either a message or
-      ;; the schema), prepend the name (or package) of the parent
-      (make-qualified-name (proto-parent message) qual-name)
+  (let ((qual-name (strcat (proto-name msg-desc) "." name)))
+    (if (proto-parent msg-desc)
+      ;; If there's a parent for this message descriptor (either a message or the schema), prepend
+      ;; the name (or package) of the parent.
+      (make-qualified-name (proto-parent msg-desc) qual-name)
       ;; Guard against a message in the middle of nowhere
       qual-name)))
 
@@ -519,17 +524,17 @@ in the hash-table indicated by TYPE."
    "Given a Protobufs message and a slot name, field name or index,
     returns the Protobufs field having that name."))
 
-(defmethod find-field ((message protobuf-message) (name symbol) &optional relative-to)
+(defmethod find-field ((msg-desc message-descriptor) (name symbol) &optional relative-to)
   (declare (ignore relative-to))
-  (find name (proto-fields message) :key #'proto-internal-field-name))
+  (find name (proto-fields msg-desc) :key #'proto-internal-field-name))
 
-(defmethod find-field ((message protobuf-message) (name string) &optional relative-to)
-  (find-qualified-name name (proto-fields message)
-                       :relative-to (or relative-to message)))
+(defmethod find-field ((msg-desc message-descriptor) (name string) &optional relative-to)
+  (find-qualified-name name (proto-fields msg-desc)
+                       :relative-to (or relative-to msg-desc)))
 
-(defmethod find-field ((message protobuf-message) (index integer) &optional relative-to)
+(defmethod find-field ((msg-desc message-descriptor) (index integer) &optional relative-to)
   (declare (ignore relative-to))
-  (find index (proto-fields message) :key #'proto-index))
+  (find index (proto-fields msg-desc) :key #'proto-index))
 
 
 ;; Extensions protocol
@@ -559,8 +564,9 @@ in the hash-table indicated by TYPE."
 (defconstant $empty-list    'empty-list)
 (defconstant $empty-vector  'empty-vector)
 
-;; Describes a field within a protobuf message.
+;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
+;; todo: rename to field-descriptor
 (defclass protobuf-field (descriptor)
   ((type :type string                           ; The name of the Protobuf type for the field
          :accessor proto-type

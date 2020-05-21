@@ -36,7 +36,7 @@
    #:protobuf-option
    #:protobuf-enum
    #:protobuf-enum-value
-   #:protobuf-message
+   #:message-descriptor
    #:protobuf-field
    #:protobuf-extension
    #:protobuf-service

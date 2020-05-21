@@ -218,11 +218,12 @@
     (format stream "~&~@[~VT~]~%"
             (and (not (zerop indentation)) indentation))))
 
-(defmethod write-schema-as ((type (eql :proto)) (message protobuf-message) stream
+(defmethod write-schema-as ((type (eql :proto)) (msg-desc message-descriptor) stream
                             &key (indentation 0) more index arity)
   (declare (ignore more arity))
-  (let ((*protobuf* message))
-    (with-prefixed-accessors (name class alias-for message-type documentation options) (proto- message)
+  (let ((*protobuf* msg-desc))
+    (with-prefixed-accessors (name class alias-for message-type documentation options)
+        (proto- msg-desc)
       (cond ((eq message-type :group)
              ;; If we've got a group, the printer for fields has already
              ;; printed a partial line (nice modularity, huh?)
@@ -237,11 +238,11 @@
              (dolist (option options)
                (format stream "~&~VToption ~:/protobuf-option/;~%"
                        (+ indentation 2) option))
-             (loop for (enum . more) on (proto-enums message) doing
+             (loop for (enum . more) on (proto-enums msg-desc) doing
                (write-schema-as type enum stream :indentation (+ indentation 2) :more more))
-             (loop for (field . more) on (proto-fields message) doing
+             (loop for (field . more) on (proto-fields msg-desc) doing
                (write-schema-as type field stream
-                                :indentation (+ indentation 2) :more more :message message))
+                                :indentation (+ indentation 2) :more more :message msg-desc))
              (format stream "~&~@[~VT~]}~%"
                      (and (not (zerop indentation)) indentation)))
             (t
@@ -250,7 +251,7 @@
              (format stream "~&~@[~VT~]~A ~A {~%"
                      (and (not (zerop indentation)) indentation)
                      (if (eq message-type :message) "message" "extend")
-                     (maybe-qualified-name message))
+                     (maybe-qualified-name msg-desc))
              (let ((other (and class (not (string-equal name (class-name->proto class))) class)))
                (when other
                  (format stream "~&~VToption (lisp_name) = \"~A:~A\";~%"
@@ -262,18 +263,18 @@
                (format stream "~&~VToption ~:/protobuf-option/;~%"
                        (+ indentation 2) option))
              (cond ((eq message-type :extends)
-                    (loop for (field . more) on (proto-extended-fields message) doing
+                    (loop for (field . more) on (proto-extended-fields msg-desc) doing
                       (write-schema-as type field stream
                                        :indentation (+ indentation 2) :more more
-                                       :message message)))
+                                       :message msg-desc)))
                    (t
-                    (loop for (enum . more) on (proto-enums message) doing
+                    (loop for (enum . more) on (proto-enums msg-desc) doing
                       (write-schema-as type enum stream :indentation (+ indentation 2) :more more))
-                    (loop for (field . more) on (proto-fields message) doing
+                    (loop for (field . more) on (proto-fields msg-desc) doing
                       (write-schema-as type field stream
                                        :indentation (+ indentation 2) :more more
-                                       :message message))
-                    (loop for (extension . more) on (proto-extensions message) doing
+                                       :message msg-desc))
+                    (loop for (extension . more) on (proto-extensions msg-desc) doing
                       (write-schema-as type extension stream :indentation (+ indentation 2) :more more))))
              (format stream "~&~@[~VT~]}~%"
                      (and (not (zerop indentation)) indentation)))))))
@@ -282,7 +283,7 @@
   "Given a message, return a fully qualified name if the short name
    is not sufficient to name the message in the current scope."
   (etypecase x
-    ((or protobuf-message protobuf-enum  protobuf-enum-value
+    ((or message-descriptor protobuf-enum  protobuf-enum-value
          protobuf-type-alias)
      (cond ((string= (make-qualified-name (proto-parent x) (proto-name x))
                      (proto-qualified-name x))
@@ -316,7 +317,7 @@
       ;; FIELD's VALUE is not the same as its NAME.
       ;; Likewise, [(lisp_container)=VECTOR].
       (declare (ignore lisp-type-override))
-      (cond ((and (typep msg 'protobuf-message)
+      (cond ((and (typep msg 'message-descriptor)
                   (eq (proto-message-type msg) :group))
              (format stream "~&~@[~VT~]~(~A~) "
                      (and (not (zerop indentation)) indentation) label)
@@ -610,12 +611,12 @@
             (+ indentation 2) serializer
             (+ indentation 2) deserializer)))
 
-(defmethod write-schema-as ((type (eql :lisp)) (message protobuf-message) stream
+(defmethod write-schema-as ((type (eql :lisp)) (msg-desc message-descriptor) stream
                             &key (indentation 0) more index arity)
   (declare (ignore more))
-  (let ((*protobuf* message))
+  (let ((*protobuf* msg-desc))
     (with-prefixed-accessors (name class alias-for conc-name message-type
-                              documentation source-location) (proto- message)
+                              documentation source-location) (proto- msg-desc)
       (cond ((eq message-type :group)
              (when documentation
                (write-schema-documentation type documentation stream :indentation indentation))
@@ -637,14 +638,14 @@
                        conc-name conc-name (and (or documentation source-location) (+ indentation 5))
                        documentation documentation (and source-location (+ indentation 5))
                        source-location source-location))
-             (loop for (enum . more) on (proto-enums message) doing
+             (loop for (enum . more) on (proto-enums msg-desc) doing
                (write-schema-as type enum stream :indentation (+ indentation 2) :more more)
                (when more
                  (terpri stream)))
-             (loop for (field . more) on (proto-fields message) doing
+             (loop for (field . more) on (proto-fields msg-desc) doing
                (write-schema-as type field stream
                                 :indentation (+ indentation 2) :more more
-                                :message message)
+                                :message msg-desc)
                (when more
                  (terpri stream))))
             (t
@@ -672,24 +673,24 @@
                      (t
                       (format stream " ()"))))
              (cond ((eq message-type :extends)
-                    (loop for (field . more) on (proto-extended-fields message) doing
+                    (loop for (field . more) on (proto-extended-fields msg-desc) doing
                       (write-schema-as type field stream
                                        :indentation (+ indentation 2) :more more
-                                       :message message)
+                                       :message msg-desc)
                       (when more
                         (terpri stream))))
                    (t
-                    (loop for (enum . more) on (proto-enums message) doing
+                    (loop for (enum . more) on (proto-enums msg-desc) doing
                       (write-schema-as type enum stream :indentation (+ indentation 2) :more more)
                       (when more
                         (terpri stream)))
-                    (loop for (field . more) on (proto-fields message) doing
+                    (loop for (field . more) on (proto-fields msg-desc) doing
                       (write-schema-as type field stream
                                        :indentation (+ indentation 2) :more more
-                                       :message message)
+                                       :message msg-desc)
                       (when more
                         (terpri stream)))
-                    (loop for (extension . more) on (proto-extensions message) doing
+                    (loop for (extension . more) on (proto-extensions msg-desc) doing
                       (write-schema-as type extension stream :indentation (+ indentation 2) :more more)
                       (when more
                         (terpri stream)))))))
@@ -732,7 +733,7 @@
                              `(vector-of ,cl)
                              `(list-of ,cl)))
                           (t cl)))))
-      (cond ((and (typep msg 'protobuf-message)
+      (cond ((and (typep msg 'message-descriptor)
                   (eq (proto-message-type msg) :group))
              (write-schema-as :lisp msg stream :indentation indentation :index index :arity label))
             (t
@@ -866,9 +867,9 @@
   (list (proto-class enum)))
 
 ;; Export the class name and all of the accessor names
-(defmethod collect-exports ((message protobuf-message))
-  (append (list (proto-class message))
-          (mapcan #'collect-exports (proto-fields message))))
+(defmethod collect-exports ((msg-desc message-descriptor))
+  (append (list (proto-class msg-desc))
+          (mapcan #'collect-exports (proto-fields msg-desc))))
 
 ;; Export just the slot accessor name
 (defmethod collect-exports ((field protobuf-field))
