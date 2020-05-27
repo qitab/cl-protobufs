@@ -23,10 +23,10 @@ OFILES = enum.o field.o file.o generator.o literals.o message.o \
 	names.o service.o proto2-descriptor-extensions.o main.o
 
 CXXFLAGS = -std=c++14 -I$(PROTOC_ROOT)/include -I.
-LIBS = -Wl,-L$(PROTOC_ROOT)/lib -Wl,-rpath -Wl,$(PROTOC_ROOT)/lib -lprotoc -lprotobuf -lpthread
+LIBS = -Wl,-L$(PROTOC_ROOT)/lib -Wl,-rpath -Wl,$(PROTOC_ROOT)/lib -lprotoc -lprotobuf -pthread
 
 protoc-gen-lisp: $(OFILES) Makefile
-	$(CXX) $(LIBS) -o protoc-gen-lisp $(OFILES)
+	$(CXX) $(OFILES) -o protoc-gen-lisp $(LIBS)
 
 install: protoc-gen-lisp
 	mkdir -p $(INSTALL_ROOT)
