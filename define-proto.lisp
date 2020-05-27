@@ -1075,9 +1075,6 @@ Arguments:
           (otherwise
            (multiple-value-bind (field slot idx)
                (process-field field :conc-name conc-name :alias-for alias-for)
-             ;; (assert (not (find-field extends (proto-index field))) ()
-             ;;         "The field ~S overlaps with another field in ~S"
-             ;;         (proto-value field) (proto-class extends))
              (assert (index-within-extensions-p idx message) ()
                      "The index ~D is not in range for extending ~S"
                      idx (proto-class message))
