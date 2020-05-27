@@ -541,7 +541,7 @@
                  (expect-char stream #\{ () "message")
                  (maybe-skip-comments stream)))
          (qualified-name (make-qualified-name desc name))
-         ;; todo s/name/qualified-name/ in next line
+         ;; TODO(dlroxe) s/name/qualified-name/ in next line
          (class (proto->class-name name *protobuf-package*))
          (msg-desc (make-instance
                     'message-descriptor
@@ -675,7 +675,7 @@
                        :parent msg-desc
                        :label label
                        :index idx
-                       ;; todo: why isn't :external-field-name set here too?  Also in
+                       ;; TODO(cgay): why isn't :external-field-name set here too?  Also in
                        ;; parse-proto-group.
                        :internal-field-name slot
                        ;; Fields parsed from .proto files usually get an accessor

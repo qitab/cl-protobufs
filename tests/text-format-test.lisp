@@ -61,11 +61,11 @@ Parameters:
 
 (deftest test-parse-text-format-nested-symbol-names (text-format-tests)
   (assert-true (find-message-for-class 'protobufs-test-proto:text-format-test))
-  ;; todo should expected nested name, not top-level name
+  ;; TODO(dlroxe) should expected nested name, not top-level name
   (assert-true (find-message-for-class 'text-format-test.nested-message1))
   ; (assert-true (find-message-for-class 'protobufs-test-proto:text-format-test.nested-message1))
 
-  ;; todo should assert-true nested name, not top-level name
+  ;; TODO(dlroxe) should assert-true nested name, not top-level name
   (assert-true (find-message-for-class 'text-format-test.nested-message1.nested-message2))
   ; (assert-true (find-message-for-class
   ;          'protobufs-test-proto:text-format-test.nested-message1.nested-message2))

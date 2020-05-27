@@ -62,7 +62,7 @@ Parameters:
           msg-bytes (serialize-object-to-bytes msg 'required-message))
     (assert-true (equalp msg-bytes #(8 2 16 2)))
 
-    ;; todo: We should optionally throw an error that
+    ;; TODO(jgodbout): We should optionally throw an error that
     ;; a required field is unset.
     (clear msg)
     (setf (required-no-default msg) 2

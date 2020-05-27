@@ -103,7 +103,7 @@ Parameters:
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (unpacked-enum m2)))
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (packed-enum packed))))))
 
-;; todo: Fix these tests.
+;; TODO(jgodbout): Fix these tests.
 ;; (progn
 ;;   (deftest inner-packed-fast-function-test ()
 ;;     (dolist (class '(test-packed-inner test-packed-outer))

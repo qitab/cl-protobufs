@@ -39,6 +39,6 @@ message TextFormatTest {
   }
 
   optional NestedMessage1 one_level_nesting = 18;
-  // todo inner nesting doesn't work yet
+  // TODO(dlroxe) inner nesting doesn't work yet
   // optional NestedMessage1.NestedMessage2 two_level_nesting = 19;
 }
