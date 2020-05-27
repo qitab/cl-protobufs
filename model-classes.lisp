@@ -12,7 +12,7 @@
 (defvar *all-schemas* (make-hash-table :test #'equal)
   "A global table mapping names to file-descriptor objects.")
 
-;; todo: this should be find-file-descriptor now
+;; TODO(cgay): this should be find-file-descriptor now
 (defun find-schema (name)
   "Find a file-descriptor for the given name. Returns nil if not found.
 Parameters:
@@ -75,7 +75,7 @@ Parameters:
          :initarg :name
          :initform nil)
    ;; The fully qualified name, e.g., "proto2.MessageSet"
-   ;; todo: rename this to qualified-name, to match the accessor
+   ;; TODO(cgay): rename this to qualified-name, to match the accessor
    (qual-name :type string
               :accessor proto-qualified-name
               :initarg :qualified-name
@@ -88,13 +88,13 @@ Parameters:
             :accessor proto-options
             :initarg :options
             :initform ())
-   ;; todo: rename to documentation, to match the accessor
+   ;; TODO(cgay): rename to documentation, to match the accessor
    (doc :type (or null string)
         :accessor proto-documentation
         :initarg :documentation
         :initform nil)
    ;; A list of (pathname start-pos end-pos) triples.
-   ;; todo: rename to source-location, to match the accessor
+   ;; TODO(cgay): rename to source-location, to match the accessor
    (location :accessor proto-source-location
              :initarg :source-location
              :initform nil))
@@ -105,7 +105,7 @@ Parameters:
   "Base structure for protobuf meta-objects."
   (index nil :type (signed-byte 32)))
 
-;; todo: Remove this temporary override.
+;; TODO(jgodbout): Remove this temporary override.
 (defmethod proto-index ((proto-message proto-base))
   (proto-base-index proto-message))
 
@@ -149,7 +149,7 @@ Parameters:
             :accessor proto-imports
             :initarg :imports
             :initform ())
-   ;; todo: rename to imported-files or just imports?
+   ;; TODO(cgay): rename to imported-files or just imports?
    (schemas :type (list-of file-descriptor)  ; the schemas that were successfully imported
             :accessor proto-imported-schemas ; this gets used for chasing namespaces
             :initform ())
@@ -232,12 +232,12 @@ message-descriptor.")
 class symbol.
 For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message.")
 
-;; todo: Rename to find-message-descriptor
+;; TODO(cgay): Rename to find-message-descriptor
 (declaim (inline find-message))
 (defun find-message (type)
   "Return the message-descriptor instance either named by TYPE (a symbol)
 or that's named by the class-name of TYPE."
-  ;; todo: I suspect this is left over from before the switch to structs.
+  ;; TODO(cgay): I suspect this is left over from before the switch to structs.
   (gethash (if (typep type 'standard-object)
                (class-name type)
                type)
@@ -424,7 +424,7 @@ Parameters:
 ;; This would have been far less confusing if it sounded more obviously like a 'descriptor'
 ;; and not the contents of the message per se.
 (defclass message-descriptor (descriptor)
-  ;; todo: would it be too obvious if we called this accessor-prefix?
+  ;; TODO(cgay): would it be too obvious if we called this accessor-prefix?
   ((conc :type (or null string)                 ;the conc-name used for Lisp accessors
          :accessor proto-conc-name
          :initarg :conc-name
@@ -440,7 +440,7 @@ Parameters:
    (field-vect :type vector
                ;; The FIELDS slot (more or less) as a vector. If the index space is dense,
                ;; the vector is accessed by field index, otherwise it requires linear scan.
-               ;; todo: sparse indices can do better than linear scan.
+               ;; TODO(dougk): sparse indices can do better than linear scan.
                :accessor proto-field-vect)
    (extended-fields :type (list-of protobuf-field) ;the extended fields defined in this message
                     :accessor proto-extended-fields
@@ -566,7 +566,7 @@ in the hash-table indicated by TYPE."
 
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
-;; todo: rename to field-descriptor
+;; TODO(cgay): rename to field-descriptor
 (defclass protobuf-field (descriptor)
   ((type :type string                           ; The name of the Protobuf type for the field
          :accessor proto-type
@@ -587,7 +587,7 @@ in the hash-table indicated by TYPE."
                  :accessor proto-field-offset
                  :initarg :field-offset)
    ;; The name of the slot holding the field value.
-   ;; todo: there's no deep reason we must have internal and external field names. It's a
+   ;; TODO(cgay): there's no deep reason we must have internal and external field names. It's a
    ;; historical artifact that can probably be removed once the QPX protobuf code has been updated.
    (internal-field-name :type (or null symbol)
                         :accessor proto-internal-field-name
@@ -710,7 +710,7 @@ in the hash-table indicated by TYPE."
             (proto-extension-from e) (proto-extension-to e))))
 
 
-;; todo: rename to service-descriptor
+;; TODO(cgay): rename to service-descriptor
 (defclass protobuf-service (descriptor)
   ((methods :type (list-of protobuf-method)
             :accessor proto-methods

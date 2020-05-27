@@ -65,7 +65,7 @@ Parameters:
 
 (deftest bool-has-works (quick-tests)
   "Assert-True that 'has' works for bools."
-  ;; todo?
+  ;; TODO(cgay): why do we call internals here rather than (make-test1-proto)?
   (let* ((p (proto-impl:make-object cl-protobufs.protobuf-unittest:test1-proto)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:u-bool)))
     (setf (cl-protobufs.protobuf-unittest:u-bool p) nil)

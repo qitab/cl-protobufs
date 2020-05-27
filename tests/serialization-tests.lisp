@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-;; todo: Remove the remaining define-schema: automobile
+;; todo(jgodbout): Remove the remaining define-schema: automobile
 
 (defpackage #:cl-protobufs.test.serialization-test
   (:use #:cl
@@ -147,7 +147,7 @@ Parameters:
                       (second (recvals (deserialize-object 'basic-test6 tser6)))
                       strval)))))
 
-;; todo: surely this can re-use the code from basic-serialization, above?
+;; TODO(cgay): surely this can re-use the code from basic-serialization, above?
 (deftest basic-optimized-serialization (serialization-tests)
   (dolist (class '(basic-test1 basic-test2 basic-test3 basic-test4 basic-test5 basic-test6))
     (let ((message (proto:find-message-for-class class)))

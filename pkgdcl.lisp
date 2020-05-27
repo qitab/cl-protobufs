@@ -31,7 +31,7 @@
    #:base-message
 
    ;; Model classes -  aka proto descriptors.
-   ;; todo: rename from protobuf-* to *-descriptor
+   ;; TODO(cgay): rename from protobuf-* to *-descriptor
    #:file-descriptor
    #:protobuf-option
    #:protobuf-enum
