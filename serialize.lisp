@@ -69,7 +69,7 @@
 ;; Allow clients to add their own methods
 ;; This is how we address the problem of cycles, e.g. -- if you have an object
 ;; that may contain cycles, serialize the cyclic object using a "handle"
-;; todo: Delete the geenric serialize-object
+;; TODO(jgodbout): Delete the geenric serialize-object
 ;; and remove the type option for the serialize defuns.
 (defgeneric serialize-object (object type buffer)
   (:documentation
@@ -650,7 +650,7 @@ See protobuf-field for the distinction between index, offset, and bool-number."
                      (if (eq (proto-message-type msg) :group)
                          ;; The end tag for a group is the field index shifted and
                          ;; and-ed with a constant.
-                         ;; todo: Group serialization works and
+                         ;; TODO(jgodbout): Group serialization works and
                          ;; is implement with the regular serializers, so
                          ;; make it work here.
                          (let ((tag1 (make-tag $wire-type-start-group index))
@@ -736,7 +736,7 @@ See protobuf-field for the distinction between index, offset, and bool-number."
   (nreverse
    (let (serializers)
      (dolist (field (proto-fields message) serializers)
-       ;; todo: class is duplicated
+       ;; TODO(shaunm): class is duplicated
        (let* ((class (proto-class field))
               (msg (and class (not (keywordp class))
                         (or (find-message class)

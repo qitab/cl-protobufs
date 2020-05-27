@@ -314,11 +314,11 @@ Arguments:
    Returns RESULT."
   (with-gensyms (vidx vlen vvec)
     `(let* ((,vvec ,vector)
-            ;; todo: Added by me - the name of the function should change if it is goint to
+            ;; TODO(shaunm): Added by me - the name of the function should change if it is goint to
             ;; accept nil
             (,vlen (if ,vvec (length (the vector ,vvec))
                        0)))
-       ;; todo?
+       ;; TODO(shaunm): Why isn't this just (loop across)?
        (loop for ,vidx fixnum from 0 below ,vlen
              as ,var = (aref ,vvec ,vidx)
              do (progn ,@body)
@@ -327,7 +327,7 @@ Arguments:
 (defmacro doseq ((var sequence &optional result) &body body)
   "Iterates over SEQUENCE, binding VAR to each element in turn. Uses DOLIST or DOVECTOR depending on
    the type of the sequence. In optimized code, this turns out to be faster than (map () #'f
-   sequence). Returns RESULT. Note that the body gets expanded twice!" ;; todo: fix
+   sequence). Returns RESULT. Note that the body gets expanded twice!" ;; TODO(dougk): fix
   (with-gensyms (vseq)
     `(let ((,vseq ,sequence))
        (if (vectorp ,vseq)
@@ -496,8 +496,8 @@ Parameters:
          (path-part (butlast full-path))
          (name-part (last full-path))
          (pkg1 (when path-from-top (find-proto-package top-level)))
-         ;; todo Next line is faithful to original implementation, but
-         ;; todo s/path-part/name-part would make more sense to me.
+         ;; TODO(dlroxe) Next line is faithful to original implementation, but
+         ;; TODO(dlroxe) s/path-part/name-part would make more sense to me.
          (pkgn (when path-from-top (find-proto-package path-part)))
          (package (or pkg1 pkgn package))
          (name (format nil "~{~A~^.~}" (cond (pkg1 path-from-top)
