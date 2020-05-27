@@ -11,14 +11,6 @@ TO DO
 [  - Printers need to print qualified names, as needed				]
 [  - 'find-message' and 'find-enum' need to search namespaces			]
 [     if the quick compare against the name/class fails				]
-  - 'message Foo { message Bar { ... } ... }'
-    should not produce a Lisp class defaultly named 'foo.bar', but...
-    - Add a keyword arg, :class-name, that overrides this convention;
-      in .proto files this should be called lisp_class
-    - Also, add :slot-name for slots and :type-name for enums
-      (called lisp_slot and lisp_type in .proto files)
-    - Rationale: 'foo.bar' isn't very Lispy;
-      for the most part, packages provide enough namespaces to avoid clashes
 
 - Get 'merge-from-message' fully working
   - See the place in 'deserialize-object' that needs to merge, too
