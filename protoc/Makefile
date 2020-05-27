@@ -16,17 +16,17 @@ INSTALL_ROOT ?= /usr/local/bin
 # Directory where Google's protocol buffer compiler is installed. This
 # should be the same directory you gave as the --prefix option to
 # ./configure when installing protobuf.
-PROTOC_ROOT ?= /usr/local
+PROTOC_ROOT ?= /usr
 PROTOC      ?= $(PROTOC_ROOT)/bin/protoc
 
 OFILES = enum.o field.o file.o generator.o literals.o message.o \
 	names.o service.o proto2-descriptor-extensions.o main.o
 
 CXXFLAGS = -std=c++14 -I$(PROTOC_ROOT)/include -I.
-LIBS = -Wl,-L$(PROTOC_ROOT)/lib -Wl,-rpath -Wl,$(PROTOC_ROOT)/lib -lprotoc -lprotobuf -lpthread
+LIBS = -Wl,-L$(PROTOC_ROOT)/lib -Wl,-rpath -Wl,$(PROTOC_ROOT)/lib -lprotoc -lprotobuf -pthread
 
 protoc-gen-lisp: $(OFILES) Makefile
-	$(CXX) $(LIBS) -o protoc-gen-lisp $(OFILES)
+	$(CXX) $(OFILES) -o protoc-gen-lisp $(LIBS)
 
 install: protoc-gen-lisp
 	mkdir -p $(INSTALL_ROOT)
