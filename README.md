@@ -39,6 +39,23 @@ buffers](https://developers.google.com/protocol-buffers/) for Common Lisp.
     $ sudo cp protoc-gen-lisp /usr/local/bin/
     ```
 
+    Make sure the installation directory is on your `PATH`.
+
+## Using `protoc-gen-lisp`
+
+    To test your build, change to the cl-protobufs/tests directory and try
+    building one of the .proto files:
+
+    ```shell
+    $ cd ../tests
+    $ protoc --plugin=protoc-gen-lisp=/usr/local/bin/protoc-gen-lisp \
+      --lisp_out=output-file=case-preservation.lisp:. \
+      case-preservation.proto
+    ```
+
+    This command should generate a file named `case-preservation.lisp` in the
+    current directory.
+
 ### ASDF
 
 It's currently possible to build cl-protobufs and cl-protobufs-test with ASDF,
