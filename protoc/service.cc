@@ -12,8 +12,6 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/stubs/strutil.h>
-
-
 #include "literals.h"
 #include "names.h"
 

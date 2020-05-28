@@ -9,8 +9,6 @@
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/strutil.h>
 
-
-
 namespace google {
 namespace protobuf {
 namespace cl_protobufs {

@@ -13,9 +13,6 @@
 
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/stubs/strutil.h>
-
-
-
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"

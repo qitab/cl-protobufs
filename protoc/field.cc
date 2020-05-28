@@ -14,8 +14,6 @@
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/extension_set.h>
 #include <google/protobuf/stubs/strutil.h>
-
-
 #include "proto2-descriptor-extensions.pb.h"
 #include "literals.h"
 #include "names.h"
