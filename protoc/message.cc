@@ -17,7 +17,6 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
 #include <google/protobuf/stubs/strutil.h>
-#include <google/protobuf/stubs/strutil.h>
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"
