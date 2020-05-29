@@ -41,20 +41,40 @@ buffers](https://developers.google.com/protocol-buffers/) for Common Lisp.
 
     Make sure the installation directory is on your `PATH`.
 
-## Using `protoc-gen-lisp`
+## Using `protoc` to Generate Lisp Code
 
-    To test your build, change to the cl-protobufs/tests directory and try
-    building one of the .proto files:
+To test your build, try generating Lisp code from the
+`cl-protobufs/tests/case-preservation.proto` file with the following command.
+Note that the command may differ slightly depending on what directory you're in
+and where you installed `protoc-gen-lisp`. In this case we assume you're in the
+directory **containing** the `cl-protobufs` directory. The reason will become
+clear in a moment.
 
-    ```shell
-    $ cd ../tests
-    $ protoc --plugin=protoc-gen-lisp=/usr/local/bin/protoc-gen-lisp \
-      --lisp_out=output-file=case-preservation.lisp:. \
-      case-preservation.proto
-    ```
+```shell
+$ protoc --plugin=protoc-gen-lisp=/usr/local/bin/protoc-gen-lisp \
+  --lisp_out=output-file=case-preservation.lisp:/tmp \
+  case-preservation.proto
+```
 
-    This command should generate a file named `case-preservation.lisp` in the
-    current directory.
+This command should generate a file named `case-preservation.lisp` in the
+`/tmp/` directory.
+
+When a .proto file imports another .proto file, `protoc` needs to know how to
+find the imported file. It does this by looking for the file relative to the
+values passed to it with the `--proto_path` option (or the `-I` short option).
+
+To see an example of this, you can try generating Lisp code for
+`cl-protobufs/tests/extend-test.proto`.  Still in the same directory, run the
+following command:
+
+```shell
+protoc --plugin=protoc-gen-lisp=/usr/local/bin/protoc-gen-lisp \
+  --lisp_out=output-file=extend-test.lisp:/tmp --proto_path=. \
+  cl-protobufs/tests/extend-test.proto
+```
+
+The file `/tmp/extend-test.lisp` should be generated. Note that the .lisp file
+for each imported file also needs to be generated separately.
 
 ### ASDF
 
@@ -84,6 +104,18 @@ release.
   cl-user> (ql:quickload :cl-protobufs-test)
   cl-user> (clunit:run-suite 'cl-protobufs.wire-test::wire-tests)
   ```
+
+## Submitting changes to cl-protobufs
+
+### Submitting a change through GitHub.
+
+1. Create a pull request like usual through GitHub.
+2. Sign the [Google CLA agreement](https://cla.developers.google.com/clas).
+This must be done only once for all Google projects.
+This must be done for your pull request to be approved.
+3. Add someone in the [Googlers team](https://github.com/orgs/qitab/teams/googlers) as a reviewer.
+4. When the reviewer is satisfied they will add the `Ready for Google` label.
+5. The pull request will later be merged.
 
 ## Examples
 

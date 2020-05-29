@@ -122,15 +122,15 @@ Parameters:
 
 ;; A Protobufs schema, corresponds to one .proto file
 (defclass file-descriptor (descriptor)
-  ((syntax :type (or null string)               ;syntax, passed on but otherwise ignored
+  ((syntax :type (or null string)               ; syntax, passed on but otherwise ignored
            :accessor proto-syntax
            :initarg :syntax
            :initform "proto2")
-   (package :type (or null string)              ;the Protobufs package
+   (package :type (or null string)              ; the Protobufs package
             :accessor proto-package
             :initarg :package
             :initform nil)
-   (lisp-pkg :type (or null string)             ;the Lisp package, from 'option lisp_package = ...'
+   (lisp-pkg :type (or null string)             ; the Lisp package, from 'option lisp_package = ...'
              :accessor proto-lisp-package
              :initarg :lisp-package
              :initform nil)
