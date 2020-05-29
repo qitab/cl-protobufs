@@ -85,6 +85,18 @@ release.
   cl-user> (clunit:run-suite 'cl-protobufs.wire-test::wire-tests)
   ```
 
+## Submitting changes to cl-protobufs
+
+### Submitting a change through GitHub.
+
+1. Create a pull request like usual through GitHub.
+2. Sign the [Google CLA agreement](https://cla.developers.google.com/clas).
+This must be done only once for all Google projects.
+This must be done for your pull request to be approved.
+3. Add someone in the [Googlers team](https://github.com/orgs/qitab/teams/googlers) as a reviewer.
+4. When the reviewer is satisfied they will add the `Ready for Google` label.
+5. The pull request will later be merged.
+
 ## Examples
 
 The files `example/math.lisp` and `example/math-test.lisp` give a simple example
