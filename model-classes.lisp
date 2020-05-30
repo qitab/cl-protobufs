@@ -683,10 +683,10 @@ in the hash-table indicated by TYPE."
 
 ;; An extension range within a message
 (defclass protobuf-extension (abstract-descriptor)
-  ((from :type (integer 1 #.(1- (ash 1 29)))    ;the index number for this field
+  ((from :type (integer 1 #.(1- (ash 1 29)))    ; the index number for this field
          :accessor proto-extension-from
          :initarg :from)
-   (to :type (integer 1 #.(1- (ash 1 29)))      ;the index number for this field
+   (to :type (integer 1 #.(1- (ash 1 29)))      ; the index number for this field
        :accessor proto-extension-to
        :initarg :to))
   (:documentation
