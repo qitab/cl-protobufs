@@ -10,7 +10,6 @@
 
 #include <ctype.h>
 
-#include <google/protobuf/stubs/macros.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
 #include <google/protobuf/stubs/strutil.h>
