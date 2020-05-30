@@ -174,8 +174,8 @@ all of its sub-objects have all of their required fields set.
 A protobuf object that is not initialized may not be correctly
 serialized/deserialized and may throw an error on
 serialization/deserialization.
-Object is the protobuf message to check. Will give an error
-  if object is not a protobuf message.
+Object is the protobuf message to check.
+Will throw an error if object is not a protobuf message.
 
 ```lisp
 (defun proto-equal (message-1 message-2 &key exact nil))
