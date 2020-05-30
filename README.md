@@ -172,10 +172,10 @@ Can specify whether to suppress-line-breaks.
 Check if OBJECT has every required field set, and recursively
 all of its sub-objects have all of their required fields set.
 A protobuf object that is not initialized may not be correctly
-serialized/deserialized and may throw an error on
+serialized/deserialized and may signal an error on
 serialization/deserialization.
 Object is the protobuf message to check.
-Will throw an error if object is not a protobuf message.
+Will signal an error if object is not a protobuf message.
 
 ```lisp
 (defun proto-equal (message-1 message-2 &key exact nil))
