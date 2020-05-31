@@ -233,6 +233,17 @@ Parameters:
     (assert-true (proto-impl::proto-equal p q))
     (assert-true (proto-impl::proto-equal p q :exact t))))
 
+(deftest test-make-qualified-name (quick-tests)
+  (assert-true
+      (string= (proto-impl::make-qualified-name
+                (find-message 'cl-protobufs.protobuf-unittest:test-protocol)
+                "bbaz")
+               "protobuf_unittest.TestProtocol.bbaz"))
+  (assert-true
+      (string= (proto-impl::make-qualified-name
+                (find-schema 'cl-protobufs.protobuf-unittest:testproto2)
+                "bbaz")
+               "protobuf_unittest.bbaz")))
 
 #|
 (deftest test-pb-write ()

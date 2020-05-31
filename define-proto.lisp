@@ -800,7 +800,6 @@ Arguments:
                                   :class type
                                   :name  name
                                   :qualified-name (make-qualified-name *protobuf* name)
-                                  :parent *protobuf*
                                   :alias-for alias-for
                                   :conc-name conc-name
                                   :options   (remove-options options "default" "packed")
@@ -808,7 +807,6 @@ Arguments:
                                   :source-location source-location))
          (index 0)
          (field-offset 0)
-         (proto-parent *protobuf*)
          (*protobuf* msg-desc)
          (bool-count (count-if #'non-repeated-bool-field fields))
          (bool-index -1)
@@ -836,7 +834,6 @@ Arguments:
              (map () #'collect-form definers)
              (case model-type
                ((define-group)
-                (setf (proto-parent model) msg-desc)
                 (when extra-slot
                   (collect-slot extra-slot))
                 (setf (proto-field-offset extra-field) field-offset)
@@ -918,13 +915,11 @@ Arguments:
       ;; Register it by the full symbol name.
       (record-protobuf-object type msg-desc :message)
       ;; Add its parent
-      (setf (proto-parent msg-desc) proto-parent)
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
       (let ((common-form
              `(progn
                 ,@type-forms
-                ,@forms
-                (setf (proto-parent ,msg-desc) ,proto-parent))))
+                ,@forms)))
         `(progn
            ,(if source-location
                 `(progn
@@ -981,7 +976,6 @@ Arguments:
                         :class  (proto-class message)
                         :name   (proto-name message)
                         :qualified-name (proto-qualified-name message)
-                        :parent *protobuf*
                         :alias-for alias-for
                         :conc-name conc-name
                         :fields   (copy-list (proto-fields message))
@@ -1009,12 +1003,12 @@ Arguments:
           ((define-group)
            (destructuring-bind (&optional progn model-type model definers extra-field extra-slot)
                (macroexpand-1 field env)
+             (declare (ignore model))
              (assert (eq progn 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-form definers)
              (case model-type
                ((define-group)
-                (setf (proto-parent model) extends)
                 (when extra-slot
                   ;;--- Refactor to get rid of all this duplicated code!
                   (let* ((sname  (field-data-internal-slot-name extra-slot))
@@ -1136,7 +1130,6 @@ Arguments:
              (setf (proto-message-type field) :extends)         ;this field is an extension
              (appendf (proto-fields extends) (list field))
              (appendf (proto-extended-fields extends) (list field))))))
-      (setf (proto-parent extends) message)
       (collect-form `(record-protobuf-object ',type ,extends :message))
       `(progn ,@forms))))
 
@@ -1201,7 +1194,6 @@ Arguments:
                     :type  name
                     :class type
                     :qualified-name (make-qualified-name *protobuf* (slot-name->proto slot))
-                    :parent *protobuf*
                     :set-type type
                     :label label
                     :index index
@@ -1213,7 +1205,6 @@ Arguments:
                     :class type
                     :name  name
                     :qualified-name (make-qualified-name *protobuf* name)
-                    :parent *protobuf*
                     :alias-for alias-for
                     :conc-name conc-name
                     :options   (remove-options options "default" "packed")
@@ -1249,7 +1240,6 @@ Arguments:
              (map () #'collect-form definers)
              (case model-type
                ((define-group)
-                (setf (proto-parent model) message)
                 (setf (proto-field-offset extra-field) field-offset)
                 (incf field-offset)
                 (collect-non-lazy-field extra-field)
@@ -1400,7 +1390,6 @@ Arguments
                          :class pclass
                          :qualified-name (make-qualified-name
                                           *protobuf* (or name (slot-name->proto slot)))
-                         :parent *protobuf*
                          :label label
                          :index  index
                          :field-offset field-offset
@@ -1578,7 +1567,6 @@ Arguments
                     :serializer   serializer
                     :deserializer deserializer
                     :qualified-name (make-qualified-name *protobuf* name)
-                    :parent *protobuf*
                     :documentation documentation
                     :source-location source-location)))
       (with-collectors ((forms collect-form))

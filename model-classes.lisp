@@ -201,17 +201,6 @@ Parameters:
       (format stream "~S" (and (slot-boundp file-desc 'class)
                                (proto-class file-desc)))))
 
-(defgeneric make-qualified-name (proto name)
-  (:documentation
-   "Give a schema or message and a name,
-    generate a fully qualified name string for the name."))
-
-(defmethod make-qualified-name ((file-desc file-descriptor) name)
-  ;; If we're at the file level, the qualified name is the file's package "dot" the name.
-  (if (proto-package file-desc)
-      (strcat (proto-package file-desc) "." name)
-      name))
-
 ;; find-* functions for finding different proto meta-objects
 
 (defvar *type-aliases* (make-hash-table :test 'eq)
@@ -399,17 +388,6 @@ Parameters:
 (defmethod make-load-form ((e protobuf-enum) &optional environment)
   (make-load-form-saving-slots e :environment environment))
 
-(defmethod make-qualified-name ((enum protobuf-enum) name)
-  ;; The qualified name is the enum name "dot" the name
-  (let ((qual-name (strcat (proto-name enum) "." name)))
-    (if (proto-parent enum)
-      ;; If there's a parent for this enum (either a message or
-      ;; the schema), prepend the name (or package) of the parent
-      (make-qualified-name (proto-parent enum) qual-name)
-      ;; Guard against a message in the middle of nowhere
-      qual-name)))
-
-
 ;; A Protobufs value within an enumeration
 (defstruct (protobuf-enum-value (:include proto-base))
   "The model class that represents a Protobufs enumeration value."
@@ -508,16 +486,6 @@ in the hash-table indicated by TYPE."
 (defmethod proto-real-lisp-package ((msg-desc message-descriptor))
   (and (proto-parent msg-desc)
        (proto-real-lisp-package (proto-parent msg-desc))))
-
-(defmethod make-qualified-name ((msg-desc message-descriptor) name)
-  ;; The qualified name is the message name "dot" the name
-  (let ((qual-name (strcat (proto-name msg-desc) "." name)))
-    (if (proto-parent msg-desc)
-      ;; If there's a parent for this message descriptor (either a message or the schema), prepend
-      ;; the name (or package) of the parent.
-      (make-qualified-name (proto-parent msg-desc) qual-name)
-      ;; Guard against a message in the middle of nowhere
-      qual-name)))
 
 (defgeneric find-field (message name &optional relative-to)
   (:documentation
@@ -831,3 +799,19 @@ in the hash-table indicated by TYPE."
     server function.")
   (:method ((method protobuf-method))
     (setf (proto-impl:proto-input-type method) nil)))
+
+(defgeneric make-qualified-name (parent-desc name)
+  (:documentation
+   "Given a parent file-descriptor or message-descriptor and a name,
+    generate a fully qualified name string for the name."))
+
+(defmethod make-qualified-name ((parent-desc file-descriptor) name)
+  ;; If we're at the file level, the qualified name is the file's package "dot" the name.
+  (if (proto-package parent-desc)
+      (strcat (proto-package parent-desc) "." name)
+      name))
+
+(defmethod make-qualified-name ((parent-desc message-descriptor) name)
+  ;; The qualified name is the message name "dot" the name
+  (let* ((parent-qual-name (proto-qualified-name parent-desc)))
+    (strcat parent-qual-name "." name)))

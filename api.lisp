@@ -208,6 +208,7 @@ For repeated fields, returns a list of the encoded values, which may be NILs.")
       type
       source)))
 
+#+sbcl
 (defun condense-protobuf-metadata ()
   "Make cl-protobuf metadata take up less space"
   (let (;; fields are hashed by QUAL-NAME, but all slots are compared to the representative
@@ -239,6 +240,7 @@ For repeated fields, returns a list of the encoded values, which may be NILs.")
             (mapl (lambda (x) (rplaca x (choose-representative-field (car x))))
                   (proto-impl:proto-fields msg))))))))
 
+#+sbcl
 (uiop:register-image-dump-hook
  '(lambda ()
    (compile 'condense-protobuf-metadata)
