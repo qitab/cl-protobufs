@@ -466,7 +466,9 @@
   (values))
 
 (defmethod add-alias-package-to-schema ((msg-desc message-descriptor) symbol)
-  (add-alias-package-to-schema (proto-parent msg-desc) symbol))
+  ;; To get this parser to work nil must be replaced by a path to the
+  ;; schema containing the message-descriptor.
+  (add-alias-package-to-schema nil symbol))
 
 (defun parse-proto-enum (stream desc)
   "Parse a protobuf enum from STREAM and store it in DESC, which may be a file-descriptor or

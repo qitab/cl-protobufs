@@ -28,11 +28,12 @@
   (:documentation "Indicates that a schema contains a message with a field whose type is not a
                    primitive type and is not a known message (or extend) or enum.")
   (:report (lambda (condition stream)
-             (format stream "~? Field ~A in message ~A has unknown type ~A"
+             (format stream "~? Qualified Field ~A has unknown type ~A"
                      (simple-condition-format-control condition)
                      (simple-condition-format-arguments condition)
-                     (error-field condition)
-                     (proto-parent (error-field condition))
+                     ;; I don't know the message but I do know the
+                     ;; fields qualified name.
+                     (proto-qualified-name (error-field condition))
                      (error-type-name condition)))))
 
 ;; The serializers use this a lot, so wrap it up
@@ -55,12 +56,12 @@
                    that a schema contains a service with a method whose input, output, or stream
                    type is not a known message (or extend).")
   (:report (lambda (condition stream)
-             (format stream "~? ~A type for RPC ~A in service ~A has unknown type ~A"
+             (format stream "~? ~A type for RPC ~A in service ~S has unknown type ~A"
                      (simple-condition-format-control condition)
                      (simple-condition-format-arguments condition)
                      (error-where condition)
                      (error-method condition)
-                     (proto-parent (error-method condition))
+                     (proto-service-name (error-method condition))
                      (error-type-name condition)))))
 
 (define-condition undefined-input-type (undefined-method-type)
