@@ -60,6 +60,7 @@
     :depends-on ("models" "parsing" "schema" "serialization")
     :components
     ((:file "api")
-     (:file "asdf-support")))))
+     (:file "asdf-support")
+     (:file "process-imports")))))
 
 (pushnew :cl-protobufs *features*)

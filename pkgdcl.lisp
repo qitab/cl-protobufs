@@ -295,9 +295,7 @@
    #:make-object
 
    ;; Stuff for ASDF
-   #:parse-protobuf-file
    #:process-imports
-   #:process-imports-from-file
 
    ;; Stuff for RPC stubs
    #:*rpc-package*
