@@ -80,10 +80,6 @@ Parameters:
               :accessor proto-qualified-name
               :initarg :qualified-name
               :initform "")
-   ;; This object's parent, e.g., for nested messages or enums.
-   (parent :type (or null descriptor)
-           :accessor proto-parent
-           :initarg :parent)
    (options :type (list-of protobuf-option)
             :accessor proto-options
             :initarg :options
@@ -134,13 +130,6 @@ Parameters:
              :accessor proto-lisp-package
              :initarg :lisp-package
              :initform nil)
-   ;; LISP-PKG may be NIL when it's not specified or may not be a valid package name if that package
-   ;; is not found.  In that case, the current package is used instead.  REAL-LISP-PKG stores the
-   ;; package that's actually used.
-   (real-lisp-pkg :type (or null package) ; actual lisp package
-                  :accessor proto-real-lisp-package
-                  :initarg :real-lisp-package
-                  :initform nil)
    (alias-packages :type list           ; list of (non-proto) packages forward referenced
                                         ; by aliases in this schema
                    :accessor proto-alias-packages
@@ -475,18 +464,6 @@ in the hash-table indicated by TYPE."
                    (eq (proto-message-type msg-desc) :extends))))
     (format stream "~S" (and (slot-boundp msg-desc 'class) (proto-class msg-desc)))))
 
-(defmethod proto-package ((msg-desc message-descriptor))
-  (and (proto-parent msg-desc)
-       (proto-package (proto-parent msg-desc))))
-
-(defmethod proto-lisp-package ((msg-desc message-descriptor))
-  (and (proto-parent msg-desc)
-       (proto-lisp-package (proto-parent msg-desc))))
-
-(defmethod proto-real-lisp-package ((msg-desc message-descriptor))
-  (and (proto-parent msg-desc)
-       (proto-real-lisp-package (proto-parent msg-desc))))
-
 (defgeneric find-field (message name &optional relative-to)
   (:documentation
    "Given a Protobufs message and a slot name, field name or index,
@@ -711,43 +688,46 @@ in the hash-table indicated by TYPE."
 
 
 (defclass protobuf-method (descriptor)
-  ((client-fn :type symbol                      ;the Lisp name of the client stb
+  ((service-name :type string                   ; The name of the stubby service
+                 :accessor proto-service-name   ; this is a method for.
+                 :initarg :service-name)
+   (client-fn :type symbol                      ; The Lisp name of the client stub
               :accessor proto-client-stub
               :initarg :client-stub)
-   (server-fn :type symbol                      ;the Lisp name of the server stb
+   (server-fn :type symbol                      ; The Lisp name of the server stub
               :accessor proto-server-stub
               :initarg :server-stub)
-   (itype :type symbol                          ;the Lisp type name of the input
+   (itype :type symbol                          ; The Lisp type name of the input.
           :accessor proto-input-type
           :initarg :input-type)
-   (iname :type (or null string)                ;the Protobufs name of the input
+   (iname :type (or null string)                ; The Protobufs name of the input.
           :accessor proto-input-name
           :initarg :input-name
           :initform nil)
-   (istreaming :type boolean                    ;for stubby4-style streaming.
+   (istreaming :type boolean                    ; For stubby4-style streaming.
                :accessor proto-input-streaming-p
                :initarg :input-streaming
                :initform nil)
-   (otype :type symbol                          ;the Lisp type name of the output
+   (otype :type symbol                          ; The Lisp type name of the output.
           :accessor proto-output-type
           :initarg :output-type)
-   (oname :type (or null string)                ;the Protobufs name of the output
+   (oname :type (or null string)                ; The Protobufs name of the output.
           :accessor proto-output-name
           :initarg :output-name
           :initform nil)
-   (ostreaming :type boolean                    ;for stubby4-style streaming.
+   (ostreaming :type boolean                    ; For stubby4-style streaming.
                :accessor proto-output-streaming-p
                :initarg :output-streaming
                :initform nil)
-   (stype :type (or symbol null)                ;the Lisp type name of the "streams" type
-          :accessor proto-streams-type
+   (stype :type (or symbol null)                ; The Lisp type name of
+          :accessor proto-streams-type          ; the "streams" type.
           :initarg :streams-type
           :initform nil)
-   (sname :type (or null string)                ;the Protobufs name of the "streams" type
-          :accessor proto-streams-name
+   (sname :type (or null string)                ; The Protobufs name of the
+          :accessor proto-streams-name          ; "streams" type.
           :initarg :streams-name
           :initform nil)
-   (index :type (unsigned-byte 32)              ;an identifying index for this method
+   (index :type (unsigned-byte 32)              ; An identifying index for this method.
           :accessor proto-index                 ; (used by the RPC implementation)
           :initarg :index))
   (:documentation
