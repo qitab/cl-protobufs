@@ -78,7 +78,7 @@ for each imported file also needs to be generated separately.
 
 ### ASDF
 
-It's currently possible to build cl-protobufs and cl-protobufs-test with ASDF,
+It's currently possible to build cl-protobufs and cl-protobufs-tests with ASDF,
 but only the wire-tests target is included in the tests because the
 :protobuf-file build action no longer works. We hope to fix this in a future
 release.
@@ -101,8 +101,8 @@ release.
 * Load and run the tests:
 
   ```lisp
-  cl-user> (ql:quickload :cl-protobufs-test)
-  cl-user> (clunit:run-suite 'cl-protobufs.wire-test::wire-tests)
+  cl-user> (ql:quickload :cl-protobufs-tests)
+  cl-user> (clunit:run-suite 'cl-protobufs.test.wire-test::wire-tests)
   ```
 
 ## Submitting changes to cl-protobufs
