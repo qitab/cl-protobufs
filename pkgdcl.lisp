@@ -164,7 +164,7 @@
    #:proto-output-type
    #:proto-package
    #:proto-packed
-   #:proto-parent
+   #:proto-service-name
    #:proto-qualified-name
    #:proto-reader
    #:proto-label

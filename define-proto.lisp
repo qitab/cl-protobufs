@@ -206,7 +206,6 @@ e.g.:
                                          (package-name (find-proto-package lisp-pkg)))
                                         (lisp-pkg)
                                         (t (substitute #\- #\_ package)))
-                    :real-lisp-package *protobuf-package*
                     :imports  imports
                     :options  (if optimize
                                   (append options
@@ -914,7 +913,6 @@ Arguments:
            (make-structure-class-forms type slots non-lazy-fields lazy-fields)))
       ;; Register it by the full symbol name.
       (record-protobuf-object type msg-desc :message)
-      ;; Add its parent
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
       (let ((common-form
              `(progn
@@ -1431,7 +1429,6 @@ Arguments
                     :class type
                     :name  name
                     :qualified-name (make-qualified-name *protobuf* name)
-                    :parent *protobuf*
                     :options options
                     :documentation documentation
                     :source-location source-location))
@@ -1470,7 +1467,7 @@ Arguments
                             :class function
                             :name  (or name (class-name->proto function))
                             :qualified-name (make-qualified-name *protobuf* (or name (class-name->proto function)))
-                            :parent service
+                            :service-name (proto-impl:proto-name service)
                             :client-stub client-fn
                             :server-stub server-fn
                             :input-type  input-type
