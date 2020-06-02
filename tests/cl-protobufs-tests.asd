@@ -78,11 +78,10 @@
     :components ((:protobuf-file "extend-test.proto")
                  (:file "extend-test")))
 
-   #+protobuf-file-debugged
    (:module "case-preservation-test"
     :serial t
     :pathname ""
-    :components ((:protobuf-file "case-preservation")
+    :components ((:protobuf-source-file "case-preservation")
                  (:file "case-preservation-test")))
 
    ;; Google's own protocol buffers and protobuf definitions tests
