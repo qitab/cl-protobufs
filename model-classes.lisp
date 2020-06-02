@@ -80,7 +80,7 @@ Parameters:
               :accessor proto-qualified-name
               :initarg :qualified-name
               :initform "")
-   (options :type (list-of protobuf-option)
+   (options :type (list-of option-descriptor)
             :accessor proto-options
             :initarg :options
             :initform ())
@@ -274,33 +274,36 @@ Parameters:
 
 ;; We accept and store any option, but only act on a few: default, packed,
 ;; optimize_for, lisp_package, lisp_name, lisp_alias
-(defclass protobuf-option (abstract-descriptor)
-  ((name :type string                           ;the key
+(defclass option-descriptor (abstract-descriptor)
+  ;; The name of the option, for example "lisp_package".
+  ((name :type string
          :reader proto-name
          :initarg :name)
-   (value :accessor proto-value                 ;the (untyped) value
+   ;; The (untyped) value
+   (value :accessor proto-value
           :initarg :value
           :initform nil)
-   (type :type (or null symbol)                 ;(optional) Lisp type,
-         :reader proto-type                     ;  one of string, integer, float, symbol (for now)
+   ;; Optional Lisp type, one of string, integer, float, symbol (for now).
+   (type :type (or null symbol)
+         :reader proto-type
          :initarg :type
          :initform 'string))
   (:documentation
    "Model class to describe a protobuf option, i.e., a keyword/value pair."))
 
-(defmethod make-load-form ((o protobuf-option) &optional environment)
+(defmethod make-load-form ((o option-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
 
-(defmethod print-object ((o protobuf-option) stream)
+(defmethod print-object ((o option-descriptor) stream)
   (if *print-escape*
-    (print-unreadable-object (o stream :type t :identity t)
-      (format stream "~A~@[ = ~S~]" (proto-name o) (proto-value o)))
-    (format stream "~A" (proto-name o))))
+      (print-unreadable-object (o stream :type t :identity t)
+        (format stream "~A~@[ = ~S~]" (proto-name o) (proto-value o)))
+      (format stream "~A" (proto-name o))))
 
 (defun make-option (name value &optional (type 'string))
   (check-type name string)
-  (make-instance 'protobuf-option
-    :name name :value value :type type))
+  (make-instance 'option-descriptor
+                 :name name :value value :type type))
 
 (defgeneric find-option (protobuf name)
   (:documentation

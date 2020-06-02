@@ -756,8 +756,8 @@
     field))
 
 (defun parse-proto-field-options (stream)
-  "Parse any options in a Protobufs field from 'stream'.
-   Returns a list of 'protobuf-option' objects."
+  "Parse any protobuf field options from STREAM.
+   Returns a list of OPTION-DESCRIPTOR objects."
   (with-collectors ((options collect-option))
     (let ((terminator nil))
       (loop
@@ -914,8 +914,8 @@
   nil)
 
 (defun parse-proto-method-options (stream)
-  "Parse any options in a Protobufs method from 'stream'.
-   Returns a list of 'protobuf-option' objects.
+  "Parse any protobuf method options from STREAM.
+   Returns a list of PROTOBUF-OPTION objects.
    If a body was parsed, returns a second value T."
   (when (eql (peek-char nil stream nil) #\{)
     (expect-char stream #\{ () "service")

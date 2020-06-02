@@ -6,6 +6,8 @@
 
 (in-package "CL-USER")
 
+;;; TODO(cgay): A lot of these symbols should never be used by client code;
+;;; stop exporting them. All the descriptor classes? All the definer macros.
 (defpackage :cl-protobufs
   (:nicknames :proto :protobufs)
   (:use)
@@ -33,7 +35,7 @@
    ;; Model classes -  aka proto descriptors.
    ;; TODO(cgay): rename from protobuf-* to *-descriptor
    #:file-descriptor
-   #:protobuf-option
+   #:option-descriptor
    #:protobuf-enum
    #:protobuf-enum-value
    #:message-descriptor
