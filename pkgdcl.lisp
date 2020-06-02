@@ -34,14 +34,14 @@
 
    ;; Model classes -  aka proto descriptors.
    ;; TODO(cgay): rename from protobuf-* to *-descriptor
+   #:extension-descriptor
+   #:field-descriptor
    #:file-descriptor
+   #:message-descriptor
    #:option-descriptor
+   #:service-descriptor
    #:protobuf-enum
    #:protobuf-enum-value
-   #:message-descriptor
-   #:field-descriptor
-   #:extension-descriptor
-   #:protobuf-service
    #:protobuf-method
    #:protobuf-type-alias                ; Lisp-only extension
 

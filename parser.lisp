@@ -802,7 +802,7 @@
          (name (prog1 (parse-token stream)
                  (expect-char stream #\{ () "service")
                  (maybe-skip-comments stream)))
-         (service (make-instance 'protobuf-service
+         (service (make-instance 'service-descriptor
                     :class (proto->class-name name *protobuf-package*)
                     :name name
                     :qualified-name (make-qualified-name *protobuf* name)
@@ -834,14 +834,14 @@
         (maybe-skip-comments stream)
         (return-from parse-proto-ignore)))))
 
-(defmethod resolve-lisp-names ((service protobuf-service))
-  "Recursively resolves protobuf type names to lisp type names for all methods of 'service'."
+(defmethod resolve-lisp-names ((service service-descriptor))
+  "Recursively resolves protobuf type names to lisp type names for all methods of SERVICE."
   (map () #'resolve-lisp-names (proto-methods service)))
 
 (defun parse-proto-method (stream service index)
-  "Parse a Protobufs method from 'stream'.
-   Updates the 'protobuf-service' object to have the method."
-  (check-type service protobuf-service)
+  "Parse a Protobufs method from STREAM.
+   Updates the SERVICE-DESCRIPTOR object to have the method."
+  (check-type service service-descriptor)
   (let* ((loc  (file-position stream))
          (name (parse-token stream))
          (in   (prog2 (expect-char stream #\( () "service")

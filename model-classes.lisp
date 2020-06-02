@@ -142,7 +142,7 @@ Parameters:
    (schemas :type (list-of file-descriptor)  ; the schemas that were successfully imported
             :accessor proto-imported-schemas ; this gets used for chasing namespaces
             :initform ())
-   (services :type (list-of protobuf-service)
+   (services :type (list-of service-descriptor)
              :accessor proto-services
              :initarg :services
              :initform ()))
@@ -662,35 +662,34 @@ in the hash-table indicated by TYPE."
             (proto-extension-from e) (proto-extension-to e))))
 
 
-;; TODO(cgay): rename to service-descriptor
-(defclass protobuf-service (descriptor)
+(defclass service-descriptor (descriptor)
   ((methods :type (list-of protobuf-method)
             :accessor proto-methods
             :initarg :methods
             :initform ()))
   (:documentation "Model class to describe a protobuf service."))
 
-(defmethod make-load-form ((s protobuf-service) &optional environment)
+(defmethod make-load-form ((s service-descriptor) &optional environment)
   (make-load-form-saving-slots s :environment environment))
 
-(defmethod print-object ((s protobuf-service) stream)
+(defmethod print-object ((s service-descriptor) stream)
   (if *print-escape*
-    (print-unreadable-object (s stream :type t :identity t)
-      (format stream "~S" (proto-name s)))
-    (format stream "~S" (proto-name s))))
+      (print-unreadable-object (s stream :type t :identity t)
+        (format stream "~S" (proto-name s)))
+      (format stream "~S" (proto-name s))))
 
 (defgeneric find-method (service name)
   (:documentation
    "Given a Protobufs service and a method name,
     returns the Protobufs method having that name."))
 
-(defmethod find-method ((service protobuf-service) (name symbol))
+(defmethod find-method ((service service-descriptor) (name symbol))
   (find name (proto-methods service) :key #'proto-class))
 
-(defmethod find-method ((service protobuf-service) (name string))
+(defmethod find-method ((service service-descriptor) (name string))
   (find-qualified-name name (proto-methods service)))
 
-(defmethod find-method ((service protobuf-service) (index integer))
+(defmethod find-method ((service service-descriptor) (index integer))
   (find index (proto-methods service) :key #'proto-index))
 
 

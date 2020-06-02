@@ -135,9 +135,8 @@ Finally we output all of the created forms.
 
 DEFINE-SERVICE:
 
-The define-service macro creates forms that make the PROTOBUF-SERVICE
-meta-object, add it to the PROTOBUF-SCHEMA meta-object, and create
-method stubs for the service implementation.
+The define-service macro creates forms that make the SERVICE-DESCRIPTOR, add it to the
+PROTOBUF-SCHEMA meta-object, and create method stubs for the service implementation.
 
 Note: Actually using services require a gRPC plugin.
 
@@ -1425,7 +1424,7 @@ Arguments
   (let* ((name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
-         (service (make-instance 'protobuf-service
+         (service (make-instance 'service-descriptor
                     :class type
                     :name  name
                     :qualified-name (make-qualified-name *protobuf* name)
@@ -1535,7 +1534,7 @@ Arguments
       (collect-form `(appendf (proto-services *protobuf*) (list ,service)))
       (if source-location
           `(progn
-             (with-proto-source-location (,type ,name protobuf-service ,@source-location)
+             (with-proto-source-location (,type ,name service-descriptor ,@source-location)
                ,@forms))
           `(progn ,@forms)))))
 
