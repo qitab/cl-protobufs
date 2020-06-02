@@ -1462,7 +1462,7 @@ Arguments
                  (package   *protobuf-rpc-package*)
                  (client-fn (intern (format nil "~A-~A" 'call function) package))
                  (server-fn (intern (format nil "~A-~A" function 'impl) package))
-                 (method  (make-instance 'protobuf-method
+                 (method  (make-instance 'method-descriptor
                             :class function
                             :name  (or name (class-name->proto function))
                             :qualified-name (make-qualified-name *protobuf* (or name (class-name->proto function)))
@@ -1495,7 +1495,7 @@ Arguments
               ;; IPC, etc). Unlike C++/Java/Python, we don't need a client-side subclass,
               ;; because we can just use multi-methods.
               ;; The 'do-XXX' method calls the RPC code with the channel, the method
-              ;; (i.e., a 'protobuf-method' object), the request and the callback function.
+              ;; (i.e., a 'method-descriptor' object), the request and the callback function.
               ;; The RPC code should take care of serializing the input, transmitting the
               ;; request over the wire, waiting for input (or not if it's asynchronous),
               ;; filling in the output, and either returning the response (if synchronous)

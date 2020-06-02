@@ -45,16 +45,17 @@
     :field field))
 
 (define-condition undefined-method-type (undefined-type)
-  ((method :type protobuf-method
+  ((method :type method-descriptor
            :reader error-method
            :initarg :method)
    (where :type string
           :reader error-where
           :initarg :where
           :documentation "Description of which type referenced by the method is undefined."))
-  (:documentation "Superclass for `undefined-type' errors related to a `protobuf-method'.  Indicates
-                   that a schema contains a service with a method whose input, output, or stream
-                   type is not a known message (or extend).")
+  (:documentation
+   "Superclass for `undefined-type' errors related to a `method-descriptor'. Indicates
+    that a schema contains a service with a method whose input, output, or stream
+    type is not a known message (or extend).")
   (:report (lambda (condition stream)
              (format stream "~? ~A type for RPC ~A in service ~S has unknown type ~A"
                      (simple-condition-format-control condition)

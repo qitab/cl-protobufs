@@ -858,7 +858,7 @@
                  (maybe-skip-comments stream)
                  opts))
          (stub   (proto->class-name name *protobuf-package*))
-         (method (make-instance 'protobuf-method
+         (method (make-instance 'method-descriptor
                    :class stub
                    :name  name
                    :qualified-name (make-qualified-name *protobuf* name)
@@ -882,10 +882,10 @@
     (appendf (proto-methods service) (list method))
     method))
 
-(defmethod resolve-lisp-names ((method protobuf-method))
+(defmethod resolve-lisp-names ((method method-descriptor))
   "Resolves input, output, and streams protobuf type names to lisp type names and sets
    `proto-input-type', `proto-output-type', and, if `proto-streams-name' is set,
-   `proto-streams-type' on 'method'."
+   `proto-streams-type' on METHOD."
   (let* ((input-name   (proto-input-name method))
          (output-name  (proto-output-name method))
          (streams-name (proto-streams-name method))
