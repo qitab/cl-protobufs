@@ -419,7 +419,7 @@ Parameters:
    (extended-fields :type (list-of field-descriptor)
                     :accessor proto-extended-fields
                     :initform ())
-   (extensions :type (list-of protobuf-extension)
+   (extensions :type (list-of extension-descriptor)
                :accessor proto-extensions
                :initarg :extensions
                :initform ())
@@ -632,7 +632,7 @@ in the hash-table indicated by TYPE."
           (and (vectorp default) (not (stringp default)))))))
 
 
-(defclass protobuf-extension (abstract-descriptor)
+(defclass extension-descriptor (abstract-descriptor)
   ;; The start of the extension range.
   ((from :type (integer 1 #.(1- (ash 1 29)))
          :accessor proto-extension-from
@@ -645,18 +645,18 @@ in the hash-table indicated by TYPE."
    "The model class that represents an extension range within a protobuf message."))
 
 (defvar *all-extensions* nil)
-(defmethod make-load-form ((e protobuf-extension) &optional environment)
+(defmethod make-load-form ((e extension-descriptor) &optional environment)
   (declare (ignore environment))
   (let ((from (and (slot-boundp e 'from) (proto-extension-from e)))
         (to (and (slot-boundp e 'to) (proto-extension-to e))))
     `(or (cdr (assoc '(,from . ,to) *all-extensions* :test #'equal))
-         (let ((obj (make-instance 'protobuf-extension
+         (let ((obj (make-instance 'extension-descriptor
                                    ,@(and from `(:from ,from))
                                    ,@(and to `(:to ,to)))))
            (push (cons '(,from . ,to) obj) *all-extensions*)
            obj))))
 
-(defmethod print-object ((e protobuf-extension) stream)
+(defmethod print-object ((e extension-descriptor) stream)
   (print-unreadable-object (e stream :type t :identity t)
     (format stream "~D - ~D"
             (proto-extension-from e) (proto-extension-to e))))

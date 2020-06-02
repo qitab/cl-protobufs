@@ -40,7 +40,7 @@
    #:protobuf-enum-value
    #:message-descriptor
    #:field-descriptor
-   #:protobuf-extension
+   #:extension-descriptor
    #:protobuf-service
    #:protobuf-method
    #:protobuf-type-alias                ; Lisp-only extension

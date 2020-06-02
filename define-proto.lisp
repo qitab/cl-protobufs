@@ -940,9 +940,9 @@ Arguments:
               (symbol (if (string-equal to "MAX") #.(1- (ash 1 29)) to)))))
     `(progn
        define-extension
-       ,(make-instance 'protobuf-extension
-          :from from
-          :to   (if (eq to 'max) #.(1- (ash 1 29)) to))
+       ,(make-instance 'extension-descriptor
+                       :from from
+                       :to   (if (eq to 'max) #.(1- (ash 1 29)) to))
        ())))
 
 (defmacro define-extend (type (&key name conc-name options documentation)

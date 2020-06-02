@@ -788,9 +788,9 @@
             "Expected 'to' in 'extensions' at position ~D" (file-position stream))
     (assert (or (integerp to) (string= to "max")) ()
             "Extension value is not an integer or 'max' as position ~D" (file-position stream))
-    (let ((extension (make-instance 'protobuf-extension
-                       :from from
-                       :to   (if (integerp to) to #.(1- (ash 1 29))))))
+    (let ((extension (make-instance 'extension-descriptor
+                                    :from from
+                                    :to   (if (integerp to) to #.(1- (ash 1 29))))))
       (appendf (proto-extensions msg-desc) (list extension))
       extension)))
 
