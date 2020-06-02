@@ -15,14 +15,16 @@
   :description      "Test code for Protobufs for Common Lisp"
   :long-description "Test code for Protobufs for Common Lisp"
   :defsystem-depends-on (:cl-protobufs)
-  :depends-on (:cl-protobufs)
+  :depends-on (:cl-protobufs "clunit2")
+  :perform (asdf:test-op (o c)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.wire-test)
+					   '#:run))
   :serial t
   :components
   ((:module "packages"
     :serial t
     :pathname ""
     :components ((:file "pkgdcl")))
-
    ;; TODO(cgay): do these tests really depend on each other in the ways that
    ;;   the :depends-on clauses imply? If so, why?
    ;; TODO(cgay): None of these tests are included here yet:
