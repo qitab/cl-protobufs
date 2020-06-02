@@ -669,7 +669,7 @@
                          (intern (string-upcase lisp-slot-override) *protobuf-package*)
                          (proto->slot-name name *protobuf-package*)))
              (label   (kintern required))
-             (field  (make-instance 'protobuf-field
+             (field  (make-instance 'field-descriptor
                        :name  name
                        :type  type
                        :lisp-type lisp-type-option
@@ -708,7 +708,7 @@
         (appendf (proto-fields msg-desc) (list field))
         field))))
 
-(defmethod resolve-lisp-names ((field protobuf-field))
+(defmethod resolve-lisp-names ((field field-descriptor))
   "Resolves the protobuf type of FIELD to a Lisp type and stores it in the field's proto-class."
   (let* ((type  (proto-type field))
          (ptype (when (member type +PRIMITIVE-TYPES+ :test #'string=)
@@ -734,7 +734,7 @@
          (idx  (parse-unsigned-int stream))
          (msg  (parse-proto-message stream msg-desc type))
          (slot  (proto->slot-name name *protobuf-package*))
-         (field (make-instance 'protobuf-field
+         (field (make-instance 'field-descriptor
                   :name  name
                   :type  type
                   :qualified-name (make-qualified-name msg-desc name)

@@ -122,8 +122,8 @@ define-message. The only difference is a group acts as a field in a message
 as well as being an message type in the message, so we must add a field to the
 PROTOBUF-MESSAGE meta-object as if it were a field.
 
-If we see a field we call process-field which creates a PROTOBUF-FIELD meta-object
-containing  details of the field and returns a form to create this meta-object.
+If we see a field we call process-field which creates a FIELD-DESCRIPTOR
+containing details of the field and returns a form to create this meta-object.
 We save the form for both output and future processing.
 
 Next we call MAKE-STRUCTURE-CLASS-FORMS that takes the field meta-objects
@@ -155,7 +155,7 @@ e.g.:
       :deserializer date-to-integer)
 |#
 
-;; TODO(jgodbout): remove this, we already have protobuf-field
+;; TODO(jgodbout): remove this, we already have field-descriptor
 (defstruct field-data
   "Keep field metadata for making the structure object."
   (internal-slot-name nil :type symbol)
@@ -1187,7 +1187,7 @@ Arguments:
                            :initform nil
                            :accessor reader
                            :initarg (kintern (symbol-name slot)))))
-         (mfield  (make-instance 'protobuf-field
+         (mfield  (make-instance 'field-descriptor
                     :name  (slot-name->proto slot)
                     :type  name
                     :class type
@@ -1380,7 +1380,7 @@ Arguments
                                  (default-p
                                   `,(protobuf-default-to-clos-init default type))))))
                  (field (make-instance
-                         'protobuf-field
+                         'field-descriptor
                          :name  (or name (slot-name->proto slot))
                          :type  (or typename ptype)
                          :lisp-type (when root-lisp-type (qualified-symbol-name root-lisp-type))

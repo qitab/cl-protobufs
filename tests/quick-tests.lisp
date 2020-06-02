@@ -489,7 +489,7 @@ Parameters:
                    (when (= n howmany)
                      (return (mapcar (lambda (x)
                                        (make-instance
-                                        'proto-impl::protobuf-field
+                                        'proto-impl::field-descriptor
                                         :index x :internal-field-name 'foo))
                                      list)))))))))
     (let ((worst-n-probes 0))
@@ -521,7 +521,7 @@ Parameters:
 (defun mapify (list)
   (proto-impl::make-field-map
    (mapcar (lambda (x)
-             (make-instance 'proto-impl::protobuf-field
+             (make-instance 'proto-impl::field-descriptor
                             :index (first x) :internal-field-name (second x)))
            list)))
 

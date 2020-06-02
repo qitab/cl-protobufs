@@ -22,7 +22,7 @@
                      (error-type-name condition)))))
 
 (define-condition undefined-field-type (undefined-type)
-  ((field :type protobuf-field
+  ((field :type field-descriptor
           :reader error-field
           :initarg :field))
   (:documentation "Indicates that a schema contains a message with a field whose type is not a

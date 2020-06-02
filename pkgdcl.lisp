@@ -39,7 +39,7 @@
    #:protobuf-enum
    #:protobuf-enum-value
    #:message-descriptor
-   #:protobuf-field
+   #:field-descriptor
    #:protobuf-extension
    #:protobuf-service
    #:protobuf-method
