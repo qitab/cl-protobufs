@@ -78,6 +78,7 @@
     :components ((:protobuf-file "extend-test.proto")
                  (:file "extend-test")))
 
+   #+protobuf-file-debugged
    (:module "case-preservation-test"
     :serial t
     :pathname ""
