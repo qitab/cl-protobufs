@@ -669,7 +669,7 @@
                          (intern (string-upcase lisp-slot-override) *protobuf-package*)
                          (proto->slot-name name *protobuf-package*)))
              (label   (kintern required))
-             (field  (make-instance 'protobuf-field
+             (field  (make-instance 'field-descriptor
                        :name  name
                        :type  type
                        :lisp-type lisp-type-option
@@ -708,7 +708,7 @@
         (appendf (proto-fields msg-desc) (list field))
         field))))
 
-(defmethod resolve-lisp-names ((field protobuf-field))
+(defmethod resolve-lisp-names ((field field-descriptor))
   "Resolves the protobuf type of FIELD to a Lisp type and stores it in the field's proto-class."
   (let* ((type  (proto-type field))
          (ptype (when (member type +PRIMITIVE-TYPES+ :test #'string=)
@@ -734,7 +734,7 @@
          (idx  (parse-unsigned-int stream))
          (msg  (parse-proto-message stream msg-desc type))
          (slot  (proto->slot-name name *protobuf-package*))
-         (field (make-instance 'protobuf-field
+         (field (make-instance 'field-descriptor
                   :name  name
                   :type  type
                   :qualified-name (make-qualified-name msg-desc name)
@@ -756,8 +756,8 @@
     field))
 
 (defun parse-proto-field-options (stream)
-  "Parse any options in a Protobufs field from 'stream'.
-   Returns a list of 'protobuf-option' objects."
+  "Parse any protobuf field options from STREAM.
+   Returns a list of OPTION-DESCRIPTOR objects."
   (with-collectors ((options collect-option))
     (let ((terminator nil))
       (loop
@@ -788,9 +788,9 @@
             "Expected 'to' in 'extensions' at position ~D" (file-position stream))
     (assert (or (integerp to) (string= to "max")) ()
             "Extension value is not an integer or 'max' as position ~D" (file-position stream))
-    (let ((extension (make-instance 'protobuf-extension
-                       :from from
-                       :to   (if (integerp to) to #.(1- (ash 1 29))))))
+    (let ((extension (make-instance 'extension-descriptor
+                                    :from from
+                                    :to   (if (integerp to) to #.(1- (ash 1 29))))))
       (appendf (proto-extensions msg-desc) (list extension))
       extension)))
 
@@ -802,7 +802,7 @@
          (name (prog1 (parse-token stream)
                  (expect-char stream #\{ () "service")
                  (maybe-skip-comments stream)))
-         (service (make-instance 'protobuf-service
+         (service (make-instance 'service-descriptor
                     :class (proto->class-name name *protobuf-package*)
                     :name name
                     :qualified-name (make-qualified-name *protobuf* name)
@@ -834,14 +834,14 @@
         (maybe-skip-comments stream)
         (return-from parse-proto-ignore)))))
 
-(defmethod resolve-lisp-names ((service protobuf-service))
-  "Recursively resolves protobuf type names to lisp type names for all methods of 'service'."
+(defmethod resolve-lisp-names ((service service-descriptor))
+  "Recursively resolves protobuf type names to lisp type names for all methods of SERVICE."
   (map () #'resolve-lisp-names (proto-methods service)))
 
 (defun parse-proto-method (stream service index)
-  "Parse a Protobufs method from 'stream'.
-   Updates the 'protobuf-service' object to have the method."
-  (check-type service protobuf-service)
+  "Parse a Protobufs method from STREAM.
+   Updates the SERVICE-DESCRIPTOR object to have the method."
+  (check-type service service-descriptor)
   (let* ((loc  (file-position stream))
          (name (parse-token stream))
          (in   (prog2 (expect-char stream #\( () "service")
@@ -914,8 +914,8 @@
   nil)
 
 (defun parse-proto-method-options (stream)
-  "Parse any options in a Protobufs method from 'stream'.
-   Returns a list of 'protobuf-option' objects.
+  "Parse any protobuf method options from STREAM.
+   Returns a list of PROTOBUF-OPTION objects.
    If a body was parsed, returns a second value T."
   (when (eql (peek-char nil stream nil) #\{)
     (expect-char stream #\{ () "service")
