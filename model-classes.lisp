@@ -80,7 +80,7 @@ Parameters:
               :accessor proto-qualified-name
               :initarg :qualified-name
               :initform "")
-   (options :type (list-of protobuf-option)
+   (options :type (list-of option-descriptor)
             :accessor proto-options
             :initarg :options
             :initform ())
@@ -142,7 +142,7 @@ Parameters:
    (schemas :type (list-of file-descriptor)  ; the schemas that were successfully imported
             :accessor proto-imported-schemas ; this gets used for chasing namespaces
             :initform ())
-   (services :type (list-of protobuf-service)
+   (services :type (list-of service-descriptor)
              :accessor proto-services
              :initarg :services
              :initform ()))
@@ -274,33 +274,36 @@ Parameters:
 
 ;; We accept and store any option, but only act on a few: default, packed,
 ;; optimize_for, lisp_package, lisp_name, lisp_alias
-(defclass protobuf-option (abstract-descriptor)
-  ((name :type string                           ;the key
+(defclass option-descriptor (abstract-descriptor)
+  ;; The name of the option, for example "lisp_package".
+  ((name :type string
          :reader proto-name
          :initarg :name)
-   (value :accessor proto-value                 ;the (untyped) value
+   ;; The (untyped) value
+   (value :accessor proto-value
           :initarg :value
           :initform nil)
-   (type :type (or null symbol)                 ;(optional) Lisp type,
-         :reader proto-type                     ;  one of string, integer, float, symbol (for now)
+   ;; Optional Lisp type, one of string, integer, float, symbol (for now).
+   (type :type (or null symbol)
+         :reader proto-type
          :initarg :type
          :initform 'string))
   (:documentation
    "Model class to describe a protobuf option, i.e., a keyword/value pair."))
 
-(defmethod make-load-form ((o protobuf-option) &optional environment)
+(defmethod make-load-form ((o option-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
 
-(defmethod print-object ((o protobuf-option) stream)
+(defmethod print-object ((o option-descriptor) stream)
   (if *print-escape*
-    (print-unreadable-object (o stream :type t :identity t)
-      (format stream "~A~@[ = ~S~]" (proto-name o) (proto-value o)))
-    (format stream "~A" (proto-name o))))
+      (print-unreadable-object (o stream :type t :identity t)
+        (format stream "~A~@[ = ~S~]" (proto-name o) (proto-value o)))
+      (format stream "~A" (proto-name o))))
 
 (defun make-option (name value &optional (type 'string))
   (check-type name string)
-  (make-instance 'protobuf-option
-    :name name :value value :type type))
+  (make-instance 'option-descriptor
+                 :name name :value value :type type))
 
 (defgeneric find-option (protobuf name)
   (:documentation
@@ -391,28 +394,32 @@ Parameters:
 ;; This would have been far less confusing if it sounded more obviously like a 'descriptor'
 ;; and not the contents of the message per se.
 (defclass message-descriptor (descriptor)
+  ;; The prefix used for Lisp accessors. (Needs more explanation.)
   ;; TODO(cgay): would it be too obvious if we called this accessor-prefix?
-  ((conc :type (or null string)                 ;the conc-name used for Lisp accessors
+  ((conc :type (or null string)
          :accessor proto-conc-name
          :initarg :conc-name
          :initform nil)
-   (alias :type (or null symbol)                ;use this if you want to make this message
-          :accessor proto-alias-for             ;  be an alias for an existing Lisp class
+   ;; Use this if you want to make this message descriptor an alias for an existing Lisp type.
+   (alias :type (or null symbol)
+          :accessor proto-alias-for
           :initarg :alias-for
           :initform nil)
-   (fields :type (list-of protobuf-field)       ;all the fields of this message
-           :accessor proto-fields               ;this includes local ones and extended ones
+   ;; All fields for this message, including local ones and extended ones.
+   (fields :type (list-of field-descriptor)
+           :accessor proto-fields
            :initarg :fields
            :initform ())
+   ;; The FIELDS slot (more or less) as a vector. If the index space is dense,
+   ;; the vector is accessed by field index, otherwise it requires linear scan.
+   ;; TODO(dougk): sparse indices can do better than linear scan.
    (field-vect :type vector
-               ;; The FIELDS slot (more or less) as a vector. If the index space is dense,
-               ;; the vector is accessed by field index, otherwise it requires linear scan.
-               ;; TODO(dougk): sparse indices can do better than linear scan.
                :accessor proto-field-vect)
-   (extended-fields :type (list-of protobuf-field) ;the extended fields defined in this message
+   ;; The extended fields defined in this message.
+   (extended-fields :type (list-of field-descriptor)
                     :accessor proto-extended-fields
                     :initform ())
-   (extensions :type (list-of protobuf-extension) ;any extension ranges
+   (extensions :type (list-of extension-descriptor)
                :accessor proto-extensions
                :initarg :extensions
                :initform ())
@@ -424,7 +431,7 @@ Parameters:
                  :initarg :message-type
                  :initform :message))
   (:documentation
-   "The model class that represents a Protobufs message."))
+   "Describes a protobuf message."))
 
 (defmethod make-load-form ((msg-desc message-descriptor) &optional environment)
   (with-slots (class message-type alias) msg-desc
@@ -511,8 +518,7 @@ in the hash-table indicated by TYPE."
 
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
-;; TODO(cgay): rename to field-descriptor
-(defclass protobuf-field (descriptor)
+(defclass field-descriptor (descriptor)
   ((type :type string                           ; The name of the Protobuf type for the field
          :accessor proto-type
          :initarg :type)
@@ -574,17 +580,17 @@ in the hash-table indicated by TYPE."
   (:documentation
    "The model class that represents one field within a Protobufs message."))
 
-(defmethod initialize-instance :after ((field protobuf-field) &rest initargs)
+(defmethod initialize-instance :after ((field field-descriptor) &rest initargs)
   (declare (ignore initargs))
   (when (slot-boundp field 'index)
     (assert (and (plusp (proto-index field))
                  (not (<= 19000 (proto-index field) 19999))) ()
             "Protobuf field indexes must be positive and not between 19000 and 19999 (inclusive)")))
 
-(defmethod make-load-form ((f protobuf-field) &optional environment)
+(defmethod make-load-form ((f field-descriptor) &optional environment)
   (make-load-form-saving-slots f :environment environment))
 
-(defmethod print-object ((f protobuf-field) stream)
+(defmethod print-object ((f field-descriptor) stream)
   (if *print-escape*
       (print-unreadable-object (f stream :type t :identity t)
         (format stream "~S :: ~S = ~D~@[ (group~*)~]~@[ (extended~*)~]"
@@ -595,16 +601,16 @@ in the hash-table indicated by TYPE."
                 (eq (proto-message-type f) :extends)))
       (format stream "~S" (proto-internal-field-name f))))
 
-(defmethod proto-slot ((field protobuf-field))
+(defmethod proto-slot ((field field-descriptor))
   (proto-internal-field-name field))
 
-(defmethod (setf proto-slot) (slot (field protobuf-field))
+(defmethod (setf proto-slot) (slot (field field-descriptor))
   (setf (proto-value field) slot))
 
 (defgeneric empty-default-p (field)
   (:documentation
    "Returns true iff the default for the field is empty, ie, was not supplied.")
-  (:method ((field protobuf-field))
+  (:method ((field field-descriptor))
     (let ((default (proto-default field)))
       (or (eq default $empty-default)
           (eq default $empty-list)
@@ -617,73 +623,73 @@ in the hash-table indicated by TYPE."
   (:documentation
    "Returns true if the storage for a 'repeated' field is a vector,
     returns false if the storage is a list.")
-  (:method ((field protobuf-field))
+  (:method ((field field-descriptor))
     ;; NB: the FieldOption (lisp_container) attempts to generalize whether a repeated field is a
-    ;; list or a vector, but for now the only indication that a protobuf-field wants to be a vector
-    ;; is what its default is.
+    ;; list or a vector, but for now the only indication that a field-descriptor wants to be a
+    ;; vector is what its default is.
     (let ((default (proto-default field)))
       (or (eq default $empty-vector)
           (and (vectorp default) (not (stringp default)))))))
 
 
-;; An extension range within a message
-(defclass protobuf-extension (abstract-descriptor)
-  ((from :type (integer 1 #.(1- (ash 1 29)))    ; the index number for this field
+(defclass extension-descriptor (abstract-descriptor)
+  ;; The start of the extension range.
+  ((from :type (integer 1 #.(1- (ash 1 29)))
          :accessor proto-extension-from
          :initarg :from)
-   (to :type (integer 1 #.(1- (ash 1 29)))      ; the index number for this field
+   ;; The end of the extension range, inclusive.
+   (to :type (integer 1 #.(1- (ash 1 29)))
        :accessor proto-extension-to
        :initarg :to))
   (:documentation
-   "The model class that represents an extension range within a Protobufs message."))
+   "The model class that represents an extension range within a protobuf message."))
 
 (defvar *all-extensions* nil)
-(defmethod make-load-form ((e protobuf-extension) &optional environment)
+(defmethod make-load-form ((e extension-descriptor) &optional environment)
   (declare (ignore environment))
   (let ((from (and (slot-boundp e 'from) (proto-extension-from e)))
         (to (and (slot-boundp e 'to) (proto-extension-to e))))
     `(or (cdr (assoc '(,from . ,to) *all-extensions* :test #'equal))
-         (let ((obj (make-instance 'protobuf-extension
+         (let ((obj (make-instance 'extension-descriptor
                                    ,@(and from `(:from ,from))
                                    ,@(and to `(:to ,to)))))
            (push (cons '(,from . ,to) obj) *all-extensions*)
            obj))))
 
-(defmethod print-object ((e protobuf-extension) stream)
+(defmethod print-object ((e extension-descriptor) stream)
   (print-unreadable-object (e stream :type t :identity t)
     (format stream "~D - ~D"
             (proto-extension-from e) (proto-extension-to e))))
 
 
-;; TODO(cgay): rename to service-descriptor
-(defclass protobuf-service (descriptor)
+(defclass service-descriptor (descriptor)
   ((methods :type (list-of protobuf-method)
             :accessor proto-methods
             :initarg :methods
             :initform ()))
   (:documentation "Model class to describe a protobuf service."))
 
-(defmethod make-load-form ((s protobuf-service) &optional environment)
+(defmethod make-load-form ((s service-descriptor) &optional environment)
   (make-load-form-saving-slots s :environment environment))
 
-(defmethod print-object ((s protobuf-service) stream)
+(defmethod print-object ((s service-descriptor) stream)
   (if *print-escape*
-    (print-unreadable-object (s stream :type t :identity t)
-      (format stream "~S" (proto-name s)))
-    (format stream "~S" (proto-name s))))
+      (print-unreadable-object (s stream :type t :identity t)
+        (format stream "~S" (proto-name s)))
+      (format stream "~S" (proto-name s))))
 
 (defgeneric find-method (service name)
   (:documentation
    "Given a Protobufs service and a method name,
     returns the Protobufs method having that name."))
 
-(defmethod find-method ((service protobuf-service) (name symbol))
+(defmethod find-method ((service service-descriptor) (name symbol))
   (find name (proto-methods service) :key #'proto-class))
 
-(defmethod find-method ((service protobuf-service) (name string))
+(defmethod find-method ((service service-descriptor) (name string))
   (find-qualified-name name (proto-methods service)))
 
-(defmethod find-method ((service protobuf-service) (index integer))
+(defmethod find-method ((service service-descriptor) (index integer))
   (find index (proto-methods service) :key #'proto-index))
 
 

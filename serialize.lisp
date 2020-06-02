@@ -132,7 +132,7 @@
                        (slot-value field 'field-offset))
                   1)))
          (emit-field (object field)
-           (declare (type protobuf-field field))
+           (declare (type field-descriptor field))
            ;; We don't do cycle detection here
            ;; If the client needs it, he can define his own 'serialize-object'
            ;; method to clean things up first
@@ -356,7 +356,7 @@
 Contains the INDEX of the field as according to protobuf, an internal
 OFFSET, the BOOL-NUMBER (for simple boolean fields), the INITARG, the COMPLEX-FIELD
 datastructure.
-See protobuf-field for the distinction between index, offset, and bool-number."
+See field-descriptor for the distinction between index, offset, and bool-number."
   index
   offset
   bool-index

@@ -26,7 +26,7 @@ TO DO
 [    which can be used to override the 'proto->class-name' default		]
 [    for messages and enums							]
 
-- Refactor 'protobuf-field' so the names are clearer:
+- Refactor 'field-descriptor' so the names are clearer:
   - Lose the existing 'proto-type' slot,
       then rename the 'proto-class' slot to 'proto-type';
       this will hold the Lisp name of the slot type
