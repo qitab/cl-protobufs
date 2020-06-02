@@ -39,7 +39,6 @@
    ;;   text-format-test.lisp
    ;;   zigzag-test.lisp
 
-   #+protobuf-file-debugged
    (:module "wire-level-tests"
     :serial t
     :pathname ""
@@ -79,7 +78,6 @@
     :components ((:protobuf-file "extend-test.proto")
                  (:file "extend-test")))
 
-;   #+protobuf-file-debugged
    (:module "case-preservation-test"
     :serial t
     :pathname ""
