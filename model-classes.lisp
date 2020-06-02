@@ -663,7 +663,7 @@ in the hash-table indicated by TYPE."
 
 
 (defclass service-descriptor (descriptor)
-  ((methods :type (list-of protobuf-method)
+  ((methods :type (list-of method-descriptor)
             :accessor proto-methods
             :initarg :methods
             :initform ()))
@@ -693,20 +693,24 @@ in the hash-table indicated by TYPE."
   (find index (proto-methods service) :key #'proto-index))
 
 
-(defclass protobuf-method (descriptor)
-  ((service-name :type string                   ; The name of the stubby service
-                 :accessor proto-service-name   ; this is a method for.
+;;; TODO(cgay): make slot names match accessor names (sans prefix).
+(defclass method-descriptor (descriptor)
+  ;; Name of the Stubby service for which this is a method.
+  ((service-name :type string
+                 :accessor proto-service-name
                  :initarg :service-name)
-   (client-fn :type symbol                      ; The Lisp name of the client stub
+   (client-fn :type symbol
               :accessor proto-client-stub
               :initarg :client-stub)
-   (server-fn :type symbol                      ; The Lisp name of the server stub
+   (server-fn :type symbol
               :accessor proto-server-stub
               :initarg :server-stub)
-   (itype :type symbol                          ; The Lisp type name of the input.
+   ;; Lisp name of the input parameter, which must be a message or extension.
+   (itype :type symbol
           :accessor proto-input-type
           :initarg :input-type)
-   (iname :type (or null string)                ; The Protobufs name of the input.
+   ;; Protobuf name of the input parameter. (Fully qualified?)
+   (iname :type (or null string)
           :accessor proto-input-name
           :initarg :input-name
           :initform nil)
@@ -714,10 +718,12 @@ in the hash-table indicated by TYPE."
                :accessor proto-input-streaming-p
                :initarg :input-streaming
                :initform nil)
-   (otype :type symbol                          ; The Lisp type name of the output.
+   ;; Lisp name of the output parameter, which must be a message or extension.
+   (otype :type symbol
           :accessor proto-output-type
           :initarg :output-type)
-   (oname :type (or null string)                ; The Protobufs name of the output.
+   ;; Protobuf name of the output parameter. (Fully qualified?)
+   (oname :type (or null string)
           :accessor proto-output-name
           :initarg :output-name
           :initform nil)
@@ -739,10 +745,10 @@ in the hash-table indicated by TYPE."
   (:documentation
    "Model class to describe one method in a protobuf service."))
 
-(defmethod make-load-form ((m protobuf-method) &optional environment)
+(defmethod make-load-form ((m method-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
 
-(defmethod print-object ((m protobuf-method) stream)
+(defmethod print-object ((m method-descriptor) stream)
   (if *print-escape*
     (print-unreadable-object (m stream :type t :identity t)
       (format stream "~S (~S) => (~S)"
@@ -783,7 +789,7 @@ in the hash-table indicated by TYPE."
   (:documentation
    "Sets a service METHOD to indicate that its input should not be deserialized prior to calling its
     server function.")
-  (:method ((method protobuf-method))
+  (:method ((method method-descriptor))
     (setf (proto-impl:proto-input-type method) nil)))
 
 (defgeneric make-qualified-name (parent-desc name)
