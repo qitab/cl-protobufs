@@ -97,6 +97,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   }
 
   printer->Print(
+      "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)"
       "\n(proto:define-schema '$schema_name$\n",
       "schema_name", schema_name_);
   printer->Indent();
@@ -122,7 +123,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     printer->Print(")"); sep = "\n ";
   }
   // END schema options
-  printer->Print(")\n");
+  printer->Print("))\n");
   printer->Outdent();
   printer->Outdent();
 
