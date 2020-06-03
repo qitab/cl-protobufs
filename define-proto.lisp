@@ -803,7 +803,7 @@ Arguments:
            (let ((result (macroexpand-1 field env)))
              (assert (eq (car result) 'progn) ()
                      "The macroexpansion for ~S failed" field)
-             (map () #'collect-form (cdr result))))
+             (map () #'collect-type-form (cdr result))))
           ((define-extension define-group)
            (destructuring-bind (&optional progn model-type model definers extra-field extra-slot)
                (macroexpand-1 field env)
@@ -1212,7 +1212,7 @@ Arguments:
                (macroexpand-1 field env)
              (assert (eq progn 'progn) ()
                      "The macroexpansion for ~S failed" field)
-             (map () #'collect-form definers)
+             (map () #'collect-type-form definers)
              (case model-type
                ((define-group)
                 (setf (proto-field-offset extra-field) field-offset)
