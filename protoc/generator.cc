@@ -7,7 +7,8 @@
 #include "generator.h"
 
 #include <memory>
-#include <set>
+#include <unordered_set>
+#include <vector>
 
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/io/zero_copy_stream.h>
@@ -64,6 +65,24 @@ bool LispGenerator::Generate(const FileDescriptor* file,
   return true;
 }
 
+void AccumulateSortedFiles(
+    const FileDescriptor* file,
+    const std::unordered_set<const FileDescriptor*>& all_files,
+    std::unordered_set<const FileDescriptor*>& visited_files,
+    std::vector<const FileDescriptor*>& sorted_files) {
+  // If we've added this already or we're outside of the files we're processing,
+  // we're done.
+  if (visited_files.count(file) > 0 || all_files.count(file) == 0) {
+    return;
+  }
+  visited_files.insert(file);
+  for (int i = 0; i < file->dependency_count(); i++) {
+    AccumulateSortedFiles(file->dependency(i), all_files, visited_files,
+                          sorted_files);
+  }
+  sorted_files.push_back(file);
+}
+
 bool LispGenerator::GenerateAll(const std::vector<const FileDescriptor*>& files,
                                 const std::string& parameter,
                                 compiler::GeneratorContext* context,
@@ -87,11 +106,27 @@ bool LispGenerator::GenerateAll(const std::vector<const FileDescriptor*>& files,
   std::unique_ptr<io::ZeroCopyOutputStream> output(context->Open(file_name));
   io::Printer printer(output.get(), '$', annotate ? &ac : nullptr);
 
-  bool cyclic = false;
-
-  for (auto file : files) {
-    FileGenerator file_generator(file);
+  if (files.size() == 1) {
+    // Most common case.
+    FileGenerator file_generator(files[0]);
     file_generator.GenerateSource(&printer);
+  } else {
+    // Sort the FileDescriptors based on the dependencies between them, so that
+    // if one processed file imports another, the import comes first. Note that
+    // the files passed to this function are in the order of
+    // compiler::CodeGeneratorRequest.files_to_generate, which is the order in which
+    // those files were passed to the protoc command-line.
+    std::unordered_set<const FileDescriptor*> all_files(files.begin(),
+                                                        files.end());
+    std::unordered_set<const FileDescriptor*> visited_files;
+    std::vector<const FileDescriptor*> sorted_files;
+    for (const FileDescriptor* file : files) {
+      AccumulateSortedFiles(file, all_files, visited_files, sorted_files);
+    }
+    for (const FileDescriptor* file : sorted_files) {
+      FileGenerator file_generator(file);
+      file_generator.GenerateSource(&printer);
+    }
   }
 
   if (annotate) {
@@ -99,7 +134,7 @@ bool LispGenerator::GenerateAll(const std::vector<const FileDescriptor*>& files,
       context->Open(file_name + ".meta"));
     GOOGLE_CHECK(annotations.SerializeToZeroCopyStream(meta.get()));
   }
-  return !cyclic;
+  return true;
 }
 
 }  // namespace cl_protobufs
