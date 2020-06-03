@@ -70,7 +70,7 @@
       (read-char stream))))
 
 
-;;--- Collect the comment so we can attach it to its associated object
+;;; Collect the comment so we can attach it to its associated object
 (defun maybe-skip-comments (stream)
   "If what appears next in the stream is a comment, skip it and any following comments,
    then skip any following whitespace."
