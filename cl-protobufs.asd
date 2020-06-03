@@ -168,6 +168,7 @@ which means ASDF loads both the .lisp file and the .fasl file."
   ;; For SBCL we'll use its builtin UTF8 encoder/decoder.
   :depends-on (:closer-mop #-sbcl :babel :trivial-garbage)
   :serial t
+  :in-order-to ((asdf:test-op (asdf:test-op :cl-protobufs-tests)))
   :components
   ((:module "packages"
     :serial t
