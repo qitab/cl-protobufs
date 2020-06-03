@@ -280,7 +280,7 @@ https://developers.google.com/protocol-buffers/docs/reference/google.protobuf
 ```lisp
 (defun unpack-any (any-message))
 ```
-Takes an Any protobuf message any-message and turns it into the stored protobuf
+Takes an Any protobuf message ANY-MESSAGE and turns it into the stored protobuf
 message as long as the qualified-name given in the type-url corresponds to a
 loaded message type.
 The type-url must be of the form base-url/qualified-name.
@@ -288,8 +288,8 @@ The type-url must be of the form base-url/qualified-name.
 ```lisp
 (defun pack-any (message &key (base-url "type.googleapis.com"))
 ```
-Creates an any message protobuf message given a protobuf message
-and a base-url.
+Creates an any message protobuf message given a protobuf MESSAGE
+and a BASE-URL.
 
 ### Proto package-rpc2
 
