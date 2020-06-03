@@ -167,8 +167,9 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   // Register the schema by pathname.
   printer->Print(
       "\n\n"
+      "(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
       "(cl:setf (cl:gethash #P\"$file_name$\" proto-impl::*all-schemas*)\n"
-      "         (proto:find-schema '$schema_name$))\n",
+      "         (proto:find-schema '$schema_name$)))\n",
       "file_name", file_->name(),
       "schema_name", schema_name_);
 
