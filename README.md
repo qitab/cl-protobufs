@@ -101,8 +101,7 @@ release.
 * Load and run the tests:
 
   ```lisp
-  cl-user> (ql:quickload :cl-protobufs-tests)
-  cl-user> (clunit:run-suite 'cl-protobufs.test.wire-test::wire-tests)
+  cl-user> (asdf:test-system :cl-protobufs)
   ```
 
 ## Submitting changes to cl-protobufs
