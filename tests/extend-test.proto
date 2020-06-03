@@ -6,7 +6,7 @@
 
 syntax = "proto2";
 
-import "cl-protobufs/tests/extend-test-base.proto";
+import "extend-test-base.proto";
 
 package extend_test;
 

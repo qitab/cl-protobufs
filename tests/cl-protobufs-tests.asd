@@ -17,8 +17,8 @@
   :defsystem-depends-on (:cl-protobufs)
   :depends-on (:cl-protobufs "clunit2")
   :perform (asdf:test-op (o c)
-			 (uiop:symbol-call (find-package 'cl-protobufs.test.wire-test)
-					   '#:run))
+                         (uiop:symbol-call (find-package 'cl-protobufs.test.wire-test)
+                                           '#:run))
   :serial t
   :components
   ((:module "packages"
@@ -88,14 +88,13 @@
                  (:file "case-preservation-test")))
 
    ;; Google's own protocol buffers and protobuf definitions tests
-   #+++notyet
    (:module "google-tests-proto"
     :serial t
     :pathname ""
     :components
-    ((:protobuf-file "descriptor")
-     (:protobuf-file "unittest_import")
-     (:protobuf-file "unittest" :depends-on ("unittest_import"))))
+    ((:protobuf-source-file "unittest_import")
+     (:protobuf-source-file "unittest"
+      :depends-on ("unittest_import"))))
    #+++notyet
    (:module "google-tests"
     :serial t

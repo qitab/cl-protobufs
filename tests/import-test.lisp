@@ -28,6 +28,6 @@ Parameters:
          (imports (proto-impl:proto-imports schema)))
     (assert-true (= (length imports) 2))
     (assert-true (string= (first imports)
-                          "cl-protobufs/tests/import-test-import-1.proto"))
+                          "import-test-import-1.proto"))
     (assert-true (string= (second imports)
-                          "cl-protobufs/tests/import-test-import-2.proto"))))
+                          "import-test-import-2.proto"))))
