@@ -88,7 +88,7 @@ release.
 
 * Install ASDF if it isn't part of your Lisp implementation.
 
-
+  
 
 * Create a link to cl-protobufs so that Quicklisp will use the local version:
 
@@ -101,7 +101,8 @@ release.
 * Load and run the tests:
 
   ```lisp
-  cl-user> (asdf:test-system :cl-protobufs)
+  cl-user> (ql:quickload :cl-protobufs-tests)
+  cl-user> (clunit:run-suite 'cl-protobufs.test.wire-test::wire-tests)
   ```
 
 ## Submitting changes to cl-protobufs
