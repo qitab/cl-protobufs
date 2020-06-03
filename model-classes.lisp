@@ -29,12 +29,6 @@ Parameters:
 (defvar *protobuf* nil
   "Bound to the Protobufs object currently being defined, either a schema or a message.")
 
-(defvar *protobuf-package* nil
-  "Bound to the Lisp package in which the Protobufs schema is being defined.")
-
-(defvar *protobuf-rpc-package* nil
-  "Bound to the Lisp package in which the Protobufs schema's service definitions are being defined.")
-
 (defvar *protobuf-conc-name* nil
   "Bound to a conc-name to use for all the messages in the schema being defined.
    This controls the name of the accessors the fields of each message.
@@ -75,7 +69,6 @@ Parameters:
          :initarg :name
          :initform nil)
    ;; The fully qualified name, e.g., "proto2.MessageSet"
-   ;; TODO(cgay): rename this to qualified-name, to match the accessor
    (qual-name :type string
               :accessor proto-qualified-name
               :initarg :qualified-name
@@ -84,13 +77,11 @@ Parameters:
             :accessor proto-options
             :initarg :options
             :initform ())
-   ;; TODO(cgay): rename to documentation, to match the accessor
    (doc :type (or null string)
         :accessor proto-documentation
         :initarg :documentation
         :initform nil)
    ;; A list of (pathname start-pos end-pos) triples.
-   ;; TODO(cgay): rename to source-location, to match the accessor
    (location :accessor proto-source-location
              :initarg :source-location
              :initform nil))

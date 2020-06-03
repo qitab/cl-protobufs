@@ -19,6 +19,15 @@
 
 ;;; Parsing utilities
 
+(defvar *protobuf-package* nil
+  "The package into which new symbols are interned during parsing, normally a package
+   created by the protobuf 'package' statement.")
+
+;; Why do services and methods use a different package?
+(defvar *protobuf-rpc-package* nil
+  "The package into which new symbols are interned during parsing, for services and
+   methods only.")
+
 (declaim (inline proto-whitespace-char-p))
 (defun proto-whitespace-char-p (ch)
   (declare #.*optimize-fast-unsafe*)
@@ -683,7 +692,8 @@
                        ;; Fields parsed from .proto files usually get an accessor
                        :reader (let ((conc-name (proto-conc-name msg-desc)))
                                  (and conc-name
-                                      (intern (format nil "~A~A" conc-name slot) *protobuf-package*)))
+                                      (intern (nstring-upcase (format nil "~A~A" conc-name slot))
+                                              *protobuf-package*)))
                        :default (multiple-value-bind (default type default-p)
                                     (find-option opts "default")
                                   (declare (ignore type))
@@ -745,7 +755,8 @@
                   ;; Groups parsed from .proto files usually get an accessor
                   :reader (let ((conc-name (proto-conc-name msg-desc)))
                             (and conc-name
-                                 (intern (format nil "~A~A" conc-name slot) *protobuf-package*)))
+                                 (intern (nstring-upcase (format nil "~A~A" conc-name slot))
+                                         *protobuf-package*)))
                   :message-type :group)))
     (setf (proto-message-type msg) :group)
     (when extended-from
@@ -874,8 +885,10 @@
            (stub (or (and name (make-lisp-symbol name))
                      stub)))
       (setf (proto-class method) stub
-            (proto-client-stub method) (intern (format nil "~A-~A" 'call stub) *protobuf-rpc-package*)
-            (proto-server-stub method) (intern (format nil "~A-~A" stub 'impl) *protobuf-rpc-package*)))
+            (proto-client-stub method) (intern (nstring-upcase (format nil "~A-~A" 'call stub))
+                                               *protobuf-rpc-package*)
+            (proto-server-stub method) (intern (nstring-upcase (format nil "~A-~A" stub 'impl))
+                                               *protobuf-rpc-package*)))
     (let ((strm (find-option method "stream_type")))
       (when strm
         (setf (proto-streams-name method) strm)))

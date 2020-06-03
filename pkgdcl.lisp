@@ -191,7 +191,6 @@
 
    ;; Controls
    #:*protobuf*
-   #:*protobuf-package*
    #:*protobuf-conc-name*
    #:*protobuf-pathname*
    #:*protobuf-search-path*

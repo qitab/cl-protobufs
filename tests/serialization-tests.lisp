@@ -503,6 +503,12 @@ Parameters:
   (auto :index 1 :type (or null automobile) :label (:required)))
 (define-message buy-car-response ()
   (price :index 1 :type proto:uint32 :label (:optional)))
+
+;;; The define-service macro expands to code in a package named <current-package>-rpc.
+;;; Normally the package would be created in the generated code but we do it manually
+;;; here because we call define-service directly.
+(defpackage #:cl-protobufs.test.serialization-test-rpc (:use))
+
 (define-service buy-car ()
   (buy-car (buy-car-request => buy-car-response)
            :options (:deadline 1.0)))

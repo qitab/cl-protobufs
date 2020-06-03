@@ -524,6 +524,8 @@ Parameters:
 ;; "slot_name" or "slotName" -> 'slot-name
 ;; "cl-user.slot_name" or "cl-user.slotName" -> 'cl-user::slot-name
 ;; "cl-user.OuterClass.slot_name" -> 'cl-user::outer-class.slot-name
+;; TODO(cgay): Can package default to *package* now that we've gotten rid of *protobuf-package*?
+;;             What's the use case for returning an uninterned symbol?
 (defun proto->slot-name (field-name &optional package)
   "Returns a Lisp slot name (a symbol) for the protobuf field named FIELD-NAME.
    FIELD-NAME is a dotted string naming a proto message field, e.g.,

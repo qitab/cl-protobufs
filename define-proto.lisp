@@ -217,12 +217,7 @@ e.g.:
                                   options)
                     :documentation documentation)))
     (record-schema schema)
-    (setf *protobuf* schema
-          *protobuf-rpc-package*
-          (or (find-proto-package
-               (format nil "~A-~A" lisp-pkg 'rpc))
-              *package*)
-          *protobuf-package* (or (find-proto-package lisp-pkg) *package*))
+    (setf *protobuf* schema)
     (process-imports schema imports)))
 
 (defmacro with-proto-source-location ((type name definition-type
@@ -298,8 +293,8 @@ DEFAULT the default value if KEYWORD is a not contained in ENUM."))
 (defun make-enum<->numeral-forms (type enum-values)
   "Generates forms for enum<->numeral conversion functions.
 TYPE is the enum type name.  ENUM-VALUES is a list of PROTOBUF-ENUM-VALUEs."
-  (let ((enum->numeral (intern (format nil "~A->NUMERAL" type) *protobuf-package*))
-        (numeral->enum (intern (format nil "NUMERAL->~A" type) *protobuf-package*)))
+  (let ((enum->numeral (fintern "~A->NUMERAL" type))
+        (numeral->enum (fintern "NUMERAL->~A" type)))
     `(progn
        (defun ,enum->numeral (enum &optional default)
          (declare (symbol enum))
@@ -355,15 +350,13 @@ message, and of +<value_name>+ when the enum is defined at top-level."
          (dot (position #\. enum-name :test #'char= :from-end t))
          ;; Use C/C++ enum scope.
          (scope (and dot (subseq enum-name 0 dot)))
-         (*package* *protobuf-package*)
          (constants
           (loop for v in enum-values
-                for c = (intern (format nil "+~@[~A.~]~A+" scope
-                                        (protobuf-enum-value-value v)))
+                for c = (fintern "+~@[~A.~]~A+" scope (protobuf-enum-value-value v))
                 collect `(defconstant ,c ,(protobuf-enum-value-index v)))))
     `(progn
        ,@constants
-       (export ',(mapcar #'second constants) ,*protobuf-package*))))
+       (export ',(mapcar #'second constants)))))
 
 (defun enum-values (enum-type)
   "Returns all keyword values that belong to the given ENUM-TYPE."
@@ -503,18 +496,15 @@ Arguments:
   SLOT-NAME: Slot name for the field (with the #\% prefix).
   FIELD: The class object field definition of the field."
   (let ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
-        (is-set-accessor (intern (format nil "~A-%%IS-SET" proto-type)
-                                 *protobuf-package*))
-        (hidden-accessor-name (intern (format nil "~A-~A" proto-type slot-name)
-                                      *protobuf-package*))
+        (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
+        (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
         (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
         (default-form (get-default-form (proto-set-type field)
                                         (proto-default field)))
         (index (proto-field-offset field))
         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
         (bool-index (proto-bool-index field))
-        (bit-field-name (intern (format nil "~A-%%BOOL-VALUES" proto-type)
-                                *protobuf-package*)))
+        (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type)))
 
     (with-gensyms (obj new-value)
       `(
@@ -554,8 +544,7 @@ Arguments:
         ;; field, this is impossible.
         (proto-impl::set-functions-in-hash-table ',proto-type ',public-slot-name)
 
-        (export '(,has-function-name ,clear-function-name ,public-accessor-name)
-                ,*protobuf-package*)))))
+        (export '(,has-function-name ,clear-function-name ,public-accessor-name))))))
 
 (defun make-structure-class-forms-lazy (proto-type field public-slot-name)
   "Makes forms for the lazy fields of a proto message using STRUCTURE-CLASS.
@@ -568,8 +557,7 @@ Arguments:
          (repeated (eq (proto-label field) :repeated))
          (vectorp (vector-field-p field))
          (public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
-         (hidden-accessor-name (intern (format nil "~A-~A" proto-type slot-name)
-                                       *protobuf-package*)))
+         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name)))
     (with-gensyms (obj field-obj bytes)
       `(
         ;; Public reader.
@@ -611,12 +599,9 @@ Arguments:
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix)."
   (let* ((slot-name (proto-internal-field-name field))
          (public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
-         (hidden-accessor-name (intern (format nil "~A-~A" proto-type slot-name)
-                                       *protobuf-package*))
+         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
          (bool-index (proto-bool-index field))
-         (bit-field-name (intern (format nil "~A-%%BOOL-VALUES" proto-type)
-                                 *protobuf-package*)))
-
+         (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type)))
     (with-gensyms (obj)
       `((declaim (inline ,public-accessor-name))
         (defun ,public-accessor-name (,obj)
@@ -690,16 +675,12 @@ Arguments:
   SLOTS: Slot definitions created by PROCESS-FIELD.
   NON-LAZY-FIELDS: Field definitions for non-lazy fields.
   LAZY-FIELDS: Field definitions for lazy fields."
-  (let* ((public-constructor-name
-          (intern (format nil "MAKE-~A" proto-type) *protobuf-package*))
-         (hidden-constructor-name
-          (intern (format nil "%MAKE-~A" proto-type) *protobuf-package*))
+  (let* ((public-constructor-name (fintern "MAKE-~A" proto-type))
+         (hidden-constructor-name (fintern "%MAKE-~A" proto-type))
          (public-lazy-slot-names (mapcar #'proto-external-field-name lazy-fields))
          (public-non-lazy-slot-names (mapcar #'proto-external-field-name non-lazy-fields))
-         (is-set-name (intern (format nil "~A-%%IS-SET" proto-type) *protobuf-package*))
-         (clear-is-set-name
-          (intern (format nil "~A.CLEAR-%%IS-SET" proto-type)
-                  *protobuf-package*))
+         (is-set-name (fintern "~A-%%IS-SET" proto-type))
+         (clear-is-set-name (fintern "~A.CLEAR-%%IS-SET" proto-type))
          (is-set-init (field-data-initform
                        (find-if #'(lambda (el)
                                     (eq (field-data-internal-slot-name el) '%%is-set))
@@ -762,11 +743,10 @@ Arguments:
          (defun ,clear-is-set-name (,obj)
            (setf (,is-set-name ,obj) ,is-set-init))
 
-         (export '(,public-constructor-name ,is-set-name) ,*protobuf-package*)
+         (export '(,public-constructor-name ,is-set-name))
          (defmethod clear ((,obj ,proto-type))
            ,@(mapcan (lambda (name)
-                       (let ((clear-name (intern (format nil "~A.CLEAR-~A" proto-type name)
-                                                 *protobuf-package*)))
+                       (let ((clear-name (fintern "~A.CLEAR-~A" proto-type name)))
                          `((,clear-name ,obj))))
                      (append public-non-lazy-slot-names additional-slots)))))))
 
@@ -1014,11 +994,10 @@ Arguments:
                          (stable (fintern "~A-VALUES" sname))
                          (stype (field-data-type extra-slot))
                          (reader (or (field-data-accessor extra-slot)
-                                     (intern (if conc-name
-                                                 (format nil "~A~A" conc-name sname)
-                                                 (symbol-name sname))
-                                             *protobuf-package*)))
-                         (writer (or (intern (format nil "~A-~A" 'set reader) *protobuf-package*)))
+                                     (if conc-name
+                                         (fintern "~A~A" conc-name sname)
+                                         (symbol-name sname))))
+                         (writer (fintern "~A-~A" 'set reader))
                          (default (field-data-initform extra-slot)))
                     (collect-form `(without-redefinition-warnings ()
                                      (let ((,stable (tg:make-weak-hash-table
@@ -1078,11 +1057,10 @@ Arguments:
                       (stable (fintern "~A-VALUES" sname))
                       (stype (field-data-type slot))
                       (reader (or (field-data-accessor slot)
-                                  (intern (if conc-name
-                                              (format nil "~A~A" conc-name sname)
-                                              (symbol-name sname))
-                                          *protobuf-package*)))
-                      (writer (or (intern (format nil "~A-~A" 'set reader) *protobuf-package*)))
+                                  (if conc-name
+                                      (fintern "~A~A" conc-name sname)
+                                      (symbol-name sname))))
+                      (writer (fintern "~A-~A" 'set reader))
                       (default (field-data-initform slot)))
                  ;; For the extended slots, each slot gets its own table
                  ;; keyed by the object, which lets us avoid having a slot in each
@@ -1164,7 +1142,7 @@ Arguments:
    'writer' is a Lisp slot writer function to use to set the value."
   (check-type index integer)
   (check-type label (member :required :optional :repeated))
-  (let* ((slot    (or type (and name (proto->slot-name name *protobuf-package*))))
+  (let* ((slot    (or type (and name (proto->slot-name name *package*))))
          (name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
@@ -1172,8 +1150,8 @@ Arguments:
          (reader  (or reader
                       (let ((msg-conc (proto-conc-name *protobuf*)))
                         (and msg-conc
-                             (intern (format nil "~A~A" msg-conc slot) *protobuf-package*)))))
-         (internal-slot-name (intern (format nil "%~A" slot) *protobuf-package*))
+                             (fintern "~A~A" msg-conc slot)))))
+         (internal-slot-name (fintern "%~A" slot))
          (mslot   (unless alias-for
                     (make-field-data
                            :internal-slot-name internal-slot-name
@@ -1340,9 +1318,9 @@ Arguments
                             index label documentation &allow-other-keys)
       field
     (let* (;; Public accessors and setters for slots should be defined later.
-           (internal-slot-name (intern (format nil "%~A" slot) *protobuf-package*))
+           (internal-slot-name (fintern "%~A" slot))
            (reader (and conc-name
-                        (intern (format nil "~A~A" conc-name slot) *protobuf-package*))))
+                        (fintern "~A~A" conc-name slot))))
       (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
           ;; The protobuf returned by clos-type-to-protobuf-type may be incorrect due to
           ;; camel-case shenanigans.  Prefer typename, if available.
@@ -1410,17 +1388,17 @@ Arguments
   "The Lisp function that implements RPC client-side calls.
    This should be set when an RPC package that uses CL-Protobufs gets loaded.")
 
-;; Define a service named 'type' with generic functions declared for
-;; each of the methods within the service
 (defmacro define-service (type (&key name options
                                 documentation source-location)
                           &body method-specs)
-  "Define a service named 'type' and Lisp 'defgeneric' for all its methods.
-   'name' can be used to override the defaultly generated Protobufs service name.
-   'options' is a set of keyword/value pairs, both of which are strings.
+  "Define a service named TYPE and a generic function for each method.
+   NAME can be used to override the defaultly generated service name.
+   OPTIONS is a set of keyword/value pairs, both of which are strings.
+   DOCUMENTATION is an optional description of the service (a string).
+   SOURCE-LOCATION is an optional source location.
 
-   The body is a set of method specs of the form (name (input-type [=>] output-type) &key options).
-   'input-type' and 'output-type' may also be of the form (type &key name)."
+   The body is a set of METHOD-SPECS of the form (name (input-type [=>] output-type) &key options).
+   INPUT-TYPE and OUTPUT-TYPE may also be of the form (type &key name)."
   (let* ((name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
@@ -1459,9 +1437,11 @@ Arguments
                  (streams-type (if (listp streams-type) (car streams-type) streams-type))
                  (options (loop for (key val) on options by #'cddr
                                 collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
-                 (package   *protobuf-rpc-package*)
-                 (client-fn (intern (format nil "~A-~A" 'call function) package))
-                 (server-fn (intern (format nil "~A-~A" function 'impl) package))
+                 (package (let ((name (strcat (package-name *package*) "-RPC")))
+                            (or (find-package name)
+                                (make-package name :use '()))))
+                 (client-fn (intern (nstring-upcase (format nil "CALL-~A" function)) package))
+                 (server-fn (intern (nstring-upcase (format nil "~A-IMPL" function)) package))
                  (method  (make-instance 'method-descriptor
                             :class function
                             :name  (or name (class-name->proto function))
@@ -1484,11 +1464,11 @@ Arguments
                             :source-location source-location)))
             (appendf (proto-methods service) (list method))
             ;; The following are the hooks to an RPC implementation
-            (let* ((vrequest  (intern (symbol-name 'request) package))
-                   (vresponse (intern (symbol-name 'response) package))
-                   (vchannel  (intern (symbol-name 'channel) package))
-                   (vcallback (intern (symbol-name 'callback) package))
-                   (vrpc      (intern (symbol-name 'rpc) package)))
+            (let* ((vrequest  (intern "REQUEST" package))
+                   (vresponse (intern "RESPONSE" package))
+                   (vchannel  (intern "CHANNEL" package))
+                   (vcallback (intern "CALLBACK" package))
+                   (vrpc      (intern "RPC" package)))
               ;; The client side stub, e.g., 'read-air-reservation'.
               ;; The expectation is that the RPC implementation will provide code to make it
               ;; easy to implement a method for this on each kind of channel (HTTP, TCP socket,
@@ -1497,7 +1477,7 @@ Arguments
               ;; The 'do-XXX' method calls the RPC code with the channel, the method
               ;; (i.e., a 'method-descriptor' object), the request and the callback function.
               ;; The RPC code should take care of serializing the input, transmitting the
-              ;; request over the wire, waiting for input (or not if it's asynchronous),
+              ;; request over the wire, waiting for input (or not, if it's asynchronous),
               ;; filling in the output, and either returning the response (if synchronous)
               ;; or calling the callback with the response as an argument (if asynchronous).
               ;; It will also deserialize the response so that the client code sees the
