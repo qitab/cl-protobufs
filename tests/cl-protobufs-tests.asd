@@ -25,6 +25,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.reference-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.serialization-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -65,13 +67,12 @@
 		  :depends-on ("descriptor")
 		  :proto-search-path ("../google/protobuf/"))))
 
-   #+protobuf-file-debugged
    (:module "object-level-tests"
     :serial t
     :pathname ""
     :depends-on ("wire-level-tests")
-    :components ((:file "serialization-tests")
-                 (:file "stability-tests")
+    :components ((:protobuf-source-file "serialization")
+		 (:file "serialization-tests")
                  (:file "symbol-import-tests")))
 
    #+protobuf-file-debugged
