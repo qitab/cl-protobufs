@@ -23,6 +23,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.extend-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.reference-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -53,7 +55,16 @@
     :components ((:file "varint-tests")
                  (:file "wire-tests")))
 
-   #+protobuf-file-debugged
+   (:module "descriptor-extensions"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "descriptor"
+		  :proto-pathname "../google/protobuf/descriptor")
+		 (:protobuf-source-file "proto2-descriptor-extensions"
+		  :proto-pathname "../proto2-descriptor-extensions"
+		  :depends-on ("descriptor")
+		  :proto-search-path ("../google/protobuf/"))))
+
    (:module "object-level-tests"
     :serial t
     :pathname ""
@@ -70,12 +81,15 @@
     :components ((:file "quick-tests")
                  (:static-file "golden.data")))
 
-   #+protobuf-file-debugged
    (:module "lisp-reference-tests"
     :serial t
     :pathname ""
-    :components ((:protobuf-file "package_test1") ; automatically includes package_test2
-                 (:protobuf-file "forward_reference")
+    :depends-on ("descriptor-extensions")
+    :components ((:protobuf-source-file "package_test2")
+		 (:protobuf-source-file "package_test1"
+		  :depends-on ("package_test2"))
+                 (:protobuf-source-file "forward_reference"
+		  :proto-search-path ("../" "../google/protobuf/"))
                  (:file "lisp-reference-tests")))
 
    (:module "nested-extend-test"
