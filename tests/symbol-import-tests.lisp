@@ -23,10 +23,14 @@
 
 (defsuite symbol-import-tests ())
 
-(defun run (&optional interactive?)
+(defun run (&optional interactive-p)
   "Run all tests in the test suite.
-User can specify INTERACTIVE? for local debugging."
-  (run-suite 'symbol-import-tests :use-debugger interactive?))
+Parameters:
+  INTERACTIVE-p: Open debugger on assert failure."
+  (let ((result (run-suite 'symbol-import-tests :use-debugger interactive-p)))
+    (print result)
+    (assert (= (slot-value result 'clunit::failed) 0))
+    (assert (= (slot-value result 'clunit::errors) 0))))
 
 ;;; Make sure we can import a schema by symbol name in a pure-lisp
 ;;; protobuf defintion.
