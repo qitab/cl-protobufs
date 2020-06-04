@@ -50,4 +50,4 @@ Parameters:
 ;;; We need an actual test to make this test pass. If we can make an instance of the message it must
 ;;; have compiled successfully.
 (deftest symbol-import-test (symbol-import-tests)
-  (expect (make-instance 'symbol-importer-message)))
+  (assert-true (make-instance 'symbol-importer-message)))
