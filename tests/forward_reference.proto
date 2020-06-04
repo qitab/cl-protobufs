@@ -6,7 +6,7 @@
 
 syntax = "proto2";
 
-import "third_party/lisp/cl_protobufs/proto2-descriptor-extensions.proto";
+import "proto2-descriptor-extensions.proto";
 
 package protobuf_forward_reference_unittest;
 
