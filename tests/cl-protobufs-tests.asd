@@ -20,7 +20,10 @@
                          (uiop:symbol-call (find-package 'cl-protobufs.test.wire-test)
                                            '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.case-preservation-test)
-					   '#:run))
+					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.extend-test)
+					   '#:run)
+			 )
   :serial t
   :components
   ((:module "packages"
@@ -75,11 +78,12 @@
                  (:protobuf-file "forward_reference")
                  (:file "lisp-reference-tests")))
 
-   #+protobuf-file-debugged
    (:module "nested-extend-test"
     :serial t
     :pathname ""
-    :components ((:protobuf-file "extend-test.proto")
+    :components ((:protobuf-source-file "extend-base")
+		 (:protobuf-source-file "extend"
+		  :depends-on ("extend-base"))
                  (:file "extend-test")))
 
    (:module "case-preservation-test"
