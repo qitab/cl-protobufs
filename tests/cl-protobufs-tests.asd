@@ -65,6 +65,7 @@
 		  :depends-on ("descriptor")
 		  :proto-search-path ("../google/protobuf/"))))
 
+   #+protobuf-file-debugged
    (:module "object-level-tests"
     :serial t
     :pathname ""
