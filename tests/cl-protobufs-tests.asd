@@ -18,7 +18,9 @@
   :depends-on (:cl-protobufs "clunit2")
   :perform (asdf:test-op (o c)
                          (uiop:symbol-call (find-package 'cl-protobufs.test.wire-test)
-                                           '#:run))
+                                           '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.case-preservation-test)
+					   '#:run))
   :serial t
   :components
   ((:module "packages"
@@ -80,7 +82,6 @@
     :components ((:protobuf-file "extend-test.proto")
                  (:file "extend-test")))
 
-   #+protobuf-file-debugged
    (:module "case-preservation-test"
     :serial t
     :pathname ""
