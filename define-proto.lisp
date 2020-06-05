@@ -17,7 +17,7 @@ The lisp generated proto file should look like:
 
 -------------------------------
 
-;; In a package named "cl-protobufs.<the-.proto-package-name>"
+;; In a package named "cl-protobufs.<the-proto-package-name>"
 
 (proto:define-message color-wheel1
     (:conc-name "")
@@ -35,7 +35,7 @@ The lisp generated proto file should look like:
   (metadata  :index 3  :type (cl:or cl:null color-wheel1.metadata1)
              :label (:optional) :typename "Metadata1"))
 
-(cl:setf (cl:gethash #P"third_party/lisp/cl_protobufs/tests/serialization-test.proto"
+(cl:setf (cl:gethash #P"third_party/lisp/cl_protobufs/tests/serialization.proto"
                      proto-impl::*all-schemas*)
          (proto:find-schema 'serialization-test))
 

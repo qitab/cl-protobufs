@@ -7,28 +7,42 @@
 (defpackage #:cl-protobufs.test.symbol-import-test
   (:use #:cl
         #:clunit)
+  ;; These are here because they are exported from the automobile
+  ;; schema below and not having them causes a build error.
+  (:export #:cl-protobufs.test.symbol-import-test
+	   #:symbol-importer-message-%%is-set
+	   #:make-symbol-imported-message
+	   #:symbol-importer-message.clear-imported-type-field
+	   #:symbol-importer-message.imported-type-field
+	   #:make-symbol-importer-message
+	   #:symbol-imported-message-%%is-set
+	   #:symbol-importer-message.has-imported-type-field)
   (:export :run))
 
 (in-package #:cl-protobufs.test.symbol-import-test)
 
 (defsuite symbol-import-tests ())
 
-(defun run (&optional interactive?)
+(defun run (&optional interactive-p)
   "Run all tests in the test suite.
-User can specify INTERACTIVE? for local debugging."
-  (run-suite 'symbol-import-tests :use-debugger interactive?))
+Parameters:
+  INTERACTIVE-p: Open debugger on assert failure."
+  (let ((result (run-suite 'symbol-import-tests :use-debugger interactive-p)))
+    (print result)
+    (assert (= (slot-value result 'clunit::failed) 0))
+    (assert (= (slot-value result 'clunit::errors) 0))))
 
 ;;; Make sure we can import a schema by symbol name in a pure-lisp
 ;;; protobuf defintion.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (proto:define-schema 'symbol-imported-schema
-      :package 'proto_test)
+    :package 'proto_test)
   (proto:define-message symbol-imported-message ()))
- ;; eval-when
+;; eval-when
 
 (proto:define-schema 'symbol-importer-schema
-    :package 'proto_test
+  :package 'proto_test
   :import 'symbol-imported-schema)
 (proto:define-message symbol-importer-message ()
   (imported-type-field :index 1 :type (or null symbol-imported-message) :label (:optional)))
@@ -36,4 +50,4 @@ User can specify INTERACTIVE? for local debugging."
 ;;; We need an actual test to make this test pass. If we can make an instance of the message it must
 ;;; have compiled successfully.
 (deftest symbol-import-test (symbol-import-tests)
-  (expect (make-instance 'symbol-importer-message)))
+  (assert-true (make-instance 'symbol-importer-message)))
