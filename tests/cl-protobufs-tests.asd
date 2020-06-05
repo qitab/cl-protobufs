@@ -47,7 +47,6 @@
    ;; TODO(cgay): do these tests really depend on each other in the ways that
    ;;   the :depends-on clauses imply? If so, why?
    ;; TODO(cgay): None of these tests are included here yet:
-   ;;   deserialize-object-to-bytes-test.lisp
    ;;   enum-mapping-test.lisp
    ;;   import-test.lisp
    ;;   lazy-structure-test.lisp
