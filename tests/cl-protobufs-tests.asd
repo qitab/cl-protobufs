@@ -49,6 +49,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.packed-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.serialize-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -60,7 +62,6 @@
    ;;   the :depends-on clauses imply? If so, why?
    ;; TODO(cgay): None of these tests are included here yet:
    ;;   lisp-service-test.lisp
-   ;;   serialize-object-to-bytes.lisp
    ;;   text-format-test.lisp
    ;;   zigzag-test.lisp
 
@@ -185,6 +186,12 @@
     :pathname ""
     :depends-on ("google-tests-proto")
     :components ((:file "packed-test")))
+
+   (:module "serialize-object-to-bytes-test"
+    :serial t
+    :pathname ""
+    :depends-on ("object-level-tests")
+    :components ((:file "serialize-object-to-bytes")))
 
    (:module "google-tests"
     :serial t
