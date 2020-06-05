@@ -45,6 +45,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.lazy-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.alias-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -55,7 +57,6 @@
    ;; TODO(cgay): do these tests really depend on each other in the ways that
    ;;   the :depends-on clauses imply? If so, why?
    ;; TODO(cgay): None of these tests are included here yet:
-   ;;   lisp-alias-test.lisp
    ;;   lisp-service-test.lisp
    ;;   packed-test.lisp
    ;;   serialize-object-to-bytes.lisp
@@ -78,6 +79,13 @@
 		  :proto-pathname "../proto2-descriptor-extensions"
 		  :depends-on ("descriptor")
 		  :proto-search-path ("../google/protobuf/"))))
+
+   (:module "lisp-alias"
+    :serial t
+    :pathname ""
+    :depends-on ("descriptor-extensions")
+    :components ((:protobuf-source-file "lisp-alias"
+		  :proto-search-path ("../" "../google/protobuf/"))))
 
    (:module "object-level-tests"
     :serial t
@@ -129,10 +137,8 @@
    (:module "deserialize-objects-to-bytes-test"
     :serial t
     :pathname ""
-    :depends-on ("descriptor-extensions")
-    :components ((:protobuf-source-file "lisp-alias"
-		  :proto-search-path ("../" "../google/protobuf/"))
-		 (:file "deserialize-object-to-bytes-test")))
+    :depends-on ("lisp-alias")
+    :components ((:file "deserialize-object-to-bytes-test")))
 
    (:module "enum-mapping-test"
     :serial t
@@ -156,6 +162,12 @@
    (:module "lazy-test"
     :serial t
     :pathname ""
+    :components ((:file "lisp-alias-test")))
+
+   (:module "lisp-alias-test"
+    :serial t
+    :pathname ""
+    :depends-on ("lisp-alias")
     :components ((:file "lisp-alias-test")))
 
    ;; Google's own protocol buffers and protobuf definitions tests
