@@ -31,7 +31,7 @@ Parameters:
     ;; make a new msg using msg's proto serialization bytes
     (let* ((msg-clone (proto:deserialize-object-to-bytes
                        'protobufs-test-proto:message msg-bytes)))
-      (assert-true (null (protobufs-test-proto:i msg-clone)))
+      (assert-false (protobufs-test-proto:message.has-i msg-clone))
       (assert-true (equalp msg-bytes (proto:serialize-object-to-bytes msg-clone)))
       ;; modify msg-clone
       (setf (protobufs-test-proto:i msg-clone) 1000)
