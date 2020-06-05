@@ -33,6 +33,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.full-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.custom-proto-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -114,6 +116,11 @@
     :pathname ""
     :components ((:protobuf-source-file "case-preservation")
                  (:file "case-preservation-test")))
+
+   (:module "custom-methods-test"
+    :serial t
+    :pathname ""
+    :components ((:file "custom-methods")))
 
    ;; Google's own protocol buffers and protobuf definitions tests
    (:module "google-tests-proto"
