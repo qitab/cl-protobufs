@@ -29,6 +29,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.symbol-import-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.quick-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -77,12 +79,13 @@
 		 (:file "serialization-tests")
                  (:file "symbol-import-tests")))
 
-   #+protobuf-file-debugged
    (:module "brown-tests"
     :serial t
     :pathname ""
     :depends-on ("object-level-tests")
-    :components ((:file "quick-tests")
+    :components ((:protobuf-source-file "testproto1")
+		 (:protobuf-source-file "testproto2")
+		 (:file "quick-tests")
                  (:static-file "golden.data")))
 
    (:module "lisp-reference-tests"
