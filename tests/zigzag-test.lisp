@@ -5,9 +5,11 @@
 ;;; https://opensource.org/licenses/MIT.
 
 (defpackage #:cl-protobufs.test.zigzag-test
-  (:use #:cl
-        #:clunit
-        #:cl-protobufs)
+  (:use
+   #:cl
+   #:clunit
+   #:cl-protobufs
+   #:alexandria)
   (:import-from #:proto-impl
                 #:proto-name
                 #:proto-fields
@@ -17,6 +19,17 @@
                 #:proto-output-type
                 #:proto-extended-fields
                 #:proto-class)
+  (:export #:make-msg
+	   #:msg-%%is-set
+	   #:msg.clear-u
+	   #:msg.clear-s
+	   #:msg.has-u
+	   #:msg.u
+	   #:msg.has-i
+	   #:msg.s
+	   #:msg.clear-i
+	   #:msg.has-s
+	   #:msg.I)
   (:export :run))
 
 (in-package #:cl-protobufs.test.zigzag-test)
@@ -37,7 +50,7 @@ Parameters:
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (proto:define-schema 'zigzag-test
-      :package 'proto-test)
+    :package 'proto-test)
 
   (proto:define-message msg ()
     (s :index 1 :type (or null proto:sint64) :label (:optional))
@@ -49,7 +62,9 @@ Parameters:
 (defconstant +TAG-I+ (proto-impl::make-tag :int32 3))
 
 
-(defconstant +equal-loop-list+ '(%s %u %i) "Fields to iterate over.")
+(define-constant +equal-loop-list+ '(%s %u %i)
+  :test #'equal
+  :documentation "Fields to iterate over.")
 
 (defun msg-equalp (x y)
   (loop for slot in +equal-loop-list+
@@ -58,12 +73,12 @@ Parameters:
 
 (defun expect-same (msg)
   (assert-true (msg-equalp msg (proto:deserialize-object-from-bytes
-                           'msg (proto:serialize-object-to-bytes msg)))))
+				'msg (proto:serialize-object-to-bytes msg)))))
 
 (deftest unsigned-positive ()
-    ;; Small encoding for positive numbers
+  ;; Small encoding for positive numbers
   (let ((msg
-         (make-msg :u 10)))
+	  (make-msg :u 10)))
     (expect-bytes (list +TAG-U+ 10) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
@@ -76,14 +91,14 @@ Parameters:
     (unless (closer-mop:class-finalized-p class)
       (closer-mop:finalize-inheritance class))
     (let* ((slot
-            (find '%u (closer-mop:class-slots class) :key 'closer-mop:slot-definition-name))
+	     (find '%u (closer-mop:class-slots class) :key 'closer-mop:slot-definition-name))
            (type (closer-mop:slot-definition-type slot)))
       (assert-true (eq type '(or null uint64)))
       (assert-true (not (typep -10 type)))
       (assert-true (typep 10 type)))))
 
 (deftest signed-positive ()
-    ;; Small encoding for positive numbers
+  ;; Small encoding for positive numbers
   (let ((msg (make-msg :s 10)))
     (expect-bytes (list +TAG-S+ (ash 10 1)) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
@@ -96,7 +111,7 @@ Parameters:
     (expect-same msg)))
 
 (deftest unspecified-positive ()
-    ;; Small encoding for positive numbers
+  ;; Small encoding for positive numbers
   (let ((msg (make-msg :i 10)))
     (expect-bytes (list +TAG-I+ 10) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
