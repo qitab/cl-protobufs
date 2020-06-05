@@ -9,7 +9,6 @@
 
 syntax = "proto2";
 
-//import "google/protobuf/descriptor.proto";
 import "descriptor.proto";
 
 enum LispContainer {

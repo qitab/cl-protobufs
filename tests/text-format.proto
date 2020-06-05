@@ -6,7 +6,7 @@
 
 syntax = "proto2";
 
-import "proto2-descriptor-extensions.proto";
+import "proto2-descriptor-extensions.proto"; // descriptor extension
 
 package travel.flights.qpx;
 

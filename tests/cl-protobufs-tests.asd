@@ -1,3 +1,4 @@
+
 ;;; Copyright 2012-2020 Google LLC
 ;;;
 ;;; Use of this source code is governed by an MIT-style
@@ -54,8 +55,7 @@
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.text-format-test)
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.zigzag-test)
-					   '#:run)
-			 )
+					   '#:run))
   :serial t
   :components
   ((:module "packages"

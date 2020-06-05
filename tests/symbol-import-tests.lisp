@@ -9,14 +9,14 @@
         #:clunit)
   ;; These are here because they are exported from the automobile
   ;; schema below and not having them causes a build error.
-  (:export #:CL-PROTOBUFS.TEST.SYMBOL-IMPORT-TEST
-	   #:SYMBOL-IMPORTER-MESSAGE-%%IS-SET
-	   #:MAKE-SYMBOL-IMPORTED-MESSAGE
-	   #:SYMBOL-IMPORTER-MESSAGE.CLEAR-IMPORTED-TYPE-FIELD
-	   #:SYMBOL-IMPORTER-MESSAGE.IMPORTED-TYPE-FIELD
-	   #:MAKE-SYMBOL-IMPORTER-MESSAGE
-	   #:SYMBOL-IMPORTED-MESSAGE-%%IS-SET
-	   #:SYMBOL-IMPORTER-MESSAGE.HAS-IMPORTED-TYPE-FIELD)
+  (:export #:cl-protobufs.test.symbol-import-test
+	   #:symbol-importer-message-%%is-set
+	   #:make-symbol-imported-message
+	   #:symbol-importer-message.clear-imported-type-field
+	   #:symbol-importer-message.imported-type-field
+	   #:make-symbol-importer-message
+	   #:symbol-imported-message-%%is-set
+	   #:symbol-importer-message.has-imported-type-field)
   (:export :run))
 
 (in-package #:cl-protobufs.test.symbol-import-test)
@@ -37,12 +37,12 @@ Parameters:
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (proto:define-schema 'symbol-imported-schema
-      :package 'proto_test)
+    :package 'proto_test)
   (proto:define-message symbol-imported-message ()))
- ;; eval-when
+;; eval-when
 
 (proto:define-schema 'symbol-importer-schema
-    :package 'proto_test
+  :package 'proto_test
   :import 'symbol-imported-schema)
 (proto:define-message symbol-importer-message ()
   (imported-type-field :index 1 :type (or null symbol-imported-message) :label (:optional)))

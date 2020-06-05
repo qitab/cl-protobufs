@@ -6,7 +6,7 @@
 
 syntax = "proto2";
 
-import "extend-base.proto";
+import "extend-base.proto"; // Test proto
 
 package extend_test;
 
