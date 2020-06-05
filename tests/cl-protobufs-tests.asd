@@ -1,3 +1,4 @@
+
 ;;; Copyright 2012-2020 Google LLC
 ;;;
 ;;; Use of this source code is governed by an MIT-style
@@ -19,14 +20,14 @@
   :perform (asdf:test-op (o c)
                          (uiop:symbol-call (find-package 'cl-protobufs.test.wire-test)
                                            '#:run)
-												 (uiop:symbol-call (find-package 'cl-protobufs.test.case-preservation-test)
-																					 '#:run)
-												 (uiop:symbol-call (find-package 'cl-protobufs.test.extend-test)
-																					 '#:run)
-												 (uiop:symbol-call (find-package 'cl-protobufs.test.reference-test)
-																					 '#:run)
-												 (uiop:symbol-call (find-package 'cl-protobufs.test.serialization-test)
-																					 '#:run))
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.case-preservation-test)
+					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.extend-test)
+					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.reference-test)
+					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.serialization-test)
+					   '#:run))
   :serial t
   :components
   ((:module "packages"
@@ -60,18 +61,18 @@
     :serial t
     :pathname ""
     :components ((:protobuf-source-file "descriptor"
-									:proto-pathname "../google/protobuf/descriptor")
-								 (:protobuf-source-file "proto2-descriptor-extensions"
-									:proto-pathname "../proto2-descriptor-extensions"
-									:depends-on ("descriptor")
-									:proto-search-path ("../google/protobuf/"))))
+		  :proto-pathname "../google/protobuf/descriptor")
+		 (:protobuf-source-file "proto2-descriptor-extensions"
+		  :proto-pathname "../proto2-descriptor-extensions"
+		  :depends-on ("descriptor")
+		  :proto-search-path ("../google/protobuf/"))))
 
    (:module "object-level-tests"
     :serial t
     :pathname ""
     :depends-on ("wire-level-tests")
     :components ((:protobuf-source-file "serialization")
-								 (:file "serialization-tests")
+		 (:file "serialization-tests")
                  (:file "symbol-import-tests")))
 
    #+protobuf-file-debugged
@@ -87,18 +88,18 @@
     :pathname ""
     :depends-on ("descriptor-extensions")
     :components ((:protobuf-source-file "package_test2")
-								 (:protobuf-source-file "package_test1"
-									:depends-on ("package_test2"))
+		 (:protobuf-source-file "package_test1"
+		  :depends-on ("package_test2"))
                  (:protobuf-source-file "forward_reference"
-									:proto-search-path ("../" "../google/protobuf/"))
+		  :proto-search-path ("../" "../google/protobuf/"))
                  (:file "lisp-reference-tests")))
 
    (:module "nested-extend-test"
     :serial t
     :pathname ""
     :components ((:protobuf-source-file "extend-base")
-								 (:protobuf-source-file "extend"
-									:depends-on ("extend-base"))
+		 (:protobuf-source-file "extend"
+		  :depends-on ("extend-base"))
                  (:file "extend-test")))
 
    (:module "case-preservation-test"
@@ -111,16 +112,14 @@
    (:module "google-tests-proto"
     :serial t
     :pathname ""
-    :components
-    ((:protobuf-source-file "unittest_import")
-     (:protobuf-source-file "unittest"
-      :depends-on ("unittest_import"))))
+    :components ((:protobuf-source-file "unittest_import")
+		 (:protobuf-source-file "unittest"
+		  :depends-on ("unittest_import"))))
    #+++notyet
    (:module "google-tests"
     :serial t
     :pathname ""
     :depends-on ("object-level-tests" "google-tests-proto")
-    :components
-    ((:file "full-tests")
-     (:static-file "golden_message.data")
-     (:static-file "golden_packed_message.data")))))
+    :components ((:file "full-tests")
+		 (:static-file "golden_message.data")
+		 (:static-file "golden_packed_message.data")))))
