@@ -53,6 +53,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.text-format-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.zigzag-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -64,7 +66,6 @@
    ;;   the :depends-on clauses imply? If so, why?
    ;; TODO(cgay): None of these tests are included here yet:
    ;;   lisp-service-test.lisp
-   ;;   zigzag-test.lisp
 
    (:module "wire-level-tests"
     :serial t
@@ -202,6 +203,11 @@
     :components ((:protobuf-source-file "text-format"
 		  :proto-search-path ("../" "../google/protobuf/"))
 		 (:file "text-format-test")))
+
+   (:module "zigzag-test"
+    :serial t
+    :pathname ""
+    :components ((:file "zigzag-test")))
 
    (:module "google-tests"
     :serial t
