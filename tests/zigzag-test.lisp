@@ -75,7 +75,7 @@ Parameters:
   (assert-true (msg-equalp msg (proto:deserialize-object-from-bytes
 				'msg (proto:serialize-object-to-bytes msg)))))
 
-(deftest unsigned-positive ()
+(deftest unsigned-positive (wire-tests)
   ;; Small encoding for positive numbers
   (let ((msg
 	  (make-msg :u 10)))
@@ -85,7 +85,7 @@ Parameters:
 ;; There is no applicable method for the generic function
 ;; #<STANDARD-GENERIC-FUNCTION SB-MOP:SLOT-DEFINITION-TYPE (1)>
 ;; with defstruct protobufs.
-(deftest unsigned-negative ()
+(deftest unsigned-negative (wire-tests)
   ;; Verify that the generated class has the correct type declaration
   (let ((class (find-class 'msg)))
     (unless (closer-mop:class-finalized-p class)
@@ -97,26 +97,26 @@ Parameters:
       (assert-true (not (typep -10 type)))
       (assert-true (typep 10 type)))))
 
-(deftest signed-positive ()
+(deftest signed-positive (wire-tests)
   ;; Small encoding for positive numbers
   (let ((msg (make-msg :s 10)))
     (expect-bytes (list +TAG-S+ (ash 10 1)) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
-(deftest signed-negative ()
+(deftest signed-negative (wire-tests)
   (let ((msg (make-msg :s -10)))
     ;; Small encoding for negative numbers
     (expect-bytes (list +TAG-S+ (1- (ash 10 1)))
                   (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
-(deftest unspecified-positive ()
+(deftest unspecified-positive (wire-tests)
   ;; Small encoding for positive numbers
   (let ((msg (make-msg :i 10)))
     (expect-bytes (list +TAG-I+ 10) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
-(deftest unspecified-negative ()
+(deftest unspecified-negative (wire-tests)
   (let ((msg (make-msg :i -10)))
     ;; Large encoding for negative numbers
     (expect-bytes (list +TAG-I+ 246 255 255 255 255 255 255 255 255 1)
