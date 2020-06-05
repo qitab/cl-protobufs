@@ -47,6 +47,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.alias-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.packed-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -58,7 +60,6 @@
    ;;   the :depends-on clauses imply? If so, why?
    ;; TODO(cgay): None of these tests are included here yet:
    ;;   lisp-service-test.lisp
-   ;;   packed-test.lisp
    ;;   serialize-object-to-bytes.lisp
    ;;   text-format-test.lisp
    ;;   zigzag-test.lisp
@@ -86,6 +87,15 @@
     :depends-on ("descriptor-extensions")
     :components ((:protobuf-source-file "lisp-alias"
 		  :proto-search-path ("../" "../google/protobuf/"))))
+
+   ;; Google's own protocol buffers and protobuf definitions tests
+   (:module "google-tests-proto"
+    :serial t
+    :pathname ""
+    :components
+    ((:protobuf-source-file "unittest_import")
+     (:protobuf-source-file "unittest"
+      :depends-on ("unittest_import"))))
 
    (:module "object-level-tests"
     :serial t
@@ -170,14 +180,11 @@
     :depends-on ("lisp-alias")
     :components ((:file "lisp-alias-test")))
 
-   ;; Google's own protocol buffers and protobuf definitions tests
-   (:module "google-tests-proto"
+   (:module "packed-test"
     :serial t
     :pathname ""
-    :components
-    ((:protobuf-source-file "unittest_import")
-     (:protobuf-source-file "unittest"
-      :depends-on ("unittest_import"))))
+    :depends-on ("google-tests-proto")
+    :components ((:file "packed-test")))
 
    (:module "google-tests"
     :serial t
