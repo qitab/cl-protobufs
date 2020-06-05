@@ -31,6 +31,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.quick-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.full-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -121,11 +123,11 @@
     ((:protobuf-source-file "unittest_import")
      (:protobuf-source-file "unittest"
       :depends-on ("unittest_import"))))
-   #+++notyet
+
    (:module "google-tests"
     :serial t
     :pathname ""
-    :depends-on ("object-level-tests" "google-tests-proto")
+    :depends-on ("brown-tests" "google-tests-proto")
     :components
     ((:file "full-tests")
      (:static-file "golden_message.data")
