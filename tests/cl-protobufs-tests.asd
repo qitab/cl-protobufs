@@ -41,6 +41,8 @@
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.import-test)
 					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.lazy-structure-test)
+					   '#:run)
 			 )
   :serial t
   :components
@@ -145,6 +147,11 @@
 		 (:protobuf-source-file "import-test-import-1")
 		 (:protobuf-source-file "import-test-import-2")
 		 (:file "import-test")))
+
+   (:module "lazy-structure-test"
+    :serial t
+    :pathname ""
+    :components ((:file "lazy-structure-test")))
 
    ;; Google's own protocol buffers and protobuf definitions tests
    (:module "google-tests-proto"
