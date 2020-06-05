@@ -15,7 +15,7 @@
   :description      "Test code for Protobufs for Common Lisp"
   :long-description "Test code for Protobufs for Common Lisp"
   :defsystem-depends-on (:cl-protobufs)
-  :depends-on (:cl-protobufs "clunit2")
+  :depends-on (:cl-protobufs "clunit2" :babel)
   :perform (asdf:test-op (o c)
                          (uiop:symbol-call (find-package 'cl-protobufs.test.wire-test)
                                            '#:run)
@@ -26,6 +26,8 @@
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.reference-test)
 					   '#:run)
 			 (uiop:symbol-call (find-package 'cl-protobufs.test.serialization-test)
+					   '#:run)
+			 (uiop:symbol-call (find-package 'cl-protobufs.test.symbol-import-test)
 					   '#:run)
 			 )
   :serial t
