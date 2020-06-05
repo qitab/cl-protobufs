@@ -174,7 +174,8 @@
    (:module "lazy-test"
     :serial t
     :pathname ""
-    :components ((:file "lisp-alias-test")))
+    :components ((:protobuf-source-file "lazy")
+		 (:file "lazy-test")))
 
    (:module "lisp-alias-test"
     :serial t
