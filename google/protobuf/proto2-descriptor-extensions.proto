@@ -1,0 +1,37 @@
+// Copyright 2012-2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+// extensions to descriptor.proto to support lisp-specific extensions
+// in proto definitions
+
+syntax = "proto2";
+
+import "google/protobuf/descriptor.proto";
+
+enum LispContainer {
+  LIST = 0;
+  VECTOR = 1;
+}
+
+extend google.protobuf.FileOptions {
+  optional string lisp_package = 195801;
+}
+
+extend google.protobuf.MessageOptions {
+  // Note those are only for Messages.
+  // Cannot specify for other declarations like enums.
+  optional string lisp_name = 195802;
+  optional string lisp_alias = 195803;
+  optional string lisp_class = 195805;
+}
+
+extend google.protobuf.FieldOptions {
+  optional string lisp_type = 195804;
+  optional string lisp_slot = 195806;
+  // Only meaningful for repeated fields.
+  // Allow use vector-of instead of list-of.
+  optional LispContainer lisp_container = 195807;
+}
