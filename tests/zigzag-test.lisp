@@ -19,17 +19,19 @@
                 #:proto-output-type
                 #:proto-extended-fields
                 #:proto-class)
+  ;; These are here because they are exported from the zigzag
+  ;; schema below and not having them causes a build error.
   (:export #:make-msg
-	   #:msg-%%is-set
-	   #:msg.clear-u
-	   #:msg.clear-s
-	   #:msg.has-u
-	   #:msg.u
-	   #:msg.has-i
-	   #:msg.s
-	   #:msg.clear-i
-	   #:msg.has-s
-	   #:msg.I)
+           #:msg-%%is-set
+           #:msg.clear-u
+           #:msg.clear-s
+           #:msg.has-u
+           #:msg.u
+           #:msg.has-i
+           #:msg.s
+           #:msg.clear-i
+           #:msg.has-s
+           #:msg.I)
   (:export :run))
 
 (in-package #:cl-protobufs.test.zigzag-test)
@@ -73,12 +75,12 @@ Parameters:
 
 (defun expect-same (msg)
   (assert-true (msg-equalp msg (proto:deserialize-object-from-bytes
-				'msg (proto:serialize-object-to-bytes msg)))))
+                                 'msg (proto:serialize-object-to-bytes msg)))))
 
 (deftest unsigned-positive (wire-tests)
   ;; Small encoding for positive numbers
   (let ((msg
-	  (make-msg :u 10)))
+          (make-msg :u 10)))
     (expect-bytes (list +TAG-U+ 10) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
@@ -91,7 +93,7 @@ Parameters:
     (unless (closer-mop:class-finalized-p class)
       (closer-mop:finalize-inheritance class))
     (let* ((slot
-	     (find '%u (closer-mop:class-slots class) :key 'closer-mop:slot-definition-name))
+             (find '%u (closer-mop:class-slots class) :key 'closer-mop:slot-definition-name))
            (type (closer-mop:slot-definition-type slot)))
       (assert-true (eq type '(or null uint64)))
       (assert-true (not (typep -10 type)))
