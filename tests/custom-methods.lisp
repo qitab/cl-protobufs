@@ -27,31 +27,30 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs)
-  ;; These are here because they are exported from the automobile
+  ;; These are here because they are exported from the testschema
   ;; schema below and not having them causes a build error.
-  (:export
-   #:example-parent.clear-code
-   #:example-parent-%%is-set
-   #:example-parent.has-name
-   #:submessage.code
-   #:submessage.has-fancything
-   #:submessage.clear-fancything
-   #:make-example-parent
-   #:submessage.clear-code
-   #:submessage-%%is-set
-   #:example-parent.submessage
-   #:submessage.othercode
-   #:submessage.clear-othercode
-   #:submessage.fancything
-   #:example-parent.clear-submessage
-   #:example-parent.has-code
-   #:example-parent.has-submessage
-   #:example-parent.clear-name
-   #:submessage.has-code
-   #:make-submessage
-   #:example-parent.name
-   #:submessage.has-othercode
-   #:example-parent.code)
+  (:export #:example-parent.clear-code
+           #:example-parent-%%is-set
+           #:example-parent.has-name
+           #:submessage.code
+           #:submessage.has-fancything
+           #:submessage.clear-fancything
+           #:make-example-parent
+           #:submessage.clear-code
+           #:submessage-%%is-set
+           #:example-parent.submessage
+           #:submessage.othercode
+           #:submessage.clear-othercode
+           #:submessage.fancything
+           #:example-parent.clear-submessage
+           #:example-parent.has-code
+           #:example-parent.has-submessage
+           #:example-parent.clear-name
+           #:submessage.has-code
+           #:make-submessage
+           #:example-parent.name
+           #:submessage.has-othercode
+           #:example-parent.code)
   (:export :run))
 
 (in-package #:cl-protobufs.test.custom-proto-test)
