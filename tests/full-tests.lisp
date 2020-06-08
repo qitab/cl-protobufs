@@ -8,7 +8,7 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs
-	#:alexandria)
+        #:alexandria)
   (:export :run))
 
 (in-package #:cl-protobufs.test.full-test)
@@ -27,7 +27,7 @@ Parameters:
 (define-constant +pwd+ #.(make-pathname
                       :directory (pathname-directory
                                   (or *compile-file-truename* *load-truename*)))
-		 :test #'equal)
+                 :test #'equal)
 
 (define-constant +golden-file-name+
   (merge-pathnames "golden_message.data" +pwd+)
