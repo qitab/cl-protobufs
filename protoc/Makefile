@@ -36,8 +36,8 @@ clean: .
 	rm -f $(OFILES) protoc_middleman protoc-gen-lisp
 
 # Generate the proto2 descriptor cpp files.
-protoc_middleman: ../proto2-descriptor-extensions.proto
-	$(PROTOC) -I=.. --cpp_out=. ../proto2-descriptor-extensions.proto
+protoc_middleman: ../google/protobuf/proto2-descriptor-extensions.proto
+	$(PROTOC) -I=../google/protobuf/ --cpp_out=. ../google/protobuf/proto2-descriptor-extensions.proto
 	@touch protoc_middleman
 
 proto2-descriptor-extensions.o: protoc_middleman
