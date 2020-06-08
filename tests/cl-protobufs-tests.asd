@@ -147,7 +147,7 @@
     :pathname ""
     :components ((:file "custom-methods")))
 
-   (:module "deserialize-objects-to-bytes-test"
+   (:module "deserialize-object-to-bytes-test"
     :serial t
     :pathname ""
     :depends-on ("lisp-alias")
