@@ -74,12 +74,11 @@ Parameters:
 
 (defun expect-same (msg)
   (assert-true (msg-equalp msg (proto:deserialize-object-from-bytes
-                                 'msg (proto:serialize-object-to-bytes msg)))))
+                                'msg (proto:serialize-object-to-bytes msg)))))
 
 (deftest unsigned-positive (wire-tests)
   ;; Small encoding for positive numbers
-  (let ((msg
-          (make-msg :u 10)))
+  (let ((msg (make-msg :u 10)))
     (expect-bytes (list +TAG-U+ 10) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
