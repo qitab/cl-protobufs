@@ -65,7 +65,7 @@
    ;; TODO(cgay): do these tests really depend on each other in the ways that
    ;;   the :depends-on clauses imply? If so, why?
    ;;
-   ;;   lisp-service-test.lisp not included as the necessary fields in 
+   ;;   lisp-service-test.lisp not included as the necessary fields in
    ;;   service-test.proto are not currently exported.
 
    (:module "wire-level-tests"
