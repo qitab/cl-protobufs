@@ -7,7 +7,8 @@
 (defpackage #:cl-protobufs.test.full-test
   (:use #:cl
         #:clunit
-        #:cl-protobufs)
+        #:cl-protobufs
+        #:alexandria)
   (:export :run))
 
 (in-package #:cl-protobufs.test.full-test)
@@ -23,15 +24,18 @@ Parameters:
     (assert (= (slot-value result 'clunit::failed) 0))
     (assert (= (slot-value result 'clunit::errors) 0))))
 
-(defconstant +pwd+ #.(make-pathname
+(define-constant +pwd+ #.(make-pathname
                       :directory (pathname-directory
-                                  (or *compile-file-truename* *load-truename*))))
+                                  (or *compile-file-truename* *load-truename*)))
+                 :test #'equal)
 
-(defconstant +golden-file-name+
-  (merge-pathnames "golden_message.data" +pwd+))
+(define-constant +golden-file-name+
+  (merge-pathnames "golden_message.data" +pwd+)
+  :test #'equal)
 
-(defconstant +golden-packed-file-name+
-  (merge-pathnames "golden_packed_message.data" +pwd+))
+(define-constant +golden-packed-file-name+
+  (merge-pathnames "golden_packed_message.data" +pwd+)
+  :test #'equal)
 
 (defparameter *optional-field-info*
   ;; field name, default value, value set by tests
@@ -156,7 +160,7 @@ Parameters:
         (assert (field-equal (first (funcall accessor m)) v0))
         (assert (field-equal (second (funcall accessor m)) v1))))))
 
-(defconstant +packed-field-info+
+(define-constant +packed-field-info+
   '((packed-int32 601 701) (packed-int64 602 702)
     (packed-uint32 603 703) (packed-uint64 604 704)
     (packed-sint32 605 705) (packed-sint64 606 706)
@@ -164,7 +168,8 @@ Parameters:
     (packed-sfixed32 609 709) (packed-sfixed64 610 710)
     (packed-float 611s0 711s0) (packed-double 612d0 712d0)
     (packed-bool t nil)
-    (packed-enum :foreign-bar :foreign-baz)))
+    (packed-enum :foreign-bar :foreign-baz))
+  :test #'equal)
 
 (defun expect-packed-fields-set (m)
   (loop for (field . values) in +packed-field-info+ do

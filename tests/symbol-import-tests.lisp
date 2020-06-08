@@ -7,16 +7,16 @@
 (defpackage #:cl-protobufs.test.symbol-import-test
   (:use #:cl
         #:clunit)
-  ;; These are here because they are exported from the automobile
+  ;; These are here because they are exported from the symbol-importer
   ;; schema below and not having them causes a build error.
   (:export #:cl-protobufs.test.symbol-import-test
-	   #:symbol-importer-message-%%is-set
-	   #:make-symbol-imported-message
-	   #:symbol-importer-message.clear-imported-type-field
-	   #:symbol-importer-message.imported-type-field
-	   #:make-symbol-importer-message
-	   #:symbol-imported-message-%%is-set
-	   #:symbol-importer-message.has-imported-type-field)
+           #:symbol-importer-message-%%is-set
+           #:make-symbol-imported-message
+           #:symbol-importer-message.clear-imported-type-field
+           #:symbol-importer-message.imported-type-field
+           #:make-symbol-importer-message
+           #:symbol-imported-message-%%is-set
+           #:symbol-importer-message.has-imported-type-field)
   (:export :run))
 
 (in-package #:cl-protobufs.test.symbol-import-test)

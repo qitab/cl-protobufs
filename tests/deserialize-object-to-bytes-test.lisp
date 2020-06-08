@@ -14,10 +14,14 @@
 
 (defsuite deserialize-tests ())
 
-(defun run (&optional interactive?)
+(defun run (&optional interactive-p)
   "Run all tests in the test suite.
-User can specify INTERACTIVE? for local debugging."
-  (run-suite 'deserialize-tests :use-debugger interactive?))
+Parameters:
+  INTERACTIVE-P: Open debugger on assert failure."
+  (let ((result (run-suite 'deserialize-tests :use-debugger interactive-p)))
+    (print result)
+    (assert (= (slot-value result 'clunit::failed) 0))
+    (assert (= (slot-value result 'clunit::errors) 0))))
 
 (deftest test-deserialize-object-to-bytes (deserialize-tests)
   (let* ((msg
@@ -27,18 +31,18 @@ User can specify INTERACTIVE? for local debugging."
     ;; make a new msg using msg's proto serialization bytes
     (let* ((msg-clone (proto:deserialize-object-to-bytes
                        'protobufs-test-proto:message msg-bytes)))
-      (expect (null (protobufs-test-proto:i msg-clone)))
-      (expect (equalp msg-bytes (proto:serialize-object-to-bytes msg-clone)))
+      (assert-false (protobufs-test-proto:message.has-i msg-clone))
+      (assert-true (equalp msg-bytes (proto:serialize-object-to-bytes msg-clone)))
       ;; modify msg-clone
       (setf (protobufs-test-proto:i msg-clone) 1000)
       ;; re-serialize msg-clone; it should still remember the bytes we gave it
-      (expect (equalp msg-bytes (proto:serialize-object-to-bytes msg-clone)))
+      (assert-true (equalp msg-bytes (proto:serialize-object-to-bytes msg-clone)))
       ;; sanity check: the bytes should not be equal if we actually serialize a message with
       ;; different content
       (let* ((new-msg-bytes
               (proto-impl:make-object
                protobufs-test-proto:message :i 1000)))
-        (expect (not (equalp msg-bytes new-msg-bytes)))))))
+        (assert-true (not (equalp msg-bytes new-msg-bytes)))))))
 
 (deftest bytes-in-embedded-obj (deserialize-tests)
   (let* ((msg
@@ -56,4 +60,4 @@ User can specify INTERACTIVE? for local debugging."
           (proto:serialize-object-to-bytes outer-with-native))
          (outer-with-clone-bytes
           (proto:serialize-object-to-bytes outer-with-clone)))
-    (expect (equalp outer-with-native-bytes outer-with-clone-bytes))))
+    (assert-true (equalp outer-with-native-bytes outer-with-clone-bytes))))

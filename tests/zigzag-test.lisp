@@ -7,7 +7,8 @@
 (defpackage #:cl-protobufs.test.zigzag-test
   (:use #:cl
         #:clunit
-        #:cl-protobufs)
+        #:cl-protobufs
+        #:alexandria)
   (:import-from #:proto-impl
                 #:proto-name
                 #:proto-fields
@@ -17,6 +18,19 @@
                 #:proto-output-type
                 #:proto-extended-fields
                 #:proto-class)
+  ;; These are here because they are exported from the zigzag
+  ;; schema below and not having them causes a build error.
+  (:export #:make-msg
+           #:msg-%%is-set
+           #:msg.clear-u
+           #:msg.clear-s
+           #:msg.has-u
+           #:msg.u
+           #:msg.has-i
+           #:msg.s
+           #:msg.clear-i
+           #:msg.has-s
+           #:msg.I)
   (:export :run))
 
 (in-package #:cl-protobufs.test.zigzag-test)
@@ -37,7 +51,7 @@ Parameters:
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (proto:define-schema 'zigzag-test
-      :package 'proto-test)
+    :package 'proto-test)
 
   (proto:define-message msg ()
     (s :index 1 :type (or null proto:sint64) :label (:optional))
@@ -49,7 +63,9 @@ Parameters:
 (defconstant +TAG-I+ (proto-impl::make-tag :int32 3))
 
 
-(defconstant +equal-loop-list+ '(%s %u %i) "Fields to iterate over.")
+(define-constant +equal-loop-list+ '(%s %u %i)
+  :test #'equal
+  :documentation "Fields to iterate over.")
 
 (defun msg-equalp (x y)
   (loop for slot in +equal-loop-list+
@@ -58,50 +74,49 @@ Parameters:
 
 (defun expect-same (msg)
   (assert-true (msg-equalp msg (proto:deserialize-object-from-bytes
-                           'msg (proto:serialize-object-to-bytes msg)))))
+                                'msg (proto:serialize-object-to-bytes msg)))))
 
-(deftest unsigned-positive ()
-    ;; Small encoding for positive numbers
-  (let ((msg
-         (make-msg :u 10)))
+(deftest unsigned-positive (wire-tests)
+  ;; Small encoding for positive numbers
+  (let ((msg (make-msg :u 10)))
     (expect-bytes (list +TAG-U+ 10) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
 ;; There is no applicable method for the generic function
 ;; #<STANDARD-GENERIC-FUNCTION SB-MOP:SLOT-DEFINITION-TYPE (1)>
 ;; with defstruct protobufs.
-(deftest unsigned-negative ()
+(deftest unsigned-negative (wire-tests)
   ;; Verify that the generated class has the correct type declaration
   (let ((class (find-class 'msg)))
     (unless (closer-mop:class-finalized-p class)
       (closer-mop:finalize-inheritance class))
     (let* ((slot
-            (find '%u (closer-mop:class-slots class) :key 'closer-mop:slot-definition-name))
+             (find '%u (closer-mop:class-slots class) :key 'closer-mop:slot-definition-name))
            (type (closer-mop:slot-definition-type slot)))
       (assert-true (eq type '(or null uint64)))
       (assert-true (not (typep -10 type)))
       (assert-true (typep 10 type)))))
 
-(deftest signed-positive ()
-    ;; Small encoding for positive numbers
+(deftest signed-positive (wire-tests)
+  ;; Small encoding for positive numbers
   (let ((msg (make-msg :s 10)))
     (expect-bytes (list +TAG-S+ (ash 10 1)) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
-(deftest signed-negative ()
+(deftest signed-negative (wire-tests)
   (let ((msg (make-msg :s -10)))
     ;; Small encoding for negative numbers
     (expect-bytes (list +TAG-S+ (1- (ash 10 1)))
                   (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
-(deftest unspecified-positive ()
-    ;; Small encoding for positive numbers
+(deftest unspecified-positive (wire-tests)
+  ;; Small encoding for positive numbers
   (let ((msg (make-msg :i 10)))
     (expect-bytes (list +TAG-I+ 10) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
-(deftest unspecified-negative ()
+(deftest unspecified-negative (wire-tests)
   (let ((msg (make-msg :i -10)))
     ;; Large encoding for negative numbers
     (expect-bytes (list +TAG-I+ 246 255 255 255 255 255 255 255 255 1)

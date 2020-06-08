@@ -24,7 +24,7 @@ Parameters:
     (assert (= (slot-value result 'clunit::errors) 0))))
 
 (deftest test-all-imports-are-included (import-tests)
-  (let* ((schema (proto:find-schema 'cl-protobufs.third-party.lisp.cl-protobufs.tests:import-test))
+  (let* ((schema (proto:find-schema 'cl-protobufs.third-party.lisp.cl-protobufs.tests:import-proto))
          (imports (proto-impl:proto-imports schema)))
     (assert-true (= (length imports) 2))
     (assert-true (string= (first imports)
