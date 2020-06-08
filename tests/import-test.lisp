@@ -31,3 +31,7 @@ Parameters:
                           "import-test-import-1.proto"))
     (assert-true (string= (second imports)
                           "import-test-import-2.proto"))))
+
+(deftest test-make-structure (import-tests)
+  (assert-true (cl-protobufs.third-party.lisp.cl-protobufs.tests:make-import1))
+  (assert-true (cl-protobufs.third-party.lisp.cl-protobufs.tests:make-import2)))
