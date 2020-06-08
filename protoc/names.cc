@@ -24,6 +24,8 @@
 #endif
 #elif defined(__GNUC__) && __GNUC__ >= 7
 #define PROTOBUF_FALLTHROUGH_INTENDED [[gnu::fallthrough]]
+#elif true
+#define PROTOBUF_FALLTHROUGH_INTENDED
 #endif
 
 namespace google {
