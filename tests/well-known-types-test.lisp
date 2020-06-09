@@ -29,13 +29,13 @@ Parameters:
                                 :two 6))
          (any (pack-any p :base-url "http://fish.com"))
          (ret (unpack-any any)))
-    (assert (proto-impl::proto-equal p ret :exact t))
-    (assert (string= "http://fish.com/protobuf_unittest.TestProtocol"
+    (assert-true (proto-impl::proto-equal p ret :exact t))
+    (assert-true (string= "http://fish.com/protobuf_unittest.TestProtocol"
                      (cl-protobufs.google.protobuf:any.type-url any))))
   (let* ((p (make-outer-message :message
                                 (make-message :i 1)))
          (any (pack-any p))
          (ret (unpack-any any)))
-    (assert (proto-impl::proto-equal p ret :exact t))
-    (assert (string= "type.googleapis.com/travel.flights.qpx.OuterMessage"
+    (assert-true (proto-impl::proto-equal p ret :exact t))
+    (assert-true (string= "type.googleapis.com/travel.flights.qpx.OuterMessage"
                      (cl-protobufs.google.protobuf:any.type-url any)))))
