@@ -236,6 +236,8 @@ which means ASDF loads both the .lisp file and the .fasl file."
       :proto-pathname "google/protobuf/field_mask.proto")
      (:protobuf-source-file "timestamp"
       :proto-pathname "google/protobuf/timestamp.proto")
+     (:protobuf-source-file "wrappers"
+      :proto-pathname "google/protobuf/wrappers.proto")
      (:file "well-known-types")))))
 
 (pushnew :cl-protobufs *features*)
