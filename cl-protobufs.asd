@@ -212,6 +212,20 @@ which means ASDF loads both the .lisp file and the .fasl file."
     :depends-on ("models" "parsing" "schema" "serialization")
     :components
     ((:file "api")
-     (:file "process-imports")))))
+     (:file "process-imports")))
+   (:module "descriptor"
+    :serial t
+    :pathname ""
+    :components
+    ((:protobuf-source-file "descriptor"
+      :proto-pathname "google/protobuf/descriptor.proto")))
+   (:module "well-known-types"
+    :serial t
+    :pathname ""
+    :depends-on ("models" "misc")
+    :components
+    ((:protobuf-source-file "any"
+      :proto-pathname "google/protobuf/any.proto")
+     (:file "well-known-types")))))
 
 (pushnew :cl-protobufs *features*)
