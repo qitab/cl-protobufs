@@ -8,7 +8,6 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs.well-known-types
-        #:cl-protobufs.protobuf-unittest
         #:protobufs-test-proto)
   (:export :run))
 
@@ -26,7 +25,7 @@ Parameters:
     (assert (= (slot-value result 'clunit::errors) 0))))
 
 (deftest test-any (well-known-types)
-  (let* ((p (make-test-protocol :zero "red" :one "fish"
+  (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol :zero "red" :one "fish"
                                 :two 6))
          (any (pack-any p :base-url "http://fish.com"))
          (ret (unpack-any any)))
