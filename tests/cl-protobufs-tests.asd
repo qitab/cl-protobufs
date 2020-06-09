@@ -210,6 +210,12 @@
     :pathname ""
     :components ((:file "zigzag-test")))
 
+   (:module "well-known-types-test"
+    :serial t
+    :pathname ""
+    :components ((:file "well-known-types-test")))
+
+
    (:module "google-tests"
     :serial t
     :pathname ""
