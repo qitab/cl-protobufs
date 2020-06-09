@@ -132,7 +132,7 @@ to PARENT-PATH."
          (search-path (cons (directory-namestring source-file) (resolve-search-path component)))
          (command (format nil "protoc --proto_path=~{~A~^:~} --lisp_out=output-file=~A:~A ~A"
                           search-path
-			  (file-namestring output-file)
+                          (file-namestring output-file)
                           (directory-namestring output-file)
                           source-file-argument)))
     (multiple-value-bind (output error-output status)
@@ -230,6 +230,10 @@ which means ASDF loads both the .lisp file and the .fasl file."
       :proto-search-path ("google/protobuf/"))
      (:protobuf-source-file "duration"
       :proto-pathname "google/protobuf/duration.proto")
+     (:protobuf-source-file "duration"
+      :proto-pathname "google/protobuf/duration.proto")
+     (:protobuf-source-file "empty"
+      :proto-pathname "google/protobuf/empty.proto")
      (:file "well-known-types")))))
 
 (pushnew :cl-protobufs *features*)
