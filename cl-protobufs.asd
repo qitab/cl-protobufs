@@ -228,6 +228,8 @@ which means ASDF loads both the .lisp file and the .fasl file."
      (:protobuf-source-file "api"
       :proto-pathname "google/protobuf/api.proto"
       :proto-search-path ("google/protobuf/"))
+     (:protobuf-source-file "duration"
+      :proto-pathname "google/protobuf/duration.proto")
      (:file "well-known-types")))))
 
 (pushnew :cl-protobufs *features*)
