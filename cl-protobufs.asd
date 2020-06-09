@@ -213,12 +213,6 @@ which means ASDF loads both the .lisp file and the .fasl file."
     :components
     ((:file "api")
      (:file "process-imports")))
-   (:module "descriptor"
-    :serial t
-    :pathname ""
-    :components
-    ((:protobuf-source-file "descriptor"
-      :proto-pathname "google/protobuf/descriptor.proto")))
    (:module "well-known-types"
     :serial t
     :pathname ""
