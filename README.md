@@ -1,4 +1,4 @@
-# cl-protobufs ![Tests](https://github.com/qitab/cl-protobufs/workflows/Tests/badge.svg)
+# cl-protobufs ![Tests](https://github.com/qitab/cl-protobufs/workflows/Tests/badge.svg?branch=master)
 
 
 

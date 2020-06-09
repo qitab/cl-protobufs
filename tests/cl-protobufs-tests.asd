@@ -163,9 +163,9 @@
    (:module "import-test"
     :serial t
     :pathname ""
-    :components ((:protobuf-source-file "import-proto")
-		 (:protobuf-source-file "import-test-import-1")
+    :components ((:protobuf-source-file "import-test-import-1")
 		 (:protobuf-source-file "import-test-import-2")
+		 (:protobuf-source-file "import-proto")
 		 (:file "import-test")))
 
    (:module "lazy-structure-test"
