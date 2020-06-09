@@ -163,3 +163,15 @@ message Person {
 message Population {
   repeated Person people = 1;
 }
+
+
+message ProtoOnWire {
+  optional string beginning = 1;
+  optional string always = 2;
+  repeated string end = 3;
+}
+
+message ProtoDifferentThanWire {
+  optional string beginning = 1;
+  optional string always = 2;
+}
