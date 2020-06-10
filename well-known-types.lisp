@@ -8,8 +8,7 @@
 
 (defpackage #:cl-protobufs.well-known-types
   (:use #:cl
-        #:cl-protobufs
-        #:cl-protobufs.google.protobuf)
+        #:cl-protobufs)
   (:export #:unpack-any
            #:pack-any))
 
@@ -48,16 +47,16 @@
   "Given an Any message unpack retrieve the stored proto message.
 Parameters:
   ANY-MESSAGE: The message to unpack."
-  (assert (find #\/ (any.type-url any-message) :from-end t) ()
+  (assert (find #\/ (cl-protobufs.google.protobuf:any.type-url any-message) :from-end t) ()
           "Could not find / inside of any.type-url.")
   (let* ((type-part-of-url
-          (subseq (any.type-url any-message)
-                  (1+ (position #\/ (any.type-url any-message)
+          (subseq (cl-protobufs.google.protobuf:any.type-url any-message)
+                  (1+ (position #\/ (cl-protobufs.google.protobuf:any.type-url any-message)
                                 :from-end t))))
          (type
           (proto-impl::find-message-by-qualified-name
            type-part-of-url))
-         (value (any.value any-message)))
+         (value (cl-protobufs.google.protobuf:any.value any-message)))
     (assert type ()
             "Could not find class for type: ~S." type-part-of-url)
     (deserialize-object-from-bytes type value)))
@@ -68,7 +67,7 @@ Parameters:
   MESSAGE: The messag to pack.
   BASE-URL: The base part of the URL without the final '/'."
   (let* ((m (proto-impl::find-message (type-of message))))
-    (make-any :type-url (proto-impl::strcat base-url
+    (cl-protobufs.google.protobuf:make-any :type-url (proto-impl::strcat base-url
                                             "/"
                                             (proto-impl::proto-qualified-name m))
               :value (serialize-object-to-bytes message))))
