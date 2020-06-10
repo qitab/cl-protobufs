@@ -655,8 +655,11 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                          ;; make it work here.
                          (let ((tag1 (make-tag $wire-type-start-group index))
                                (tag2 (make-tag $wire-type-end-group   index)))
-                           tag1 tag2
-                           `(error "GROUP serialization is b0rked"))
+                           `(when ,boundp
+                              (,iterator (,vval ,reader)
+                                         (iincf ,size (encode-uint32 ,tag1 ,vbuf))
+                                         ,(call-pseudo-method :serialize msg vval vbuf)
+                                         (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
                          (let ((tag (make-tag $wire-type-string index)))
                            `(when ,boundp
                               (,iterator (,vval ,reader)
