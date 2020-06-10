@@ -702,9 +702,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                          `(let ((,vval ,reader))
                             (when ,vval
                               (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-                              (with-placeholder (,vbuf)
-                                (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
-                                  (iincf ,size (i+ len (backpatch len)))))
+                              ,(call-pseudo-method :serialize msg vval vbuf)
                               (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
                        (let ((tag (make-tag $wire-type-string index)))
                          `(let ((,vval ,reader))
