@@ -616,3 +616,27 @@ Parameters:
                       (print-text-format
                        (deserialize-object 'add-color2 ser2) :stream s))
                     9))))))
+
+;;; We make two protos: ProtoOnWire and ProtoDifferentThanWire.
+;;; The difference is that ProtoOnWire contains a superset of the
+;;; fields ProtoOnWire contains.
+;;;
+;;; We create a ProtoOnWire, serialize, and then deserialize
+;;; using the ProtoOnWire's bytes to a ProtoDifferentThanWire
+;;;
+;;; This aims to test updateing a protocol buffer and deserializing
+;;; on a binary containing the previous version.
+(deftest test-proto-backwards-compatability (serialization-tests)
+  (let* ((proto-on-wire (make-proto-on-wire
+                         :beginning "char"
+                         :always "pika-pal"
+                         :end (list "mander")))
+         (proto-on-wire-octet-bytes (serialize-object-to-bytes proto-on-wire))
+         (my-deserialized-proto
+          (deserialize-object 'proto-different-than-wire
+                              proto-on-wire-octet-bytes))
+         (proto-different-than-wire (make-proto-different-than-wire
+                                     :beginning "char"
+                                     :always "pika-pal")))
+    (assert-true my-deserialized-proto)
+    (assert-true (proto-equal my-deserialized-proto proto-different-than-wire))))
