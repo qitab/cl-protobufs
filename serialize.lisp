@@ -820,19 +820,26 @@ Parameters:
                                       (list non-packed-form packed-form))
                             (ret tag non-packed-form))))
                      ((typep msg 'message-descriptor)
-                      (when (eq (proto-message-type msg) :group)
-                        (error "deserialize: unhandled repeated group"))
-                      (ret (make-tag $wire-type-string index)
-                           `(multiple-value-bind (payload-len payload-start)
-                                (decode-uint32 ,vbuf ,vidx)
-                              ;; This index points *after* the sub-message,
-                              ;; but incrementing it now serves to computes the LIMIT
-                              ;; for the recursive call. And we don't need
-                              ;; the secondary return value for anything.
-                              (setq ,vidx (+ payload-start payload-len))
-                              (push ,(call-pseudo-method :deserialize msg vbuf
-                                                         'payload-start vidx)
-                                    ,temp))))
+                      (if (eq (proto-message-type msg) :group)
+                          (let ((end-tag (ilogior $wire-type-end-group
+                                                  (logand #xfFFFFFF8 index))))
+                            (ret (make-tag $wire-type-start-group index)
+                                 `(multiple-value-bind (obj end)
+                                      ,(call-pseudo-method :deserialize msg vbuf
+                                                           vidx nil end-tag)
+                                    (setq ,vidx end)
+                                    (push obj ,temp))))
+                          (ret (make-tag $wire-type-string index)
+                               `(multiple-value-bind (payload-len payload-start)
+                                    (decode-uint32 ,vbuf ,vidx)
+                                  ;; This index points *after* the sub-message,
+                                  ;; but incrementing it now serves to computes the LIMIT
+                                  ;; for the recursive call. And we don't need
+                                  ;; the secondary return value for anything.
+                                  (setq ,vidx (+ payload-start payload-len))
+                                  (push ,(call-pseudo-method :deserialize msg vbuf
+                                                             'payload-start vidx)
+                                        ,temp)))))
                      ((typep msg 'protobuf-enum)
                       (let* ((tag (make-tag $wire-type-varint index))
                              (packed-tag (packed-tag index))
@@ -874,14 +881,21 @@ Parameters:
                            `(multiple-value-setq (,temp ,vidx)
                               (deserialize-prim ,class ,vbuf ,vidx))))
                      ((typep msg 'message-descriptor)
-                      (when (eq (proto-message-type msg) :group)
-                           (error "deserialize: unhandled group"))
-                      (ret (make-tag $wire-type-string index)
-                           `(multiple-value-bind (payload-len payload-start)
-                                 (decode-uint32 ,vbuf ,vidx)
-                               (setq ,vidx (+ payload-start payload-len)
-                                     ,temp ,(call-pseudo-method :deserialize msg vbuf
-                                                                'payload-start vidx)))))
+                      (if (eq (proto-message-type msg) :group)
+                          (ret (make-tag $wire-type-start-group index)
+                               (let ((end-tag (ilogior $wire-type-end-group
+                                                       (logand #xfFFFFFF8 index))))
+                                 `(multiple-value-bind (obj end)
+                                      ,(call-pseudo-method :deserialize msg vbuf
+                                                           vidx nil end-tag)
+                                    (setq ,vidx end
+                                          ,temp obj))))
+                          (ret (make-tag $wire-type-string index)
+                               `(multiple-value-bind (payload-len payload-start)
+                                    (decode-uint32 ,vbuf ,vidx)
+                                  (setq ,vidx (+ payload-start payload-len)
+                                        ,temp ,(call-pseudo-method :deserialize msg vbuf
+                                                                   'payload-start vidx))))))
                      ((typep msg 'protobuf-enum)
                       (ret (make-tag $wire-type-varint index)
                            `(multiple-value-setq (,temp ,vidx)
