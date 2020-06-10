@@ -263,7 +263,6 @@ Parameters:
                       (second (subgroups (deserialize-object 'basic-test7 tser7)))
                       strval intvals)))))
 
-#+off
 (deftest text-serialization (serialization-tests)
   (let* ((test1  (proto-impl:make-object basic-test1 :intval 150))
          (test1b (proto-impl:make-object basic-test1 :intval -150))
@@ -380,7 +379,6 @@ Parameters:
                                    (parse-text-format 'basic-test6 :stream s))))
                         strval))))))
 
-#+off
 (deftest serialization-integrity (serialization-tests)
   (flet ((do-test (message)
            (let* ((type (type-of message))
@@ -404,7 +402,6 @@ Parameters:
       (do-test (proto-impl:make-object outer :simple simple-1))
       (do-test (proto-impl:make-object outer :simple simple-2)))))
 
-#+off
 (deftest empty-message-serialization (serialization-tests)
   (let ((speed0 (proto-impl:make-object speed-empty))
         (speed1 (proto-impl:make-object speed-optional))
@@ -454,7 +451,6 @@ Parameters:
     "George W. Bush" "Barack Obama")
   "A list of presidents from George Washington until Barack Obama")
 
-#+off
 (deftest optimize-performance-test (serialization-tests)
   (let ((population (make-population))
         (count 0))
@@ -485,7 +481,6 @@ Parameters:
            (result (time (deserialize-object-from-bytes (type-of population) buffer))))
       (assert-true (proto:proto-equal population result :exact t)))))
 
-#+off
 (deftest performance-test (serialization-tests)
   (let ((population (make-population))
         (count 0))
@@ -562,7 +557,6 @@ Parameters:
   (buy-car (buy-car-request => buy-car-response)
            :options (:deadline 1.0)))
 
-#+off
 (deftest extension-serialization (serialization-tests)
   (let* ((color1 (proto-impl:make-object auto-color :r-value 100 :g-value 0 :b-value 100))
          (car1   (proto-impl:make-object automobile :model "Audi" :color color1))
