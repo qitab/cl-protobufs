@@ -651,9 +651,6 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                      (if (eq (proto-message-type msg) :group)
                          ;; The end tag for a group is the field index shifted and
                          ;; and-ed with a constant.
-                         ;; TODO(jgodbout): Group serialization works and
-                         ;; is implement with the regular serializers, so
-                         ;; make it work here.
                          (let ((tag1 (make-tag $wire-type-start-group index))
                                (tag2 (make-tag $wire-type-end-group   index)))
                            `(when ,boundp
