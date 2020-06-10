@@ -132,7 +132,7 @@ to PARENT-PATH."
          (search-path (cons (directory-namestring source-file) (resolve-search-path component)))
          (command (format nil "protoc --proto_path=~{~A~^:~} --lisp_out=output-file=~A:~A ~A"
                           search-path
-			  (file-namestring output-file)
+                          (file-namestring output-file)
                           (directory-namestring output-file)
                           source-file-argument)))
     (multiple-value-bind (output error-output status)
@@ -212,6 +212,32 @@ which means ASDF loads both the .lisp file and the .fasl file."
     :depends-on ("models" "parsing" "schema" "serialization")
     :components
     ((:file "api")
-     (:file "process-imports")))))
+     (:file "process-imports")))
+   (:module "well-known-types"
+    :serial t
+    :pathname ""
+    :depends-on ("models" "misc")
+    :components
+    ((:protobuf-source-file "any"
+      :proto-pathname "google/protobuf/any.proto")
+     (:protobuf-source-file "source_context"
+      :proto-pathname "google/protobuf/source_context.proto")
+     (:protobuf-source-file "type"
+      :proto-pathname "google/protobuf/type.proto"
+      :proto-search-path ("google/protobuf/"))
+     (:protobuf-source-file "api"
+      :proto-pathname "google/protobuf/api.proto"
+      :proto-search-path ("google/protobuf/"))
+     (:protobuf-source-file "duration"
+      :proto-pathname "google/protobuf/duration.proto")
+     (:protobuf-source-file "empty"
+      :proto-pathname "google/protobuf/empty.proto")
+     (:protobuf-source-file "field_mask"
+      :proto-pathname "google/protobuf/field_mask.proto")
+     (:protobuf-source-file "timestamp"
+      :proto-pathname "google/protobuf/timestamp.proto")
+     (:protobuf-source-file "wrappers"
+      :proto-pathname "google/protobuf/wrappers.proto")
+     (:file "well-known-types")))))
 
 (pushnew :cl-protobufs *features*)
