@@ -821,12 +821,12 @@ Parameters:
                             (ret tag non-packed-form))))
                      ((typep msg 'message-descriptor)
                       (if (eq (proto-message-type msg) :group)
-                          (let ((end-tag (ilogior $wire-type-end-group
-                                                  (logand #xfFFFFFF8 index))))
-                            (ret (make-tag $wire-type-start-group index)
+                          (let ((tag1 (make-tag $wire-type-start-group index))
+                                (tag2 (make-tag $wire-type-end-group index)))
+                            (ret tag1
                                  `(multiple-value-bind (obj end)
                                       ,(call-pseudo-method :deserialize msg vbuf
-                                                           vidx nil end-tag)
+                                                           vidx nil tag2)
                                     (setq ,vidx end)
                                     (push obj ,temp))))
                           (ret (make-tag $wire-type-string index)
@@ -882,12 +882,12 @@ Parameters:
                               (deserialize-prim ,class ,vbuf ,vidx))))
                      ((typep msg 'message-descriptor)
                       (if (eq (proto-message-type msg) :group)
-                          (ret (make-tag $wire-type-start-group index)
-                               (let ((end-tag (ilogior $wire-type-end-group
-                                                       (logand #xfFFFFFF8 index))))
+                          (let ((tag1 (make-tag $wire-type-start-group index))
+                                (tag2 (make-tag $wire-type-end-group index)))
+                            (ret tag1
                                  `(multiple-value-bind (obj end)
                                       ,(call-pseudo-method :deserialize msg vbuf
-                                                           vidx nil end-tag)
+                                                           vidx nil tag2)
                                     (setq ,vidx end
                                           ,temp obj))))
                           (ret (make-tag $wire-type-string index)
