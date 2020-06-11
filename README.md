@@ -53,7 +53,7 @@ clear in a moment.
 ```shell
 $ protoc --plugin=protoc-gen-lisp=/usr/local/bin/protoc-gen-lisp \
   --lisp_out=output-file=case-preservation.lisp:/tmp \
-  case-preservation.proto
+  cl-protobufs/tests/case-preservation.proto
 ```
 
 This command should generate a file named `case-preservation.lisp` in the
