@@ -783,10 +783,10 @@ Parameters:
            (ret-list (tags collectors)
              (return-from generate-field-deserializer (values tags collectors
                                                               nslot rslot)))
-           (call-pseudo-method (fun msg vbuf start end)
+           (call-pseudo-method (fun msg vbuf start end &optional (end-tag 0))
              (if raw-p
-                 `(list ,vbuf ,start ,end)
-                 (call-pseudo-method fun msg vbuf start end))))
+                 `(list ,vbuf ,start ,end ,end-tag)
+                 (call-pseudo-method fun msg vbuf start end end-tag))))
       (let* ((class  (proto-class field))
              (msg    (and class (not (keywordp class))
                           (or (find-message class)
