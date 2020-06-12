@@ -70,6 +70,15 @@ message BasicTest6 {
   repeated BasicTest2 recvals = 3;
 }
 
+message BasicTest7 {
+  optional string strval = 1;
+  repeated int32 intvals = 2;
+  repeated group Subgroups = 3 {
+    optional string strval = 1;
+    repeated int32 intvals = 2;
+  }
+}
+
 message ColorWheel1 {
   message Metadata1 {
     optional string author = 1;
