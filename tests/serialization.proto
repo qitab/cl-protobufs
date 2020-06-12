@@ -71,10 +71,10 @@ message BasicTest6 {
 }
 
 message BasicTest7 {
-  required string strval = 1;
+  optional string strval = 1;
   repeated int32 intvals = 2;
   repeated group Subgroups = 3 {
-    required string strval = 1;
+    optional string strval = 1;
     repeated int32 intvals = 2;
   }
 }
