@@ -86,30 +86,30 @@ Parameters:
                         27 10 2 103 50 28 34 3 116 119 111))
 
 (deftest basic-serialization (serialization-tests)
-  (let* ((test1  (proto-impl:make-object basic-test1 :intval 150))
-         (test1b (proto-impl:make-object basic-test1 :intval -150))
-         (test2  (proto-impl:make-object basic-test2 :strval "testing"))
-         (test2b (proto-impl:make-object basic-test2 :strval "1 2 3"))
-         (test3  (proto-impl:make-object basic-test3 :recval test1))
-         (test4  (proto-impl:make-object basic-test4 :recval test2))
-         (test5  (proto-impl:make-object basic-test5
-                                         :color :red
-                                         :intvals '(2 3 5 7)
-                                         :strvals '("two" "three" "five" "seven")))
-         (test6  (proto-impl:make-object basic-test6
-                                         :intvals '(2 3 5 7)
-                                         :strvals '("two" "three" "five" "seven")
-                                         :recvals (list test2 test2b)))
-         (group1 (proto-impl:make-object subgroups
-                                         :strval "g1"
-                                         :intvals '(1 1 2 3)))
-         (group2 (proto-impl:make-object subgroups
-                                         :strval "g2"))
-         (test7  (proto-impl:make-object basic-test7
-                                        :strval1 "seven"
-                                        :intvals '(2 27)
-                                        :subgroups (list group1  group2)
-                                        :strval2 "two")))
+  (let* ((test1  (make-basic-test1 :intval 150))
+         (test1b (make-basic-test1 :intval -150))
+         (test2  (make-basic-test2 :strval "testing"))
+         (test2b (make-basic-test2 :strval "1 2 3"))
+         (test3  (make-basic-test3 :recval test1))
+         (test4  (make-basic-test4 :recval test2))
+         (test5  (make-basic-test5
+                  :color :red
+                  :intvals '(2 3 5 7)
+                  :strvals '("two" "three" "five" "seven")))
+         (test6  (make-basic-test6
+                  :intvals '(2 3 5 7)
+                  :strvals '("two" "three" "five" "seven")
+                  :recvals (list test2 test2b)))
+         (group1 (make-subgroups
+                  :strval "g1"
+                  :intvals '(1 1 2 3)))
+         (group2 (make-subgroups
+                  :strval "g2"))
+         (test7  (make-basic-test7
+                  :strval1 "seven"
+                  :intvals '(2 27)
+                  :subgroups (list group1  group2)
+                  :strval2 "two")))
     (let ((tser1  (serialize-object-to-bytes test1 'basic-test1))
           (tser1b (serialize-object-to-bytes test1b 'basic-test1))
           (tser2  (serialize-object-to-bytes test2 'basic-test2))
@@ -179,29 +179,29 @@ Parameters:
       (handler-bind ((style-warning #'muffle-warning))
         (eval (proto-impl:generate-deserializer message))
         (eval (proto-impl:generate-serializer message)))))
-  (let* ((test1  (proto-impl:make-object basic-test1 :intval 150))
-         (test1b (proto-impl:make-object basic-test1 :intval -150))
-         (test2  (proto-impl:make-object basic-test2 :strval "testing"))
-         (test2b (proto-impl:make-object basic-test2 :strval "1 2 3"))
-         (test3  (proto-impl:make-object basic-test3 :recval test1))
-         (test4  (proto-impl:make-object basic-test4 :recval test2))
-         (test5  (proto-impl:make-object basic-test5
-                                         :color :red :intvals '(2 3 5 7)
-                                         :strvals '("two" "three" "five" "seven")))
-         (test6  (proto-impl:make-object basic-test6
-                                         :intvals '(2 3 5 7)
-                                         :strvals '("two" "three" "five" "seven")
-                                         :recvals (list test2 test2b)))
-         (group1 (proto-impl:make-object subgroups
-                                         :strval "g1"
-                                         :intvals '(1 1 2 3)))
-         (group2 (proto-impl:make-object subgroups
-                                         :strval "g2"))
-         (test7  (proto-impl:make-object basic-test7
-                                        :strval1 "seven"
-                                        :intvals '(2 27)
-                                        :subgroups (list group1  group2)
-                                        :strval2 "two")))
+    (let* ((test1  (make-basic-test1 :intval 150))
+         (test1b (make-basic-test1 :intval -150))
+         (test2  (make-basic-test2 :strval "testing"))
+         (test2b (make-basic-test2 :strval "1 2 3"))
+         (test3  (make-basic-test3 :recval test1))
+         (test4  (make-basic-test4 :recval test2))
+         (test5  (make-basic-test5
+                  :color :red :intvals '(2 3 5 7)
+                  :strvals '("two" "three" "five" "seven")))
+         (test6  (make-basic-test6
+                  :intvals '(2 3 5 7)
+                  :strvals '("two" "three" "five" "seven")
+                  :recvals (list test2 test2b)))
+         (group1 (make-subgroups
+                  :strval "g1"
+                  :intvals '(1 1 2 3)))
+         (group2 (make-subgroups
+                  :strval "g2"))
+         (test7  (make-basic-test7
+                  :strval1 "seven"
+                  :intvals '(2 27)
+                  :subgroups (list group1  group2)
+                  :strval2 "two")))
     (let ((tser1  (serialize-object-to-bytes test1 'basic-test1))
           (tser1b (serialize-object-to-bytes test1b 'basic-test1))
           (tser2  (serialize-object-to-bytes test2 'basic-test2))
@@ -265,19 +265,19 @@ Parameters:
                       strval intvals)))))
 
 (deftest text-serialization (serialization-tests)
-  (let* ((test1  (proto-impl:make-object basic-test1 :intval 150))
-         (test1b (proto-impl:make-object basic-test1 :intval -150))
-         (test2  (proto-impl:make-object basic-test2 :strval "testing"))
-         (test2b (proto-impl:make-object basic-test2 :strval "1 2 3"))
-         (test3  (proto-impl:make-object basic-test3 :recval test1))
-         (test4  (proto-impl:make-object basic-test4 :recval test2))
-         (test5  (proto-impl:make-object basic-test5
-                                         :color :red :intvals '(2 3 5 7)
-                                         :strvals '("two" "three" "five" "seven")))
-         (test6  (proto-impl:make-object basic-test6
-                                         :intvals '(2 3 5 7)
-                                         :strvals '("two" "three" "five" "seven")
-                                         :recvals (list test2 test2b))))
+  (let* ((test1  (make-basic-test1 :intval 150))
+         (test1b (make-basic-test1 :intval -150))
+         (test2  (make-basic-test2 :strval "testing"))
+         (test2b (make-basic-test2 :strval "1 2 3"))
+         (test3  (make-basic-test3 :recval test1))
+         (test4  (make-basic-test4 :recval test2))
+         (test5  (make-basic-test5
+                  :color :red :intvals '(2 3 5 7)
+                  :strvals '("two" "three" "five" "seven")))
+         (test6  (make-basic-test6
+                  :intvals '(2 3 5 7)
+                  :strvals '("two" "three" "five" "seven")
+                  :recvals (list test2 test2b))))
     (let ((tser1  (serialize-object-to-bytes test1 'basic-test1))
           (tser1b (serialize-object-to-bytes test1b 'basic-test1))
           (tser2  (serialize-object-to-bytes test2 'basic-test2))
@@ -392,24 +392,24 @@ Parameters:
                                      (print-text-format message :stream s))
                                    (with-output-to-string (s)
                                      (print-text-format new :stream s)))))))
-    (do-test (proto-impl:make-object outer :i 4))
-    (do-test (proto-impl:make-object outer :i -4))
-    (let ((inner-1 (mapcar #'(lambda (i) (proto-impl:make-object inner :i i)) '(1 2 3)))
-          (inner-2 (mapcar #'(lambda (i) (proto-impl:make-object inner :i i)) '(-1 -2 -3)))
-          (simple-1 (proto-impl:make-object inner :i 4))
-          (simple-2 (proto-impl:make-object inner :i -4)))
-      (do-test (proto-impl:make-object outer :inner inner-1))
-      (do-test (proto-impl:make-object outer :inner inner-2))
-      (do-test (proto-impl:make-object outer :simple simple-1))
-      (do-test (proto-impl:make-object outer :simple simple-2)))))
+    (do-test (make-outer :i 4))
+    (do-test (make-outer :i -4))
+    (let ((inner-1 (mapcar #'(lambda (i) (make-inner :i i)) '(1 2 3)))
+          (inner-2 (mapcar #'(lambda (i) (make-inner :i i)) '(-1 -2 -3)))
+          (simple-1 (make-inner :i 4))
+          (simple-2 (make-inner :i -4)))
+      (do-test (make-outer :inner inner-1))
+      (do-test (make-outer :inner inner-2))
+      (do-test (make-outer :simple simple-1))
+      (do-test (make-outer :simple simple-2)))))
 
 (deftest empty-message-serialization (serialization-tests)
-  (let ((speed0 (proto-impl:make-object speed-empty))
-        (speed1 (proto-impl:make-object speed-optional))
-        (speed2 (proto-impl:make-object speed-repeated))
-        (space0 (proto-impl:make-object space-empty))
-        (space1 (proto-impl:make-object space-optional))
-        (space2 (proto-impl:make-object space-repeated)))
+  (let ((speed0 (make-speed-empty))
+        (speed1 (make-speed-optional))
+        (speed2 (make-speed-repeated))
+        (space0 (make-space-empty))
+        (space1 (make-space-optional))
+        (space2 (make-space-repeated)))
     (setf (foo speed1) speed0)
     (setf (foo space1) space0)
     (push speed0 (foo speed2))
@@ -559,12 +559,12 @@ Parameters:
            :options (:deadline 1.0)))
 
 (deftest extension-serialization (serialization-tests)
-  (let* ((color1 (proto-impl:make-object auto-color :r-value 100 :g-value 0 :b-value 100))
-         (car1   (proto-impl:make-object automobile :model "Audi" :color color1))
-         (rqst1  (proto-impl:make-object buy-car-request :auto car1))
-         (color2 (proto-impl:make-object auto-color :r-value 100 :g-value 0 :b-value 100))
-         (car2   (proto-impl:make-object automobile :model "Audi" :color color2))
-         (rqst2  (proto-impl:make-object buy-car-request :auto car2)))
+  (let* ((color1 (make-auto-color :r-value 100 :g-value 0 :b-value 100))
+         (car1   (make-automobile :model "Audi" :color color1))
+         (rqst1  (make-buy-car-request :auto car1))
+         (color2 (make-auto-color :r-value 100 :g-value 0 :b-value 100))
+         (car2   (make-automobile :model "Audi" :color color2))
+         (rqst2  (make-buy-car-request :auto car2)))
     (setf (paint-type color2) :metallic)
     (let ((ser1 (serialize-object-to-bytes rqst1 'buy-car-request))
           (ser2 (serialize-object-to-bytes rqst2 'buy-car-request)))
@@ -588,14 +588,14 @@ Parameters:
       (assert-true (search "paint_type:" str2 :test #'char=)))))
 
 (deftest group-serialization (serialization-tests)
-  (let* ((meta1  (proto-impl:make-object color-wheel1.metadata1 :revision "1.0"))
-         (wheel1 (proto-impl:make-object color-wheel1 :name "Colors" :metadata meta1))
-         (color1 (proto-impl:make-object color1 :r-value 100 :g-value 0 :b-value 100))
-         (rqst1  (proto-impl:make-object add-color1 :wheel wheel1 :color color1))
-         (meta2  (proto-impl:make-object metadata :revision "1.0"))
-         (wheel2 (proto-impl:make-object color-wheel2 :name "Colors" :metadata meta2))
-         (color2 (proto-impl:make-object color2 :r-value 100 :g-value 0 :b-value 100))
-         (rqst2  (proto-impl:make-object add-color2 :wheel wheel2 :color color2)))
+  (let* ((meta1  (make-color-wheel1.metadata1 :revision "1.0"))
+         (wheel1 (make-color-wheel1 :name "Colors" :metadata meta1))
+         (color1 (make-color1 :r-value 100 :g-value 0 :b-value 100))
+         (rqst1  (make-add-color1 :wheel wheel1 :color color1))
+         (meta2  (make-metadata :revision "1.0"))
+         (wheel2 (make-color-wheel2 :name "Colors" :metadata meta2))
+         (color2 (make-color2 :r-value 100 :g-value 0 :b-value 100))
+         (rqst2  (make-add-color2 :wheel wheel2 :color color2)))
     (let ((ser1 (serialize-object-to-bytes rqst1 'add-color1))
           (ser2 (serialize-object-to-bytes rqst2 'add-color2)))
       (assert-true (string= (subseq
