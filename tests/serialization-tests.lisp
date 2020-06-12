@@ -83,7 +83,7 @@ Parameters:
 
 (defvar *tser7-bytes* #(10 5 115 101 118 101 110 16 2 16 27
                         27 10 2 103 49 16 1 16 1 16 2 16 3 28
-                        27 10 2 103 50 28))
+                        27 10 2 103 50 28 34 3 116 119 111))
 
 (deftest basic-serialization (serialization-tests)
   (let* ((test1  (make-basic-test1 :intval 150))
@@ -106,9 +106,10 @@ Parameters:
          (group2 (make-subgroups
                   :strval "g2"))
          (test7  (make-basic-test7
-                  :strval "seven"
+                  :strval1 "seven"
                   :intvals '(2 27)
-                  :subgroups (list group1  group2))))
+                  :subgroups (list group1  group2)
+                  :strval2 "two")))
     (let ((tser1  (serialize-object-to-bytes test1 'basic-test1))
           (tser1b (serialize-object-to-bytes test1b 'basic-test1))
           (tser2  (serialize-object-to-bytes test2 'basic-test2))
@@ -162,7 +163,7 @@ Parameters:
                       (second (recvals (deserialize-object 'basic-test6 tser6)))
                       strval)
         (slots-equalp test7 (deserialize-object 'basic-test7 tser7)
-                      strval intvals)
+                      strval1 intvals strval2)
         (slots-equalp (first (subgroups test7))
                       (first (subgroups (deserialize-object 'basic-test7 tser7)))
                       strval intvals)
@@ -176,10 +177,9 @@ Parameters:
                    basic-test5 basic-test6 basic-test7 subgroups))
     (let ((message (proto:find-message-for-class class)))
       (handler-bind ((style-warning #'muffle-warning))
-        (eval (proto-impl:generate-serializer message))
-        (when (not (equal class 'basic-test7))
-          (eval (proto-impl:generate-deserializer message))))))
-  (let* ((test1  (make-basic-test1 :intval 150))
+        (eval (proto-impl:generate-deserializer message))
+        (eval (proto-impl:generate-serializer message)))))
+    (let* ((test1  (make-basic-test1 :intval 150))
          (test1b (make-basic-test1 :intval -150))
          (test2  (make-basic-test2 :strval "testing"))
          (test2b (make-basic-test2 :strval "1 2 3"))
@@ -198,9 +198,10 @@ Parameters:
          (group2 (make-subgroups
                   :strval "g2"))
          (test7  (make-basic-test7
-                  :strval "seven"
+                  :strval1 "seven"
                   :intvals '(2 27)
-                  :subgroups (list group1  group2))))
+                  :subgroups (list group1  group2)
+                  :strval2 "two")))
     (let ((tser1  (serialize-object-to-bytes test1 'basic-test1))
           (tser1b (serialize-object-to-bytes test1b 'basic-test1))
           (tser2  (serialize-object-to-bytes test2 'basic-test2))
@@ -255,7 +256,7 @@ Parameters:
                       (second (recvals (deserialize-object 'basic-test6 tser6)))
                       strval)
         (slots-equalp test7 (deserialize-object 'basic-test7 tser7)
-                      strval intvals)
+                      strval1 intvals strval2)
         (slots-equalp (first (subgroups test7))
                       (first (subgroups (deserialize-object 'basic-test7 tser7)))
                       strval intvals)

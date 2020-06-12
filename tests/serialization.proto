@@ -71,12 +71,13 @@ message BasicTest6 {
 }
 
 message BasicTest7 {
-  optional string strval = 1;
+  optional string strval1 = 1;
   repeated int32 intvals = 2;
   repeated group Subgroups = 3 {
     optional string strval = 1;
     repeated int32 intvals = 2;
   }
+  optional string strval2 = 4;
 }
 
 message ColorWheel1 {
