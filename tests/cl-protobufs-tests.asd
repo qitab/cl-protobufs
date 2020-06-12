@@ -207,3 +207,4 @@
   (uiop:symbol-call (find-package 'cl-protobufs.test.text-format-test)       '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.zigzag-test)            '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.well-known-types-test)  '#:run))
+
