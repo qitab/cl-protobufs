@@ -783,10 +783,10 @@ Parameters:
            (ret-list (tags collectors)
              (return-from generate-field-deserializer (values tags collectors
                                                               nslot rslot)))
-           (call-pseudo-method (fun msg vbuf start end &optional (end-tag 0))
+           (call-deserializer (msg vbuf start end &optional (end-tag 0))
              (if raw-p
                  `(list ,vbuf ,start ,end ,end-tag)
-                 (call-pseudo-method fun msg vbuf start end end-tag))))
+                 (call-pseudo-method :deserialize msg vbuf start end end-tag))))
       (let* ((class  (proto-class field))
              (msg    (and class (not (keywordp class))
                           (or (find-message class)
@@ -825,8 +825,7 @@ Parameters:
                                 (tag2 (make-tag $wire-type-end-group index)))
                             (ret tag1
                                  `(multiple-value-bind (obj end)
-                                      ,(call-pseudo-method :deserialize msg vbuf
-                                                           vidx nil tag2)
+                                      ,(call-deserializer msg vbuf vidx nil tag2)
                                     (setq ,vidx end)
                                     (push obj ,temp))))
                           (ret (make-tag $wire-type-string index)
@@ -837,8 +836,7 @@ Parameters:
                                   ;; for the recursive call. And we don't need
                                   ;; the secondary return value for anything.
                                   (setq ,vidx (+ payload-start payload-len))
-                                  (push ,(call-pseudo-method :deserialize msg vbuf
-                                                             'payload-start vidx)
+                                  (push ,(call-deserializer msg vbuf 'payload-start vidx)
                                         ,temp)))))
                      ((typep msg 'protobuf-enum)
                       (let* ((tag (make-tag $wire-type-varint index))
@@ -886,16 +884,14 @@ Parameters:
                                 (tag2 (make-tag $wire-type-end-group index)))
                             (ret tag1
                                  `(multiple-value-bind (obj end)
-                                      ,(call-pseudo-method :deserialize msg vbuf
-                                                           vidx nil tag2)
+                                      ,(call-deserializer msg vbuf vidx nil tag2)
                                     (setq ,vidx end
                                           ,temp obj))))
                           (ret (make-tag $wire-type-string index)
                                `(multiple-value-bind (payload-len payload-start)
                                     (decode-uint32 ,vbuf ,vidx)
                                   (setq ,vidx (+ payload-start payload-len)
-                                        ,temp ,(call-pseudo-method :deserialize msg vbuf
-                                                                   'payload-start vidx))))))
+                                        ,temp ,(call-deserializer msg vbuf 'payload-start vidx))))))
                      ((typep msg 'protobuf-enum)
                       (ret (make-tag $wire-type-varint index)
                            `(multiple-value-setq (,temp ,vidx)
