@@ -1001,7 +1001,7 @@ Arguments:
                          (default (field-data-initform extra-slot)))
                     (collect-form `(without-redefinition-warnings ()
                                      (let ((,stable (tg:make-weak-hash-table
-                                                     :weakness :value :test #'eq)))
+                                                     :weakness :key :test #'eq)))
                                        ,@(and reader `((defmethod ,reader ((object ,type))
                                                          (gethash object ,stable ,default))))
                                        ,@(and writer `((defmethod ,writer ((object ,type) value)
@@ -1070,7 +1070,7 @@ Arguments:
                  ;;--- Maybe these methods need to be defined in 'define-message'?
                  (collect-form
                   `(without-redefinition-warnings ()
-                     (let ((,stable (tg:make-weak-hash-table :weakness :value :test #'eq)))
+                     (let ((,stable (tg:make-weak-hash-table :weakness :key :test #'eq)))
                        ,@(and reader `((defmethod ,reader ((object ,type))
                                          (gethash object ,stable ,default))))
                        ,@(and writer `((defmethod ,writer ((object ,type) value)
