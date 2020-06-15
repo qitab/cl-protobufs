@@ -96,14 +96,14 @@ only if the same fields have been explicitly set."
             do (when (or slot-value-1 slot-value-2)
                  (return-from proto-equal nil))
           when (and slot-value-1 (find-message lisp-type))
-            do (loop for x being the elements
-                       of (if (eq (proto-label field) :repeated)
-                              slot-value-1
-                              (list slot-value-1))
-                     for y being the elements
-                       of (if (eq (proto-label field) :repeated)
-                              slot-value-2
-                              (list slot-value-2))
+            do (loop for x in
+                           (if (eq (proto-label field) :repeated)
+                               slot-value-1
+                               (list slot-value-1))
+                     for y in
+                           (if (eq (proto-label field) :repeated)
+                               slot-value-2
+                               (list slot-value-2))
                      do (unless (and x y (proto-equal x y :exact exact))
                           (return-from proto-equal nil))))
     t))
