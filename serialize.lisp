@@ -1015,7 +1015,7 @@ Parameters:
                      ;; nonrepeating slots
                      ,@(loop for temp in nslots
                              for mtemp = (slot-value-to-slot-name-symbol temp)
-                             nconc (list (sb-int:keywordicate mtemp) temp))
+                             nconc (list (intern (string mtemp) :keyword) temp))
                      ;; repeating slots
                      ,@(loop for field in rfields
                              for temp in rtemps
@@ -1025,7 +1025,7 @@ Parameters:
                              for conversion = (if (vector-field-p field)
                                                    `(coerce (nreverse ,temp) 'vector)
                                                    `(nreverse ,temp))
-                             nconc `(,(sb-int:keywordicate mtemp)
+                             nconc `(,(intern (string mtemp) :keyword)
                                      ,(if missing-value
                                           `(if (null ,temp) ,missing-value
                                                ,conversion)

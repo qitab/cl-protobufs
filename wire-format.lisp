@@ -848,13 +848,16 @@
 (progn
 (declaim (inline fast-utf8-encode))
 (defun fast-utf8-encode (string)
+  #+sbcl
   (sb-kernel:with-array-data ((string string) (start 0) (end nil)
                               :check-fill-pointer t)
     ;; This avoids calling GET-EXTERNAL-FORMAT at runtime.
     (funcall (load-time-value
               (sb-impl::ef-string-to-octets-fun
                (sb-impl::get-external-format-or-lose :utf-8)))
-             string start end 0))))
+             string start end 0))
+  #-sbcl
+  (babel:string-to-octets string)))
 
 ;; The number of bytes to reserve to write a 'uint32' for the length of
 ;; a sub-message. In theory a uint32 should reserve 5 bytes,
