@@ -8,7 +8,7 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs.well-known-types
-        #:protobufs-test-proto)
+        #:cl-protobufs.test-proto)
   (:export :run))
 
 (in-package #:cl-protobufs.test.well-known-types-test)
