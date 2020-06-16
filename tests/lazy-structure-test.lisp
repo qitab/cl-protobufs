@@ -62,8 +62,7 @@ Parameters:
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (proto:define-schema 'lazy-test
-    :package "lazy-structure-test"
-    :lisp-package "cl-protobufs.lazy-structure-test")
+    :package "lazy-structure-test")
   (proto:define-message inner ()
     (value :index 1 :type (or null proto:int32) :typename "int32" :label (:optional)))
   (proto:define-message container ()
