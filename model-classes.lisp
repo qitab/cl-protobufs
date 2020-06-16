@@ -117,10 +117,6 @@ Parameters:
             :accessor proto-package
             :initarg :package
             :initform nil)
-   (lisp-pkg :type (or null string)             ; the Lisp package, from 'option lisp_package = ...'
-             :accessor proto-lisp-package
-             :initarg :lisp-package
-             :initform nil)
    (alias-packages :type list           ; list of (non-proto) packages forward referenced
                                         ; by aliases in this schema
                    :accessor proto-alias-packages
@@ -264,9 +260,9 @@ Parameters:
     (find-service schema name)))
 
 ;; We accept and store any option, but only act on a few: default, packed,
-;; optimize_for, lisp_package, lisp_name, lisp_alias
+;; optimize_for, lisp_name, lisp_alias
 (defclass option-descriptor (abstract-descriptor)
-  ;; The name of the option, for example "lisp_package".
+  ;; The name of the option, for example "lisp_name".
   ((name :type string
          :reader proto-name
          :initarg :name)
