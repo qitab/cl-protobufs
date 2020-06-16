@@ -167,13 +167,11 @@ e.g.:
 (defvar *protobuf* nil
   "The current proto-schema, proto-message, or group object we're compiling.")
 
-(defun define-schema (type &key name syntax package lisp-package import
+(defun define-schema (type &key name syntax package import
                            optimize options documentation)
   "Define a schema named TYPE, corresponding to a .proto file of that name.
    NAME can be used to override the defaultly generated Protobufs name.
    SYNTAX and PACKAGE are as they would be in a .proto file.
-   LISP-PACKAGE can be used to specify a Lisp package if it is different from
-   the Protobufs package given by 'package'.
    IMPORT is a list of pathname strings to be imported.
    OPTIMIZE can be either :space (the default) or :speed; if it is :speed, the
    serialization code will be much faster, but much less compact.
@@ -183,9 +181,6 @@ e.g.:
          (package  (and package (if (stringp package)
                                     package
                                     (string-downcase (string package)))))
-         (lisp-pkg (and lisp-package (if (stringp lisp-package)
-                                         lisp-package
-                                         (string lisp-package))))
          (options  (remove-options
                     (loop for (key val) on options by #'cddr
                           collect (make-option
@@ -193,7 +188,7 @@ e.g.:
                                        (slot-name->proto key)
                                        key)
                                    val))
-                    "optimize_for" "lisp_package"))
+                    "optimize_for"))
          (imports  (if (listp import) import (list import)))
          (schema   (make-instance
                     'file-descriptor
@@ -201,10 +196,6 @@ e.g.:
                     :name     name
                     :syntax   (or syntax "proto2")
                     :package  package
-                    :lisp-package (cond ((and lisp-pkg (find-proto-package lisp-pkg))
-                                         (package-name (find-proto-package lisp-pkg)))
-                                        (lisp-pkg)
-                                        (t (substitute #\- #\_ package)))
                     :imports  imports
                     :options  (if optimize
                                   (append options
