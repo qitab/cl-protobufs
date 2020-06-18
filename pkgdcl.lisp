@@ -68,6 +68,7 @@
    ;; Code generation
    #:define-schema
    #:define-enum
+   #:define-map
    #:define-message
    #:define-extend
    #:define-extension

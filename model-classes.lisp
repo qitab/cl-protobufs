@@ -238,6 +238,15 @@ Parameters:
     (or (find-message type)
         (find-type-alias type))))
 
+(defvar *maps* (make-hash-table :test 'eq)
+  "Maps map names (symbols) to message-descriptor instances
+   which describe map entries.")
+
+(declaim (inline find-map))
+(defun find-map (type)
+  "Return a message-descriptor instance named by TYPE (a symbol)."
+  (gethash type *maps*))
+
 (defvar *enums* (make-hash-table :test 'eq)
   "Maps enum names (symbols) to protobuf-enum instances.")
 
@@ -359,7 +368,6 @@ Parameters:
          (end2   (if (eql (char name2 0) #\() (- (length name2) 1) (length name2))))
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
 
-
 ;; A Protobufs enumeration
 (defstruct protobuf-enum
   "The meta-object for a protobuf-enum"
@@ -446,7 +454,8 @@ in the hash-table indicated by TYPE."
      (when (and (slot-boundp message 'qual-name) (proto-qualified-name message))
        (setf (gethash (proto-qualified-name message) *qualified-messages*)
              (proto-class message))))
-    (:alias (setf (gethash symbol *type-aliases*) message))))
+    (:alias (setf (gethash symbol *type-aliases*) message))
+    (:map (setf (gethash symbol *maps*) message))))
 
 (defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*
