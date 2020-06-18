@@ -108,11 +108,6 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     printer->Print(sep); sep = "\n ";
     printer->Print(":package \"$pck$\"", "pck", file_->package());
   }
-  if (!lisp_package_name_.empty()) {
-    printer->Print(sep); sep = "\n ";
-    printer->Print(":lisp-package \"$pck$\"",
-                   "pck", NonDestructiveStrToLower(lisp_package_name_));
-  }
   if (file_->dependency_count() > 0) {
     printer->Print(sep);
     printer->Print(":import '("); sep = "";

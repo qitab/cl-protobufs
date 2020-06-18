@@ -110,10 +110,6 @@ const std::string ToLispName(const std::string& name) {
 const char* const kClProtobufs = "CL-PROTOBUFS";
 
 const std::string FileLispPackage(const FileDescriptor* file) {
-  if (file->options().HasExtension(lisp_package)) {
-    // This comes from using the "lisp_package" cl_protobufs extension.
-    return ToUpper(file->options().GetExtension(lisp_package));
-  }
   if (file->package().empty()) {
     return std::string(kClProtobufs) + "-USER";
   } else {
