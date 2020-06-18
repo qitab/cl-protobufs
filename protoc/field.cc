@@ -209,23 +209,31 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   std::map<std::string, std::string> vars;
   vars["name"] = FieldLispName(field);
   vars["tag"] = StrCat(field->number());
-  vars["type"] = FieldLispType(field);
-  vars["label"] = FieldLispLabel(field);
-  vars["typename"] = FieldTypeName(field);
-  vars["packed"] = field->options().packed() ? " :packed cl:t" : "";
-  vars["lazy"] = field->options().lazy() ? " :lazy cl:t" : "";
-  vars["default"] = field->has_default_value()
-                        ? StrCat(" :default ", FieldLispDefault(field))
-                        : "";
-  printer->Print(vars,
-                 "\n($name$ "
-                 " :index $tag$ "
-                 " :type $type$"
-                 " :label $label$"
-                 " :typename \"$typename$\""
-                 "$default$"
-                 "$packed$"
-                 "$lazy$)");
+  if(field->is_map()) {
+    vars["type"] = QualifiedMessageLispName(field->message_type(), field->file());
+    printer->Print(vars,
+                    "\n(proto:define-map $name$\n"
+                    "  (:map-desc $type$\n"
+                    "   :index $tag$))");
+  } else {
+    vars["type"] = FieldLispType(field);
+    vars["label"] = FieldLispLabel(field);
+    vars["typename"] = FieldTypeName(field);
+    vars["packed"] = field->options().packed() ? " :packed cl:t" : "";
+    vars["lazy"] = field->options().lazy() ? " :lazy cl:t" : "";
+    vars["default"] = field->has_default_value()
+        ? StrCat(" :default ", FieldLispDefault(field))
+        : "";
+    printer->Print(vars,
+                   "\n($name$ "
+                   " :index $tag$ "
+                   " :type $type$"
+                   " :label $label$"
+                   " :typename \"$typename$\""
+                   "$default$"
+                   "$packed$"
+                   "$lazy$)");
+  }
   printer->Annotate("name", field);
 }
 
