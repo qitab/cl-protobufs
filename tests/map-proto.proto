@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+package map_test;
+
+message MapProto {
+  optional string strval = 1;
+  map<int32,string> map_field = 2;
+  optional int32 intval = 3;
+}
