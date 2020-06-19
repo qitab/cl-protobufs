@@ -589,6 +589,55 @@ Arguments:
 
         (export '(,has-function-name ,clear-function-name ,public-accessor-name))))))
 
+(defun make-map-structure-class-forms (proto-type public-slot-name slot-name field val-field)
+  "Create specific forms needed for map fields: set, get, and remove.
+
+Arguments:
+  PROTO-TYPE: The Lisp type name of the proto message.
+  PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix).
+  SLOT-NAME: Slot name for the field (with the #\% prefix).
+  FIELD: The class object field definition of the field.
+  VAL-FIELD: The class object field definition of the map's value type."
+  (let ((public-getter-name (proto-slot-function-name proto-type public-slot-name :map-get))
+        (public-setter-name (proto-slot-function-name proto-type public-slot-name :map-put))
+        (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
+        (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
+        (val-default-form (get-default-form (proto-set-type val-field)
+					    (proto-default val-field)))
+        (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
+        (index (proto-field-offset field)))
+
+    (with-gensyms (obj new-key new-val)
+      `(
+        (declaim (inline ,public-getter-name))
+        (defun ,public-getter-name (,obj ,new-key)
+          (check-type ,new-key ,(second (proto-set-type field)))
+          (the (values ,(third (proto-set-type field)) t)
+               (multiple-value-bind (val flag)
+                   (gethash ,new-key (,hidden-accessor-name ,obj))
+                 (if flag
+                     (values val flag)
+                     (values ,val-default-form nil)))))
+
+        (declaim (inline ,public-setter-name))
+        (defun ,public-setter-name (,obj ,new-key ,new-val)
+          (check-type ,new-key ,(second (proto-set-type field)))
+          (check-type ,new-val ,(third (proto-set-type field)))
+          (setf (bit (,is-set-accessor ,obj) ,index) 1)
+          (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
+
+        (declaim (inline ,public-remove-name))
+        (defun ,public-remove-name (,obj ,new-key)
+          (check-type ,new-key ,(second (proto-set-type field)))
+          (remhash ,new-key (,hidden-accessor-name ,obj))
+          (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
+              (setf (bit (,is-set-accessor ,obj) ,index) 0)))
+
+        (export '(,public-getter-name
+                  ,public-setter-name
+                  ,public-remove-name))))))
+
+
 (defun make-structure-class-forms-lazy (proto-type field public-slot-name)
   "Makes forms for the lazy fields of a proto message using STRUCTURE-CLASS.
 
@@ -653,7 +702,14 @@ Arguments:
                `(,hidden-accessor-name ,obj)))
 
         ,@(make-common-forms-for-structure-class
-           proto-type public-slot-name slot-name field)))))
+           proto-type public-slot-name slot-name field)
+
+
+        ; Make special map forms.
+        ,@(if (eq (proto-class field) :map)
+            (make-map-structure-class-forms
+             proto-type public-slot-name slot-name field
+             (second (proto-fields (find-map public-slot-name)))))))))
 
 
 (let ((default-form (make-hash-table)))
@@ -706,7 +762,9 @@ Arguments:
               (eq (first type) 'cl:or)
               (eq (second type) 'cl:null))
          nil)
-        ;; The only possibility left is we have an enum.
+        ((and (listp type)
+              (eq (first type) 'proto:map-of))
+         '(make-hash-table))
         ((enum-default-value `,type) (enum-default-value `,type))
         (t `(enum-default-value ',type))))))
 
