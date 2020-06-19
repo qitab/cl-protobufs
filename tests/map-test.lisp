@@ -1,4 +1,4 @@
-;;; Copyright 2013 Google LLC
+;;; Copyright 2020 Google LLC
 ;;;
 ;;; Use of this source code is governed by an MIT-style
 ;;; license that can be found in the LICENSE file or at
@@ -25,13 +25,20 @@ Parameters:
     (assert (= (slot-value result 'clunit::errors) 0))))
 
 ;; Ideas for testing
-;; x Init check
+;; x Accessor function check
 ;; - Serialize/deserialize pipe (check for raw bytes in middle)
 ;; - Ensure there is a good error when we serialize a bad hashmap.
 ;; - Optimized serialization
 ;; - Print and ensure keys are sorted
 ;; - Hashing to more complicated types (messages, nested messages)
+;; - ^ ensure we return right default value.
 
-(deftest initialization-check (map-tests)
-	(let ((message (make-map-proto)))
-		(assert-true message)))
+(deftest accessor-check (map-tests)
+  (let ((m (make-map-proto)))
+    (assert-true (not (map-proto.has-map-field m)))
+    (map-proto.map-field-put m 1 "string")
+    (assert-true (string-equal (map-proto.map-field-get m 1) "string"))
+    (proto:clear m)
+    (assert-true (not (map-proto.has-map-field m)))
+    ;; ensure that clear made a new empty hash-table
+    (assert-true (string-equal (map-proto.map-field-get m 1) ""))))
