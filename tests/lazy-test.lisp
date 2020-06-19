@@ -32,11 +32,10 @@ Parameters:
     (assert-true (proto-impl::proto-lazy-p inner-field))))
 
 (deftest test-lazy-field-serialize (lazy-tests)
-  (let* ((proto (proto-impl:make-object container
-                                        :value-before 10
-                                        :inner (proto-impl:make-object
-                                                inner :value 42)
-                                        :value-after 20))
+  (let* ((proto (make-container
+                 :value-before 10
+                 :inner (make-inner :value 42)
+                 :value-after 20))
          (bytes (proto:serialize-object-to-bytes proto))
          (restored (proto:deserialize-object-from-bytes 'container bytes)))
     ;; The original proto doesn't have encoded field.
@@ -61,10 +60,10 @@ Parameters:
     (assert-true (equalp bytes (proto:serialize-object-to-bytes restored)))))
 
 (deftest test-recursive-lazy (lazy-tests)
-  (let* ((inner (proto-impl:make-object inner :value 123))
-         (rec-lazy (proto-impl:make-object recursively-lazy :inner inner))
-         (container2 (proto-impl:make-object container2
-                                             :rec-lazy rec-lazy))
+  (let* ((inner (make-inner :value 123))
+         (rec-lazy (make-recursively-lazy :inner inner))
+         (container2 (make-container2
+                      :rec-lazy rec-lazy))
          (cntnr-bytes (proto:serialize-object-to-bytes container2))
          (restored-cntnr (proto:deserialize-object-from-bytes 'container2 cntnr-bytes)))
     (assert-true (proto:encoded-field restored-cntnr 'rec-lazy))
@@ -74,14 +73,14 @@ Parameters:
     (assert-true (= 123 (value (inner (rec-lazy restored-cntnr)))))))
 
 (deftest test-write-lazy-fields (lazy-tests)
-  (let* ((proto (proto-impl:make-object container
-                                        :value-before 10
-                                        :inner (proto-impl:make-object inner :value 42)
-                                        :value-after 20))
+  (let* ((proto (make-container
+                 :value-before 10
+                 :inner (make-inner :value 42)
+                 :value-after 20))
          (bytes (proto:serialize-object-to-bytes proto)))
     ;; Updating the lazy field with a new value will invalidate the encoded field.
     (let ((restored (proto:deserialize-object-from-bytes 'container bytes)))
-      (setf (inner restored) (proto-impl:make-object inner :value 1234))
+      (setf (inner restored) (make-inner :value 1234))
       (assert-true (null (proto:encoded-field restored 'inner)))
       ;; If serialized and deserialized again, the new value should be found.
       (let ((updated-restored
@@ -101,15 +100,15 @@ Parameters:
         (assert-true (= 5678 (value (inner updated-restored))))))))
 
 (deftest test-required-lazy (lazy-tests)
-  (let* ((proto (proto-impl:make-object required-lazy
-                                        :inner (proto-impl:make-object inner :value 42)))
+  (let* ((proto (make-required-lazy
+                 :inner (make-inner :value 42)))
          (bytes (proto:serialize-object-to-bytes proto))
          (restored (proto:deserialize-object-from-bytes 'required-lazy bytes)))
     (assert-true (= 42 (value (inner restored))))))
 
 (deftest test-repeated-lazy (lazy-tests)
-  (let* ((inners (loop for i from 0 below 5 collect (proto-impl:make-object inner :value i)))
-         (proto (proto-impl:make-object repeated-lazy :inners inners))
+  (let* ((inners (loop for i from 0 below 5 collect (make-inner :value i)))
+         (proto (make-repeated-lazy :inners inners))
          (bytes (proto:serialize-object-to-bytes proto))
          (restored (proto:deserialize-object-from-bytes 'repeated-lazy bytes))
          (encoded-bytes (proto:encoded-field restored 'inners)))
