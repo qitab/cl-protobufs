@@ -259,23 +259,34 @@ Arguments
 Arguments:
   PROTO-TYPE: The symbol naming a protobuf message, group, etc.
   SLOT: The symbol naming a protobuf field.
-  FUNCTION-TYPE: The type of function name to retrieve: :has, :get, or :clear"
+  FUNCTION-TYPE: The type of function name to retrieve: :has, :get, or :clear.
+                 This can also be :map-get, :map-put, or :map-rem the for special map functions."
   (declare (type symbol proto-type slot)
-           (type (member :has :get :clear) function-type))
+           (type (member :has :get :clear :map-get :map-put :map-rem) function-type))
   (let ((f-symbol (ecase function-type
                     (:has 'has)
                     (:clear 'clear)
-                    (:get nil))))
-    (if f-symbol
-        (intern (format nil "~a.~a-~a"
-                        (symbol-name proto-type)
-                        f-symbol
-                        (symbol-name slot))
-                (symbol-package proto-type))
-        (intern (format nil "~a.~a"
-                        (symbol-name proto-type)
-                        (symbol-name slot))
-                (symbol-package proto-type)))))
+                    (:get nil)
+                    (:map-get 'get)
+                    (:map-put 'put)
+                    (:map-rem 'remove))))
+    (cond ((or (eq f-symbol 'get) (eq f-symbol 'put) (eq f-symbol 'remove))
+           (intern (format nil "~a.~a-~a"
+                           (symbol-name proto-type)
+                           (symbol-name slot)
+                           f-symbol)))
+          (f-symbol
+           (intern (format nil "~a.~a-~a"
+                           (symbol-name proto-type)
+                           f-symbol
+                           (symbol-name slot))
+                   (symbol-package proto-type)))
+          (t
+           (intern (format nil "~a.~a"
+                           (symbol-name proto-type)
+                           (symbol-name slot))
+                   (symbol-package proto-type))))))
+           
 
 
 (defmacro with-collectors ((&rest collection-descriptions) &body body)
@@ -356,6 +367,13 @@ Arguments:
       '(array * (0))
       '(array * (*))))      ; a 1-dimensional array of any type
 
+
+;; A parameterized type for map fields.
+;; TODO(benkuehnert): May want to write a better type specifier if we ever want to type-check.
+(deftype map-of (key-type val-type)
+  (if (or (eq key-type 'nil) (eq val-type 'nil))
+      'null
+      'list))
 
 ;; This corresponds to the :bytes protobuf type
 (deftype byte-vector () '(array (unsigned-byte 8) (*)))
