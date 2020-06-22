@@ -220,7 +220,7 @@ Paramaters:
      (#xffffffffffffffff (#xff #xff #xff #xff #xff #xff #xff #xff #xff #x01))))
   ;; This number doesn't fit in a uint64.  We deserialize the whole thing, but then only return
   ;; the low 64 bits.
-  #-ccl ;; Can't safely use use fixnums in the generate-integer-encoders on ABCL
+  #-ccl ;; Can't safely use use fixnums in the generate-integer-encoders on CCL
   (verify-encode-decode
    nil #'decode-uint64
    '((#x0 (#x80 #x80 #x80 #x80 #x80 #x80 #x80 #x80 #x80 #x10))
