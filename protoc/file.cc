@@ -87,7 +87,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     printer->Print(
         "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
         "  (cl:unless (cl:find-package \"$package_name$\")\n"
-        "    (cl:make-package \"$package_name$\")))\n",
+        "    (cl:defpackage \"$package_name$\" (:use))))\n",
         "package_name", package);
   }
 

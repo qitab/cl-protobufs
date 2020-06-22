@@ -395,15 +395,19 @@
       ;; We shouldn't get here unless we're reading a value that doesn't fit in two fixnums.
       (assert nil nil "The value doesn't fit into ~A bits" (* 2 fixnum-bits)))))
 
+
+;; TODO(jgodbout): Find all of the different instances of word-size
+;; for each language, make a defconstant for word-size, then use it.
 (declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
                           (values (unsigned-byte 64) array-index))
                 decode-varint)
          (inline decode-varint))
 (defun decode-varint (a index)
+  "Decode the varint in buffer A at INDEX."
   (let ((word 0))
     (declare (type (simple-array (unsigned-byte 8) (*)) a)
-             (type sb-ext:word word)
-             (type sb-int:index index)
+             #+sbcl (type sb-ext:word word)
+             #+sbcl (type sb-int:index index)
              (optimize (safety 0)))
     (let ((shift 0))
       (dotimes (i 10)
@@ -411,7 +415,7 @@
           (incf index)
           (setf word
                 (logior (logand (ash (logand byte 127) (the (mod 64) shift))
-                                sb-ext:most-positive-word)
+                                #+sbcl sb-ext:most-positive-word)
                         word))
           (unless (logbitp 7 byte) (return)))
         (incf shift 7)))
@@ -820,6 +824,7 @@
   (dotimes (i count count)
     (fast-octet-out buffer (aref scratchpad i))))
 
+#+(and sbcl x86-64)
 (macrolet ((define-fixed-width-encoder (n-bytes name lisp-type accessor)
              `(progn
                 (declaim (ftype (function (,lisp-type buffer)
@@ -844,6 +849,157 @@
   (define-fixed-width-encoder 8 encode-sfixed64 (signed-byte 64) sb-sys:signed-sap-ref-64)
   (define-fixed-width-encoder 4 encode-single single-float sb-sys:sap-ref-single)
   (define-fixed-width-encoder 8 encode-double double-float sb-sys:sap-ref-double))
+
+;;; TODO(jgodbout):
+;;; The amount of repeated code below and in some other places
+;;; boggles my mind. This should be reduced...
+;;; At least macroize writing 4-byte integer so that you can use
+;;; it for fixed32, single float, and (twice) for double-float
+#-(and sbcl x86-64)
+(progn
+  (defmacro generate-integer-encoders (bits)
+    "Generate 32- or 64-bit versions of integer encoders given BITS."
+    (assert (and (plusp bits) (zerop (mod bits 8))))
+    (let* ((encode-uint   (fintern "~A~A" 'encode-uint bits))
+           (encode-fixed  (fintern "~A~A" 'encode-fixed bits))
+           (encode-sfixed (fintern "~A~A" 'encode-sfixed bits))
+           (bytes (/ bits 8))
+           ;; Given bits, can we use fixnums safely?
+           (fixnump (<= bits (integer-length most-negative-fixnum)))
+           (ldb (if fixnump 'ildb 'ldb))
+           (ash (if fixnump 'iash 'ash))
+           (zerop-val (if fixnump '(i= val 0) '(zerop val))))
+      `(progn
+         (defun ,encode-uint (val buffer)
+           ,(format nil
+                    "Encodes the unsigned ~A-bit integer 'val' as a varint
+                   into the buffer at the given index.~
+                   Modifies the buffer, and returns the new index into the buffer.~
+                   Watch out, this function turns off all type
+                   checking and array bounds checking." bits)
+           (declare #.$optimize-serialization)
+           (let ((val (ldb (byte ,bits 0) val)))
+             (declare (type (unsigned-byte ,bits) val))
+             (let ((index (buffer-index buffer))
+                   (buf
+                    (if (buffer-ensure-space buffer 8)
+                        (octet-buffer-block buffer)
+                        (octet-buffer-scratchpad buffer))))
+               ;; Seven bits at a time, least significant bits first
+               (loop do (let ((bits (,ldb (byte 7 0) val)))
+                          (declare (type (unsigned-byte 8) bits))
+                          (setq val (,ash val -7))
+                          (setf (aref buf index)
+                                (ilogior bits (if ,zerop-val 0 128)))
+                          (iincf index))
+                  until ,zerop-val)
+               (setf (buffer-index buffer) index)))
+           ,bytes)
+         (defun ,encode-fixed (val buffer)
+           ,(format nil
+                    "Encodes the unsigned ~A-bit integer 'val' as a
+                    fixed int into the buffer at the given index.~
+                   ~&    Modifies the buffer, and returns the new
+                    index into the buffer.~
+                   ~&    Watch out, this function turns off all
+                   type checking and array bounds checking." bits)
+           (declare #.$optimize-serialization)
+           (declare (type (unsigned-byte ,bits) val))
+           (let ((index (buffer-index buffer))
+                 (buf
+                  (if (buffer-ensure-space buffer 8)
+                      (octet-buffer-block buffer)
+                      (octet-buffer-scratchpad buffer))))
+             (loop repeat ,bytes doing
+                  (let ((byte (,ldb (byte 8 0) val)))
+                    (declare (type (unsigned-byte 8) byte))
+                    (setq val (,ash val -8))
+                    (setf (aref buf index) byte)
+                    (iincf index)))
+             (setf (buffer-index buffer) index))
+           ,bytes)
+         (defun ,encode-sfixed (val buffer)
+           ,(format nil
+                    "Encodes the signed ~A-bit integer 'val' as a
+                    fixed int into the buffer at the given index.~
+                   ~&    Modifies the buffer, and returns the new
+                     index into the buffer.~
+                   ~&    Watch out, this function turns off all type
+                    checking and array bounds checking." bits)
+           (declare #.$optimize-serialization)
+           (declare (type (signed-byte ,bits) val))
+           (let ((index (buffer-index buffer))
+                 (buf
+                  (if (buffer-ensure-space buffer 8)
+                      (octet-buffer-block buffer)
+                      (octet-buffer-scratchpad buffer))))
+             (loop repeat ,bytes doing
+                  (let ((byte (,ldb (byte 8 0) val)))
+                    (declare (type (unsigned-byte 8) byte))
+                    (setq val (,ash val -8))
+                    (setf (aref buf index) byte)
+                    (iincf index)))
+             (setf (buffer-index buffer) index))
+           ,bytes))))
+
+  (generate-integer-encoders 32)
+  (generate-integer-encoders 64)
+
+  (defun encode-single (val buffer)
+    "Encodes the single float VAL into the buffer.
+   Modifies the BUFFER, and returns the new index into the buffer.
+   Watch out, this function turns off all type checking and array bounds checking."
+    (declare #.$optimize-serialization)
+    (declare (type single-float val))
+    (let ((bits (single-float-bits val)))
+      (declare (type (signed-byte 32) bits))
+      (let ((index (buffer-index buffer))
+            (buf
+             (if (buffer-ensure-space buffer 8)
+                 (octet-buffer-block buffer)
+                 (octet-buffer-scratchpad buffer))))
+        (loop repeat 4 doing
+             (let ((byte (ldb (byte 8 0) bits)))
+               (declare (type (unsigned-byte 8) byte))
+               (setq bits (ash bits -8))
+               (setf (aref buf index) byte)
+               (iincf index)))
+        (setf (buffer-index buffer) index))
+      4))
+
+  ;; This seems ghastly. Would it make sense for double-float-bits to
+  ;; returns all 8 bytes?  Any implementation on which you have to
+  ;; call integer-decode-float is going perform so badly anyway that
+  ;; returning a bignum is the least of the problems.
+  (defun encode-double (val buffer)
+    "Encodes the double float VAL into the BUFFER.
+   Modifies the buffer, and returns the new index into the buffer.
+   Watch out, this function turns off all type checking and array bounds checking."
+    (declare #.$optimize-serialization)
+    (declare (type double-float val))
+    (multiple-value-bind (low high)
+        (double-float-bits val)
+      (declare (type (unsigned-byte 32) low)
+               (type (signed-byte 32) high))
+      (let ((index (buffer-index buffer))
+            (buf
+             (if (buffer-ensure-space buffer 8)
+                 (octet-buffer-block buffer)
+                 (octet-buffer-scratchpad buffer))))
+        (loop repeat 4 doing
+             (let ((byte (ldb (byte 8 0) low)))
+               (declare (type (unsigned-byte 8) byte))
+               (setf low (ash low -8)
+                     (aref buf index) byte)
+               (iincf index)))
+        (loop repeat 4 doing
+             (let ((byte (ldb (byte 8 0) high)))
+               (declare (type (unsigned-byte 8) byte))
+               (setq high (ash high -8))
+               (setf (aref buf index) byte)
+               (iincf index)))
+        (setf (buffer-index buffer) index))
+      8)))
 
 (progn
 (declaim (inline fast-utf8-encode))
