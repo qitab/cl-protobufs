@@ -291,6 +291,7 @@
    #:proto->class-name
    #:proto->enum-name
    #:proto->slot-name
+   #:proto-type->keyword
    #:protobufs-warning
    #:protobufs-warn
    #:make-qualified-name
