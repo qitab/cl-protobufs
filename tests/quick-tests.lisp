@@ -66,7 +66,7 @@ Parameters:
 (deftest bool-has-works (quick-tests)
   "Assert-True that 'has' works for bools."
   ;; TODO(cgay): why do we call internals here rather than (make-test1-proto)?
-  (let* ((p (proto-impl:make-object cl-protobufs.protobuf-unittest:test1-proto)))
+  (let* ((p (cl-protobufs.protobuf-unittest:make-test1-proto)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:u-bool)))
     (setf (cl-protobufs.protobuf-unittest:u-bool p) nil)
     (assert-true (has-field p 'cl-protobufs.protobuf-unittest:u-bool))
@@ -75,19 +75,17 @@ Parameters:
     (setf (cl-protobufs.protobuf-unittest:u-bool p) t)
     (assert-true (has-field p 'cl-protobufs.protobuf-unittest:u-bool)))
 
-  (assert-true (has-field (proto-impl:make-object
-                      cl-protobufs.protobuf-unittest:test1-proto
-                      :u-bool nil)
-                     'cl-protobufs.protobuf-unittest:u-bool))
+  (assert-true (has-field (cl-protobufs.protobuf-unittest:make-test1-proto
+                           :u-bool nil)
+                          'cl-protobufs.protobuf-unittest:u-bool))
 
-  (assert-true (has-field (proto-impl:make-object
-                      cl-protobufs.protobuf-unittest:test1-proto
-                      :u-bool t)
-                     'cl-protobufs.protobuf-unittest:u-bool)))
+  (assert-true (has-field (cl-protobufs.protobuf-unittest:make-test1-proto
+                           :u-bool t)
+                          'cl-protobufs.protobuf-unittest:u-bool)))
 
 (deftest generic-slot-functions-work (quick-tests)
   "Assert-True that 'has' 'set' and 'slot-value' works."
-  (let* ((p (proto-impl:make-object cl-protobufs.protobuf-unittest:test1-proto)))
+  (let* ((p (cl-protobufs.protobuf-unittest:make-test1-proto)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:u-bool)))
     (setf (proto-slot-value p 'cl-protobufs.protobuf-unittest:u-bool) t)
     (assert-true (has-field p 'cl-protobufs.protobuf-unittest:u-bool))
@@ -97,7 +95,7 @@ Parameters:
     (assert-true (not (proto-slot-value p 'cl-protobufs.protobuf-unittest:u-bool)))))
 
 (deftest print-bool (quick-tests)
-  (let* ((p (proto-impl:make-object cl-protobufs.protobuf-unittest:test1-proto))
+  (let* ((p (cl-protobufs.protobuf-unittest:make-test1-proto))
          (text (with-output-to-string (s) (print-text-format p :stream s)))
          (text2 (progn
                   (setf (cl-protobufs.protobuf-unittest:test1-proto.u-bool p) t)
@@ -112,7 +110,7 @@ Parameters:
     (assert-true (search "u_bool: false" text3))))
 
 (deftest test-has-speed (quick-tests)
-  (let* ((p (proto-impl:make-object cl-protobufs.protobuf-unittest:test1-proto)))
+  (let* ((p (cl-protobufs.protobuf-unittest:make-test1-proto)))
     (setf (cl-protobufs.protobuf-unittest:u-bool p) t)
     (time
      (loop for i from 0 to 1000000

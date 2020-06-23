@@ -4,6 +4,9 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
+(in-package "PROTO-IMPL")
+
+
 ;;; Portable floating point utilities
 
 #+(or abcl allegro ccl cmu sbcl lispworks)

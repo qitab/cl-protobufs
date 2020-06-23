@@ -87,7 +87,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     printer->Print(
         "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
         "  (cl:unless (cl:find-package \"$package_name$\")\n"
-        "    (cl:make-package \"$package_name$\")))\n",
+        "    (cl:defpackage \"$package_name$\" (:use))))\n",
         "package_name", package);
   }
 
@@ -107,11 +107,6 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   if (!file_->package().empty()) {
     printer->Print(sep); sep = "\n ";
     printer->Print(":package \"$pck$\"", "pck", file_->package());
-  }
-  if (!lisp_package_name_.empty()) {
-    printer->Print(sep); sep = "\n ";
-    printer->Print(":lisp-package \"$pck$\"",
-                   "pck", NonDestructiveStrToLower(lisp_package_name_));
   }
   if (file_->dependency_count() > 0) {
     printer->Print(sep);

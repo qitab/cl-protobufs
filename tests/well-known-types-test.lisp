@@ -8,7 +8,7 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs.well-known-types
-        #:protobufs-test-proto)
+        #:cl-protobufs.test-proto)
   (:export :run))
 
 (in-package #:cl-protobufs.test.well-known-types-test)
@@ -37,5 +37,5 @@ Parameters:
          (any (pack-any p))
          (ret (unpack-any any)))
     (assert-true (proto-impl::proto-equal p ret :exact t))
-    (assert-true (string= "type.googleapis.com/travel.flights.qpx.OuterMessage"
+    (assert-true (string= "type.googleapis.com/test_proto.OuterMessage"
                      (cl-protobufs.google.protobuf:any.type-url any)))))

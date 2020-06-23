@@ -152,6 +152,7 @@ Paramaters:
                           (#x10000000 (#x80 #x80 #x80 #x80 #x01))
                           (#xffffffff (#xff #xff #xff #xff #x0f))))
   ;; We're reading a number that doesn't fit in 32 bits.  We decode this as the low 32 bits.
+  #-abcl ;; Can't safely use use fixnums in the generate-integer-encoders on ABCL
   (verify-encode-decode nil #'decode-uint32
                         '((#x0 (#x80 #x80 #x80 #x80 #x10))
                           (#x1 (#x81 #x80 #x80 #x80 #x10))))
@@ -219,6 +220,7 @@ Paramaters:
      (#xffffffffffffffff (#xff #xff #xff #xff #xff #xff #xff #xff #xff #x01))))
   ;; This number doesn't fit in a uint64.  We deserialize the whole thing, but then only return
   ;; the low 64 bits.
+  #-ccl ;; Can't safely use use fixnums in the generate-integer-encoders on CCL
   (verify-encode-decode
    nil #'decode-uint64
    '((#x0 (#x80 #x80 #x80 #x80 #x80 #x80 #x80 #x80 #x80 #x10))

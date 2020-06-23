@@ -8,9 +8,7 @@ syntax = "proto2";
 
 import "proto2-descriptor-extensions.proto"; // descriptor extension
 
-package travel.flights.qpx;
-
-option (lisp_package) = "PROTOBUFS-TEST-PROTO";
+package test_proto;
 
 message Message {
   optional int32 i = 1;

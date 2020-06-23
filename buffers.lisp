@@ -54,6 +54,7 @@
 ;; Otherwise any extraction of a SAP from the buffer would be reliable only
 ;; within the scope of a WITHOUT-GCING or WITH-PINNED-OBJECTS.
 ;; It would work as an inline function, but this forces the right behavior.
+#+sbcl
 (defmacro buffer-sap (buffer)
   `(sb-sys:vector-sap (buffer-block ,buffer)))
 

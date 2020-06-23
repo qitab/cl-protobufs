@@ -16,10 +16,6 @@ enum LispContainer {
   VECTOR = 1;
 }
 
-extend google.protobuf.FileOptions {
-  optional string lisp_package = 195801;
-}
-
 extend google.protobuf.MessageOptions {
   // Note those are only for Messages.
   // Cannot specify for other declarations like enums.
