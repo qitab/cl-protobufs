@@ -604,7 +604,7 @@ Arguments:
         (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
         (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
         (val-default-form (get-default-form (proto-set-type val-field)
-					    (proto-default val-field)))
+                                            (proto-default val-field)))
         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
         (index (proto-field-offset field)))
 
