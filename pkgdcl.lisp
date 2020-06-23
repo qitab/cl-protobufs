@@ -80,6 +80,7 @@
    #:serialize-object-to-stream
    #:serialize-object-to-bytes
    #:serialize-object
+   #:emit-non-repeated-field
    #:deserialize-object-from-file
    #:deserialize-object-from-stream
    #:deserialize-object-from-bytes
