@@ -6,8 +6,6 @@
 
 syntax = "proto2";
 
-import "proto2-descriptor-extensions.proto"; // descriptor extension
-
 package test_proto;
 
 message TextFormatTest {
