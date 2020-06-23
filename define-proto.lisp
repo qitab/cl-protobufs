@@ -448,6 +448,7 @@ Parameters:
                   :class :map
                   :qualified-name (make-qualified-name *protobuf* (slot-name->proto slot))
                   :set-type type
+                  :label '(:optional)
                   :index index
                   :internal-field-name internal-slot-name
                   :external-field-name slot
