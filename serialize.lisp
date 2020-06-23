@@ -656,7 +656,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                            `(when ,boundp
                               (,iterator (,vval ,reader)
                                          (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-                                         ,(call-pseudo-method :serialize msg vval vbuf)
+                                         (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
                                          (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
                          (let ((tag (make-tag $wire-type-string index)))
                            `(when ,boundp
