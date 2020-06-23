@@ -395,6 +395,24 @@ Arguments:
 (deftype sfixed32 () '(signed-byte 32))
 (deftype sfixed64 () '(signed-byte 64))
 
+;; Due to the fact that serialization works with keywords for primitive
+;; types, we need this hack for now. If the type given is not primitive,
+;; just return it.
+(defun proto-type->keyword (type)
+  (case type
+    (string :string)
+    (int32 :int32)
+    (int64 :int64)
+    (uint32 :uint32)
+    (uint64 :uint64)
+    (sint32 :sint32)
+    (sint64 :sint64)
+    (fixed32 :fixed32)
+    (fixed64 :fixed64)
+    (sfixed32 :sfixed64)
+    (sfixed64 :sfixed64)
+    (t type)))
+
 (defun fixed-width-integer-type-p (type)
   "Check whether TYPE can be serialized in a fixed number of bits."
   (member type '(fixed32 fixed64 sfixed32 sfixed64)))
