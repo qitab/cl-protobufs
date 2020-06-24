@@ -214,13 +214,13 @@
                       (iincf size (serialize-prim v type tag buffer))))))
                (t (undefined-field-type "While serializing ~S,"
                                         object type field))))
-        ((eq (type :map))
-         (let* ((tag (make-tag $wire-type string index))
+        ((eq type :map)
+         (let* ((tag (make-tag $wire-type-string index))
                 (key-type (proto-type->keyword
                            (second (proto-set-type field))))
                 (val-type (proto-type->keyword
                            (third (proto-set-type field))))
-                (val-msg  (and val-type (not (keyword val-type))
+                (val-msg  (and val-type (not (keywordp val-type))
                                (or (find-message val-type)
                                    (find-enum val-type)
                                    (findtype-alias val-type)))))
@@ -233,10 +233,11 @@
                                                        (make-tag key-type 1) buffer))
                         ;  value types are arbitrary non repeated.
                         (iincf map-len (emit-non-repeated-field v val-type 2 buffer))
-                                        ; + or i+ here?
-                        (+ ret-len (+ (map-len (backpatch map-len)))))))))
-             (loop for k being the hash-keys of val using (hash-value v)
-                   sum (serialize-pair k v))))
+                        ; + or i+ here?
+                        (+ ret-len (+ map-len (backpatch map-len)))))))
+             (loop for k being the hash-keys of (read-slot object slot reader)
+                     using (hash-value v)
+                   sum (serialize-pair k v)))))
         ; at this point, we have a non-repeated non-map type.
         (t (let ((result (emit-non-repeated-field
                           (if slot (read-slot object slot reader) object)
