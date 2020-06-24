@@ -601,67 +601,137 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                    (data))
               ;; Not dealing with :GROUP (proto1 is deprecated), nor "aliases".
               ;; Occam's razor, anyone?
-              (rplaca cell ; CELL nows points to the cons where DATA should go
-               (if (keywordp type) ; a wire-level primitive
-                   (cond ((and (packed-type-p type)
-                               (length-encoded-tag-p tag))
-                          (multiple-value-setq (data index)
-                            (deserialize-packed type buffer index))
-                          ;; Multiple occurrences of packed fields must append.
-                          ;; All repeating fields will be reversed before calling
-                          ;; the structure constructor, so reverse here to counteract.
-                          (nreconc data (car cell)))
-                         (t
-                          (multiple-value-setq (data index)
-                            (deserialize-prim type buffer index))
-                          (if repeated-p (cons data (car cell)) data)))
-                   (let ((enum (find-enum type)))
-                     (if enum
-                         (cond ((length-encoded-tag-p tag)
-                                (multiple-value-setq (data index)
-                                  (deserialize-packed-enum (protobuf-enum-values enum)
-                                                           buffer index))
-                                (nreconc data (car cell)))
-                               (t
-                                (multiple-value-setq (data index)
-                                  (deserialize-enum (protobuf-enum-values enum)
-                                                    buffer index))
-                                (if repeated-p (cons data (car cell)) data)))
-                         (let ((submessage (find-message type)))
-                           (assert submessage)
-                           (let* ((deserializer (custom-deserializer type))
-                                  (group-p (i= (logand tag 7) $wire-type-start-group))
-                                  (end-tag (if group-p
-                                               (ilogior $wire-type-end-group
-                                                        (logand #xfFFFFFF8 tag))
-                                               0)))
-                             (if group-p
-                                 (multiple-value-bind (obj end)
-                                     (cond (deserializer
-                                            (funcall deserializer buffer index
-                                                     nil end-tag))
-                                           (t
-                                            (%deserialize-object
-                                             submessage buffer index nil end-tag)))
-                                   (setq index end)
-                                   (if repeated-p (cons obj (car cell)) obj))
-                                 (multiple-value-bind (embedded-msg-len start)
-                                     (decode-uint32 buffer index)
-                                   (let* ((end (+ start embedded-msg-len))
-                                          (deserializer (custom-deserializer type))
-                                          (obj
-                                           (cond (lazy
-                                                  ;; For lazy fields, just store bytes in the %bytes
-                                                  ;; field.
-                                                  (deserialize-object-to-bytes
-                                                   type (subseq buffer start end)))
-                                                 (deserializer
-                                                  (funcall deserializer buffer start end end-tag))
-                                                 (t
-                                                  (%deserialize-object
-                                                   submessage buffer start end end-tag)))))
-                                     (setq index end)
-                                     (if repeated-p (cons obj (car cell)) obj))))))))))))))))
+              ;; If the field is a map, we want to add to the existing hash-table
+              ;; rather than make a new cell.
+              (cond
+                ((eq type :map)
+                 (unless (car cell)
+                   (setf (car cell) (make-hash-table)))
+                 (let ((start index)
+                       (key-type (proto-type->keyword
+                                  (second (proto-set-type field))))
+                       (val-type (proto-type->keyword
+                                  (third  (proto-set-type field))))
+                       map-tag map-len key-data (val-data nil))
+                   (multiple-value-setq (map-len index)
+                     (decode-uint32 buffer index))
+                   (loop
+                     (when (>= index (+ map-len start))
+                       (assert key-data)
+                       (setf (gethash key-data (car cell)) val-data)
+                       (return))
+                     (multiple-value-setq (map-tag index)
+                       (decode-uint32 buffer index))
+                     ;; Check if data on the wire is a key
+                     ;; Keys are always scalar (primitive) types,
+                     ;; so just deserialize it.
+                     (if (= 1 (ilogand (iash map-tag -3)))
+                         (multiple-value-setq (key-data index)
+                           (deserialize-prim key-type buffer index))
+                         ;; Otherwise it must be a value, which has
+                         ;; arbitrary type.
+                         (if (keywordp val-type)
+                             (multiple-value-setq (val-data index)
+                               (deserialize-prim val-type buffer index))
+                             (let ((enum (find-enum val-type)))
+                               (if enum
+                                   (multiple-value-setq (val-data index)
+                                     (deserialize-enum (protobuf-enum-values enum)
+                                                       buffer index))
+                                   (let ((submessage (find-message val-type)))
+                                     (assert submessage)
+                                     (let* ((deserializer (custom-deserializer val-type))
+                                            (group-p (i= (logand tag 7) $wire-type-start-group))
+                                            (end-tag (if group-p
+                                                         (ilogior $wire-type-end-group
+                                                                  (logand #xfFFFFFF8 tag))
+                                                         0)))
+                                       (if group-p
+                                           (multiple-value-setq (val-data index)
+                                             (cond (deserializer
+                                                    (funcall deserializer buffer index
+                                                             nil end-tag))
+                                                   (t
+                                                    (%deserialize-object
+                                                     submessage buffer index nil end-tag))))
+                                           (multiple-value-bind (embedded-msg-len start)
+                                               (decode-uint32 buffer index)
+                                             (let* ((end (+ start embedded-msg-len))
+                                                    (deserializer (custom-deserializer val-type))
+                                                    (obj
+                                                      (cond (lazy
+                                                             (deserialize-object-to-bytes
+                                                              val-type (subseq buffer start end)))
+                                                            (deserializer
+                                                             (funcall deserializer buffer start end end-tag))
+                                                            (t
+                                                             (%deserialize-object
+                                                              submessage buffer start end end-tag)))))
+                                               (setq index end)
+                                               (setq val-data obj)))))))))))))
+                (t
+                 (rplaca cell ; CELL nows points to the cons where DATA should go
+                         (cond
+                           ((keywordp type) ; a wire-level primitive
+                            (cond ((and (packed-type-p type)
+                                        (length-encoded-tag-p tag))
+                                   (multiple-value-setq (data index)
+                                     (deserialize-packed type buffer index))
+                                   ;; Multiple occurrences of packed fields must append.
+                                   ;; All repeating fields will be reversed before calling
+                                   ;; the structure constructor, so reverse here to counteract.
+                                   (nreconc data (car cell)))
+                                  (t
+                                   (multiple-value-setq (data index)
+                                     (deserialize-prim type buffer index))
+                                   (if repeated-p (cons data (car cell)) data))))
+                           (t (let ((enum (find-enum type)))
+                                (if enum
+                                    (cond ((length-encoded-tag-p tag)
+                                           (multiple-value-setq (data index)
+                                             (deserialize-packed-enum (protobuf-enum-values enum)
+                                                                      buffer index))
+                                           (nreconc data (car cell)))
+                                          (t
+                                           (multiple-value-setq (data index)
+                                             (deserialize-enum (protobuf-enum-values enum)
+                                                               buffer index))
+                                           (if repeated-p (cons data (car cell)) data)))
+                                    (let ((submessage (find-message type)))
+                                      (assert submessage)
+                                      (let* ((deserializer (custom-deserializer type))
+                                             (group-p (i= (logand tag 7) $wire-type-start-group))
+                                             (end-tag (if group-p
+                                                          (ilogior $wire-type-end-group
+                                                                   (logand #xfFFFFFF8 tag))
+                                                          0)))
+                                        (if group-p
+                                            (multiple-value-bind (obj end)
+                                                (cond (deserializer
+                                                       (funcall deserializer buffer index
+                                                                nil end-tag))
+                                                      (t
+                                                       (%deserialize-object
+                                                        submessage buffer index nil end-tag)))
+                                              (setq index end)
+                                              (if repeated-p (cons obj (car cell)) obj))
+                                            (multiple-value-bind (embedded-msg-len start)
+                                                (decode-uint32 buffer index)
+                                              (let* ((end (+ start embedded-msg-len))
+                                                     (deserializer (custom-deserializer type))
+                                                     (obj
+                                                       (cond (lazy
+                                                              ;; For lazy fields, just store bytes in the %bytes
+                                                              ;; field.
+                                                              (deserialize-object-to-bytes
+                                                               type (subseq buffer start end)))
+                                                             (deserializer
+                                                              (funcall deserializer buffer start end end-tag))
+                                                             (t
+                                                              (%deserialize-object
+                                                               submessage buffer start end end-tag)))))
+                                                (setq index end)
+                                                (if repeated-p (cons obj (car cell)) obj)))))))))))))))))))
 
 ;;; Compile-time generation of serializers
 ;;; Type-checking is done at the top-level methods specialized on 'symbol',
