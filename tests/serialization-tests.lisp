@@ -596,7 +596,7 @@ Parameters:
          (wheel2 (make-color-wheel2 :name "Colors" :metadata meta2))
          (color2 (make-color2 :r-value 100 :g-value 0 :b-value 100))
          (rqst2  (make-add-color2 :wheel wheel2 :color color2))
-	 (rqst3  (make-color-wheel2-wrap :id 9001 :wheel wheel2 :metaname "meta")))
+         (rqst3  (make-color-wheel2-wrap :id 9001 :wheel wheel2 :metaname "meta")))
     (let ((ser1 (serialize-object-to-bytes rqst1 'add-color1))
           (ser2 (serialize-object-to-bytes rqst2 'add-color2)))
       (assert-true (string= (subseq
@@ -624,8 +624,8 @@ Parameters:
       (proto-impl:make-serializer color-wheel2)
       (proto-impl:make-serializer color-wheel2-wrap)
       (let* ((ser3 (serialize-object-to-bytes rqst3 'color-wheel2-wrap))
-	     (res3 (deserialize-object-from-bytes 'color-wheel2-wrap ser3)))
-	(assert-true (proto-equal res3 rqst3))))))
+             (res3 (deserialize-object-from-bytes 'color-wheel2-wrap ser3)))
+        (assert-true (proto-equal res3 rqst3))))))
 
 ;;; We make two protos: ProtoOnWire and ProtoDifferentThanWire.
 ;;; The difference is that ProtoOnWire contains a superset of the
