@@ -600,24 +600,21 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                    (lazy  (proto-lazy-p field))
                    (type (proto-class field))
                    (data))
-              ;; Not dealing with :GROUP (proto1 is deprecated), nor "aliases".
-              ;; Occam's razor, anyone?
-              ;; If the field is a map, we want to add to the existing hash-table
-              ;; rather than make a new cell.
+              ; CELL nows points to the cons where DATA should go
               (cond
                 ((eq type :map)
                  (unless (car cell)
                    (setf (car cell) (make-hash-table)))
-                 (let ((start index)
-                       (key-type (proto-type->keyword
+                 (let ((key-type (proto-type->keyword
                                   (second (proto-set-type field))))
                        (val-type (proto-type->keyword
                                   (third  (proto-set-type field))))
-                       map-tag map-len key-data (val-data nil))
+                       map-tag map-len key-data start (val-data nil))
                    (multiple-value-setq (map-len index)
                      (decode-uint32 buffer index))
+                   (setq start index)
                    (loop
-                     (when (>= index (+ map-len start))
+                     (when (= index (+ map-len start))
                        (assert key-data)
                        (setf (gethash key-data (car cell)) val-data)
                        (return))
@@ -626,7 +623,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                      ;; Check if data on the wire is a key
                      ;; Keys are always scalar (primitive) types,
                      ;; so just deserialize it.
-                     (if (= 1 (ilogand (iash map-tag -3)))
+                     (if (= 1 (ilogand (iash map-tag -3) #x1FFFFFFF))
                          (multiple-value-setq (key-data index)
                            (deserialize-prim key-type buffer index))
                          ;; Otherwise it must be a value, which has
