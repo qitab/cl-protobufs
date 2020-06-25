@@ -1034,6 +1034,66 @@ Parameters:
                      (t
                       (undefined-field-type "While generating 'deserialize-object' for ~S,"
                                             message class field))))
+              ((eq class :map)
+               (setf nslot temp)
+               (let* ((start vidx)
+                      (key-type (proto-type->keyword
+                                 (second (proto-set-type field))))
+                      (val-type (proto-type->keyword
+                                 (third (proto-set-type field))))
+                      (val-msg  (and val-type (not (keywordp val-type))
+                                     (or (find-message val-type)
+                                         (find-enum val-type)
+                                         (find-type-alias val-type)))))
+                 (ret
+                  (make-tag $wire-type-string index)
+                  `(progn
+                     ; if ,temp points to the "unset" placeholder, make a new hash-table
+                     (unless (typep ,temp 'hash-table)
+                         (setq ,temp (make-hash-table)))
+                     ; todo (benkuehnert): val-data should be the default value of
+                     ; ,key-type instead of nil.
+                     (let ((val-data nil)
+                           map-tag map-len key-data start)
+                       (multiple-value-setq (map-len ,vidx)
+                         (decode-uint32 ,vbuf ,vidx))
+                       (setq start ,vidx)
+                       (loop
+                         (when (= ,vidx (+ map-len start))
+                           (setf (gethash key-data ,temp) val-data)
+                           (return))
+                         (multiple-value-setq (map-tag ,vidx)
+                           (decode-uint32 ,vbuf ,vidx))
+                         (if (= 1 (ilogand (iash map-tag -3) #x1FFFFFFF))
+                             (multiple-value-setq (key-data ,vidx)
+                               (deserialize-prim ,key-type ,vbuf ,vidx))
+                             ,(cond ((keywordp val-type)
+                                     `(multiple-value-setq (val-data ,vidx)
+                                        (deserialize-prim ,val-type ,vbuf ,vidx)))
+                                    ((typep val-msg 'message-descriptor)
+                                     (if (eq (proto-message-type val-msg) :group)
+                                         (let ((tag2 (make-tag $wire-type-end-group 2)))
+                                           `(multiple-value-setq (val-data ,vidx)
+                                              ,(call-deserializer val-msg vbuf vidx nil tag2)))
+                                         `(multiple-value-bind (payload-len payload-start)
+                                              (decode-uint32 ,vbuf ,vidx)
+                                            (setq ,vidx (+ payload-start payload-len)
+                                                  val-data ,(call-deserializer val-msg vbuf
+                                                                                'payload-start
+                                                                                vidx)))))
+                                    ((typep val-msg 'protobuf-enum)
+                                     `(multiple-value-setq (val-data ,vidx)
+                                        (deserialize-enum '(,@(protobuf-enum-values val-msg))
+                                                          ,vbuf ,vidx)))
+                                    ((typep val-msg 'protobuf-type-alias)
+                                     (let ((class (proto-proto-type val-msg)))
+                                       `(progn
+                                          (multiple-value-setq (val-data ,vidx)
+                                            (deserialize-prim ,class ,vbuf ,vidx))
+                                          (setq ,val-data (funcall #',(proto-deserializer val-msg)
+                                                                   ,temp)))))
+                                    ;todo (benkuehnert): add special map type error handling
+                                    (t nil)))))))))
               (t
                (setf nslot temp)
                ;; Non-repeating field.
