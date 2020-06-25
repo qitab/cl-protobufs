@@ -6,7 +6,6 @@
 
 (in-package "PROTO-IMPL")
 
-
 ;;; Protobuf serialization from Lisp objects
 
 ;;; When the optimize speed option is used we avoid using DEFMETHOD, which generates
@@ -656,7 +655,8 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                            `(when ,boundp
                               (,iterator (,vval ,reader)
                                          (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-                                         (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
+                                         (iincf ,size ,(call-pseudo-method :serialize
+                                                                           msg vval vbuf))
                                          (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
                          (let ((tag (make-tag $wire-type-string index)))
                            `(when ,boundp
