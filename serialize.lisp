@@ -661,14 +661,20 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                                                              (deserialize-object-to-bytes
                                                               val-type (subseq buffer start end)))
                                                             (deserializer
-                                                             (funcall deserializer buffer start end end-tag))
+                                                             (funcall deserializer
+                                                                      buffer start end end-tag))
                                                             (t
                                                              (%deserialize-object
-                                                              submessage buffer start end end-tag)))))
+                                                              submessage buffer start
+                                                              end end-tag)))))
                                                (setq index end)
                                                (setq val-data obj)))))))))))))
+              ;; Not dealing with :GROUP (proto1 is deprecated), nor "aliases".
+              ;; Occam's razor, anyone?
+              ;; If the field is a map, we want to add to the existing hash-table
+              ;; rather than make a new cell.
                 (t
-                 (rplaca cell ; CELL nows points to the cons where DATA should go
+                 (rplaca cell
                          (cond
                            ((keywordp type) ; a wire-level primitive
                             (cond ((and (packed-type-p type)
@@ -724,12 +730,15 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                                                               (deserialize-object-to-bytes
                                                                type (subseq buffer start end)))
                                                              (deserializer
-                                                              (funcall deserializer buffer start end end-tag))
+                                                              (funcall deserializer buffer
+                                                                       start end end-tag))
                                                              (t
                                                               (%deserialize-object
-                                                               submessage buffer start end end-tag)))))
+                                                               submessage buffer
+                                                               start end end-tag)))))
                                                 (setq index end)
-                                                (if repeated-p (cons obj (car cell)) obj)))))))))))))))))))
+                                                (if repeated-p
+                                                    (cons obj (car cell)) obj)))))))))))))))))))
 
 ;;; Compile-time generation of serializers
 ;;; Type-checking is done at the top-level methods specialized on 'symbol',
@@ -890,7 +899,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                             (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf)))))))
                   (t
                    (undefined-field-type "While generating 'serialize-object' for ~S,"
-                                         msg class field))))))))
+                                         msg class field)))))))))
 
 ;; Note well: keep this in sync with the main 'serialize-object' method above
 (defun generate-serializer-body (message vobj vbuf size)
