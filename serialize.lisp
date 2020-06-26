@@ -833,7 +833,8 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                                                 (iincf map-len
                                                        ,(call-pseudo-method
                                                          :serialize val-msg 'v vbuf)
-                                                       (iincf map-len (encode-uint32 ,tag2 ,vbuf)))))
+                                                       (iincf map-len
+                                                              (encode-uint32 ,tag2 ,vbuf)))))
                                            (let ((tag (make-tag $wire-type-string 2)))
                                              `(when v
                                                 (iincf map-len (encode-uint32 ,tag ,vbuf))
