@@ -397,7 +397,8 @@ Arguments:
 
 ;; Due to the fact that serialization works with keywords for primitive
 ;; types, we need this hack for now. If the type given is not primitive,
-;; just return it.
+;; then it is some message type of the form (or null [type]). In which
+;; case, return [type].
 (defun proto-type->keyword (type)
   (case type
     (string :string)
@@ -411,7 +412,7 @@ Arguments:
     (fixed64 :fixed64)
     (sfixed32 :sfixed64)
     (sfixed64 :sfixed64)
-    (t type)))
+    (t (third type))))
 
 (defun fixed-width-integer-type-p (type)
   "Check whether TYPE can be serialized in a fixed number of bits."
