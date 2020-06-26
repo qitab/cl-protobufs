@@ -126,11 +126,12 @@ Parameters:
             (format stream "~&}~%"))
         nil))))
 
-(defun print-prim (val type field stream indent)
+(defun print-prim (val type field stream indent &optional (newline-p t))
   (when (or val (eq type :bool))
-    (if (eq indent 't)
-      (format stream "~A: " (proto-name field))
-      (format stream "~&~VT~A: " (+ indent 2) (proto-name field)))
+    (unless (eq indent 't)
+        (format stream "~&~VT" (+ indent 2)))
+    (if field
+      (format stream "~A: " (proto-name field)))
     (ecase type
       ((:int32 :uint32 :int64 :uint64 :sint32 :sint64
         :fixed32 :sfixed32 :fixed64 :sfixed64)
@@ -143,6 +144,20 @@ Parameters:
        (format stream "~A" (if val "true" "false")))
       ((:float :double)
        (format stream "~D" val))
+      ; todo(benkuehnert): Sort output by key value.
+      ((:map)
+       (let ((key-type (proto-type->keyword
+                        (second (proto-set-type field))))
+             (val-type (proto-type->keyword
+                        (third  (proto-set-type field)))))
+         (flet ((print-entry (k v)
+                  (print-prim k key-type nil stream (+ 2 indent) nil)
+                  (format stream "-> ")
+                  (if (keywordp val-type)
+                      (print-prim v val-type nil stream t)
+                      (print-text-format v :stream stream :suppress-pretty-print t))))
+           (format stream "~%")
+           (maphash #'print-entry val))))
       ;; A few of our homegrown types
       ((:symbol)
        (let ((val (if (keywordp val)
@@ -151,9 +166,9 @@ Parameters:
          (format stream "\"~A\"" val)))
       ((:date :time :datetime :timestamp)
        (format stream "~D" val)))
-    (if (eq indent 't)
-      (format stream " ")
-      (format stream "~%"))))
+    (if (and (not (eq indent 't)) newline-p)
+      (format stream "~%")
+      (format stream " "))))
 
 (defun print-enum (val enum field stream indent)
   (when val
