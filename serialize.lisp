@@ -857,8 +857,10 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                                             (let ((v (funcall #',(proto-serializer val-msg) ,v)))
                                               (iincf map-len (serialize-prim v ,class
                                                                              ,tag ,vbuf))))))
-                                        ;todo (benkuehnert): add error handling here.
-                                      (t nil))
+                                      (t
+                                       (undefined-field-type
+                                        "While generating 'serialize-object' for ~S,"
+                                        msg val-type field)))
                                (i+ ret-len (+ map-len (backpatch map-len)))))))
                     (loop for k being the hash-keys of ,vval using (hash-value v)
                           sum (serialize-pair k v)))))))
@@ -1102,8 +1104,10 @@ Parameters:
                                             (deserialize-prim ,class ,vbuf ,vidx))
                                           (setq ,val-data (funcall #',(proto-deserializer val-msg)
                                                                    ,temp)))))
-                                    ;todo (benkuehnert): add special map type error handling
-                                    (t nil)))))))))
+                                    (t
+                                     (undefined-field-type
+                                      "While generating 'deserialize-object' for ~S,"
+                                      message val-type field))))))))))
               (t
                (setf nslot temp)
                ;; Non-repeating field.
