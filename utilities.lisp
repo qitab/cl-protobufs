@@ -400,19 +400,23 @@ Arguments:
 ;; then it is some message type of the form (or null [type]). In which
 ;; case, return [type].
 (defun proto-type->keyword (type)
-  (case type
-    (string :string)
-    (int32 :int32)
-    (int64 :int64)
-    (uint32 :uint32)
-    (uint64 :uint64)
-    (sint32 :sint32)
-    (sint64 :sint64)
-    (fixed32 :fixed32)
-    (fixed64 :fixed64)
-    (sfixed32 :sfixed64)
-    (sfixed64 :sfixed64)
-    (t (third type))))
+  (if (and (listp type)
+           (eq (first type) 'or)
+           (eq (second type) 'null))
+      (proto-type->keyword (third type))
+      (case type
+        (string :string)
+        (int32 :int32)
+        (int64 :int64)
+        (uint32 :uint32)
+        (uint64 :uint64)
+        (sint32 :sint32)
+        (sint64 :sint64)
+        (fixed32 :fixed32)
+        (fixed64 :fixed64)
+        (sfixed32 :sfixed64)
+        (sfixed64 :sfixed64)
+        (t type))))
 
 (defun fixed-width-integer-type-p (type)
   "Check whether TYPE can be serialized in a fixed number of bits."
