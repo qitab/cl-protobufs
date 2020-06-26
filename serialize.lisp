@@ -849,7 +849,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                                             (iincf map-len (serialize-enum
                                                             v '(,@(protobuf-enum-values val-msg))
                                                             ,tag ,vbuf)))))
-                                        ;todo (benkuehnert): I'm not sure if this is a possible case.
+                                      ;todo (benkuehnert): I'm not sure if this is a possible case.
                                       ((typep val-msg 'protobuf-type-alias)
                                        (let* ((class (proto-proto-type val-msg))
                                               (tag   (make-tag class (proto-index field))))
