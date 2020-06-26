@@ -682,10 +682,7 @@ Arguments:
          ;; DEFSTRUCT form.
          (declaim (inline ,hidden-constructor-name))
          (defstruct (,proto-type (:constructor ,hidden-constructor-name)
-                                 (:include base-message)
-                                 ;; Yet more class->struct code we have to add,
-                                 ;; todo(jgodbout):delete asap
-                                 (:predicate nil))
+                                 (:include base-message))
            ,@(remove nil
               (mapcar (lambda (slot)
                         (let ((name (field-data-internal-slot-name slot))
