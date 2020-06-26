@@ -215,11 +215,9 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
                           " ",
                           FieldLispType(field->message_type()->field(1)),
                           ")");
-    vars["meta"] = QualifiedMessageLispName(field->message_type(), field->file());
     printer->Print(vars,
                     "\n(proto:define-map $name$\n"
                     "  (:type $type$\n"
-                    "   :map-desc $meta$\n"
                     "   :index $tag$))");
   } else {
     vars["type"] = FieldLispType(field);
