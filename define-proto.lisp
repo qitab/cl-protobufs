@@ -411,18 +411,18 @@ Parameters:
           `(progn ,@forms)))))
 
 
-(defmacro define-map (name (&key type index))
+(defmacro define-map (type-name (&key type index))
 "Define a lisp type given the data for a protobuf map type.
 
 Parameters:
-  NAME: Map type name
+  TYPE-NAME: Map type name
   TYPE: The proto type of the map, in the form of (proto:map-of [key-type] [val-type])
   INDEX: Index of this map type in the field."
   (check-type index integer)
   ; binding slot to this seems incorrect, but changing it breaks.
-  (let* ((slot      (or name (and name (proto->slot-name name *package*))))
-         (name      (class-name->proto name))
-         (conc-name (conc-name-for-type name ""))
+  (let* ((slot      type-name)
+         (name      (class-name->proto type-name))
+         (conc-name (conc-name-for-type type-name ""))
          (reader    (let ((msg-conc (proto-conc-name *protobuf*)))
                       (and msg-conc
                            (fintern "~A~A" msg-conc slot))))
