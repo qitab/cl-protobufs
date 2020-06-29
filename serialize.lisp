@@ -150,24 +150,23 @@ Parameters:
           msg)
       (declare (fixnum index))
       (if (eq (proto-label field) :repeated)
-          (if-let (result (emit-repeated-field
-                           (if slot (read-slot object slot
-                                               ;; For lazy fields, don't use reader
-                                               ;; because that will deserialize
-                                               ;; unnecessarily.
-                                               (and (not (proto-lazy-p field))
-                                                    reader))
-                               (list object))
-                           type (proto-packed field) index buffer))
-                  result
-                  (undefined-field-type "While serializing ~S,"
-                                        object type field))
-          (if-let (result (emit-non-repeated-field
-                           (if slot (read-slot object slot reader) object)
-                           type index buffer))
-                  result
-                  (undefined-field-type "While serializing ~S,"
-                                        object type field))))))
+          (or (emit-repeated-field
+               (if slot (read-slot object slot
+                                   ;; For lazy fields, don't use reader
+                                   ;; because that will deserialize
+                                   ;; unnecessarily.
+                                   (and (not (proto-lazy-p field))
+                                        reader))
+                   (list object)
+                   type (proto-packed field) index buffer))
+
+              (undefined-field-type "While serializing ~S,"
+                                    object type field))
+          (or (emit-non-repeated-field
+               (if slot (read-slot object slot reader) object)
+               type index buffer)
+              (undefined-field-type "While serializing ~S,"
+                                    object type field))))))
 
 (defun emit-repeated-field (value type packed-p index buffer)
   "Serialize a repeated field.
