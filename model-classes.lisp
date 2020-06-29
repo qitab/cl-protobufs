@@ -234,15 +234,6 @@ Parameters:
     (or (find-message type)
         (find-type-alias type))))
 
-(defvar *maps* (make-hash-table :test 'eq)
-  "Maps map names (symbols) to message-descriptor instances
-   which describe map entries.")
-
-(declaim (inline find-map))
-(defun find-map (type)
-  "Return a message-descriptor instance named by TYPE (a symbol)."
-  (gethash type *maps*))
-
 (defvar *enums* (make-hash-table :test 'eq)
   "Maps enum names (symbols) to protobuf-enum instances.")
 
