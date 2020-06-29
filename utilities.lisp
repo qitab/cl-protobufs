@@ -270,7 +270,7 @@ Arguments:
                     (:map-get 'get)
                     (:map-put 'put)
                     (:map-rem 'remove))))
-    (cond ((or (eq f-symbol 'get) (eq f-symbol 'put) (eq f-symbol 'remove))
+    (cond ((member f-symbol '(get put remove))
            (intern (format nil "~a.~a-~a"
                            (symbol-name proto-type)
                            (symbol-name slot)
