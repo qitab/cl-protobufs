@@ -587,21 +587,22 @@ Arguments:
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix).
   SLOT-NAME: Slot name for the field (with the #\% prefix).
   FIELD: The class object field definition of the field."
-  (let ((public-getter-name (proto-slot-function-name proto-type public-slot-name :map-get))
-        (public-setter-name (proto-slot-function-name proto-type public-slot-name :map-put))
-        (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
-        (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
-        (val-default-form (get-default-form (third (proto-set-type field))
-                                            $empty-default))
-        (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
-        (index (proto-field-offset field)))
+  (let* ((public-getter-name (proto-slot-function-name proto-type public-slot-name :map-get))
+         (public-setter-name (proto-slot-function-name proto-type public-slot-name :map-put))
+         (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
+         (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
+         (key-type (second (proto-set-type field)))
+         (val-type (third  (proto-set-type field)))
+         (val-default-form (get-default-form val-type $empty-default))
+         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
+         (index (proto-field-offset field)))
 
     (with-gensyms (obj new-key new-val)
       `(
         (declaim (inline ,public-getter-name))
         (defun ,public-getter-name (,obj ,new-key)
-          (check-type ,new-key ,(second (proto-set-type field)))
-          (the (values ,(third (proto-set-type field)) t)
+          (check-type ,new-key ,key-type)
+          (the (values ,val-type t)
                (multiple-value-bind (val flag)
                    (gethash ,new-key (,hidden-accessor-name ,obj))
                  (if flag
@@ -610,19 +611,19 @@ Arguments:
 
         (declaim (inline ,public-setter-name))
         (defun ,public-setter-name (,obj ,new-key ,new-val)
-          (check-type ,new-key ,(second (proto-set-type field)))
+          (check-type ,new-key ,key-type)
           ; If the val type is a list, then must describe a message and be of the form
           ; (or null [message-type]). This ensures that we type-check ,new-val against
           ; the message type and disallow inserting nil into the map.
-          ,(if (listp (third (proto-set-type field)))
-               `(check-type ,new-val ,(third (third (proto-set-type field))))
-               `(check-type ,new-val ,(third (proto-set-type field))))
+          ,(if (listp val-type)
+               `(check-type ,new-val ,(third val-type))
+               `(check-type ,new-val ,val-type))
           (setf (bit (,is-set-accessor ,obj) ,index) 1)
           (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
 
         (declaim (inline ,public-remove-name))
         (defun ,public-remove-name (,obj ,new-key)
-          (check-type ,new-key ,(second (proto-set-type field)))
+          (check-type ,new-key ,key-type)
           (remhash ,new-key (,hidden-accessor-name ,obj))
           (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
               (setf (bit (,is-set-accessor ,obj) ,index) 0)))
