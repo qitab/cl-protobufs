@@ -236,6 +236,12 @@ ENUM-VALUES is a list of PROTOBUF-ENUM-VALUEs."
 
 (deftype numeral () "byte 32" '(signed-byte 32))
 
+(defun top-level-p (descriptor)
+  "Check if the current macro is defining a top level element.
+Parameters:
+  DESCRIPTOR: The parent descriptor of the element we're looking at."
+  (typep descriptor 'file-descriptor))
+
 (defgeneric cl-protobufs:numeral->enum (enum numeral &optional default)
   (:documentation
    "Converts a NUMERAL to a corresponding ENUM keyword.
@@ -324,6 +330,30 @@ message, and of +<value_name>+ when the enum is defined at top-level."
     (check-type expansion (cons (eql member) list))
     (rest expansion)))
 
+(defvar *enum-forms* nil
+  "The enum forms have to be evaluated first as they become types
+for messages and sadly the messages can be defined before the enums.")
+
+(defun create-progn-with-enum-forms-if-top-level (top-level-form-p &rest lists)
+  "Create the output progn form for a define statement which may be top-level
+and have an enum inside of it. If it is top level output the internal enums
+before the rest of the forms, otherwise just output the forms collected.
+Parameters:
+  TOP-LEVEL-FORM-P: Bool stating whether this is top-level or not.
+  LISTS: The lists that have been collected in the defining form for output."
+  (let (out-list)
+    ;; Our foolish version of one-level flatten
+    (dolist (list (reverse lists))
+      (dolist (inner-list (reverse list))
+        (push inner-list out-list)))
+
+    (if (and top-level-form-p *enum-forms*)
+        (let ((output
+               `(progn ,@*enum-forms* ,@out-list)))
+          (setf *enum-forms* nil)
+          output)
+        `(progn ,@out-list))))
+
 (defmacro define-enum (type (&key name conc-name alias-for)
                        &body values)
   "Define a lisp type given the data for a protobuf enum type.
@@ -372,6 +402,13 @@ Parameters:
       (collect-form `(record-protobuf-object ',type ,enum :enum))
       ;; Register it by the full symbol name.
       (record-protobuf-object type enum :enum)
+      ;; This is messy and should be fixed.
+      ;; Enums define types and functions that will need to be called
+      ;; when creating messages. As such they need to be first
+      ;; in the list of things a macro evaluated. So we make a global var
+      ;; and gaurantee they are first.
+      (unless (top-level-p *protobuf*)
+        (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
 (declaim (inline proto-%bytes))
@@ -740,6 +777,7 @@ Arguments:
                                   :documentation documentation))
          (index 0)
          (field-offset 0)
+         (top-level-form-p (top-level-p *protobuf*))
          (*protobuf* msg-desc)
          (bool-count (count-if #'non-repeated-bool-field fields))
          (bool-index -1)
@@ -754,7 +792,11 @@ Arguments:
                       (non-lazy-fields collect-non-lazy-field))
       (dolist (field fields)
         (case (car field)
-          ((define-enum define-message define-extend)
+          ((define-enum)
+           (let ((result (macroexpand-1 field env)))
+             (assert (eq (car result) 'progn) ()
+                     "The macroexpansion for ~S failed" field)))
+          ((define-message define-extend)
            (let ((result (macroexpand-1 field env)))
              (assert (eq (car result) 'progn) ()
                      "The macroexpansion for ~S failed" field)
@@ -848,7 +890,7 @@ Arguments:
       ;; Register it by the full symbol name.
       (record-protobuf-object type msg-desc :message)
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
-      `(progn ,@type-forms ,@forms))))
+      (create-progn-with-enum-forms-if-top-level top-level-form-p type-forms forms))))
 
 (defun conc-name-for-type (type conc-name)
   (and conc-name
@@ -908,6 +950,7 @@ Arguments:
                                    "default" "packed")
                         :message-type :extends ; this message is an extension
                         :documentation documentation)))
+         (top-level-form-p (top-level-p *protobuf*))
          ;; Only now can we bind *protobuf* to the new extended message
          (*protobuf* extends)
          (index 0))
@@ -1052,7 +1095,7 @@ Arguments:
              (appendf (proto-fields extends) (list field))
              (appendf (proto-extended-fields extends) (list field))))))
       (collect-form `(record-protobuf-object ',type ,extends :message))
-      `(progn ,@forms))))
+      (create-progn-with-enum-forms-if-top-level top-level-form-p forms))))
 
 (defun index-within-extensions-p (index message)
   (let ((extensions (proto-extensions message)))
@@ -1218,6 +1261,7 @@ Arguments:
           (collect-type-form
            (make-structure-class-forms type slots non-lazy-fields lazy-fields)))
       (collect-form `(record-protobuf-object ',type ,message :message))
+      ;; Group can never be a top level element.
       `(progn
          define-group
          ,message
