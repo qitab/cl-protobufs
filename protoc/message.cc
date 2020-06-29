@@ -70,113 +70,111 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
                                       const FieldDescriptor::Label label) {
   // If descriptor_ describes a map entry message, ignore it. We do not use
   // this generated message for map types.
-  if (descriptor_->options().map_entry()) {
+  if (descriptor_->options().map_entry())
     return;
-  } else {
-    const bool group = tag >= 0;
-    printer->Print("\n");
-    printer->Print((group ? "(proto:define-group $name$" :
-                            "(proto:define-message $name$"),
-                   "name", lisp_name);
-    printer->Annotate("name", descriptor_);
-    printer->Indent();
+  const bool group = tag >= 0;
+  printer->Print("\n");
+  printer->Print((group ? "(proto:define-group $name$" :
+                          "(proto:define-message $name$"),
+                 "name", lisp_name);
+  printer->Annotate("name", descriptor_);
+  printer->Indent();
 
-    // Message options.
-    printer->Indent();
-    printer->Print("\n(:conc-name \"\"");
-    if (group) {
-      printer->Print("\n :index $tag$", "tag", StrCat(tag));
-      printer->Print("\n :label $label$", "label", FieldKeywordLabel(label));
-    }
-    if (CamelIsSpitting(descriptor_->name())) {
-      printer->Print("\n :name \"$name$\"", "name", descriptor_->name());
-      printer->Annotate("name", descriptor_->name());
-    }
-    if (descriptor_->options().HasExtension(lisp_alias)) {
-      // The symbol most likely doesn't exist yet.  Use double-colon to create
-      // the symbol if doesn't exist yet.
-      const std::string& lasn =
-          ToLispAliasSymbolName(descriptor_->options().GetExtension(lisp_alias));
-      printer->Print("\n :alias-for $for$", "for", lasn);
-      printer->Annotate("for", lasn);
-    }
-    // END message options.
-    printer->Print(")");
-    printer->Outdent();
-
-    if (descriptor_->enum_type_count() > 0) {
-      printer->Print("\n;; Nested enums.");
-      for (int i = 0; i < descriptor_->enum_type_count(); ++i) {
-        enums_[i]->Generate(printer);
-      }
-    }
-
-    if (descriptor_->nested_type_count() > 0) {
-      printer->Print("\n;; Nested messages.");
-      int printed = 0;
-      for (int n = 0; n < descriptor_->nested_type_count(); ++n) {
-        // Strange handling of group fields.
-        // Remove all groups. Those should be generated with the fields.
-        bool skip = false;
-        for (int f = 0; f < descriptor_->field_count(); ++f) {
-          if (descriptor_->field(f)->type() == FieldDescriptor::TYPE_GROUP &&
-              descriptor_->field(f)->message_type() ==
-              descriptor_->nested_type(n)) {
-            skip = true;
-            break;
-          }
-        }
-        if (!skip) {
-          nested_[n]->Generate(printer);
-          ++printed;
-        }
-      }
-      if (!printed) printer->Print(".. are all groups.\n");
-    }
-
-    if (descriptor_->field_count() > 0) {
-      printer->Print("\n;; Fields.");
-      for (int i = 0; i < descriptor_->field_count(); ++i) {
-        const FieldDescriptor* field = descriptor_->field(i);
-        if (field->type() == FieldDescriptor::TYPE_GROUP) {
-          // Strange way of handling group fields.
-          MessageGenerator group(field->message_type());
-          group.GenerateSource(printer,
-                               ToLispName(field->message_type()->name()),
-                               field->number(),
-                               field->label());
-        } else {
-          GenerateField(printer, field);
-        }
-      }
-    }
-
-    if (descriptor_->extension_count() > 0) {
-      printer->Print("\n;; Extensions.");
-      for (int i = 0; i < descriptor_->extension_count(); ++i) {
-        GenerateExtension(
-            printer, descriptor_->extension(i), descriptor_->file());
-      }
-    }
-
-    if (descriptor_->extension_range_count() > 0) {
-      printer->Print("\n;; Extension ranges.");
-      for (int i = 0; i < descriptor_->extension_range_count(); ++i) {
-        const Descriptor::ExtensionRange* range = descriptor_->extension_range(i);
-        printer->Print(
-            "\n(proto:define-extension $start$ $end$)", "start",
-            StrCat(range->start),
-            // The end is inclusive in cl_protobufs.
-            // For some reason, the extension number is generated as
-            // 0x7ffffffe when specified as 'max', but the max must be
-            // (2^29 - 1).
-            "end", StrCat(std::min(kMaxExtensionNumber, range->end - 1)));
-      }
-    }
-
-    printer->Print(")");
-    printer->Outdent();
+  // Message options.
+  printer->Indent();
+  printer->Print("\n(:conc-name \"\"");
+  if (group) {
+    printer->Print("\n :index $tag$", "tag", StrCat(tag));
+    printer->Print("\n :label $label$", "label", FieldKeywordLabel(label));
   }
+  if (CamelIsSpitting(descriptor_->name())) {
+    printer->Print("\n :name \"$name$\"", "name", descriptor_->name());
+    printer->Annotate("name", descriptor_->name());
+  }
+  if (descriptor_->options().HasExtension(lisp_alias)) {
+    // The symbol most likely doesn't exist yet.  Use double-colon to create
+    // the symbol if doesn't exist yet.
+    const std::string& lasn =
+        ToLispAliasSymbolName(descriptor_->options().GetExtension(lisp_alias));
+    printer->Print("\n :alias-for $for$", "for", lasn);
+    printer->Annotate("for", lasn);
+  }
+  // END message options.
+  printer->Print(")");
+  printer->Outdent();
+
+  if (descriptor_->enum_type_count() > 0) {
+    printer->Print("\n;; Nested enums.");
+    for (int i = 0; i < descriptor_->enum_type_count(); ++i) {
+      enums_[i]->Generate(printer);
+    }
+  }
+
+  if (descriptor_->nested_type_count() > 0) {
+    printer->Print("\n;; Nested messages.");
+    int printed = 0;
+    for (int n = 0; n < descriptor_->nested_type_count(); ++n) {
+      // Strange handling of group fields.
+      // Remove all groups. Those should be generated with the fields.
+      bool skip = false;
+      for (int f = 0; f < descriptor_->field_count(); ++f) {
+        if (descriptor_->field(f)->type() == FieldDescriptor::TYPE_GROUP &&
+            descriptor_->field(f)->message_type() ==
+            descriptor_->nested_type(n)) {
+          skip = true;
+          break;
+        }
+      }
+      if (!skip) {
+        nested_[n]->Generate(printer);
+        ++printed;
+      }
+    }
+    if (!printed) printer->Print(".. are all groups.\n");
+  }
+
+  if (descriptor_->field_count() > 0) {
+    printer->Print("\n;; Fields.");
+    for (int i = 0; i < descriptor_->field_count(); ++i) {
+      const FieldDescriptor* field = descriptor_->field(i);
+      if (field->type() == FieldDescriptor::TYPE_GROUP) {
+        // Strange way of handling group fields.
+        MessageGenerator group(field->message_type());
+        group.GenerateSource(printer,
+                             ToLispName(field->message_type()->name()),
+                             field->number(),
+                             field->label());
+      } else {
+        GenerateField(printer, field);
+      }
+    }
+  }
+
+  if (descriptor_->extension_count() > 0) {
+    printer->Print("\n;; Extensions.");
+    for (int i = 0; i < descriptor_->extension_count(); ++i) {
+      GenerateExtension(
+          printer, descriptor_->extension(i), descriptor_->file());
+    }
+  }
+
+  if (descriptor_->extension_range_count() > 0) {
+    printer->Print("\n;; Extension ranges.");
+    for (int i = 0; i < descriptor_->extension_range_count(); ++i) {
+      const Descriptor::ExtensionRange* range = descriptor_->extension_range(i);
+      printer->Print(
+          "\n(proto:define-extension $start$ $end$)", "start",
+          StrCat(range->start),
+          // The end is inclusive in cl_protobufs.
+          // For some reason, the extension number is generated as
+          // 0x7ffffffe when specified as 'max', but the max must be
+          // (2^29 - 1).
+          "end", StrCat(std::min(kMaxExtensionNumber, range->end - 1)));
+    }
+  }
+
+  printer->Print(")");
+  printer->Outdent();
 }
 
 void MessageGenerator::Generate(io::Printer* printer) {
