@@ -120,6 +120,10 @@
 
   (:shadow
    #:find-method)
+
+  (:import-from :alexandria
+                #:if-let)
+
   (:import-from :closer-mop
                 #:class-slots
                 #:class-direct-slots
