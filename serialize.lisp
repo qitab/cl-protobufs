@@ -146,9 +146,7 @@ Parameters:
     (let ((type   (slot-value field 'class))
           (slot   (slot-value field 'internal-field-name))
           (reader (slot-value field 'reader))
-          (index (proto-index field))
-          msg)
-      (declare (fixnum index))
+          (index (proto-index field)))
       (if (eq (proto-label field) :repeated)
           (or (emit-repeated-field
                (if slot (read-slot object slot
@@ -177,7 +175,8 @@ Parameters:
   PACKED-P: Whether or not the field in question is packed.
   INDEX: The index of the field (used for making tags).
   BUFFER: The buffer to write to."
-  (let ((size 0))
+  (let ((size 0)
+        msg)
     (declare (fixnum size index))
     (declare (buffer buffer))
     (cond ((and packed-p (packed-type-p type))
@@ -250,7 +249,8 @@ Parameters:
   TYPE: The :class slot of the field.
   INDEX: The index of the field (used for making tags).
   BUFFER: The buffer to write to."
-  (let ((size 0))
+  (let ((size 0)
+        msg)
     (declare (fixnum size index))
     (declare (buffer buffer))
     (cond ((keywordp type)
