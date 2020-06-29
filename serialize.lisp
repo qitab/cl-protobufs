@@ -157,9 +157,8 @@ Parameters:
                                    ;; unnecessarily.
                                    (and (not (proto-lazy-p field))
                                         reader))
-                   (list object)
-                   type (proto-packed field) index buffer))
-
+                   (list object))
+               type (proto-packed field) index buffer)
               (undefined-field-type "While serializing ~S,"
                                     object type field))
           (or (emit-non-repeated-field
