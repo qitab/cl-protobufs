@@ -175,10 +175,11 @@ Parameters:
   PACKED-P: Whether or not the field in question is packed.
   INDEX: The index of the field (used for making tags).
   BUFFER: The buffer to write to."
+  (declare (fixnum index)
+           (buffer buffer))
   (let ((size 0)
         msg)
-    (declare (fixnum size index))
-    (declare (buffer buffer))
+    (declare (fixnum size))
     (cond ((and packed-p (packed-type-p type))
            ;; This is where we handle packed primitive types
            ;; Packed enums get handled below
@@ -249,10 +250,11 @@ Parameters:
   TYPE: The :class slot of the field.
   INDEX: The index of the field (used for making tags).
   BUFFER: The buffer to write to."
+  (declare (fixnum index)
+           (buffer buffer))
   (let ((size 0)
         msg)
-    (declare (fixnum size index))
-    (declare (buffer buffer))
+    (declare (fixnum size))
     (cond ((keywordp type)
            (serialize-prim value type (make-tag type index)
                            buffer))
