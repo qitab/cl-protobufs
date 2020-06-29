@@ -580,7 +580,10 @@ Arguments:
         (export '(,has-function-name ,clear-function-name ,public-accessor-name))))))
 
 (defun make-map-structure-class-forms (proto-type public-slot-name slot-name field)
-  "Create specific forms needed for map fields: set, get, and remove.
+  "This creates forms that define map accessors which are type safe. Using these will
+guarantee that the resulting map can be properly serialized, whereas if one modifies
+the underlying map (which is accessed via the make-common-forms-for-structure-class
+function) then there is no guarantee on the serialize function working properly.
 
 Arguments:
   PROTO-TYPE: The Lisp type name of the proto message.
