@@ -445,11 +445,11 @@ Parameters:
                   :external-field-name slot
                   :reader reader)))
     `(progn
-       define-map
-       nil
-       nil
-       ,mfield
-       ,mslot)))
+       define-map ; the type of this model
+       nil        ; this slot is used for model data, but map data is held on the field-descriptor.
+       nil        ; this slot is used for definers, but these are created later.
+       ,mfield    ; the extra field-data object created by this macro
+       ,mslot)))  ; the extra field-descriptor object created by this macro.
 
 (declaim (inline proto-%bytes))
 (defun proto-%bytes (obj)
