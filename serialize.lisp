@@ -122,6 +122,12 @@
       (iincf size (emit-field object field buffer)))))
 
 (defun emit-field (object field buffer)
+  "Serialize a single field from an object to buffer
+
+Parameters:
+  OBJECT: The protobuf object which contains the field to be serialized.
+  FIELD: The field of the object to serialize.
+  BUFFER: The buffer to serialize to."
   (declare (type field-descriptor field))
   (flet ((read-slot (object slot reader)
            ;; Don't do a boundp check, we assume the object is fully populated
@@ -238,7 +244,7 @@ Parameters:
           (t nil))))
 
 (defun emit-non-repeated-field (value type index buffer)
-  "Serialize a non-repeated field. 
+  "Serialize a non-repeated field.
 Warning: this function does not signal the undefined-field-type if serialization fails.
 
 Parameters:
