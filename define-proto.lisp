@@ -702,9 +702,8 @@ Arguments:
         ,@(make-common-forms-for-structure-class
            proto-type public-slot-name slot-name field)
 
-
         ; Make special map forms.
-        ,@(if (eq (proto-class field) :map)
+        ,@(when (eq (proto-class field) :map)
             (make-map-structure-class-forms
              proto-type public-slot-name slot-name field))))))
 
