@@ -121,15 +121,15 @@
     (dolist (field (proto-fields msg-desc) size)
       (iincf size (emit-field object field buffer)))))
 
-(macrolet ((read-slot (object slot reader)
-             ;; Don't do a boundp check, we assume the object is fully populated
-             ;; Unpopulated slots should be "nullable" and will contain nil when empty
-             `(if ,reader
-                  (funcall ,reader ,object)
-                  (slot-value ,object ,slot))))
-  (defun emit-field (object field buffer)
+(defun emit-field (object field buffer)
+  (declare (type field-descriptor field))
+  (flet ((read-slot (object slot reader)
+           ;; Don't do a boundp check, we assume the object is fully populated
+           ;; Unpopulated slots should be "nullable" and will contain nil when empty
+           (if reader
+               (funcall reader object)
+               (slot-value object slot))))
     "Serialize FIELD in OBJECT to BUFFER"
-    (declare (type field-descriptor field))
     (unless
         (if (eq (slot-value field 'message-type) :extends)
             (has-extension object (slot-value field 'internal-field-name))
@@ -153,7 +153,7 @@
                 ((keywordp type)
                  (let ((tag (make-tag type index)))
                    (doseq (v (read-slot object slot reader))
-                     (iincf size (serialize-prim v type tag buffer)))
+                          (iincf size (serialize-prim v type tag buffer)))
                    size))
                 ((typep (setq msg (and type (or (find-message type)
                                                 (find-enum type)
@@ -161,14 +161,14 @@
                         'message-descriptor)
                  (if (eq (proto-message-type msg) :group)
                      (doseq (v (if slot (read-slot object slot reader) (list object)))
-                       ;; To serialize a group, we encode a start tag,
-                       ;; serialize the fields, then encode an end tag
-                       (let ((tag1 (make-tag $wire-type-start-group index))
-                             (tag2 (make-tag $wire-type-end-group   index)))
-                         (iincf size (encode-uint32 tag1 buffer))
-                         (dolist (f (proto-fields msg))
-                           (iincf size (emit-field v f buffer)))
-                         (iincf size (encode-uint32 tag2 buffer))))
+                            ;; To serialize a group, we encode a start tag,
+                            ;; serialize the fields, then encode an end tag
+                            (let ((tag1 (make-tag $wire-type-start-group index))
+                                  (tag2 (make-tag $wire-type-end-group   index)))
+                              (iincf size (encode-uint32 tag1 buffer))
+                              (dolist (f (proto-fields msg))
+                                (iincf size (emit-field v f buffer)))
+                              (iincf size (encode-uint32 tag2 buffer))))
                      ;; I don't understand this at all - if there is a slot, then the slot
                      ;; holds a list of objects, otherwise just serialize this object?
                      (let ((tag (make-tag $wire-type-string index))
@@ -181,18 +181,18 @@
                                                 (and (not (proto-lazy-p field))
                                                      reader))
                                      (list object)))
-                         ;; To serialize an embedded message, first say that it's
-                         ;; a string, then encode its size, then serialize its fields
-                         (iincf size (encode-uint32 tag buffer))
-                         (let ((submessage-size 0))
-                           (with-placeholder (buffer)
-                             (if custom-serializer
-                                 (iincf submessage-size
-                                        (funcall custom-serializer v buffer))
-                                 (dolist (f (proto-fields msg))
-                                   (iincf submessage-size (emit-field v f buffer))))
-                             (iincf size (+ (backpatch submessage-size)
-                                            submessage-size)))))))
+                              ;; To serialize an embedded message, first say that it's
+                              ;; a string, then encode its size, then serialize its fields
+                              (iincf size (encode-uint32 tag buffer))
+                              (let ((submessage-size 0))
+                                (with-placeholder (buffer)
+                                  (if custom-serializer
+                                      (iincf submessage-size
+                                             (funcall custom-serializer v buffer))
+                                      (dolist (f (proto-fields msg))
+                                        (iincf submessage-size (emit-field v f buffer))))
+                                  (iincf size (+ (backpatch submessage-size)
+                                                 submessage-size)))))))
                  size)
                 ((typep msg 'protobuf-enum)
                  ;; 'proto-packed-p' of enum types returns nil,
@@ -203,14 +203,14 @@
                       (protobuf-enum-values msg) index buffer)
                      (let ((tag (make-tag $wire-type-varint index)))
                        (doseq (v (read-slot object slot reader) size)
-                         (iincf size
-                                (serialize-enum v (protobuf-enum-values msg) tag buffer))))))
+                              (iincf size
+                                     (serialize-enum v (protobuf-enum-values msg) tag buffer))))))
                 ((typep msg 'protobuf-type-alias)
                  (let* ((type (proto-proto-type msg))
                         (tag  (make-tag type index)))
                    (doseq (v (read-slot object slot reader) size)
-                     (let ((v (funcall (proto-serializer msg) v)))
-                       (iincf size (serialize-prim v type tag buffer))))))
+                          (let ((v (funcall (proto-serializer msg) v)))
+                            (iincf size (serialize-prim v type tag buffer))))))
                 (t (undefined-field-type "While serializing ~S,"
                                          object type field)))
           (let ((result (emit-non-repeated-field
@@ -218,7 +218,7 @@
                          type index buffer)))
             (if result result
                 (undefined-field-type "While serializing ~S,"
-                                  object type field)))))))
+                                      object type field)))))))
 
 (defun emit-non-repeated-field (value type index buffer)
   "Serialize a non-repeated field. 
