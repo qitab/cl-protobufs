@@ -69,7 +69,6 @@ Parameters:
            (t1res (deserialize-object-from-bytes 'map-proto t1ser))
            (t2res (deserialize-object-from-bytes 'map-message t2ser))
            (t3res (deserialize-object-from-bytes 'map-enum t3ser)))
-      (inspect t3res)
       (assert-true (proto:proto-equal test1 t1res))
       (assert-true (proto:proto-equal test2 t2res))
       (assert-true (proto:proto-equal test3 t3res)))))
