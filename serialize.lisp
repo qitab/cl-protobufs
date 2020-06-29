@@ -540,32 +540,32 @@ See field-descriptor for the distinction between index, offset, and bool-number.
         (loop
             for cell on initargs by #'cddr
             do
-            (let* ((field (car cell))
-                   (inner-index (field-offset field))
-                   (bool-index (field-bool-index field)))
-              (rplaca cell (field-initarg field))
-              ;; Get the full metadata from the brief metadata.
-              (let ((field (field-complex-field field)))
-                (when (eq (proto-label field) :repeated)
-                  (let ((data (nreverse (cadr cell))))
-                    (setf (cadr cell)
-                          (if (vector-field-p field) (coerce data 'vector) data)))))
-              (cond ((eq (proto-message-type (field-complex-field field)) :extends)
-                     ;; If an extension we'll have to set it manually later...
-                     (progn
-                       (push `(,(proto-internal-field-name (field-complex-field field))
-                               ,(cadr cell)) extension-list)))
-                    (bool-index
-                     (push (cons bool-index (cadr cell)) bool-map)
-                     (when inner-index
-                       (push inner-index offset-list)))
-                    ;; Otherwise we have to mark is set later.
-                    (t
-                     (progn
-                       (push (cadr cell) initargs-final)
-                       (push (car cell) initargs-final)
-                       (when inner-index
-                         (push inner-index offset-list)))))))
+           (let* ((field (car cell))
+                  (inner-index (field-offset field))
+                  (bool-index (field-bool-index field)))
+             (rplaca cell (field-initarg field))
+             ;; Get the full metadata from the brief metadata.
+             (let ((field (field-complex-field field)))
+               (when (eq (proto-label field) :repeated)
+                 (let ((data (nreverse (cadr cell))))
+                   (setf (cadr cell)
+                         (if (vector-field-p field) (coerce data 'vector) data)))))
+             (cond ((eq (proto-message-type (field-complex-field field)) :extends)
+                    ;; If an extension we'll have to set it manually later...
+                    (progn
+                      (push `(,(proto-internal-field-name (field-complex-field field)) ,(cadr cell))
+                            extension-list)))
+                   (bool-index
+                    (push (cons bool-index (cadr cell)) bool-map)
+                    (when inner-index
+                      (push inner-index offset-list)))
+                   ;; Otherwise we have to mark is set later.
+                   (t
+                    (progn
+                      (push (cadr cell) initargs-final)
+                      (push (car cell) initargs-final)
+                      (when inner-index
+                        (push inner-index offset-list)))))))
         (let ((new-struct
                #+sbcl ; use the defstruct description to get the constructor name
                (let ((dd (sb-kernel:layout-info (sb-pcl::class-wrapper class))))
