@@ -41,7 +41,14 @@ Parameters:
     (proto:clear m)
     (assert-true (not (map-proto.has-map-field m)))
     ;; ensure that clear made a new empty hash-table
-    (assert-true (string-equal (map-proto.map-field-get m 1) ""))))
+    (assert-true (string-equal (map-proto.map-field-get m 1) ""))
+    (map-proto.map-field-put m 1 "string")
+    (map-proto.map-field-remove m 1)
+    ;; ensure that removing a key works
+    (assert-true (string-equal (map-proto.map-field-get m 1) ""))
+    ;; ensure that if removing a key causes the hash-table to be empty,
+    ;; then the is-set vector is properly updated.
+    (assert-false (has-field m 'map-field))))
 
 ; Verify that the map returns the correct default value when unset.
 (deftest default-check (map-tests)
