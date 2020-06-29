@@ -123,7 +123,7 @@ void ServiceGenerator::Generate(io::Printer* printer) {
   printer->Indent();
   {
     printer->Indent();
-    printer->Print("\n(:source-location (#P\"$file$\")",
+    printer->Print("\n(:source-location #P\"$file$\"",
                    "file", descriptor_->file()->name());
     if (CamelIsSpitting(descriptor_->name())) {
       printer->Print("\n :name \"$name$\"", "name", descriptor_->name());

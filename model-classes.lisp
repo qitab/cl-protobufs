@@ -80,11 +80,7 @@ Parameters:
    (doc :type (or null string)
         :accessor proto-documentation
         :initarg :documentation
-        :initform nil)
-   ;; A list of (pathname start-pos end-pos) triples.
-   (location :accessor proto-source-location
-             :initarg :source-location
-             :initform nil))
+        :initform nil))
   (:documentation
    "Shared attributes for most kinds of protobuf objects."))
 
@@ -653,7 +649,12 @@ in the hash-table indicated by TYPE."
   ((methods :type (list-of method-descriptor)
             :accessor proto-methods
             :initarg :methods
-            :initform ()))
+            :initform ())
+   ;; The pathname of the protobuf the service is defined in.
+   (location :type (or null pathname)
+             :accessor proto-source-location
+             :initarg :source-location
+             :initform nil))
   (:documentation "Model class to describe a protobuf service."))
 
 (defmethod make-load-form ((s service-descriptor) &optional environment)
