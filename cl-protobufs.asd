@@ -166,7 +166,7 @@ which means ASDF loads both the .lisp file and the .fasl file."
   :description      "Protobufs for Common Lisp"
   :long-description "Protobufs for Common Lisp"
   ;; For SBCL we'll use its builtin UTF8 encoder/decoder.
-  :depends-on (:closer-mop #-sbcl :babel :trivial-garbage :alexandria)
+  :depends-on (:closer-mop #-sbcl :babel :trivial-garbage)
   :serial t
   :in-order-to ((asdf:test-op (asdf:test-op :cl-protobufs-tests)))
   :components
