@@ -18,6 +18,7 @@ message MyMessage {
     FOO = 1;
     BAR = 2;
     BAZ = 2;
+    FOO_BAR = 3;
     ZAPHOD = 42;
   }
 }

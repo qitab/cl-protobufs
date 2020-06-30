@@ -43,6 +43,8 @@ Parameters:
   string_field: \"A string\"
   string_fields: \"First\"
   string_fields: \"Second\"
+  enum_vals: NONE
+  enum_vals: TWENTY_ONE
 }
 ")
 
@@ -56,7 +58,8 @@ Parameters:
     (assert-true (eql 1.5 (cl-protobufs.test-proto:float-field msg-parse)))
     (assert-true (eql 1.5d0 (cl-protobufs.test-proto:double-field msg-parse)))
     (assert-true (string-equal "A string" (cl-protobufs.test-proto:string-field msg-parse)))
-    (assert-true (equal '("First" "Second")  (cl-protobufs.test-proto:string-fields msg-parse)))))
+    (assert-true (equal '("First" "Second")  (cl-protobufs.test-proto:string-fields msg-parse)))
+    (assert-true (equal '(:NONE :TWENTY-ONE) (cl-protobufs.test-proto:enum-vals msg-parse)))))
 
 
 (deftest test-parse-text-format-nested-symbol-names (text-format-tests)

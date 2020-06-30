@@ -232,7 +232,7 @@
         ((symbolp x) (keywordify (symbol-name x)))
         ((zerop (length x)) nil)
         ((string-not-equal x "nil")
-         (intern (string-upcase x) (find-package "KEYWORD")))
+         (intern (substitute #\- #\_ (string-upcase x)) (find-package "KEYWORD")))
         (t nil)))
 
 (defun join-intern (&rest symbols)

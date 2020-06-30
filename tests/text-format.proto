@@ -8,6 +8,11 @@ syntax = "proto2";
 
 package test_proto;
 
+enum TextEnumValues {
+  NONE = 0;
+  TWENTY_ONE = 21;
+}
+
 message TextFormatTest {
   optional int32 int_field = 1;
   optional sint32 sint_field = 2;
@@ -25,7 +30,6 @@ message TextFormatTest {
   optional uint32 embedded_comment_e = /* comment */ 15;
   optional uint32 embedded_comment_f = 16 /* comment */;
   optional uint32 embedded_comment_g = 17; /* comment */
-
   message NestedMessage1 {
     optional int32 int_field = 1;
 
@@ -35,6 +39,7 @@ message TextFormatTest {
   }
 
   optional NestedMessage1 one_level_nesting = 18;
+  repeated TextEnumValues enum_vals = 19;
   // TODO(dlroxe) inner nesting doesn't work yet
   // optional NestedMessage1.NestedMessage2 two_level_nesting = 19;
 }
