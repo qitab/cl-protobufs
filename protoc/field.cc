@@ -210,15 +210,13 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   vars["name"] = FieldLispName(field);
   vars["tag"] = StrCat(field->number());
   if(field->is_map()) {
-    vars["type"] = StrCat("(proto:map-of ",
-                          FieldLispType(field->message_type()->field(0)),
-                          " ",
-                          FieldLispType(field->message_type()->field(1)),
-                          ")");
+    vars["key-type"] = FieldLispType(field->message_type()->field(0));
+    vars["val-type"] = FieldLispType(field->message_type()->field(1));
     printer->Print(vars,
                     "\n(proto:define-map $name$\n"
-                    "  (:type $type$\n"
-                    "   :index $tag$))");
+                    "   :key-type $key-type$\n"
+                    "   :val-type $val-type$\n"
+                    "   :index $tag$)");
   } else {
     vars["type"] = FieldLispType(field);
     vars["label"] = FieldLispLabel(field);

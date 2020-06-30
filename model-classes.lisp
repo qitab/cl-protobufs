@@ -230,6 +230,14 @@ Parameters:
     (or (find-message type)
         (find-type-alias type))))
 
+(defvar *maps* (make-hash-table :test 'eq)
+  "Maps map names (symbols) to map-descriptor instances.")
+
+(declaim (inline find-map))
+(defun find-map (type)
+  "Return a map-descriptor instance named by TYPE (a symbol)."
+  (gethash type *maps*))
+
 (defvar *enums* (make-hash-table :test 'eq)
   "Maps enum names (symbols) to protobuf-enum instances.")
 
@@ -350,6 +358,15 @@ Parameters:
          (end1   (if (eql (char name1 0) #\() (- (length name1) 1) (length name1)))
          (end2   (if (eql (char name2 0) #\() (- (length name2) 1) (length name2))))
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
+
+; todo(benkuehnert): add comments to each field
+(defstruct map-descriptor
+  (class     nil :type (or null symbol))
+  (name      nil :type (or null string))
+  (key-class nil :type (or null symbol))
+  (val-class nil :type (or null symbol))
+  (key-type nil :type (or null symbol))
+  (val-type nil :type (or null list symbol)))
 
 ;; A Protobufs enumeration
 (defstruct protobuf-enum

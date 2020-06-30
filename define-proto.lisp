@@ -413,15 +413,15 @@ Parameters:
       `(progn ,@forms))))
 
 
-(defmacro define-map (type-name (&key type index))
+(defmacro define-map (type-name &key key-type val-type index)
 "Define a lisp type given the data for a protobuf map type.
 
 Parameters:
-  TYPE-NAME: Map type name
-  TYPE: The proto type of the map, in the form of (proto:map-of [key-type] [val-type])
+  TYPE-NAME: Map type name.
+  KEY-TYPE: The lisp type of the map's keys.
+  VAL-TYPE: The lisp type of the map's values.
   INDEX: Index of this map type in the field."
   (check-type index integer)
-  ; binding slot to this seems incorrect, but changing it breaks.
   (let* ((slot      type-name)
          (name      (class-name->proto type-name))
          (conc-name (conc-name-for-type type-name ""))
@@ -429,6 +429,8 @@ Parameters:
                       (and msg-conc
                            (fintern "~A~A" msg-conc slot))))
          (internal-slot-name (fintern "%~A" slot))
+         (qual-name (make-qualified-name *protobuf* (slot-name->proto slot)))
+         (class (fintern (uncamel-case qual-name)))
          (mslot  (make-field-data
                   :internal-slot-name internal-slot-name
                   :external-slot-name slot
@@ -438,18 +440,27 @@ Parameters:
          (mfield (make-instance 'field-descriptor
                   :name (slot-name->proto slot)
                   :type "map"
-                  :class :map
-                  :qualified-name (make-qualified-name *protobuf* (slot-name->proto slot))
-                  :set-type type
+                  :class class
+                  :qualified-name qual-name
+                  :set-type :map
                   :label '(:optional)
                   :index index
                   :internal-field-name internal-slot-name
                   :external-field-name slot
-                  :reader reader)))
+                  :reader reader))
+         (map-desc (make-map-descriptor
+                    :class class
+                    :name name
+                    :key-class (proto-type->keyword key-type)
+                    :val-class (proto-type->keyword val-type)
+                    :key-type key-type
+                    :val-type val-type)))
+    (record-protobuf-object class map-desc :map)
     `(progn
        define-map ; the type of this model
-       nil        ; this slot is used for model data, but map data is held on the field-descriptor.
-       nil        ; this slot is used for definers, but these are created later.
+       map-desc   ; the model data.
+       nil        ; this slot is for definer forms, but this is must be done later
+                  ; in
        ,mfield    ; the extra field-data object created by this macro
        ,mslot)))  ; the extra field-descriptor object created by this macro.
 
@@ -581,6 +592,7 @@ Arguments:
 
         (export '(,has-function-name ,clear-function-name ,public-accessor-name))))))
 
+
 (defun make-map-structure-class-forms (proto-type public-slot-name slot-name field)
   "This creates forms that define map accessors which are type safe. Using these will
 guarantee that the resulting map can be properly serialized, whereas if one modifies
@@ -596,8 +608,8 @@ Arguments:
          (public-setter-name (proto-slot-function-name proto-type public-slot-name :map-put))
          (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
-         (key-type (second (proto-set-type field)))
-         (val-type (third  (proto-set-type field)))
+         (key-type (map-descriptor-key-type (find-map (proto-class field))))
+         (val-type (map-descriptor-val-type (find-map (proto-class field))))
          (val-default-form (get-default-form val-type $empty-default))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
@@ -705,7 +717,7 @@ Arguments:
            proto-type public-slot-name slot-name field)
 
         ; Make special map forms.
-        ,@(when (eq (proto-class field) :map)
+        ,@(when (typep (find-map (proto-class field)) 'map-descriptor)
             (make-map-structure-class-forms
              proto-type public-slot-name slot-name field))))))
 
@@ -760,8 +772,7 @@ Arguments:
               (eq (first type) 'cl:or)
               (eq (second type) 'cl:null))
          nil)
-        ((and (listp type)
-              (eq (first type) 'proto:map-of))
+        ((eq type :map)
          '(make-hash-table))
         ((enum-default-value `,type) (enum-default-value `,type))
         (t `(enum-default-value ',type))))))
