@@ -34,7 +34,7 @@ Parameters:
 
 (deftest default-and-clear (quick-tests)
   ;; Assert-True that required strings are made unbound by 'clear'
-  (let* ((p (make-instance 'cl-protobufs.protobuf-unittest:test-protocol)))
+  (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:zero)))
 
     (setf (cl-protobufs.protobuf-unittest:zero p) "x")
@@ -49,7 +49,7 @@ Parameters:
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:zero p) "0")))
 
   ;; Assert-True that optional strings are set to their default value by 'clear'
-  (let ((p (make-instance 'cl-protobufs.protobuf-unittest:test-protocol)))
+  (let ((p (cl-protobufs.protobuf-unittest:make-test-protocol)))
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:opt-string p) "opt"))
     (setf (cl-protobufs.protobuf-unittest:opt-string p) "x")
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:opt-string p) "x"))

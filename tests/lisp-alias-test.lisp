@@ -42,7 +42,9 @@ Parameters:
 
 ;; Serialization of the aliased (explicit) message
 
-(defun (:protobuf :serialize cl-protobufs.test-proto::aliased-message) (val buf &aux (size 0))
+(defun #+sbcl (:protobuf :serialize cl-protobufs.test-proto::aliased-message)
+  #-sbcl ()
+  (val buf &aux (size 0))
   (let ((i (aliased-struct-i val)))
     (incf size (proto-impl::serialize-prim i :int32  +TAG-I+ buf)))
   size)
@@ -55,7 +57,7 @@ Parameters:
 ;;  Serialization of OuterMessage
 
 (deftest serialize-empty-outer (alias-tests)
-  (let ((outer (make-instance 'cl-protobufs.test-proto::outer-message)))
+  (let ((outer (cl-protobufs.test-proto::make-outer-message)))
     (expect-bytes nil (proto-impl::serialize-object-to-bytes outer))))
 
 (defconstant +TAG-MESSAGE+ (proto-impl::make-tag :string 1)

@@ -31,7 +31,7 @@ Parameters:
   (assert-true (= #b11010 (proto-impl::packed-tag 3))))
 
 (deftest packed-encoding-test (packed-tests)
-  (let ((m1 (make-instance 'test-packed-types)))
+  (let ((m1 (make-test-packed-types)))
     (push 10 (packed-int32 m1))
     (push 20 (packed-int32 m1))
     (push 30 (packed-int32 m1))
@@ -50,7 +50,7 @@ Parameters:
       (assert-true (equalp '(30 20 10) (unpacked-int32 unpacked))))))
 
 (deftest unpacked-encoding-test (packed-tests)
-  (let ((m1 (make-instance 'test-unpacked-types)))
+  (let ((m1 (make-test-unpacked-types)))
     (push 10 (unpacked-int32 m1))
     (push 20 (unpacked-int32 m1))
     (push 30 (unpacked-int32 m1))
@@ -68,7 +68,7 @@ Parameters:
       (assert-true (equalp '(30 20 10) (packed-int32 packed))))))
 
 (deftest packed-enum-encoding-test (packed-tests)
-  (let ((m1 (make-instance 'test-packed-types)))
+  (let ((m1 (make-test-packed-types)))
     (push :foreign-foo (packed-enum m1))
     (push :foreign-bar (packed-enum m1))
     (push :foreign-baz (packed-enum m1))
@@ -86,7 +86,7 @@ Parameters:
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (unpacked-enum unpacked))))))
 
 (deftest unpacked-enum-encoding-test (packed-tests)
-  (let ((m1 (make-instance 'test-unpacked-types)))
+  (let ((m1 (make-test-unpacked-types)))
     (push :foreign-foo (unpacked-enum m1))
     (push :foreign-bar (unpacked-enum m1))
     (push :foreign-baz (unpacked-enum m1))

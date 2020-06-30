@@ -566,13 +566,12 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                #+sbcl ; use the defstruct description to get the constructor name
                (let ((dd (sb-kernel:layout-info (sb-pcl::class-wrapper class))))
                  (apply (sb-kernel:dd-default-constructor dd) initargs-final))
+               ;; We have to call the constructor for the object as
+               ;; we have no idea if MAKE-INSTANCE will actually work.
+               ;; So just use the constructor name.
                #-sbcl
-               ;; In SBCL, MAKE-INSTANCE does not accept initargs for a structure-object
-               ;; assuming the default defstruct form was used. CLHS doesn't say whether
-               ;; MAKE-INSTANCE should even have a method on structure-class.
-               ;; The other possibility here is to funcall the assumed default
-               ;; constructor named by (fintern "%MAKE-" (class-name class)).
-               (apply #'make-instance class initargs-final)))
+               (let ((class-name (class-name class)))
+                 (apply (get-constructor-name class-name) initargs-final))))
           ;; Finally set the extensions and the is-set field.
           (loop for extension in extension-list do
             (set-extension new-struct (first extension) (second extension)))
@@ -983,8 +982,12 @@ Parameters:
           `(,vbuf ,vidx ,vlim &optional (,vendtag 0))
           `((declare #.$optimize-serialization)
             (declare (ignore ,vbuf ,vlim ,vendtag))
-            (values (make-instance ',(or (proto-alias-for message) (proto-class message)))
-                    ,vidx)))))
+            (values #+sbcl (make-instance ',(or (proto-alias-for message)
+                                                (proto-class message)))
+                    #-sbcl (funcall (get-constructor-name
+                                     ',(or (proto-alias-for message)
+                                           (proto-class message)))))
+            ,vidx))))
     (with-collectors ((deserializers collect-deserializer)
                       ;; Nonrepeating slots
                       (nslots collect-nslot)
@@ -1043,7 +1046,9 @@ Parameters:
                (when (i= tag ,vendtag)
                  (return-from :deserialize
                    (values
-                    (,@(if constructor (list constructor) `(make-instance ',lisp-type))
+                    (,@(if constructor (list constructor)
+                           #+sbcl`(make-instance ',lisp-type)
+                           #-sbcl`(funcall (get-constructor-name ',lisp-type)))
                      ;; nonrepeating slots
                      ,@(loop for temp in nslots
                              for mtemp = (slot-value-to-slot-name-symbol temp)
@@ -1073,7 +1078,15 @@ Parameters:
    return when deserializing.  Useful when an object is being passed through without ever being
    deserialized.  Note that BUFFER is not actually deserialized here."
   (let* ((message (find-message-for-class type))
-         (object  (make-instance
-                   (or (proto-alias-for message) (proto-class message)))))
+         (message-name (or (proto-alias-for message) (proto-class message)))
+         (object  #+sbcl (make-instance message-name)
+                  #-sbcl (funcall (get-constructor-name message-name))))
     (setf (proto-%bytes object) buffer)
     object))
+
+#-sbcl
+(defun get-constructor-name (class-name)
+  "Get the constructor lisp has made for our structure-class protos.
+Parameters:
+  CLASS-NAME: The name of the structure-class proto."
+  (get class-name :default-constructor))

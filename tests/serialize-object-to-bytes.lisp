@@ -27,7 +27,7 @@ Parameters:
     (assert (= (slot-value result 'clunit::errors) 0))))
 
 (deftest test-optional-serialization (serialize-tests)
-  (let* ((msg (make-instance 'optional-message))
+  (let* ((msg (make-optional-message))
          (msg-bytes (serialize-object-to-bytes msg 'optional-message)))
     (assert-true (equalp msg-bytes #()))
 
@@ -49,7 +49,7 @@ Parameters:
 
 
 (deftest test-required-serialization (serialize-tests)
-  (let* ((msg (make-instance 'required-message))
+  (let* ((msg (make-required-message))
          (msg-bytes))
 
     (setf (required-no-default msg) 3
@@ -71,7 +71,7 @@ Parameters:
 
 
 (deftest test-repeated-serialization (serialize-tests)
-  (let* ((msg (make-instance 'repeated-message))
+  (let* ((msg (make-repeated-message))
          (msg-bytes (serialize-object-to-bytes msg 'repeated-message)))
 
     (push 3 (repeated-no-default msg))
@@ -84,7 +84,7 @@ Parameters:
 
 
 (deftest test-float-serialization (serialize-tests)
-  (let* ((msg (make-instance 'message-with-floats)))
+  (let* ((msg (make-message-with-floats)))
     (setf (message-with-floats.test-float msg) 5.0
           (message-with-floats.test-double msg) 6.0d0)
 
