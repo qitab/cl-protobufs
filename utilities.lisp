@@ -257,14 +257,14 @@ Arguments:
                     (:clear 'clear)
                     (:get nil))))
     (if f-symbol
-        (intern (format nil "~a.~a-~a"
-                        (symbol-name proto-type)
-                        f-symbol
-                        (symbol-name slot))
+        (intern (nstring-upcase (format nil "~a.~a-~a"
+                                        (symbol-name proto-type)
+                                        f-symbol
+                                        (symbol-name slot)))
                 (symbol-package proto-type))
-        (intern (format nil "~a.~a"
-                        (symbol-name proto-type)
-                        (symbol-name slot))
+        (intern (nstring-upcase (format nil "~a.~a"
+                                        (symbol-name proto-type)
+                                        (symbol-name slot)))
                 (symbol-package proto-type)))))
 
 
@@ -490,9 +490,10 @@ Parameters:
          ;; TODO(dlroxe) s/path-part/name-part would make more sense to me.
          (pkgn (when path-from-top (find-proto-package path-part)))
          (package (or pkg1 pkgn package))
-         (name (format nil "~{~A~^.~}" (cond (pkg1 path-from-top)
-                                             (pkgn name-part)
-                                             (t full-path)))))
+         (name (nstring-upcase
+                (format nil "~{~A~^.~}" (cond (pkg1 path-from-top)
+                                              (pkgn name-part)
+                                              (t full-path))))))
     (if package
         (intern name package)
         (make-symbol name))))
@@ -527,9 +528,10 @@ Parameters:
          (pkg1 (and (cdr xs) (find-proto-package (first xs))))
          (pkgn (and (cdr xs) (find-proto-package (butlast xs))))
          (package (or pkg1 pkgn package))
-         (name (format nil "~{~A~^.~}" (cond (pkg1 (cdr xs))
-                                             (pkgn (last xs))
-                                             (t xs)))))
+         (name (nstring-upcase
+                (format nil "~{~A~^.~}" (cond (pkg1 (cdr xs))
+                                              (pkgn (last xs))
+                                              (t xs))))))
     (if package
         (intern name package)
         (make-symbol name))))
