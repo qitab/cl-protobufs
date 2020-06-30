@@ -299,7 +299,7 @@ Parameters:
           ((typep msg 'map-descriptor)
            (let* ((tag (make-tag $wire-type-string index))
                   (key-class (map-descriptor-key-class msg))
-                  (val-class (map-descriptor-key-class msg))
+                  (val-class (map-descriptor-val-class msg))
                   (val-msg  (and val-class (not (keywordp val-class))
                                  (or (find-message val-class)
                                      (find-enum val-class)
@@ -315,7 +315,7 @@ Parameters:
                           (iincf map-len (emit-non-repeated-field v val-class 2 buffer))
                           ;todo(benkuehnert): + or i+ here?
                           (+ ret-len (+ map-len (backpatch map-len)))))))
-               (loop for k being the hash-keys of (read-slot object slot reader)
+               (loop for k being the hash-keys of value
                        using (hash-value v)
                      sum (serialize-pair k v)))))
           ((typep msg 'protobuf-type-alias)
@@ -649,12 +649,13 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                               ;; arbitrary type.
                               (multiple-value-setq (val-data index)
                                 (deserialize-structure-object-field
-                                 val-class buffer 2 map-tag nil nil))))))
+                                 val-class buffer index map-tag nil nil))))))
                     (rplaca cell
-                            (multiple-value-setq (data index)
-                              (deserialize-structure-object-field
-                               type buffer index tag repeated-p lazy-p cell))
-                            data)))))))))
+                            (progn
+                              (multiple-value-setq (data index)
+                                (deserialize-structure-object-field
+                                 type buffer index tag repeated-p lazy-p cell))
+                              data))))))))))
 
 
 (defun deserialize-structure-object-field
@@ -710,7 +711,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                        (let* ((end (+ start embedded-msg-len))
                               (deserializer (custom-deserializer type))
                               (obj
-                                (cond (lazy
+                                (cond (lazy-p
                                        ;; For lazy fields, just store bytes in the %bytes
                                        ;; field.
                                        (deserialize-object-to-bytes
