@@ -295,8 +295,6 @@
    #:protobufs-warning
    #:protobufs-warn
    #:make-qualified-name
-   ;; temp utilities
-   #:make-object
 
    ;; Stuff for ASDF
    #:process-imports

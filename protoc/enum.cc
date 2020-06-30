@@ -37,7 +37,6 @@ void EnumGenerator::Generate(io::Printer* printer) {
   }
   // More options here.
   // Note(czak): skipped lisp_alias as it is a MessageOptions extension.
-  // Note(czak): skipped documentation and source-location.
   printer->Print(")");
   printer->Outdent();
 

@@ -113,6 +113,12 @@ message ColorWheel2 {
   }
 }
 
+message ColorWheel2Wrap {
+  optional int32 id = 1;
+  optional ColorWheel2 wheel = 2;
+  optional string metaname = 3;
+}
+
 message Color2 {
   optional string name = 1;
   required int32 r_value = 2;

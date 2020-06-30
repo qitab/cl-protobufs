@@ -80,11 +80,7 @@ Parameters:
    (doc :type (or null string)
         :accessor proto-documentation
         :initarg :documentation
-        :initform nil)
-   ;; A list of (pathname start-pos end-pos) triples.
-   (location :accessor proto-source-location
-             :initarg :source-location
-             :initform nil))
+        :initform nil))
   (:documentation
    "Shared attributes for most kinds of protobuf objects."))
 
@@ -432,12 +428,17 @@ Parameters:
 
 (defun record-protobuf-object (symbol message type)
   "Record the protobuf-metaobject MESSAGE with named by SYMBOL and
-in the hash-table indicated by TYPE."
+in the hash-table indicated by TYPE. Also sets the default constructor
+on the symbol if we are not in SBCL."
   ;; No need to record an extension, it's already been recorded
   (ecase type
     (:enum (setf (gethash symbol *enums*) message))
     (:message
      (setf (gethash symbol *messages*) message)
+     #-sbcl
+     (setf (get symbol :default-constructor)
+           (intern (nstring-upcase (format nil "%MAKE-~A" symbol))
+                   (symbol-package symbol)))
      (when (and (slot-boundp message 'qual-name) (proto-qualified-name message))
        (setf (gethash (proto-qualified-name message) *qualified-messages*)
              (proto-class message))))
@@ -653,7 +654,12 @@ in the hash-table indicated by TYPE."
   ((methods :type (list-of method-descriptor)
             :accessor proto-methods
             :initarg :methods
-            :initform ()))
+            :initform ())
+   ;; The pathname of the protobuf the service is defined in.
+   (location :type (or null pathname)
+             :accessor proto-source-location
+             :initarg :source-location
+             :initform nil))
   (:documentation "Model class to describe a protobuf service."))
 
 (defmethod make-load-form ((s service-descriptor) &optional environment)

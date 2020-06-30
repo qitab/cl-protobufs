@@ -77,12 +77,12 @@ Parameters:
       (assert-true (equal 'cl-protobufs.protobuf-package-unittest1::%baa
                           (proto-internal-field-name baa)))))
 
-  (let* ((orig1 (make-instance 'message-with-cross-package-reference))
-         (bam1 (make-instance 'message-defined-in-both-packages))
-         (bing (make-instance 'cl-protobufs.protobuf-package-unittest2:message-defined-in-both-packages))
-         (extended1 (make-instance 'cl-protobufs.protobuf-package-unittest2:message-in-other-package))
-         (extended2 (make-instance 'cl-protobufs.protobuf-package-unittest2:message-in-other-package))
-         (orig2 (make-instance 'message-with-cross-package-extension)))
+  (let* ((orig1 (make-message-with-cross-package-reference))
+         (bam1 (make-message-defined-in-both-packages))
+         (bing (cl-protobufs.protobuf-package-unittest2:make-message-defined-in-both-packages))
+         (extended1 (cl-protobufs.protobuf-package-unittest2:make-message-in-other-package))
+         (extended2 (cl-protobufs.protobuf-package-unittest2:make-message-in-other-package))
+         (orig2 (make-message-with-cross-package-extension)))
 
     ;; set for orig1
     (setf (cl-protobufs.protobuf-package-unittest2:foo extended1) 123
@@ -157,11 +157,9 @@ Parameters:
         'cl-protobufs.protobuf-forward-reference-unittest::MSG-W-OVERRIDDEN-LISP-CLASS
         (proto-output-type beep)))))
   (let* ((orig
-          (make-instance
-           'cl-protobufs.protobuf-forward-reference-unittest::message-with-forward-reference))
+          (cl-protobufs.protobuf-forward-reference-unittest::make-message-with-forward-reference))
          (foo
-          (make-instance
-           'cl-protobufs.protobuf-forward-reference-unittest::msg-w-overridden-lisp-class)))
+          (cl-protobufs.protobuf-forward-reference-unittest::make-msg-w-overridden-lisp-class)))
 
     (setf (cl-protobufs.protobuf-forward-reference-unittest::foo orig) foo
           (cl-protobufs.protobuf-forward-reference-unittest::bar orig) :baa

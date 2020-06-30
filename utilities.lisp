@@ -7,16 +7,6 @@
 (in-package "PROTO-IMPL")
 
 
-;; Temporary functions for standard-class -> structure-class conversion.
-
-(defmacro make-object (name &rest keys)
-  "Macro to hide the change from standard-object to structure-object.
-Arguments
-  NAME: Symbol-name of the object to make.
-  KEYS: Instantiation keys."
-  (let ((constructor (intern (format nil "MAKE-~a" (symbol-name name))
-                             (symbol-package name))))
-    `(,constructor ,@keys)))
 
 ;;; Optimized fixnum arithmetic
 

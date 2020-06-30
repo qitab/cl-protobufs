@@ -212,7 +212,7 @@ Parameters:
         (funcall setter entries m)))))
 
 (defun test-parse-helpers ()
-  (let ((m1 (make-instance 'cl-protobufs.protobuf-unittest:test-all-types)))
+  (let ((m1 (cl-protobufs.protobuf-unittest:make-test-all-types)))
     (set-all-fields m1)
     (expect-all-fields-set m1)
     (let* ((bytes (serialize-object-to-bytes m1))
@@ -272,7 +272,7 @@ Parameters:
         (assert-true (field-equal (second (funcall accessor m)) v1))))))
 
 (defun test-modify-repeated-fields ()
-  (let ((m (make-instance 'cl-protobufs.protobuf-unittest:test-all-types)))
+  (let ((m (cl-protobufs.protobuf-unittest:make-test-all-types)))
     (expect-clear m)
     (set-all-fields m)
     (expect-all-fields-set m)
