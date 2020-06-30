@@ -726,6 +726,129 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                          (values (if repeated-p (cons obj (car cell)) obj)
                                  end)))))))))))
 
+(defun generate-repeated-field-serializer
+    (class index boundp reader vbuf size vector-p &optional (packed-p nil) (msg nil))
+  (let ((vval (gensym "VAL"))
+        (iterator (if vector-p 'dovector 'dolist))
+        (msg (and class (not (keywordp class))
+                  (or (find-message class)
+                      (find-enum class)
+                      (find-type-alias class)
+                      (find-map class)))))
+    (cond ((and packed-p (packed-type-p class))
+           `(iincf ,size (serialize-packed ,reader ,class ,index ,vbuf ,vector-p)))
+          ((keywordp class)
+           (let ((tag (make-tag class index)))
+             `(when ,boundp
+                (,iterator (,vval ,reader)
+                           (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf))))))
+          ((typep msg 'message-descriptor)
+           (if (eq (proto-message-type msg) :group)
+               ;; The end tag for a group is the field index shifted and
+               ;; and-ed with a constant.
+               (let ((tag1 (make-tag $wire-type-start-group index))
+                     (tag2 (make-tag $wire-type-end-group   index)))
+                 `(when ,boundp
+                    (,iterator (,vval ,reader)
+                               (iincf ,size (encode-uint32 ,tag1 ,vbuf))
+                               (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
+                               (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
+               (let ((tag (make-tag $wire-type-string index)))
+                 `(when ,boundp
+                    (,iterator (,vval ,reader)
+                               (iincf ,size (encode-uint32 ,tag ,vbuf))
+                               (with-placeholder (,vbuf)
+                                 (let ((len ,(call-pseudo-method
+                                              :serialize msg vval vbuf)))
+                                   (iincf ,size (i+ len (backpatch len))))))))))
+          ((typep msg 'protobuf-enum)
+           (let ((tag (make-tag $wire-type-varint index)))
+             (if packed-p
+                 `(iincf ,size
+                         (serialize-packed-enum ,reader '(,@(protobuf-enum-values msg))
+                                                ,index ,vbuf))
+                 `(when ,boundp
+                    (,iterator (,vval ,reader)
+                               (iincf ,size (serialize-enum
+                                             ,vval '(,@(protobuf-enum-values msg))
+                                             ,tag ,vbuf)))))))
+          ((typep msg 'protobuf-type-alias)
+           (let* ((class (proto-proto-type msg))
+                  (tag   (make-tag class index)))
+             `(when ,boundp
+                (,iterator (,vval ,reader)
+                           (let ((,vval (funcall #',(proto-serializer msg) ,vval)))
+                             (iincf ,size
+                                    (serialize-prim ,vval ,class ,tag ,vbuf)))))))
+          (t nil))))
+
+(defun generate-non-repeated-field-serializer
+    (class index boundp reader vbuf size)
+  (let ((vval (gensym "VAL"))
+        (msg (and class (not (keywordp class))
+                  (or (find-message class)
+                      (find-enum class)
+                      (find-type-alias class)
+                      (find-map class)))))
+    (cond ((keywordp class)
+           (let ((tag (make-tag class index)))
+             `(when ,boundp
+                (let ((,vval ,reader))
+                  (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf))))))
+          ((typep msg 'message-descriptor)
+           (if (eq (proto-message-type msg) :group)
+               (let ((tag1 (make-tag $wire-type-start-group index))
+                     (tag2 (make-tag $wire-type-end-group   index)))
+                 `(let ((,vval ,reader))
+                    (when ,vval
+                      (iincf ,size (encode-uint32 ,tag1 ,vbuf))
+                      (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
+                      (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
+               (let ((tag (make-tag $wire-type-string index)))
+                 `(let ((,vval ,reader))
+                    (when ,vval
+                      (iincf ,size (encode-uint32 ,tag ,vbuf))
+                      (with-placeholder (,vbuf)
+                        (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
+                          (iincf ,size (i+ len (backpatch len))))))))))
+          ((typep msg 'protobuf-enum)
+           (let ((tag (make-tag $wire-type-varint index)))
+             `(when ,boundp
+                (let ((,vval ,reader))
+                  (iincf ,size (serialize-enum
+                                ,vval '(,@(protobuf-enum-values msg))
+                                ,tag ,vbuf))))))
+          ((typep msg 'protobuf-type-alias)
+           (let* ((class (proto-proto-type msg))
+                  (tag   (make-tag class index)))
+             `(let ((,vval ,reader))
+                (when ,vval
+                  (let ((,vval (funcall #',(proto-serializer msg) ,vval)))
+                    (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf)))))))
+          ((typep msg 'map-descriptor)
+           (let* ((tag      (make-tag $wire-type-string index))
+                  (key-class (map-descriptor-key-class msg))
+                  (val-class (map-descriptor-val-class msg))
+                  (val-msg   (and val-class (not (keywordp val-class))
+                                  (or (find-message val-class)
+                                      (find-enum val-class)
+                                      (find-type-alias val-class)))))
+             `(when ,boundp
+                (let ((,vval ,reader))
+                  (flet ((serialize-pair (k v)
+                           (let ((ret-len (encode-uint32 ,tag ,vbuf))
+                                 (map-len 0))
+                             (with-placeholder (,vbuf)
+                               (iincf map-len (serialize-prim k ,key-class
+                                                              ,(make-tag key-class 1)
+                                                              ,vbuf))
+                               ,(generate-non-repeated-field-serializer
+                                 val-class 2 'v 'v vbuf 'map-len)
+                               (i+ ret-len (+ map-len (backpatch map-len)))))))
+                    (loop for k being the hash-keys of ,vval using (hash-value v)
+                          sum (serialize-pair k v)))))))
+          (t nil))))
+
 ;;; Compile-time generation of serializers
 ;;; Type-checking is done at the top-level methods specialized on 'symbol',
 ;;; so we turn off all type checking at the level of these functions
@@ -734,161 +857,18 @@ See field-descriptor for the distinction between index, offset, and bool-number.
     (let* ((class  (proto-class field))
            (index  (proto-index field)))
       (when reader
-        (cond
-          ((eq (proto-label field) :repeated)
-           (let* ((vectorp  (vector-field-p field))
-                  (iterator (if vectorp 'dovector 'dolist)))
-             (cond ((and (proto-packed field) (packed-type-p class))
-                    `(iincf ,size (serialize-packed ,reader ,class ,index ,vbuf ,vectorp)))
-                   ((and (keywordp class) (not (eq class :map)))
-                    (let ((tag (make-tag class index)))
-                      `(when ,boundp
-                         (,iterator (,vval ,reader)
-                                    (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf))))))
-                   ((typep msg 'message-descriptor)
-                    (if (eq (proto-message-type msg) :group)
-                        ;; The end tag for a group is the field index shifted and
-                        ;; and-ed with a constant.
-                        (let ((tag1 (make-tag $wire-type-start-group index))
-                              (tag2 (make-tag $wire-type-end-group   index)))
-                          `(when ,boundp
-                             (,iterator (,vval ,reader)
-                                        (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-                                        ,(call-pseudo-method :serialize msg vval vbuf)
-                                        (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
-                        (let ((tag (make-tag $wire-type-string index)))
-                          `(when ,boundp
-                             (,iterator (,vval ,reader)
-                                        (iincf ,size (encode-uint32 ,tag ,vbuf))
-                                        (with-placeholder (,vbuf)
-                                          (let ((len ,(call-pseudo-method
-                                                       :serialize msg vval vbuf)))
-                                            (iincf ,size (i+ len (backpatch len))))))))))
-                   ((typep msg 'protobuf-enum)
-                    (let ((tag (make-tag $wire-type-varint index)))
-                      (if (proto-packed field)
-                          `(iincf ,size
-                                  (serialize-packed-enum ,reader '(,@(protobuf-enum-values msg))
-                                                         ,index ,vbuf))
-                          `(when ,boundp
-                             (,iterator (,vval ,reader)
-                                        (iincf ,size (serialize-enum
-                                                      ,vval '(,@(protobuf-enum-values msg))
-                                                      ,tag ,vbuf)))))))
-                   ((typep msg 'protobuf-type-alias)
-                    (let* ((class (proto-proto-type msg))
-                           (tag   (make-tag class (proto-index field))))
-                      `(when ,boundp
-                         (,iterator (,vval ,reader)
-                                    (let ((,vval (funcall #',(proto-serializer msg) ,vval)))
-                                      (iincf ,size
-                                             (serialize-prim ,vval ,class ,tag ,vbuf)))))))
-                   (t
-                    (undefined-field-type "While generating 'serialize-object' for ~S,"
-                                          msg class field)))))
-          ((eq class :map)
-           (let* ((tag      (make-tag $wire-type-string index))
-                  (key-type (proto-type->keyword
-                             (second (proto-set-type field))))
-                  (val-type (proto-type->keyword
-                             (third (proto-set-type field))))
-                  (val-msg  (and val-type (not (keywordp val-type))
-                                 (or (find-message val-type)
-                                     (find-enum val-type)
-                                     (find-type-alias val-type)))))
-             `(when ,boundp
-                (let ((,vval ,reader))
-                  (flet ((serialize-pair (k v)
-                           (let ((ret-len (encode-uint32 ,tag ,vbuf))
-                                 (map-len 0))
-                             (with-placeholder (,vbuf)
-                               (iincf map-len (serialize-prim k ,key-type
-                                                              ,(make-tag key-type 1)
-                                                              ,vbuf))
-                               ,(cond ((and (keywordp val-type) (not (eq val-type :map)))
-                                       (let ((tag (make-tag val-type 2)))
-                                         `(when v
-                                            (iincf map-len (serialize-prim v ,val-type
-                                                                           ,tag ,vbuf)))))
-                                      ((typep val-msg 'message-descriptor)
-                                       (if (eq (proto-message-type val-msg) :group)
-                                           (let ((tag1 (make-tag $wire-type-start-group 2))
-                                                 (tag2 (make-tag $wire-type-end-group   2)))
-                                             `(when v
-                                                (iincf map-len (encode-uint32 ,tag1 ,vbuf))
-                                                (iincf map-len
-                                                       ,(call-pseudo-method
-                                                         :serialize val-msg 'v vbuf)
-                                                       (iincf map-len
-                                                              (encode-uint32 ,tag2 ,vbuf)))))
-                                           (let ((tag (make-tag $wire-type-string 2)))
-                                             `(when v
-                                                (iincf map-len (encode-uint32 ,tag ,vbuf))
-                                                (with-placeholder (,vbuf)
-                                                  (let ((len ,(call-pseudo-method
-                                                               :serialize val-msg 'v vbuf)))
-                                                    (iincf map-len
-                                                           (i+ len (backpatch len)))))))))
-                                      ((typep val-msg 'protobuf-enum)
-                                       (let ((tag (make-tag $wire-type-varint 2)))
-                                         `(when v
-                                            (iincf map-len (serialize-enum
-                                                            v '(,@(protobuf-enum-values val-msg))
-                                                            ,tag ,vbuf)))))
-                                      ;todo (benkuehnert): I'm not sure if this is a possible case.
-                                      ((typep val-msg 'protobuf-type-alias)
-                                       (let* ((class (proto-proto-type val-msg))
-                                              (tag   (make-tag class (proto-index field))))
-                                         `(when v
-                                            (let ((v (funcall #',(proto-serializer val-msg) ,v)))
-                                              (iincf map-len (serialize-prim v ,class
-                                                                             ,tag ,vbuf))))))
-                                      (t
-                                       (undefined-field-type
-                                        "While generating 'serialize-object' for ~S,"
-                                        msg val-type field)))
-                               (i+ ret-len (+ map-len (backpatch map-len)))))))
-                    (loop for k being the hash-keys of ,vval using (hash-value v)
-                          sum (serialize-pair k v)))))))
-          (t
-           (cond ((and (keywordp class) (not (eq class :map)))
-                  (let ((tag (make-tag class index)))
-                    `(when ,boundp
-                       (let ((,vval ,reader))
-                         (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf))))))
-                 ((typep msg 'message-descriptor)
-                  (if (eq (proto-message-type msg) :group)
-                      (let ((tag1 (make-tag $wire-type-start-group index))
-                            (tag2 (make-tag $wire-type-end-group   index)))
-                        `(let ((,vval ,reader))
-                           (when ,vval
-                             (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-                             (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf)
-                                    (iincf ,size (encode-uint32 ,tag2 ,vbuf))))))
-                        (let ((tag (make-tag $wire-type-string index)))
-                          `(let ((,vval ,reader))
-                             (when ,vval
-                               (iincf ,size (encode-uint32 ,tag ,vbuf))
-                               (with-placeholder (,vbuf)
-                                 (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
-                                   (iincf ,size (i+ len (backpatch len))))))))))
-                  ((typep msg 'protobuf-enum)
-                   (let ((tag (make-tag $wire-type-varint index)))
-                     `(when ,boundp
-                        (let ((,vval ,reader))
-                          (iincf ,size (serialize-enum
-                                        ,vval '(,@(protobuf-enum-values msg))
-                                        ,tag ,vbuf))))))
-                  ((typep msg 'protobuf-type-alias)
-                   (let* ((class (proto-proto-type msg))
-                          (tag   (make-tag class (proto-index field))))
-                     `(let ((,vval ,reader))
-                        (when ,vval
-                          (let ((,vval (funcall #',(proto-serializer msg) ,vval)))
-                            (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf)))))))
-                  (t
-                   (undefined-field-type "While generating 'serialize-object' for ~S,"
-                                         msg class field)))))))))
+        (if (eq (proto-label field) :repeated)
+            (let ((vector-p (vector-field-p field))
+                  (packed-p (proto-packed field)))
+              (or (generate-repeated-field-serializer
+                   class index boundp reader vbuf size vector-p packed-p)
+                  (undefined-field-type "While generating 'serialize-object' for ~S,"
+                                        msg class field)))
+
+            (or (generate-non-repeated-field-serializer
+                 class index boundp reader vbuf size)
+                (undefined-field-type "While generating 'serialize-object' for ~S,"
+                                      msg class field)))))))
 
 ;; Note well: keep this in sync with the main 'serialize-object' method above
 (defun generate-serializer-body (message vobj vbuf size)
