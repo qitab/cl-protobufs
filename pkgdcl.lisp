@@ -133,169 +133,43 @@
                 #:slot-definition-readers
                 #:slot-definition-writers)
 
+  ;; TODO(cgay): These are in use outside of cl-protobufs and should be removed or moved to the
+  ;; interface package, as appropriate.
   (:export
-   ;; Model class protocol
-   #:abstract-descriptor
-   #:descriptor
-   #:proto-alias-for
-   #:proto-class
-   #:proto-client-stub
-   #:proto-conc-name
-   #:proto-default
-   #:proto-documentation
-   #:proto-extension-from
-   #:proto-extension-to
-   #:proto-extended-fields
-   #:proto-extensions
-   #:proto-fields
-   #:proto-imported-schemas
-   #:proto-imports
-   #:proto-index
-   #:proto-input-name
-   #:proto-input-streaming-p
-   #:proto-input-type
-   #:proto-internal-field-name
-   #:proto-external-field-name
-   #:proto-lisp-package
-   #:proto-message-type
-   #:proto-methods
-   #:proto-name
-   #:proto-options
-   #:proto-output-name
-   #:proto-output-streaming-p
-   #:proto-output-type
-   #:proto-package
-   #:proto-packed
-   #:proto-service-name
-   #:proto-qualified-name
-   #:proto-reader
-   #:proto-label
-   #:proto-server-stub
-   #:proto-services
-   #:proto-slot
-   #:proto-source-location
-   #:proto-streams-name
-   #:proto-streams-type
-   #:proto-syntax
-   #:proto-type
-   #:proto-value
-   #:proto-writer
-   #:protobuf-enum-values
-
-   ;; Type aliases, a Lisp-only extension
-   #:proto-lisp-type
-   #:proto-proto-type
-   #:proto-serializer
-   #:proto-deserializer
-   #:find-type-alias
-
-   ;; Controls
-   #:*protobuf*
-   #:*protobuf-conc-name*
-   #:*protobuf-pathname*
-   #:*protobuf-search-path*
-   #:*protobuf-output-path*
-
-   ;; Object lookup
-   #:*all-schemas*
-   #:find-enum
-   #:find-field
-   #:find-method                        ; If you ":use proto-impl", watch for name clash.
-   #:make-option
-   #:find-option
-   #:add-option
-   #:remove-options
-
-   ;; Printing
-   #:write-schema-as
-
-   ;; Protobuf defining macros
-   #:ensure-all-schemas
-   #:ensure-schema
-
-   ;; CLOS to Protobufs utilities
-   #:lisp-type-to-protobuf-type
-   #:clos-type-to-protobuf-type
-   #:protobuf-default-to-clos-init
-
-   ;; Buffering
-   #:make-octet-buffer
-   #:buffer-block
-   #:buffer-chain
-   #:buffer-index
-   #:octet-buffer-backpatches
-   #:call-with-each-block
-   #:compactify-blocks
-   #:concatenate-blocks
-
-   ;; Serialization
-   #:serialize-prim
-   #:serialize-packed
-   #:serialize-enum
-   #:serialize-packed-enum
-   #:deserialize-prim
-   #:deserialize-packed
-   #:deserialize-enum
-   #:deserialize-packed-enum
-   #:packed-size
-   #:packed-enum-size
-   #:make-serializer
-   #:generate-serializer
-   #:make-deserializer
-   #:generate-deserializer
-
-   ;; Raw encoding and decoding
-   #:$wire-type-varint
-   #:$wire-type-64bit
-   #:$wire-type-string
-   #:$wire-type-start-group
-   #:$wire-type-end-group
-   #:$wire-type-32bit
-   #:make-tag
-   #:encode-uint32
-   #:encode-uint64
-   #:encode-fixed32
-   #:encode-fixed64
-   #:encode-sfixed32
-   #:encode-sfixed64
-   #:encode-single
    #:encode-double
    #:encode-string
-   #:encode-octets
-   #:zig-zag-encode32
-   #:zig-zag-encode64
-   #:decode-uint32
-   #:decode-uint64
-   #:decode-int32
-   #:decode-int64
-   #:decode-fixed32
-   #:decode-fixed64
-   #:decode-sfixed32
-   #:decode-sfixed64
-   #:decode-single
-   #:decode-double
-   #:decode-string
-   #:decode-octets
-   #:zig-zag-decode32
-   #:zig-zag-decode64
-   #:length32
-   #:length64
-   #:skip-element
+   #:encode-uint32
+   #:find-enum
+   #:find-field
+   #:find-method
+   #:find-option
+   #:make-deserializer
+   #:make-serializer
+   #:make-tag
+   #:proto-class
+   #:proto-external-field-name
+   #:proto-default
+   #:proto-fields
+   #:proto-index
+   #:proto-input-name
+   #:proto-input-type
+   #:proto-internal-field-name
+   #:proto-label
+   #:proto-methods
+   #:proto-name
+   #:proto-output-name
+   #:proto-output-streaming-p
+   #:proto-qualified-name
+   #:proto-server-stub
+   #:proto-service-name
+   #:proto-source-location              ; should be proto-source-pathname now?
+   #:proto-streams-name
+   #:serialize-prim
 
-   ;; Utilities
-   #:class-name->proto
-   #:enum-name->proto
-   #:slot-name->proto
-   #:proto->class-name
-   #:proto->enum-name
-   #:proto->slot-name
-   #:protobufs-warning
-   #:protobufs-warn
-   #:make-qualified-name
-
-   ;; Stuff for ASDF
+   ;; For ASDF
    #:process-imports
 
-   ;; Stuff for RPC stubs
+   ;; For RPC stubs
+   #:*rpc-call-function*
    #:*rpc-package*
-   #:*rpc-call-function*))
+   ))

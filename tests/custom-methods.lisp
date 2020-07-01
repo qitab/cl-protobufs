@@ -92,41 +92,41 @@ Parameters:
   ;; as a double-check that this was called.
   (incf *callcount-serialize*)
   (let ((val (slot-value obj '%code)))
-    (when val (protobufs-implementation::iincf size
-                  (protobufs-implementation:serialize-prim val :string 10 buf))))
+    (when val (proto-impl::iincf size
+                  (proto-impl::serialize-prim val :string 10 buf))))
   ;; skip the FANCYTHING slot
   (let ((val (slot-value obj '%othercode)))
-    (when val (protobufs-implementation::iincf size
-                  (protobufs-implementation:serialize-prim val :string 26 buf))))
+    (when val (proto-impl::iincf size
+                  (proto-impl::serialize-prim val :string 26 buf))))
   size)
 
 (defun (:protobuf :deserialize submessage)
     (buffer index limit
      &optional (endtag 0)
-     &aux protobufs-implementation::tag)
+     &aux proto-impl::tag)
   (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (declare (type protobufs-implementation::array-index index limit))
+  (declare (type proto-impl::array-index index limit))
   (let (code othercode)
     (loop
-     (multiple-value-setq (protobufs-implementation::tag index)
-       (if (protobufs-implementation::i< index limit)
-           (protobufs-implementation:decode-uint32 buffer index)
+     (multiple-value-setq (proto-impl::tag index)
+       (if (proto-impl::i< index limit)
+           (proto-impl::decode-uint32 buffer index)
            (values 0 index)))
-     (when (protobufs-implementation::i= protobufs-implementation::tag endtag)
+     (when (proto-impl::i= proto-impl::tag endtag)
        (return-from :deserialize
          (values (make-submessage
                   :code code
                   :fancything (format nil "Reconstructed[~A,~A]" code othercode)
                   :othercode othercode)
                  index)))
-     (case protobufs-implementation::tag
+     (case proto-impl::tag
        ((10) (multiple-value-setq (code index)
-               (protobufs-implementation:deserialize-prim
+               (proto-impl::deserialize-prim
                 :string buffer index)))
        ((26) (multiple-value-setq (othercode index)
-               (protobufs-implementation:deserialize-prim :string buffer index)))
-       (otherwise (setq index (protobufs-implementation:skip-element
-                               buffer index protobufs-implementation::tag)))))))
+               (proto-impl::deserialize-prim :string buffer index)))
+       (otherwise (setq index (proto-impl::skip-element
+                               buffer index proto-impl::tag)))))))
 
 (defparameter *sending-test*
   (cl-protobufs.test.custom-proto-test::make-example-parent

@@ -30,4 +30,4 @@
     (let* ((imported (proto:find-schema (if (stringp import) (pathname import) import))))
       (unless imported
         (error "Could not find imported schema: ~S for: ~A" import schema))
-      (pushnew imported (proto-impl:proto-imported-schemas schema) :test #'equal))))
+      (pushnew imported (proto-impl::proto-imported-schemas schema) :test #'equal))))

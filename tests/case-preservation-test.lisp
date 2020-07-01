@@ -29,9 +29,9 @@ Parameters:
     (assert-true service)
     ;; We're reaching into the implementation to verify the objects have
     ;; been properly constructed.
-    (let ((method (proto-impl:find-method service "QUUXMethod")))
+    (let ((method (proto-impl::find-method service "QUUXMethod")))
       (assert-true method)
-      (assert-true (string= (proto-impl:proto-input-name method)
+      (assert-true (string= (proto-impl::proto-input-name method)
                        "protobuf_case_preservation_unittest.QUUXRequest"))
-      (assert-true (string= (proto-impl:proto-output-name method)
+      (assert-true (string= (proto-impl::proto-output-name method)
                        "protobuf_case_preservation_unittest.QUUXResponse")))))

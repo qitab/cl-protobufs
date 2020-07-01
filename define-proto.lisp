@@ -1443,7 +1443,7 @@ Arguments
                            :qualified-name (make-qualified-name *protobuf*
                                                                 (or name
                                                                     (class-name->proto function)))
-                           :service-name (proto-impl:proto-name service)
+                           :service-name (proto-impl::proto-name service)
                            :client-stub client-fn
                            :server-stub server-fn
                            :input-type  input-type
