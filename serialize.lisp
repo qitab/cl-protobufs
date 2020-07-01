@@ -932,7 +932,8 @@ Parameters:
              (msg    (and class (not (keywordp class))
                           (or (find-message class)
                               (find-enum class)
-                              (find-type-alias class))))
+                              (find-type-alias class)
+                              (find-map class))))
              (index  (proto-index field))
              (temp (make-symbol (string (proto-internal-field-name field)))))
         (cond ((eq (proto-label field) :repeated)
@@ -1012,17 +1013,15 @@ Parameters:
                      (t
                       (undefined-field-type "While generating 'deserialize-object' for ~S,"
                                             message class field))))
-              ((eq class :map)
+              ((typep msg 'map-descriptor)
                (setf nslot temp)
                (let* ((start vidx)
-                      (key-type (proto-type->keyword
-                                 (second (proto-set-type field))))
-                      (val-type (proto-type->keyword
-                                 (third (proto-set-type field))))
-                      (val-msg  (and val-type (not (keywordp val-type))
-                                     (or (find-message val-type)
-                                         (find-enum val-type)
-                                         (find-type-alias val-type)))))
+                      (key-class (map-descriptor-key-class msg))
+                      (val-class (map-descriptor-val-class msg))
+                      (val-msg  (and val-class (not (keywordp val-class))
+                                     (or (find-message val-class)
+                                         (find-enum val-class)
+                                         (find-type-alias val-class)))))
                  (ret
                   (make-tag $wire-type-string index)
                   `(progn
@@ -1044,10 +1043,10 @@ Parameters:
                            (decode-uint32 ,vbuf ,vidx))
                          (if (= 1 (ilogand (iash map-tag -3) #x1FFFFFFF))
                              (multiple-value-setq (key-data ,vidx)
-                               (deserialize-prim ,key-type ,vbuf ,vidx))
-                             ,(cond ((keywordp val-type)
+                               (deserialize-prim ,key-class ,vbuf ,vidx))
+                             ,(cond ((keywordp val-class)
                                      `(multiple-value-setq (val-data ,vidx)
-                                        (deserialize-prim ,val-type ,vbuf ,vidx)))
+                                        (deserialize-prim ,val-class ,vbuf ,vidx)))
                                     ((typep val-msg 'message-descriptor)
                                      (if (eq (proto-message-type val-msg) :group)
                                          (let ((tag2 (make-tag $wire-type-end-group 2)))
@@ -1073,7 +1072,7 @@ Parameters:
                                     (t
                                      (undefined-field-type
                                       "While generating 'deserialize-object' for ~S,"
-                                      message val-type field))))))))))
+                                      message val-class field))))))))))
               (t
                (setf nslot temp)
                ;; Non-repeating field.
