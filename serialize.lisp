@@ -783,10 +783,11 @@ See field-descriptor for the distinction between index, offset, and bool-number.
          (push (generate-field-serializer msg field boundp reader vbuf size)
                serializers))))))
 
-(defmacro make-serializer (message-name)
+(declaim (inline make-serializer))
+(defun make-serializer (message-name)
   "Create the serializer for a message.
 Parameters:
-  MESSAGE-NAME: The symbol-name of a message."
+  MESSAGE-NAME: a symbol naming a protobuf message type."
   (generate-serializer (find-message message-name)))
 
 (defun generate-serializer (message)
@@ -947,10 +948,11 @@ slot-name as a symbol."
         (intern (subseq (symbol-name slot-value) 1)))))
 
 
-(defmacro make-deserializer (message-name)
+(declaim (inline make-deserializer))
+(defun make-deserializer (message-name)
   "Create the deserializer for a message.
 Parameters:
-  MESSAGE-NAME: The symbol-name of a message."
+  MESSAGE-NAME: a symbol naming a protobuf message type."
   (generate-deserializer (find-message message-name)))
 
 ;; Note well: keep this in sync with the main 'deserialize-object' method above
