@@ -726,8 +726,20 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                          (values (if repeated-p (cons obj (car cell)) obj)
                                  end)))))))))))
 
+
 (defun generate-repeated-field-serializer
-    (class index boundp reader vbuf size vector-p &optional (packed-p nil) (msg nil))
+    (class index boundp reader vbuf size vector-p &optional (packed-p nil))
+  "Generate the field serializer for a repeated field
+
+Parameters:
+  CLASS: The class of the field.
+  INDEX: The index of the field
+  BOUNDP: symbol-name that evaluates to t if this field is set.
+  READER: symbol-name for the function which returns the value bound in the field.
+  VBUF: The symbol-name of the buffer to write to
+  SIZE: The symbol-name of the variable which keeps track of the length serialized.
+  VECTOR-P: If true, the field is serialized as a vector. Otherwise, it is a list.
+  PACKED-P: True if and only if the field is packed."
   (let ((vval (gensym "VAL"))
         (iterator (if vector-p 'dovector 'dolist))
         (msg (and class (not (keywordp class))
@@ -784,6 +796,15 @@ See field-descriptor for the distinction between index, offset, and bool-number.
 
 (defun generate-non-repeated-field-serializer
     (class index boundp reader vbuf size)
+  "Generate the field serializer for a non-repeated field
+
+Parameters:
+  CLASS: The class of the field.
+  INDEX: The index of the field
+  BOUNDP: symbol-name that evaluates to t if this field is set.
+  READER: symbol-name for the function which returns the value bound in the field.
+  VBUF: The symbol-name of the buffer to write to
+  SIZE: The symbol-name of the variable which keeps track of the length serialized."
   (let ((vval (gensym "VAL"))
         (msg (and class (not (keywordp class))
                   (or (find-message class)
