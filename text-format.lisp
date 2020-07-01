@@ -48,7 +48,7 @@ Parameters:
                             (cond ((keywordp type)
                                    (doseq (v (read-slot object slot reader))
                                      (print-prim v type field stream
-                                                 (or suppress-pretty-print indent))))
+                                                 (and (not suppress-pretty-print) indent))))
                                   ((typep (setq msg (and type (or (find-message type)
                                                                   (find-enum type)
                                                                   (find-type-alias type))))
@@ -68,13 +68,13 @@ Parameters:
                                   ((typep msg 'protobuf-enum)
                                    (doseq (v (read-slot object slot reader))
                                      (print-enum v msg field stream
-                                                 (or suppress-pretty-print indent))))
+                                                 (and (not suppress-pretty-print) indent))))
                                   ((typep msg 'protobuf-type-alias)
                                    (let ((type (proto-proto-type msg)))
                                      (doseq (v (read-slot object slot reader))
                                        (let ((v (funcall (proto-serializer msg) v)))
                                          (print-prim v type field stream
-                                                     (or suppress-pretty-print indent))))))
+                                                     (and (not suppress-pretty-print) indent))))))
                                   (t
                                    (undefined-field-type "While printing ~S to text format,"
                                                          object type field))))
@@ -82,7 +82,7 @@ Parameters:
                             (cond ((keywordp type)
                                    (let ((v (read-slot object slot reader)))
                                      (print-prim v type field stream
-                                                 (or suppress-pretty-print indent))))
+                                                 (and (not suppress-pretty-print) indent))))
                                   ((typep (setq msg (and type (or (find-message type)
                                                                   (find-enum type)
                                                                   (find-type-alias type))))
@@ -102,14 +102,14 @@ Parameters:
                                    (let ((v (read-slot object slot reader)))
                                      (when (and v (not (eql v (proto-default field))))
                                        (print-enum v msg field stream
-                                                   (or suppress-pretty-print indent)))))
+                                                   (and (not suppress-pretty-print) indent)))))
                                   ((typep msg 'protobuf-type-alias)
                                    (let ((v (read-slot object slot reader)))
                                      (when v
                                        (let ((v    (funcall (proto-serializer msg) v))
                                              (type (proto-proto-type msg)))
                                          (print-prim v type field stream
-                                                     (or suppress-pretty-print indent))))))
+                                                     (and (not suppress-pretty-print) indent))))))
                                   (t
                                    (undefined-field-type "While printing ~S to text format,"
                                                          object type field)))))))))
@@ -126,11 +126,25 @@ Parameters:
             (format stream "~&}~%"))
         nil))))
 
+
 (defun print-prim (val type field stream indent)
+  "Print primitive value to stream
+
+Parameters:
+  VAL: The data for the value to print.
+  TYPE: The type of val.
+  FIELD: The field which contains this value.
+  STREAM: The stream to print to.
+  INDENT: Either a number or nil.
+          - If indent is a number, indent this print
+            by (+ indent 2) and write a newline at
+            the end.
+          - If indent is nil, then do not indent and
+            do not write a newline."
   (when (or val (eq type :bool))
-    (if (eq indent 't)
-      (format stream "~A: " (proto-name field))
-      (format stream "~&~VT~A: " (+ indent 2) (proto-name field)))
+    (if indent
+      (format stream "~&~VT~A: " (+ indent 2) (proto-name field))
+      (format stream "~A: " (proto-name field)))
     (ecase type
       ((:int32 :uint32 :int64 :uint64 :sint32 :sint64
         :fixed32 :sfixed32 :fixed64 :sfixed64)
@@ -151,23 +165,36 @@ Parameters:
          (format stream "\"~A\"" val)))
       ((:date :time :datetime :timestamp)
        (format stream "~D" val)))
-    (if (eq indent 't)
-      (format stream " ")
-      (format stream "~%"))))
+    (if indent
+      (format stream "~%")
+      (format stream " "))))
 
 (defun print-enum (val enum field stream indent)
+  "Print enum to stream
+
+Parameters:
+  VAL: The enum value.
+  ENUM: The enum descriptor.
+  FIELD: The field which contains this value.
+  STREAM: The stream to print to.
+  INDENT: Either a number or nil.
+          - If indent is a number, indent this print
+            by (+ indent 2) and write a newline at
+            the end.
+          - If indent is nil, then do not indent and
+            do not write a newline."
   (when val
-    (if (eq indent 't)
-      (format stream "~A: " (proto-name field))
-      (format stream "~&~VT~A: " (+ indent 2) (proto-name field)))
+    (if indent
+      (format stream "~&~VT~A: " (+ indent 2) (proto-name field))
+      (format stream "~A: " (proto-name field)))
     (let ((name (let ((e (find (keywordify val)
                                (protobuf-enum-values enum)
                                :key #'protobuf-enum-value-value)))
                   (and e (protobuf-enum-value-value e)))))
       (format stream "~A" name)
-      (if (eq indent 't)
-        (format stream " ")
-        (format stream "~%")))))
+      (if indent
+        (format stream "~%")
+        (format stream " ")))))
 
 
 ;;; Parse objects that were serialized using the text format
