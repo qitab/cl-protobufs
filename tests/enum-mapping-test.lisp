@@ -34,6 +34,7 @@ Parameters:
   (assert-true (= 1 (my-message.my-enum->numeral :foo)))
   (assert-true (= 2 (my-message.my-enum->numeral :bar)))
   (assert-true (= 2 (my-message.my-enum->numeral :baz)))
+  (assert-true (= 3 (my-message.my-enum->numeral :foo-bar)))
   (assert-true (= 42 (my-message.my-enum->numeral :zaphod)))
 
   (assert-true (eq :foo (numeral->my-message.my-enum 1)))
@@ -142,7 +143,7 @@ Parameters:
 (proto:define-enum alias-enum (:alias-for orig-enum))
 
 (deftest test-enum-values (enum-mapping-tests)
-  (assert-true (equal '(:foo :bar :baz :zaphod)
+  (assert-true (equal '(:foo :bar :baz :foo-bar :zaphod)
                  (proto:enum-values 'my-message.my-enum)))
   (assert-true (equal '(:foo :bar :baz :zaphod)
                  (proto:enum-values 'outer-enum)))

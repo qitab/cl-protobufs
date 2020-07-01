@@ -621,6 +621,7 @@ Parameters:
       ; this tests the optimized serializer's ability to serialize messages
       ; which have nested messages which have group fields.
       (proto-impl:make-serializer metadata)
+      (proto-impl:make-serializer color2)
       (proto-impl:make-serializer color-wheel2)
       (proto-impl:make-serializer color-wheel2-wrap)
       (let* ((ser3 (serialize-object-to-bytes rqst3 'color-wheel2-wrap))

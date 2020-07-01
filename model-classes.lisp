@@ -217,7 +217,7 @@ or that's named by the class-name of TYPE."
   "Return the message-descriptor instance in the package of
 MESSAGE named by NAME (a string)."
   (declare (type string name))
-  (find-message (intern (uncamel-case name)
+  (find-message (intern (nstring-upcase (uncamel-case name))
                         (symbol-package (proto-class message)))))
 
 (defun find-message-for-class (class)

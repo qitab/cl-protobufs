@@ -232,7 +232,7 @@
         ((symbolp x) (keywordify (symbol-name x)))
         ((zerop (length x)) nil)
         ((string-not-equal x "nil")
-         (intern (string-upcase x) (find-package "KEYWORD")))
+         (intern (substitute #\- #\_ (string-upcase x)) (find-package "KEYWORD")))
         (t nil)))
 
 (defun join-intern (&rest symbols)
@@ -261,23 +261,22 @@ Arguments:
                     (:map-put 'put)
                     (:map-rem 'remove))))
     (cond ((member f-symbol '(get put remove))
-           (intern (format nil "~a.~a-~a"
-                           (symbol-name proto-type)
-                           (symbol-name slot)
-                           f-symbol)))
+           (intern (nstring-upcase (format nil "~a.~a-~a"
+                                           (symbol-name proto-type)
+                                           (symbol-name slot)
+                                           f-symbol))))
           (f-symbol
-           (intern (format nil "~a.~a-~a"
-                           (symbol-name proto-type)
-                           f-symbol
-                           (symbol-name slot))
-                   (symbol-package proto-type)))
+           (intern (nstring-upcase (format nil "~a.~a-~a"
+                                           (symbol-name proto-type)
+                                           f-symbol
+                                           (symbol-name slot))
+                                   (symbol-package proto-type))))
           (t
-           (intern (format nil "~a.~a"
-                           (symbol-name proto-type)
-                           (symbol-name slot))
-                   (symbol-package proto-type))))))
+           (intern (nstring-upcase (format nil "~a.~a"
+                                           (symbol-name proto-type)
+                                           (symbol-name slot))
+                                   (symbol-package proto-type)))))))
            
-
 
 (defmacro with-collectors ((&rest collection-descriptions) &body body)
   "COLLECTION-DESCRIPTIONS is a list of clauses of the form (collection function).
@@ -523,9 +522,10 @@ Parameters:
          ;; TODO(dlroxe) s/path-part/name-part would make more sense to me.
          (pkgn (when path-from-top (find-proto-package path-part)))
          (package (or pkg1 pkgn package))
-         (name (format nil "~{~A~^.~}" (cond (pkg1 path-from-top)
-                                             (pkgn name-part)
-                                             (t full-path)))))
+         (name (nstring-upcase
+                (format nil "~{~A~^.~}" (cond (pkg1 path-from-top)
+                                              (pkgn name-part)
+                                              (t full-path))))))
     (if package
         (intern name package)
         (make-symbol name))))
@@ -560,9 +560,10 @@ Parameters:
          (pkg1 (and (cdr xs) (find-proto-package (first xs))))
          (pkgn (and (cdr xs) (find-proto-package (butlast xs))))
          (package (or pkg1 pkgn package))
-         (name (format nil "~{~A~^.~}" (cond (pkg1 (cdr xs))
-                                             (pkgn (last xs))
-                                             (t xs)))))
+         (name (nstring-upcase
+                (format nil "~{~A~^.~}" (cond (pkg1 (cdr xs))
+                                              (pkgn (last xs))
+                                              (t xs))))))
     (if package
         (intern name package)
         (make-symbol name))))
