@@ -357,14 +357,6 @@ Arguments:
       '(array * (0))
       '(array * (*))))      ; a 1-dimensional array of any type
 
-
-;; A parameterized type for map fields.
-;; TODO(benkuehnert): May want to write a better type specifier if we ever want to type-check.
-(deftype map-of (key-type val-type)
-  (if (or (eq key-type 'nil) (eq val-type 'nil))
-      'null
-      'list))
-
 ;; This corresponds to the :bytes protobuf type
 (deftype byte-vector () '(array (unsigned-byte 8) (*)))
 

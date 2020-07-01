@@ -26,7 +26,6 @@
    #:sfixed64
    #:list-of
    #:vector-of
-   #:map-of
    #:byte-vector
    #:make-byte-vector
 
