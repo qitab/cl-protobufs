@@ -939,197 +939,229 @@ Parameters:
 (defun generate-field-deserializer (message field vbuf vidx &key raw-p)
   (let ((nslot nil)
         (rslot nil))
-    (flet ((ret (tag collector)
-             (return-from generate-field-deserializer (values (list tag) (list collector)
-                                                              nslot rslot)))
-           (ret-list (tags collectors)
-             (return-from generate-field-deserializer (values tags collectors
-                                                              nslot rslot)))
-           (call-deserializer (msg vbuf start end &optional (end-tag 0))
+    (let* ((class  (proto-class field))
+           (index  (proto-index field))
+           (temp (make-symbol (string (proto-internal-field-name field)))))
+      (cond ((eq (proto-label field) :repeated)
+             (setf rslot (list field temp))
+             (multiple-value-bind (deserializer tag list?)
+                 (generate-repeated-field-deserializer
+                  class index vbuf vidx temp :raw-p raw-p)
+               (if deserializer
+                   (if list?
+                       (return-from generate-field-deserializer
+                         (values tag deserializer
+                                 nslot rslot))
+                       (return-from generate-field-deserializer
+                         (values (list tag) (list deserializer)
+                                 nslot rslot)))
+                   (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                                         message class field))))
+            ;; Non-repeated field.
+            (t
+             (setf nslot temp)
+             (multiple-value-bind (deserializer tag)
+                 (generate-non-repeated-field-deserializer
+                  class index vbuf vidx temp :raw-p raw-p)
+               (if deserializer
+                   (return-from generate-field-deserializer
+                     (values (list tag) (list deserializer)
+                             nslot rslot)))
+               (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                                     message class field))))))
+
+  (assert nil))
+
+(defun generate-repeated-field-deserializer
+    (class index vbuf vidx dest &key raw-p)
+  "Returns three values: The first is a (list of) s-expressions that deserializes the
+specified object to dest and updates vidx to the new index. The second is (list of)
+tag(s) of this field. The third is true if and only if lists are being returned.
+
+Parameters:
+  CLASS: The :class field of this field.
+  INDEX: The field index of the field.
+  VBUF: The buffer to read from.
+  VIDX: The index of the buffer to read from & to update.
+  DEST: The symbol name for the destination of deserialized data.
+  RAW-P: If true, return a list of the arguments passed to any recursive
+         deserialization call instead of calling the function."
+  (let ((msg (and class (not (keywordp class))
+                  (or (find-message class)
+                      (find-enum class)
+                      (find-type-alias class)
+                      (find-map class)))))
+    (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
              (if raw-p
                  `(list ,vbuf ,start ,end ,end-tag)
                  (call-pseudo-method :deserialize msg vbuf start end end-tag))))
-      (let* ((class  (proto-class field))
-             (msg    (and class (not (keywordp class))
-                          (or (find-message class)
-                              (find-enum class)
-                              (find-type-alias class)
-                              (find-map class))))
-             (index  (proto-index field))
-             (temp (make-symbol (string (proto-internal-field-name field)))))
-        (cond ((eq (proto-label field) :repeated)
-               (setf rslot (list field temp))
-               (cond ((keywordp class)
-                      (let* ((tag (make-tag class index))
-                             (packed-tag (when (packed-type-p class)
-                                           (packed-tag index)))
-                             (non-packed-form `(multiple-value-bind (val next-index)
-                                                   (deserialize-prim ,class ,vbuf ,vidx)
-                                                 (setq ,vidx next-index)
-                                                 (push val ,temp)))
-                             (packed-form `(multiple-value-bind (x idx)
-                                               (deserialize-packed ,class ,vbuf ,vidx)
-                                             (setq ,vidx idx)
-                                             ;; The reason for nreversing here is that a field that
-                                             ;; is repeated+packed may be transmitted as several
-                                             ;; runs of packed values interleaved with other fields,
-                                             ;; and it might even be possible to send an occurrence
-                                             ;; of the field as non-packed, but I'm not sure.
-                                             ;; The final NREVERSE is going to put everything right.
-                                             ;; Not efficient, but probably not a huge loss.
-                                             (setq ,temp (nreconc x ,temp)))))
-                        (if packed-tag
-                            (ret-list (list tag packed-tag)
-                                      (list non-packed-form packed-form))
-                            (ret tag non-packed-form))))
-                     ((typep msg 'message-descriptor)
-                      (if (eq (proto-message-type msg) :group)
-                          (let ((tag1 (make-tag $wire-type-start-group index))
-                                (tag2 (make-tag $wire-type-end-group index)))
-                            (ret tag1
-                                 `(multiple-value-bind (obj end)
-                                      ,(call-deserializer msg vbuf vidx nil tag2)
-                                    (setq ,vidx end)
-                                    (push obj ,temp))))
-                          (ret (make-tag $wire-type-string index)
-                               `(multiple-value-bind (payload-len payload-start)
-                                    (decode-uint32 ,vbuf ,vidx)
-                                  ;; This index points *after* the sub-message,
-                                  ;; but incrementing it now serves to computes the LIMIT
-                                  ;; for the recursive call. And we don't need
-                                  ;; the secondary return value for anything.
-                                  (setq ,vidx (+ payload-start payload-len))
-                                  (push ,(call-deserializer msg vbuf 'payload-start vidx)
-                                        ,temp)))))
-                     ((typep msg 'protobuf-enum)
-                      (let* ((tag (make-tag $wire-type-varint index))
-                             (packed-tag (packed-tag index))
-                             (non-packed-form `(multiple-value-bind (x idx)
-                                                   (deserialize-enum
-                                                    '(,@(protobuf-enum-values msg)) ,vbuf ,vidx)
-                                                 (setq ,vidx idx)
-                                                 (push x ,temp)))
-                             (packed-form `(multiple-value-bind (x idx)
-                                               (deserialize-packed-enum
-                                                '(,@(protobuf-enum-values msg))
-                                                ,vbuf ,vidx)
-                                             (setq ,vidx idx)
-                                             ;; The reason for nreversing here is that a field that
-                                             ;; is repeated+packed may be transmitted as several
-                                             ;; runs of packed values interleaved with other fields,
-                                             ;; and it might even be possible to send an occurrence
-                                             ;; of the field as non-packed, but I'm not sure.
-                                             ;; The final NREVERSE is going to put everything right.
-                                             ;; Not efficient, but probably not a huge loss.
-                                             (setq ,temp (nreconc x ,temp)))))
-                        (ret-list (list tag packed-tag)
-                                  (list non-packed-form packed-form))))
-                     ((typep msg 'protobuf-type-alias)
-                      (let ((class (proto-proto-type msg)))
-                        (ret (make-tag class index)
-                             `(multiple-value-bind (prim-val idx)
-                                  (deserialize-prim ,class ,vbuf ,vidx)
-                                (setq ,vidx idx)
-                                (push (funcall #',(proto-deserializer msg) prim-val) ,temp)))))
-                     (t
-                      (undefined-field-type "While generating 'deserialize-object' for ~S,"
-                                            message class field))))
-              ((typep msg 'map-descriptor)
-               (setf nslot temp)
-               (let* ((start vidx)
-                      (key-class (map-descriptor-key-class msg))
-                      (val-class (map-descriptor-val-class msg))
-                      (val-msg  (and val-class (not (keywordp val-class))
-                                     (or (find-message val-class)
-                                         (find-enum val-class)
-                                         (find-type-alias val-class)))))
-                 (ret
-                  (make-tag $wire-type-string index)
-                  `(progn
-                     ; if ,temp points to the "unset" placeholder, make a new hash-table
-                     (unless (typep ,temp 'hash-table)
-                         (setq ,temp (make-hash-table)))
-                     ; todo (benkuehnert): val-data should be the default value of
-                     ; ,key-type instead of nil.
-                     (let ((val-data nil)
-                           map-tag map-len key-data start)
-                       (multiple-value-setq (map-len ,vidx)
+      (cond ((keywordp class)
+             (let* ((tag (make-tag class index))
+                    (packed-tag (when (packed-type-p class)
+                                  (packed-tag index)))
+                    (non-packed-form `(multiple-value-bind (val next-index)
+                                          (deserialize-prim ,class ,vbuf ,vidx)
+                                        (setq ,vidx next-index)
+                                        (push val ,dest)))
+                    (packed-form `(multiple-value-bind (x idx)
+                                      (deserialize-packed ,class ,vbuf ,vidx)
+                                    (setq ,vidx idx)
+                                    ;; The reason for nreversing here is that a field that
+                                    ;; is repeated+packed may be transmitted as several
+                                    ;; runs of packed values interleaved with other fields,
+                                    ;; and it might even be possible to send an occurrence
+                                    ;; of the field as non-packed, but I'm not sure.
+                                    ;; The final NREVERSE is going to put everything right.
+                                    ;; Not efficient, but probably not a huge loss.
+                                    (setq ,dest (nreconc x ,dest)))))
+               (if packed-tag
+                   (values
+                    (list non-packed-form packed-form)
+                    (list tag packed-tag)
+                    t)
+                   (values non-packed-form tag))))
+            ((typep msg 'message-descriptor)
+             (if (eq (proto-message-type msg) :group)
+                 (let ((tag1 (make-tag $wire-type-start-group index))
+                       (tag2 (make-tag $wire-type-end-group index)))
+                   (values `(multiple-value-bind (obj end)
+                                ,(call-deserializer msg vbuf vidx nil tag2)
+                              (setq ,vidx end)
+                              (push obj ,dest))
+                           tag1))
+                 (values `(multiple-value-bind (payload-len payload-start)
+                              (decode-uint32 ,vbuf ,vidx)
+                            ;; This index points *after* the sub-message,
+                            ;; but incrementing it now serves to computes the LIMIT
+                            ;; for the recursive call. And we don't need
+                            ;; the secondary return value for anything.
+                            (setq ,vidx (+ payload-start payload-len))
+                            (push ,(call-deserializer msg vbuf 'payload-start vidx)
+                                  ,dest))
+                         (make-tag $wire-type-string index))))
+            ((typep msg 'protobuf-enum)
+             (let* ((tag (make-tag $wire-type-varint index))
+                    (packed-tag (packed-tag index))
+                    (non-packed-form `(multiple-value-bind (x idx)
+                                          (deserialize-enum
+                                           '(,@(protobuf-enum-values msg)) ,vbuf ,vidx)
+                                        (setq ,vidx idx)
+                                        (push x ,dest)))
+                    (packed-form `(multiple-value-bind (x idx)
+                                      (deserialize-packed-enum
+                                       '(,@(protobuf-enum-values msg))
+                                       ,vbuf ,vidx)
+                                    (setq ,vidx idx)
+                                    ;; The reason for nreversing here is that a field that
+                                    ;; is repeated+packed may be transmitted as several
+                                    ;; runs of packed values interleaved with other fields,
+                                    ;; and it might even be possible to send an occurrence
+                                    ;; of the field as non-packed, but I'm not sure.
+                                    ;; The final NREVERSE is going to put everything right.
+                                    ;; Not efficient, but probably not a huge loss.
+                                    (setq ,dest (nreconc x ,dest)))))
+               (values (list non-packed-form packed-form)
+                       (list tag packed-tag)
+                       t)))
+            ((typep msg 'protobuf-type-alias)
+             (let ((class (proto-proto-type msg)))
+               (values `(multiple-value-bind (prim-val idx)
+                            (deserialize-prim ,class ,vbuf ,vidx)
+                          (setq ,vidx idx)
+                          (push (funcall #',(proto-deserializer msg) prim-val) ,dest))
+                       (make-tag class index))))
+            (t nil)))))
+
+(defun generate-non-repeated-field-deserializer
+    (class index vbuf vidx dest &key raw-p)
+  "Returns two values: The first is lisp code that deserializes the specified object
+to dest and updates vidx to the new index. The second is the tag of this field.
+
+Parameters:
+  CLASS: The :class field of this field.
+  INDEX: The field index of the field.
+  VBUF: The buffer to read from.
+  VIDX: The index of the buffer to read from & to update.
+  DEST: The symbol name for the destination of deserialized data.
+  RAW-P: If true, return a list of the arguments passed to any recursive
+         deserialization call instead of calling the function."
+
+  (let ((msg (and class (not (keywordp class))
+                  (or (find-message class)
+                      (find-enum class)
+                      (find-type-alias class)
+                      (find-map class)))))
+    (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
+             (if raw-p
+                 `(list ,vbuf ,start ,end ,end-tag)
+                 (call-pseudo-method :deserialize msg vbuf start end end-tag))))
+      (cond ((keywordp class)
+             (values
+              `(multiple-value-setq (,dest ,vidx)
+                 (deserialize-prim ,class ,vbuf ,vidx))
+              (make-tag class index)))
+            ((typep msg 'message-descriptor)
+             (if (eq (proto-message-type msg) :group)
+                 (let ((tag1 (make-tag $wire-type-start-group index))
+                       (tag2 (make-tag $wire-type-end-group index)))
+                   (values
+                    `(multiple-value-bind (obj end)
+                         ,(call-deserializer msg vbuf vidx nil tag2)
+                       (setq ,vidx end
+                             ,dest obj))
+                    tag1))
+                 (values
+                  `(multiple-value-bind (payload-len payload-start)
+                       (decode-uint32 ,vbuf ,vidx)
+                     (setq ,vidx (+ payload-start payload-len)
+                           ,dest ,(call-deserializer msg vbuf 'payload-start vidx)))
+                  (make-tag $wire-type-string index))))
+            ((typep msg 'protobuf-enum)
+             (values
+              `(multiple-value-setq (,dest ,vidx)
+                 (deserialize-enum '(,@(protobuf-enum-values msg)) ,vbuf ,vidx))
+              (make-tag $wire-type-varint index)))
+            ((typep msg 'protobuf-type-alias)
+             (let ((class (proto-proto-type msg)))
+               (values
+                `(progn
+                   (multiple-value-setq (,dest ,vidx)
+                     (deserialize-prim ,class ,vbuf ,vidx))
+                   (setq ,dest (funcall #',(proto-deserializer msg) ,dest)))
+                (make-tag class index))))
+            ((typep msg 'map-descriptor)
+             (let* ((start vidx)
+                    (key-class (map-descriptor-key-class msg))
+                    (val-class (map-descriptor-val-class msg))
+                    (val-msg  (and val-class (not (keywordp val-class))
+                                   (or (find-message val-class)
+                                       (find-enum val-class)
+                                       (find-type-alias val-class)))))
+               (values
+                `(progn
+                   ; if ,dest points to the "unset" placeholder, make a new hash-table
+                   (unless (typep ,dest 'hash-table)
+                     (setq ,dest (make-hash-table)))
+                   ; todo (benkuehnert): val-data should be the default value of
+                   ; ,key-type instead of nil.
+                   (let ((val-data nil)
+                         map-tag map-len key-data start)
+                     (multiple-value-setq (map-len ,vidx)
+                       (decode-uint32 ,vbuf ,vidx))
+                     (setq start ,vidx)
+                     (loop
+                       (when (= ,vidx (+ map-len start))
+                         (setf (gethash key-data ,dest) val-data)
+                         (return))
+                       (multiple-value-setq (map-tag ,vidx)
                          (decode-uint32 ,vbuf ,vidx))
-                       (setq start ,vidx)
-                       (loop
-                         (when (= ,vidx (+ map-len start))
-                           (setf (gethash key-data ,temp) val-data)
-                           (return))
-                         (multiple-value-setq (map-tag ,vidx)
-                           (decode-uint32 ,vbuf ,vidx))
-                         (if (= 1 (ilogand (iash map-tag -3) #x1FFFFFFF))
-                             (multiple-value-setq (key-data ,vidx)
-                               (deserialize-prim ,key-class ,vbuf ,vidx))
-                             ,(cond ((keywordp val-class)
-                                     `(multiple-value-setq (val-data ,vidx)
-                                        (deserialize-prim ,val-class ,vbuf ,vidx)))
-                                    ((typep val-msg 'message-descriptor)
-                                     (if (eq (proto-message-type val-msg) :group)
-                                         (let ((tag2 (make-tag $wire-type-end-group 2)))
-                                           `(multiple-value-setq (val-data ,vidx)
-                                              ,(call-deserializer val-msg vbuf vidx nil tag2)))
-                                         `(multiple-value-bind (payload-len payload-start)
-                                              (decode-uint32 ,vbuf ,vidx)
-                                            (setq ,vidx (+ payload-start payload-len)
-                                                  val-data ,(call-deserializer val-msg vbuf
-                                                                                'payload-start
-                                                                                vidx)))))
-                                    ((typep val-msg 'protobuf-enum)
-                                     `(multiple-value-setq (val-data ,vidx)
-                                        (deserialize-enum '(,@(protobuf-enum-values val-msg))
-                                                          ,vbuf ,vidx)))
-                                    ((typep val-msg 'protobuf-type-alias)
-                                     (let ((class (proto-proto-type val-msg)))
-                                       `(progn
-                                          (multiple-value-setq (val-data ,vidx)
-                                            (deserialize-prim ,class ,vbuf ,vidx))
-                                          (setq ,val-data (funcall #',(proto-deserializer val-msg)
-                                                                   ,temp)))))
-                                    (t
-                                     (undefined-field-type
-                                      "While generating 'deserialize-object' for ~S,"
-                                      message val-class field))))))))))
-              (t
-               (setf nslot temp)
-               ;; Non-repeating field.
-               (cond ((keywordp class)
-                      (ret (make-tag class index)
-                           `(multiple-value-setq (,temp ,vidx)
-                              (deserialize-prim ,class ,vbuf ,vidx))))
-                     ((typep msg 'message-descriptor)
-                      (if (eq (proto-message-type msg) :group)
-                          (let ((tag1 (make-tag $wire-type-start-group index))
-                                (tag2 (make-tag $wire-type-end-group index)))
-                            (ret tag1
-                                 `(multiple-value-bind (obj end)
-                                      ,(call-deserializer msg vbuf vidx nil tag2)
-                                    (setq ,vidx end
-                                          ,temp obj))))
-                          (ret (make-tag $wire-type-string index)
-                               `(multiple-value-bind (payload-len payload-start)
-                                    (decode-uint32 ,vbuf ,vidx)
-                                  (setq ,vidx (+ payload-start payload-len)
-                                        ,temp ,(call-deserializer msg vbuf 'payload-start vidx))))))
-                     ((typep msg 'protobuf-enum)
-                      (ret (make-tag $wire-type-varint index)
-                           `(multiple-value-setq (,temp ,vidx)
-                              (deserialize-enum '(,@(protobuf-enum-values msg)) ,vbuf ,vidx))))
-                     ((typep msg 'protobuf-type-alias)
-                      (let ((class (proto-proto-type msg)))
-                        (ret (make-tag class index)
-                             `(progn
-                                (multiple-value-setq (,temp ,vidx)
-                                  (deserialize-prim ,class ,vbuf ,vidx))
-                                (setq ,temp (funcall #',(proto-deserializer msg) ,temp))))))
-                     (t
-                      (undefined-field-type "While generating 'deserialize-object' for ~S,"
-                                            message class field))))))))
-  (assert nil))
+                       (if (= 1 (ilogand (iash map-tag -3) #x1FFFFFFF))
+                           (multiple-value-setq (key-data ,vidx)
+                             (deserialize-prim ,key-class ,vbuf ,vidx))
+                           ,(generate-non-repeated-field-deserializer
+                             val-class 2 vbuf vidx 'val-data)))))
+                (make-tag $wire-type-string index))))
+            (t nil)))))
 
 (defun slot-value-to-slot-name-symbol (slot-value)
   "Given the SLOT-VALUE of a proto field return the
