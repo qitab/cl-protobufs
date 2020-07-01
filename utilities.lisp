@@ -264,18 +264,19 @@ Arguments:
            (intern (nstring-upcase (format nil "~a.~a-~a"
                                            (symbol-name proto-type)
                                            (symbol-name slot)
-                                           f-symbol))))
+                                           f-symbol))
+                   (symbol-package proto-type)))
           (f-symbol
            (intern (nstring-upcase (format nil "~a.~a-~a"
                                            (symbol-name proto-type)
                                            f-symbol
-                                           (symbol-name slot))
-                                   (symbol-package proto-type))))
+                                           (symbol-name slot)))
+                   (symbol-package proto-type)))
           (t
            (intern (nstring-upcase (format nil "~a.~a"
                                            (symbol-name proto-type)
-                                           (symbol-name slot))
-                                   (symbol-package proto-type)))))))
+                                           (symbol-name slot)))
+                   (symbol-package proto-type))))))
            
 
 (defmacro with-collectors ((&rest collection-descriptions) &body body)
