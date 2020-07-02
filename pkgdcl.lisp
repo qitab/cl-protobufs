@@ -120,18 +120,6 @@
 
   (:shadow
    #:find-method)
-  (:import-from :closer-mop
-                #:class-slots
-                #:class-direct-slots
-                #:class-precedence-list
-                #:class-finalized-p
-                #:finalize-inheritance
-                #:slot-definition-name
-                #:slot-definition-type
-                #:slot-definition-initform
-                #:slot-definition-initfunction
-                #:slot-definition-readers
-                #:slot-definition-writers)
 
   ;; TODO(cgay): These are in use outside of cl-protobufs and should be removed or moved to the
   ;; interface package, as appropriate.
