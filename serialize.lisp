@@ -313,8 +313,7 @@ Parameters:
                                                          (make-tag key-class 1) buffer))
                           ; value types are arbitrary, non-map, non-repeated.
                           (iincf map-len (emit-non-repeated-field v val-class 2 buffer))
-                          ;todo(benkuehnert): + or i+ here?
-                          (+ ret-len (+ map-len (backpatch map-len)))))))
+                          (i+ ret-len (i+ map-len (backpatch map-len)))))))
                (loop for k being the hash-keys of value
                        using (hash-value v)
                      sum (serialize-pair k v)))))
@@ -865,7 +864,7 @@ Parameters:
                                                               ,vbuf))
                                ,(generate-non-repeated-field-serializer
                                  val-class 2 'v 'v vbuf 'map-len)
-                               (i+ ret-len (+ map-len (backpatch map-len)))))))
+                               (i+ ret-len (i+ map-len (backpatch map-len)))))))
                     (loop for k being the hash-keys of ,vval using (hash-value v)
                           sum (serialize-pair k v)))))))
           (t nil))))
