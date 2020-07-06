@@ -80,7 +80,7 @@ Parameters:
 
 (deftest test-lazy-field-schema (lazy-structure-tests)
   (let* ((container-message (proto:find-message 'container))
-         (inner-field (proto-impl:find-field container-message '%inner)))
+         (inner-field (proto-impl::find-field container-message '%inner)))
     (assert-true (proto-impl::proto-lazy-p inner-field))))
 
 (deftest test-lazy-field-serialize (lazy-structure-tests)

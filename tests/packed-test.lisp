@@ -108,7 +108,7 @@ Parameters:
 ;;   (deftest inner-packed-fast-function-test ()
 ;;     (dolist (class '(test-packed-inner test-packed-outer))
 ;;       ;; Generate fast serializers for the interesting messages
-;;       (eval (proto-impl:generate-serializer (proto-impl::find-message-for-class class))))
+;;       (eval (proto-impl::generate-serializer (proto-impl::find-message-for-class class))))
 
 ;;     (let* ((packed (make-instance 'test-packed-inner))
 ;;            (outer1 (make-instance 'test-packed-outer
@@ -128,8 +128,8 @@ Parameters:
 ;;   (deftest inner-packed-enum-fast-function-test ()
 ;;     (dolist (class '(test-packed-inner test-packed-outer))
 ;;       ;; Generate fast serializers for the interesting messages
-;;       (eval (proto-impl:generate-serializer (proto-impl::find-message-for-class class)))
-;;       (eval (proto-impl:generate-deserializer (proto-impl::find-message-for-class class))))
+;;       (eval (proto-impl::generate-serializer (proto-impl::find-message-for-class class)))
+;;       (eval (proto-impl::generate-deserializer (proto-impl::find-message-for-class class))))
 
 ;;     (let* ((packed (make-instance 'test-packed-inner))
 ;;            (outer1 (make-instance 'test-packed-outer

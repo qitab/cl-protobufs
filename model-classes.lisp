@@ -799,7 +799,7 @@ on the symbol if we are not in SBCL."
    "Sets a service METHOD to indicate that its input should not be deserialized prior to calling its
     server function.")
   (:method ((method method-descriptor))
-    (setf (proto-impl:proto-input-type method) nil)))
+    (setf (proto-impl::proto-input-type method) nil)))
 
 (defgeneric make-qualified-name (parent-desc name)
   (:documentation

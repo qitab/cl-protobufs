@@ -40,11 +40,11 @@ Parameters:
           (proto:find-service
            'cl-protobufs.protobuf-package-unittest1:package_test1
            'cl-protobufs.protobuf-package-unittest1:service-with-camel-spitting-input-output))
-         (method (proto-impl:find-method
+         (method (proto-impl::find-method
                   service
                   'cl-protobufs.protobuf-package-unittest1::record2f-lookup))
-         (input (proto-impl:proto-input-name method))
-         (output (proto-impl:proto-output-name method)))
+         (input (proto-impl::proto-input-name method))
+         (output (proto-impl::proto-output-name method)))
     ;; Input/output names must be fully qualified.
     (assert-true (string= "protobuf_package_unittest1.Record2fLookupRequest" input))
     (assert-true (string= "protobuf_package_unittest1.Record2fLookupResponse" output))))
@@ -54,11 +54,11 @@ Parameters:
           (proto:find-service
            'cl-protobufs.third-party.lisp.cl-protobufs.tests:service-test
            'cl-protobufs.third-party.lisp.cl-protobufs.tests:foo-service))
-         (method (proto-impl:find-method service 'cl-protobufs.third-party.lisp.cl-protobufs.tests::bar-method)))
-    (assert-true (eq :udp (proto-impl:find-option method "protocol")))
-    (assert-true (eql 30.0d0 (proto-impl:find-option method "deadline")))
-    (assert-true (eq t (proto-impl:find-option method "duplicate_suppression")))
-    (assert-true (eql -123 (proto-impl:find-option method "client_logging")))
-    (assert-true (eq :privacy-and-integrity (proto-impl:find-option method "security_level")))
-    (assert-true (equal "admin" (proto-impl:find-option method "security_label")))
-    (assert-true (eql 42 (proto-impl:find-option method "legacy_client_initial_tokens")))))
+         (method (proto-impl::find-method service 'cl-protobufs.third-party.lisp.cl-protobufs.tests::bar-method)))
+    (assert-true (eq :udp (proto-impl::find-option method "protocol")))
+    (assert-true (eql 30.0d0 (proto-impl::find-option method "deadline")))
+    (assert-true (eq t (proto-impl::find-option method "duplicate_suppression")))
+    (assert-true (eql -123 (proto-impl::find-option method "client_logging")))
+    (assert-true (eq :privacy-and-integrity (proto-impl::find-option method "security_level")))
+    (assert-true (equal "admin" (proto-impl::find-option method "security_label")))
+    (assert-true (eql 42 (proto-impl::find-option method "legacy_client_initial_tokens")))))

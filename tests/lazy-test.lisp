@@ -25,10 +25,10 @@ Parameters:
 
 (deftest test-lazy-field-schema (lazy-tests)
   (let* ((container-message (proto:find-message 'container))
-         (container-fields (proto-impl:proto-fields container-message))
+         (container-fields (proto-impl::proto-fields container-message))
          (inner-field (find 'inner
                             container-fields
-                            :key #'proto-impl:proto-external-field-name)))
+                            :key #'proto-impl::proto-external-field-name)))
     (assert-true (proto-impl::proto-lazy-p inner-field))))
 
 (deftest test-lazy-field-serialize (lazy-tests)
