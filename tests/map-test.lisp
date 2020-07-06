@@ -24,15 +24,11 @@ Parameters:
     (assert (= (slot-value result 'clunit::failed) 0))
     (assert (= (slot-value result 'clunit::errors) 0))))
 
-;; Ideas for testing
-;; x Accessor function check
-;; - Serialize/deserialize pipe (check for raw bytes in middle)
-;; - Ensure there is a good error when we serialize a bad hashmap.
-;; - Optimized serialization
-;; - Print and ensure keys are sorted
-;; x Hashing to more complicated types (messages, nested messages)
-;; x ^ ensure we return right default value.
+; todo(benkuehnert):
+; - Test maps with aliased types as the value.
+; - Test map type text format
 
+; Tests that accessor functions are working: put, get, remove, has.
 (deftest accessor-check (map-tests)
   (let ((m (make-map-proto)))
     (assert-true (not (map-proto.has-map-field m)))
@@ -58,6 +54,8 @@ Parameters:
     (assert-equal (map-all.msgmap-get test 0) nil)
     (assert-equal (map-all.enummap-get test 0) :one)))
 
+
+; Verify that generic (de)serialization works.
 (deftest serialization-test (map-tests)
   (let ((test1 (make-map-proto :strval "test" :intval 1))
         (submsg1 (make-map-message.val-message :strval "one"))
@@ -80,6 +78,7 @@ Parameters:
       (assert-true (proto:proto-equal test2 t2res))
       (assert-true (proto:proto-equal test3 t3res)))))
 
+; Verify that optimized (de)serialization works.
 (deftest optimized-serialization-test (map-tests)
   (proto-impl:make-serializer map-proto)
   (proto-impl:make-serializer map-message.val-message)
