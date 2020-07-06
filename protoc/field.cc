@@ -1,3 +1,4 @@
+
 // Copyright 2016-2020 Google LLC
 //
 // Use of this source code is governed by an MIT-style
@@ -87,7 +88,9 @@ const std::string FieldLispType(const FieldDescriptor* field) {
     }
   }
 
-  if (field->type() == FieldDescriptor::TYPE_MESSAGE && !field->is_repeated())
+  if (field->type() == FieldDescriptor::TYPE_MESSAGE &&
+      !field->is_repeated() &&
+      !field->containing_type()->options().map_entry())
     return StrCat("(cl:or cl:null ", type, ")");
   if (field->is_required() || field->is_optional()) return type;
   if (field->is_repeated()) {

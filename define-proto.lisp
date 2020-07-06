@@ -616,34 +616,34 @@ Arguments:
 
     (with-gensyms (obj new-key new-val)
       `(
-        (declaim (inline ,public-getter-name))
-        (defun ,public-getter-name (,obj ,new-key)
-          (declare (type ,key-type ,new-key))
-          (the (values ,val-type t)
-               (multiple-value-bind (val flag)
-                   (gethash ,new-key (,hidden-accessor-name ,obj))
-                 (if flag
-                     (values val flag)
-                     (values ,val-default-form nil)))))
-
         (declaim (inline ,public-setter-name))
         (defun ,public-setter-name (,obj ,new-key ,new-val)
           (declare (type ,key-type ,new-key))
-          ; If the val type is a list, then must describe a message and be of the form
-          ; (or null [message-type]). This ensures that we type-check ,new-val against
-          ; the message type and disallow inserting nil into the map.
-          ,(if (listp val-type)
-               `(declare (type ,(third val-type) ,new-val))
-               `(declare (type ,val-type ,new-val)))
           (setf (bit (,is-set-accessor ,obj) ,index) 1)
           (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
 
-        (declaim (inline ,public-remove-name))
-        (defun ,public-remove-name (,obj ,new-key)
-          (declare (type ,key-type ,new-key))
-          (remhash ,new-key (,hidden-accessor-name ,obj))
-          (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
-              (setf (bit (,is-set-accessor ,obj) ,index) 0)))
+        ; If the map's value type is a message, then the default value returned
+        ; should be nil. However, we do not want to allow the user to insert nil
+        ; into the map, so this binding only applies to the clear and get functions.
+        ,@(let ((val-type (if (find-message val-type)
+                              (list 'or 'null val-type)
+                              val-type)))
+            `((declaim (inline ,public-getter-name))
+              (defun ,public-getter-name (,obj ,new-key)
+                (declare (type ,key-type ,new-key))
+                (the (values ,val-type t)
+                     (multiple-value-bind (val flag)
+                         (gethash ,new-key (,hidden-accessor-name ,obj))
+                       (if flag
+                           (values val flag)
+                           (values ,val-default-form nil)))))
+
+              (declaim (inline ,public-remove-name))
+              (defun ,public-remove-name (,obj ,new-key)
+                (declare (type ,key-type ,new-key))
+                (remhash ,new-key (,hidden-accessor-name ,obj))
+                (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
+                    (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
 
         (export '(,public-getter-name
                   ,public-setter-name
