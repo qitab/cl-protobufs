@@ -606,8 +606,8 @@ Arguments:
   (let* ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :map-get))
          (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
-         (key-type (map-descriptor-key-type (find-map (proto-class field))))
-         (val-type (map-descriptor-val-type (find-map (proto-class field))))
+         (key-type (map-descriptor-key-type (find-map-descriptor (proto-class field))))
+         (val-type (map-descriptor-val-type (find-map-descriptor (proto-class field))))
          (val-default-form (get-default-form val-type $empty-default))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
@@ -719,7 +719,7 @@ Arguments:
            proto-type public-slot-name slot-name field)
 
         ; Make special map forms.
-        ,@(when (typep (find-map (proto-class field)) 'map-descriptor)
+        ,@(when (typep (find-map-descriptor (proto-class field)) 'map-descriptor)
             (make-map-accessor-forms
              proto-type public-slot-name slot-name field))))))
 

@@ -233,8 +233,8 @@ Parameters:
 (defvar *maps* (make-hash-table :test 'eq)
   "Maps map names (symbols) to map-descriptor instances.")
 
-(declaim (inline find-map))
-(defun find-map (type)
+(declaim (inline find-map-descriptor))
+(defun find-map-descriptor (type)
   "Return a map-descriptor instance named by TYPE (a symbol)."
   (gethash type *maps*))
 

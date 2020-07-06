@@ -260,7 +260,7 @@ Parameters:
           ((typep (setq msg (and type (or (find-message type)
                                           (find-enum type)
                                           (find-type-alias type)
-                                          (find-map type))))
+                                          (find-map-descriptor type))))
                   'message-descriptor)
            (cond ((not value) 0)
                  ((eq (proto-message-type msg) :group)
@@ -629,7 +629,7 @@ Parameters:
                    (data))
               ;; If we are deseralizing a map type, we want to (create and) add
               ;; to an existing hash table in the CELL cons.
-              (let ((map-desc (find-map type)))
+              (let ((map-desc (find-map-descriptor type)))
                 (if map-desc
                     (progn
                       (unless (car cell)
@@ -765,7 +765,7 @@ Parameters:
                   (or (find-message class)
                       (find-enum class)
                       (find-type-alias class)
-                      (find-map class)))))
+                      (find-map-descriptor class)))))
     (cond ((and packed-p (packed-type-p class))
            `(iincf ,size (serialize-packed ,reader ,class ,index ,vbuf ,vector-p)))
           ((keywordp class)
@@ -829,7 +829,7 @@ Parameters:
                   (or (find-message class)
                       (find-enum class)
                       (find-type-alias class)
-                      (find-map class)))))
+                      (find-map-descriptor class)))))
     (cond ((keywordp class)
            (let ((tag (make-tag class index)))
              `(when ,boundp
@@ -1027,7 +1027,7 @@ Parameters:
                   (or (find-message class)
                       (find-enum class)
                       (find-type-alias class)
-                      (find-map class)))))
+                      (find-map-descriptor class)))))
     (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
              (if raw-p
                  `(list ,vbuf ,start ,end ,end-tag)
@@ -1127,7 +1127,7 @@ Parameters:
                   (or (find-message class)
                       (find-enum class)
                       (find-type-alias class)
-                      (find-map class)))))
+                      (find-map-descriptor class)))))
     (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
              (if raw-p
                  `(list ,vbuf ,start ,end ,end-tag)

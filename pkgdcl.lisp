@@ -129,6 +129,7 @@
    #:encode-string
    #:encode-uint32
    #:find-enum
+   #:find-map-descriptor
    #:find-field
    #:find-method
    #:find-option
