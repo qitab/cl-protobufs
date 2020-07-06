@@ -538,6 +538,15 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                  (insert-in (cdr field-list))))))))
 
 (defun deserialize-structure-object (message buffer index limit end-tag class)
+  "Deserialize a message.
+
+Parameters:
+  MESSAGE: The message-descriptor of the data to be deserialized
+  BUFFER: The buffer to read from.
+  INDEX: The index of the buffer to read from.
+  LIMIT: The upper bound of INDEX.
+  END-TAG: [For groups only] The tag which ends a group.
+  CLASS: The class which will be created and returned."
   (declare (type (simple-array (unsigned-byte 8)) buffer))
   ;; FIELD-MAP quickly translates a field number to its PROTO-FIELD object
   ;; without using linear scan
@@ -659,6 +668,17 @@ See field-descriptor for the distinction between index, offset, and bool-number.
 
 (defun deserialize-structure-object-field
     (type buffer index tag repeated-p lazy-p &optional (cell nil))
+  "Deserialize a single field from the wire, and return it.
+
+Parameters:
+  TYPE: The class of the field to deserialize.
+  BUFFER: The buffer to deserialize from.
+  INDEX: The index of the buffer to read.
+  TAG: The protobuf tag of the field to deserialize.
+  REPEATED-P: True if and only if the field is repeated
+  LAZY-P: True if and only if the field is lazy
+  CELL: [For repeated fields only]: The current list (or vector) of
+        deserialized objects to add to."
   (cond
     ((keywordp type) ; a wire-level primitive
      (cond ((and (packed-type-p type)
@@ -873,6 +893,15 @@ Parameters:
 ;;; Type-checking is done at the top-level methods specialized on 'symbol',
 ;;; so we turn off all type checking at the level of these functions
 (defun generate-field-serializer (msg field boundp reader vbuf size)
+  "Generate the serializer for a field.
+
+Parameters:
+  MSG: The containing message-descriptor.
+  FIELD: The field-descriptor for the field to serialize.
+  BOUNDP: A symbol which evaluates to true if the field is bound.
+  READER: A symbol which evaluates to the field's data.
+  VBUF: The buffer to write to.
+  SIZE: A symbol which stores the number of bytes serialized."
   (let ((vval (gensym "VAL")))
     (let* ((class  (proto-class field))
            (index  (proto-index field)))
@@ -936,6 +965,15 @@ Parameters:
           ,size)))))
 
 (defun generate-field-deserializer (message field vbuf vidx &key raw-p)
+  "Generate a deserializer for a single field.
+
+Parameters:
+  MESSAGE: The message-descriptor that contains the field.
+  FIELD: The field-descriptor to deserialize.
+  VBUF: The buffer to deserialize from.
+  VIDX: The index of the buffer to rea dfrom.
+  RAW-P: If true, return a list of the arguments passed to any recursive
+         deserialization call instead of calling the function."
   (let ((nslot nil)
         (rslot nil))
     (let* ((class  (proto-class field))
