@@ -424,7 +424,6 @@ Parameters:
   (check-type index integer)
   (let* ((slot      type-name)
          (name      (class-name->proto type-name))
-         (conc-name (conc-name-for-type type-name ""))
          (reader    (let ((msg-conc (proto-conc-name *protobuf*)))
                       (and msg-conc
                            (fintern "~A~A" msg-conc slot))))
