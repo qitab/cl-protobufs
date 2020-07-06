@@ -592,7 +592,7 @@ Arguments:
         (export '(,has-function-name ,clear-function-name ,public-accessor-name))))))
 
 
-(defun make-map-structure-class-forms (proto-type public-slot-name slot-name field)
+(defun make-map-accessor-forms (proto-type public-slot-name slot-name field)
   "This creates forms that define map accessors which are type safe. Using these will
 guarantee that the resulting map can be properly serialized, whereas if one modifies
 the underlying map (which is accessed via the make-common-forms-for-structure-class
@@ -603,8 +603,7 @@ Arguments:
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix).
   SLOT-NAME: Slot name for the field (with the #\% prefix).
   FIELD: The class object field definition of the field."
-  (let* ((public-getter-name (proto-slot-function-name proto-type public-slot-name :map-get))
-         (public-setter-name (proto-slot-function-name proto-type public-slot-name :map-put))
+  (let* ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :map-get))
          (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
          (key-type (map-descriptor-key-type (find-map (proto-class field))))
@@ -613,40 +612,44 @@ Arguments:
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
 
-    (with-gensyms (obj new-key new-val)
-      `(
-        (declaim (inline ,public-setter-name))
-        (defun ,public-setter-name (,obj ,new-key ,new-val)
-          (declare (type ,key-type ,new-key))
-          (setf (bit (,is-set-accessor ,obj) ,index) 1)
-          (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
+    `(
+      (declaim (inline (setf ,public-accessor-name)))
+      (defsetf ,public-accessor-name (new-key obj) (new-val)
+        `(progn
+           ; todo(benkuehnert): get this type checking working
+           ;(declare (type ,',key-type new-key))
+           ;(declare (type ,',val-type new-val))
+           (setf (bit (,',is-set-accessor ,obj) ,',index) 1)
+           (setf (gethash ,new-key (,',hidden-accessor-name ,obj)) ,new-val)))
 
-        ; If the map's value type is a message, then the default value returned
-        ; should be nil. However, we do not want to allow the user to insert nil
-        ; into the map, so this binding only applies to the clear and get functions.
-        ,@(let ((val-type (if (find-message val-type)
-                              (list 'or 'null val-type)
-                              val-type)))
-            `((declaim (inline ,public-getter-name))
-              (defun ,public-getter-name (,obj ,new-key)
-                (declare (type ,key-type ,new-key))
-                (the (values ,val-type t)
-                     (multiple-value-bind (val flag)
-                         (gethash ,new-key (,hidden-accessor-name ,obj))
-                       (if flag
-                           (values val flag)
-                           (values ,val-default-form nil)))))
+      ; If the map's value type is a message, then the default value returned
+      ; should be nil. However, we do not want to allow the user to insert nil
+      ; into the map, so this binding only applies to the clear and get functions.
+      ,@(let ((val-type (if (find-message val-type)
+                            (list 'or 'null val-type)
+                            val-type))
+              (obj (gensym "OBJ"))
+              (new-key (gensym "NEW-KEY"))
+              (new-val (gensym "NEW-VAL")))
+          `((declaim (inline ,public-accessor-name))
+            (defun ,public-accessor-name (,new-key ,obj)
+              (declare (type ,key-type ,new-key))
+              (the (values ,val-type t)
+                   (multiple-value-bind (val flag)
+                       (gethash ,new-key (,hidden-accessor-name ,obj))
+                     (if flag
+                         (values val flag)
+                         (values ,val-default-form nil)))))
 
-              (declaim (inline ,public-remove-name))
-              (defun ,public-remove-name (,obj ,new-key)
-                (declare (type ,key-type ,new-key))
-                (remhash ,new-key (,hidden-accessor-name ,obj))
-                (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
-                    (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
+            (declaim (inline ,public-remove-name))
+            (defun ,public-remove-name (,new-key ,obj)
+              (declare (type ,key-type ,new-key))
+              (remhash ,new-key (,hidden-accessor-name ,obj))
+              (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
+                  (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
 
-        (export '(,public-getter-name
-                  ,public-setter-name
-                  ,public-remove-name))))))
+      (export '(,public-accessor-name
+                ,public-remove-name)))))
 
 
 (defun make-structure-class-forms-lazy (proto-type field public-slot-name)
@@ -717,7 +720,7 @@ Arguments:
 
         ; Make special map forms.
         ,@(when (typep (find-map (proto-class field)) 'map-descriptor)
-            (make-map-structure-class-forms
+            (make-map-accessor-forms
              proto-type public-slot-name slot-name field))))))
 
 
