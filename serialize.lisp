@@ -877,8 +877,8 @@ Parameters:
                                ,(generate-non-repeated-field-serializer
                                  val-class 2 'v 'v vbuf 'map-len)
                                (i+ ret-len (i+ map-len (backpatch map-len)))))))
-                    (loop for k being the hash-keys of ,vval using (hash-value v)
-                          sum (serialize-pair k v)))))))
+                    (iincf ,size (loop for k being the hash-keys of ,vval using (hash-value v)
+                                       sum (serialize-pair k v))))))))
           (t nil))))
 
 ;;; Compile-time generation of serializers
