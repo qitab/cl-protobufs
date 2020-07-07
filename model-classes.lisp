@@ -368,14 +368,10 @@ Parameters:
 (defmethod make-load-form ((e enum-descriptor) &optional environment)
   (make-load-form-saving-slots e :environment environment))
 
-;; A Protobufs value within an enumeration
-;;
-;; TODO(cgay): [naming] proto-base has an INDEX field, but it's not indexing anything here; it's a
-;; random int32 value. And the VALUE field is in fact the name. Also shouldn't be (or null symbol).
 (defstruct (enum-value-descriptor (:include proto-base))
-  "The model class that represents a Protobufs enumeration value."
+  "The model class that represents a protobuf enum key/value pair."
   ;; The keyword symbol corresponding to a protobuf enum value.
-  (value nil :type (or null symbol)))
+  (name nil :type symbol))
 
 (defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
   (make-load-form-saving-slots desc :environment environment))

@@ -307,7 +307,7 @@
   (declare (type list enum-values)
            (type (unsigned-byte 32) tag))
   (locally (declare #.$optimize-serialization)
-    (let ((val (let ((e (find val enum-values :key #'enum-value-descriptor-value)))
+    (let ((val (let ((e (find val enum-values :key #'enum-value-descriptor-name)))
                  ;; This was not type-safe. What if E isn't found?
                  ;; It was emitting the low 32 bits of the NIL's machine representation.
                  ;; Seems perhaps better to emit something more concrete, namely 0.
@@ -332,7 +332,7 @@
       (declare (type fixnum sum))
       (map nil
            (lambda (val)
-             (let ((val (let ((e (find val enum-values :key #'enum-value-descriptor-value)))
+             (let ((val (let ((e (find val enum-values :key #'enum-value-descriptor-name)))
                           (unless e (error "No such val ~S in amongst ~S" val enum-values))
                           (enum-value-descriptor-index e))))
                (declare (type (unsigned-byte 32) val))
@@ -721,7 +721,7 @@
     (multiple-value-bind (val idx)
         (decode-int32 buffer index)
       (let ((val (let ((e (find val enum-values :key #'enum-value-descriptor-index)))
-                   (and e (enum-value-descriptor-value e)))))
+                   (and e (enum-value-descriptor-name e)))))
         (values val idx)))))
 
 (defun deserialize-packed-enum (enum-values buffer index)
@@ -747,7 +747,7 @@
                 (decode-int32 buffer idx)
               (let ((val (let ((e (find val enum-values
                                         :key #'enum-value-descriptor-index)))
-                           (and e (enum-value-descriptor-value e)))))
+                           (and e (enum-value-descriptor-name e)))))
                 (collect-value val)
                 (setq idx nidx)))))))))
 
@@ -807,8 +807,7 @@
          (lambda (val)
            ;; TODO(cgay): this (find val enum-values ...) is done in various places and only
            ;; sometimes does it assert the result is non-nil. Use an inline function.
-           (let ((idx (let ((e (find val enum-values
-                                     :key #'enum-value-descriptor-value)))
+           (let ((idx (let ((e (find val enum-values :key #'enum-value-descriptor-name)))
                         (and e (enum-value-descriptor-index e)))))
              (assert idx () "There is no enum value for ~S" val)
              (iincf sum (length32 (ldb (byte 32 0) idx)))))
