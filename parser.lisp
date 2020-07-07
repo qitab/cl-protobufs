@@ -382,7 +382,6 @@
                      ;; Try to put symbols into the right package
                      (make-package (string-upcase lisp-package-name) :use ())
                      *protobuf-package*)))
-    (setf (proto-lisp-package file-desc) lisp-package-name)
     (setq *protobuf-package* package)))
 
 (defmethod resolve-lisp-names ((file-desc file-descriptor))
@@ -406,11 +405,9 @@
   (let* ((package  (prog1 (parse-token stream)
                      (expect-char stream terminator () "package")
                      (maybe-skip-comments stream)))
-         (lisp-pkg (or (proto-lisp-package file-desc)
-                       (substitute #\- #\_ package))))
+         (lisp-pkg (substitute #\- #\_ package)))
     (setf (proto-package file-desc) package)
-    (unless (proto-lisp-package file-desc)
-      (set-lisp-package file-desc lisp-pkg))))
+    (set-lisp-package file-desc lisp-pkg)))
 
 (defun parse-proto-import (stream file-desc &optional (terminator #\;))
   "Parse a protobuf import line from STREAM and store it in FILE-DESC.
