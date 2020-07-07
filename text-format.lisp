@@ -138,9 +138,9 @@ Parameters:
             by (+ indent 2) and write a newline at
             the end.
           - If indent is t, then do not indent and
-            do not write a newline."
+            do not write a newline.
   NEWLINE-P: If t (and indent is a number) print a newline after. If false
-             then there will not be a newline printed after.
+             then there will not be a newline printed after."
   (when (or val (eq type :bool))
     (unless (eq indent 't)
         (format stream "~&~VT" (+ indent 2)))
