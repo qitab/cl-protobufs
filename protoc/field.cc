@@ -212,7 +212,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   std::map<std::string, std::string> vars;
   vars["name"] = FieldLispName(field);
   vars["tag"] = StrCat(field->number());
-  if(field->is_map()) {
+  if (field->is_map()) {
     vars["key-type"] = FieldLispType(field->message_type()->field(0));
     vars["val-type"] = FieldLispType(field->message_type()->field(1));
     printer->Print(vars,

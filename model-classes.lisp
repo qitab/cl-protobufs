@@ -360,6 +360,7 @@ Parameters:
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
 
 (defstruct map-descriptor
+  "The meta-object for a protobuf map"
   (class     nil :type symbol)
   (name      nil :type string)
   (key-class nil :type symbol) ; the :class of the key

@@ -276,7 +276,6 @@ Arguments:
                                            (symbol-name proto-type)
                                            (symbol-name slot)))
                    (symbol-package proto-type))))))
-           
 
 (defmacro with-collectors ((&rest collection-descriptions) &body body)
   "COLLECTION-DESCRIPTIONS is a list of clauses of the form (collection function).
@@ -376,9 +375,12 @@ Arguments:
 (deftype sfixed32 () '(signed-byte 32))
 (deftype sfixed64 () '(signed-byte 64))
 
-;; Converts from primtive lisp types to their associated keywords
-;; enum and message types are left alone.
 (defun proto-type->keyword (type)
+  "Converts from primitive lisp type to associated keywords.
+Enum and message types are left alone.
+
+Parameters:
+  TYPE: Lisp type to convert."
   (case type
     (string :string)
     (int32 :int32)

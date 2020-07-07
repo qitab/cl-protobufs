@@ -127,6 +127,20 @@ Parameters:
         nil))))
 
 (defun print-prim (val type field stream indent &optional (newline-p t))
+  "Print primitive value to stream
+Parameters:
+  VAL: The data for the value to print.
+  TYPE: The type of val.
+  FIELD: The field which contains this value.
+  STREAM: The stream to print to.
+  INDENT: Either a number or t.
+          - If indent is a number, indent this print
+            by (+ indent 2) and write a newline at
+            the end.
+          - If indent is t, then do not indent and
+            do not write a newline."
+  NEWLINE-P: If t (and indent is a number) print a newline after. If false
+             then there will not be a newline printed after.
   (when (or val (eq type :bool))
     (unless (eq indent 't)
         (format stream "~&~VT" (+ indent 2)))
