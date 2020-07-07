@@ -74,7 +74,7 @@ create the message structures that hold data. These are:
 
 DEFINE-ENUM:
 
-The define-enum macro creates a PROTOBUF-ENUM meta-object as well
+The define-enum macro creates a ENUM-DESCRIPTOR meta-object as well
 as a type with enum-name being (MEMBER :enum-1 :enum-2 ...).
 It also creates methods to access the default-enum, and convert
 from the enum keyword to the enum index and back.
@@ -213,26 +213,26 @@ e.g.:
 
 (defun %make-enum->numeral-table (enum-values)
   "Makes a hash table mapping enum values to numerals.
-ENUM-VALUES is a list of PROTOBUF-ENUM-VALUEs."
+ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs."
   `(case enum
      ,@(loop for v in enum-values
              collect
-             `(,(protobuf-enum-value-value v) ,(protobuf-enum-value-index v)))))
+             `(,(enum-value-descriptor-value v) ,(enum-value-descriptor-index v)))))
 
 (defun %make-numeral->enum-table (enum-values)
   "Makes a hash table mapping enum values to numerals.
-ENUM-VALUES is a list of PROTOBUF-ENUM-VALUEs."
+ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs."
   `(case numeral
      ,@(loop with mapped = (make-hash-table)
              for v in enum-values
-             for proto-index = (protobuf-enum-value-index v)
+             for proto-index = (enum-value-descriptor-index v)
              for already-set-p = (gethash proto-index mapped)
              unless already-set-p
                do
           (setf (gethash proto-index mapped) t)
              unless already-set-p
                collect
-             `(,proto-index ,(protobuf-enum-value-value v)))))
+             `(,proto-index ,(enum-value-descriptor-value v)))))
 
 (deftype numeral () "byte 32" '(signed-byte 32))
 
@@ -258,7 +258,7 @@ DEFAULT the default value if KEYWORD is a not contained in ENUM."))
 
 (defun make-enum<->numeral-forms (type enum-values)
   "Generates forms for enum<->numeral conversion functions.
-TYPE is the enum type name.  ENUM-VALUES is a list of PROTOBUF-ENUM-VALUEs."
+TYPE is the enum type name.  ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs."
   (let ((enum->numeral (fintern "~A->NUMERAL" type))
         (numeral->enum (fintern "NUMERAL->~A" type)))
     `(progn
@@ -299,16 +299,16 @@ with the lowest index value in ENUM-VALUES."
     (loop with smallest-index = nil
           for enum in enum-values
           when (or (not smallest-index)
-                   (< (protobuf-enum-value-index enum) smallest-index))
+                   (< (enum-value-descriptor-index enum) smallest-index))
             do
-       (setf smallest-index (protobuf-enum-value-index enum)
-             default-value (protobuf-enum-value-value enum)))
+       (setf smallest-index (enum-value-descriptor-index enum)
+             default-value (enum-value-descriptor-value enum)))
     `(defmethod enum-default-value ((e (eql ',type)))
        ,default-value)))
 
 (defun make-enum-constant-forms (type enum-values)
   "Generates forms for defining a constant for each enum value in ENUM-VALUES.
-TYPE is the enum type name.  ENUM-VALUES is a list of PROTOBUF-ENUM-VALUEs.
+TYPE is the enum type name.  ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs.
 
 Constant names are in the form of +<message_name>.<value_name>+ when the enum is defined in a
 message, and of +<value_name>+ when the enum is defined at top-level."
@@ -318,8 +318,8 @@ message, and of +<value_name>+ when the enum is defined at top-level."
          (scope (and dot (subseq enum-name 0 dot)))
          (constants
           (loop for v in enum-values
-                for c = (fintern "+~@[~A.~]~A+" scope (protobuf-enum-value-value v))
-                collect `(defconstant ,c ,(protobuf-enum-value-index v)))))
+                for c = (fintern "+~@[~A.~]~A+" scope (enum-value-descriptor-value v))
+                collect `(defconstant ,c ,(enum-value-descriptor-index v)))))
     `(progn
        ,@constants
        (export ',(mapcar #'second constants)))))
@@ -365,43 +365,42 @@ Parameters:
   TYPE: The name of the type.
   NAME: Override for the protobuf enum type name.
   CONC-NAME: Prefix to the defaultly generated protobuf enum name.
-  ALIAS-FOR: Make this enum an alias for another enum.
+  ALIAS-FOR: Make this enum an alias for another type.
   VALUES: The possible values for the enum in the form (name :index index)."
-  (let* ((name    (or name (class-name->proto type)))
-         (conc-name (conc-name-for-type type conc-name))
-         (enum  (make-protobuf-enum
-                  :class  type
-                  :name   name
-                  :alias-for (if (listp alias-for)
-                                 alias-for
-                                 (list alias-for)))))
-    (with-collectors ((vals  collect-val)
+  (let ((name (or name (class-name->proto type)))
+        (prefix (conc-name-for-type type conc-name)))
+    (with-collectors ((names collect-name) ; keyword symbols
                       (forms collect-form)
-                      (enum-values collect-enum-value))
+                      (value-descriptors collect-value-descriptor))
       ;; The middle value is :index, useful for readability of generated code...
-      (loop for (name nil index) in values do
-        (let* ((val-name  (kintern (if conc-name
-                                       (format nil "~A~A" conc-name name)
-                                       (symbol-name name))))
-               (enum-val  (make-protobuf-enum-value
-                            :index  index
-                            :value  val-name)))
-          (collect-val val-name)
-          (collect-enum-value enum-val)))
-      (setf (protobuf-enum-values enum) enum-values)
-      (cond ((and alias-for (not (eq type alias-for)))
-             ;; If we've got an alias, define a a type that is the subtype of
-             ;; the Lisp enum so that typep and subtypep work
-             (collect-form `(deftype ,type () ',alias-for)))
-            ((null alias-for)
-             ;; If no alias, define the Lisp enum type now
-             (collect-form `(deftype ,type () '(member ,@vals)))
-             (collect-form (make-enum<->numeral-forms type enum-values))
-             (collect-form (make-enum-constant-forms type enum-values))
-             (collect-form (make-enum-default type enum-values))))
-      (collect-form `(record-protobuf-object ',type ,enum :enum))
-      ;; Register it by the full symbol name.
-      (record-protobuf-object type enum :enum)
+      (loop for (name nil value) in values do
+        (let* ((val-name (kintern (if prefix
+                                      (format nil "~A~A" prefix name)
+                                      (symbol-name name))))
+               (val-desc (make-enum-value-descriptor
+                          :index value
+                          :value val-name)))
+          (collect-name val-name)
+          (collect-value-descriptor val-desc)))
+      (let ((enum (make-enum-descriptor
+                   :class  type
+                   :name   name
+                   :alias-for (if (listp alias-for)
+                                  alias-for
+                                  (list alias-for))
+                   :values value-descriptors)))
+        (cond ((and alias-for (not (eq type alias-for)))
+               ;; If we've got an alias, define a type that is a subtype of
+               ;; the Lisp enum so that typep and subtypep work.
+               (collect-form `(deftype ,type () ',alias-for)))
+              ((null alias-for)
+               (collect-form `(deftype ,type () '(member ,@names)))
+               (collect-form (make-enum<->numeral-forms type value-descriptors))
+               (collect-form (make-enum-constant-forms type value-descriptors))
+               (collect-form (make-enum-default type value-descriptors))))
+        (collect-form `(record-protobuf-object ',type ,enum :enum))
+        ;; Register it by the full symbol name.
+        (record-protobuf-object type enum :enum))
       ;; This is messy and should be fixed.
       ;; Enums define types and functions that will need to be called
       ;; when creating messages. As such they need to be first
@@ -1443,7 +1442,7 @@ Arguments
                            :qualified-name (make-qualified-name *protobuf*
                                                                 (or name
                                                                     (class-name->proto function)))
-                           :service-name (proto-impl:proto-name service)
+                           :service-name (proto-impl::proto-name service)
                            :client-stub client-fn
                            :server-stub server-fn
                            :input-type  input-type

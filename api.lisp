@@ -159,7 +159,9 @@ For repeated fields, returns a list of the encoded values, which may be NILs.")
               "There is no Protobufs message for the class ~S" class)
       (unless field
         (let* ((lisp-package (symbol-package class))
-               (lazy-slot (and lisp-package (intern (format nil "%~A" slot) lisp-package))))
+               (lazy-slot (and lisp-package
+                               (intern (nstring-upcase (format nil "%~A" slot))
+                                       lisp-package))))
           (assert lisp-package ()
                   "Lisp package is not found for message ~A" (proto-name message))
           (setf field (find-field message lazy-slot))

@@ -502,7 +502,7 @@ Parameters:
               (dolist (x fields)
                 (let* ((brief-field
                         (proto-impl::find-in-field-map
-                         (proto-impl:proto-index x) field-map))
+                         (proto-impl::proto-index x) field-map))
                        (full-field
                         (and brief-field (proto-impl::field-complex-field brief-field))))
                   (assert (eq full-field x))))
