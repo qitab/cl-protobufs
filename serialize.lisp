@@ -299,11 +299,7 @@ Parameters:
           ((typep msg 'map-descriptor)
            (let* ((tag (make-tag $wire-type-string index))
                   (key-class (map-descriptor-key-class msg))
-                  (val-class (map-descriptor-val-class msg))
-                  (val-msg  (and val-class (not (keywordp val-class))
-                                 (or (find-message val-class)
-                                     (find-enum val-class)
-                                     (findtype-alias val-class)))))
+                  (val-class (map-descriptor-val-class msg)))
              (flet ((serialize-pair (k v)
                       (let ((ret-len (encode-uint32 tag buffer))
                             (map-len 0))
@@ -868,11 +864,7 @@ Parameters:
           ((typep msg 'map-descriptor)
            (let* ((tag      (make-tag $wire-type-string index))
                   (key-class (map-descriptor-key-class msg))
-                  (val-class (map-descriptor-val-class msg))
-                  (val-msg   (and val-class (not (keywordp val-class))
-                                  (or (find-message val-class)
-                                      (find-enum val-class)
-                                      (find-type-alias val-class)))))
+                  (val-class (map-descriptor-val-class msg)))
              `(when ,boundp
                 (let ((,vval ,reader))
                   (flet ((serialize-pair (k v)
@@ -1169,11 +1161,7 @@ Parameters:
             ((typep msg 'map-descriptor)
              (let* ((start vidx)
                     (key-class (map-descriptor-key-class msg))
-                    (val-class (map-descriptor-val-class msg))
-                    (val-msg  (and val-class (not (keywordp val-class))
-                                   (or (find-message val-class)
-                                       (find-enum val-class)
-                                       (find-type-alias val-class)))))
+                    (val-class (map-descriptor-val-class msg)))
                (values
                 `(progn
                    ; if ,dest points to the "unset" placeholder, make a new hash-table
