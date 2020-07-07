@@ -231,11 +231,11 @@ Parameters:
         (find-type-alias type))))
 
 (defvar *enums* (make-hash-table :test 'eq)
-  "Maps enum names (symbols) to protobuf-enum instances.")
+  "Maps enum names (symbols) to enum-descriptor instances.")
 
 (declaim (inline find-enum))
 (defun find-enum (type)
-  "Return a protobuf-enum instance named by TYPE (a symbol)."
+  "Return a enum-descriptor instance named by TYPE (a symbol)."
   (gethash type *enums*))
 
 (defgeneric find-service (protobuf name)
@@ -352,24 +352,33 @@ Parameters:
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
 
 
-;; A Protobufs enumeration
-(defstruct protobuf-enum
-  "The meta-object for a protobuf-enum"
+(defstruct enum-descriptor
+  "Describes a protobuf enum."
+  ;; The symbol naming the Lisp type for this enum.
   (class nil :type (or null symbol))
+  ;; The string naming the protobuf type for this enum.
   (name nil :type (or null string))
-  (alias-for nil :type (list-of protobuf-enum-value))           ; the numeric value of the enum
-  (values nil :type (list-of protobuf-enum-value)))           ; the Lisp value of the enum
+  ;; Not sure what this is or why it was originally added. Based on the one existing test that uses
+  ;; it the type of this slot shouldn't be (list-of enum-value-descriptor). (SBCL doesn't seem to
+  ;; care.) Perhaps it can be deleted.
+  (alias-for nil :type (list-of enum-value-descriptor))
+  ;; The name and integer value of each enum element.
+  (values nil :type (list-of enum-value-descriptor)))
 
-(defmethod make-load-form ((e protobuf-enum) &optional environment)
+(defmethod make-load-form ((e enum-descriptor) &optional environment)
   (make-load-form-saving-slots e :environment environment))
 
 ;; A Protobufs value within an enumeration
-(defstruct (protobuf-enum-value (:include proto-base))
+;;
+;; TODO(cgay): [naming] proto-base has an INDEX field, but it's not indexing anything here; it's a
+;; random int32 value. And the VALUE field is in fact the name. Also shouldn't be (or null symbol).
+(defstruct (enum-value-descriptor (:include proto-base))
   "The model class that represents a Protobufs enumeration value."
-  (value nil :type (or null symbol)))           ; the Lisp value of the enum
+  ;; The keyword symbol corresponding to a protobuf enum value.
+  (value nil :type (or null symbol)))
 
-(defmethod make-load-form ((v protobuf-enum-value) &optional environment)
-  (make-load-form-saving-slots v :environment environment))
+(defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
+  (make-load-form-saving-slots desc :environment environment))
 
 ;; An object describing a Protobufs message. Confusingly most local variables that hold
 ;; instances of this struct are named MESSAGE, but the C API makes it clear that

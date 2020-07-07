@@ -65,7 +65,7 @@ Parameters:
                                            (if suppress-pretty-print
                                                (format stream "} ")
                                                (format stream "~&~VT}~%" indent)))))))
-                                  ((typep msg 'protobuf-enum)
+                                  ((typep msg 'enum-descriptor)
                                    (doseq (v (read-slot object slot reader))
                                      (print-enum v msg field stream
                                                  (or suppress-pretty-print indent))))
@@ -98,7 +98,7 @@ Parameters:
                                          (if suppress-pretty-print
                                              (format stream "} ")
                                              (format stream "~&~VT}~%" indent))))))
-                                  ((typep msg 'protobuf-enum)
+                                  ((typep msg 'enum-descriptor)
                                    (let ((v (read-slot object slot reader)))
                                      (when (and v (not (eql v (proto-default field))))
                                        (print-enum v msg field stream
@@ -161,9 +161,9 @@ Parameters:
       (format stream "~A: " (proto-name field))
       (format stream "~&~VT~A: " (+ indent 2) (proto-name field)))
     (let ((name (let ((e (find (keywordify val)
-                               (protobuf-enum-values enum)
-                               :key #'protobuf-enum-value-value)))
-                  (and e (protobuf-enum-value-value e)))))
+                               (enum-descriptor-values enum)
+                               :key #'enum-value-descriptor-value)))
+                  (and e (enum-value-descriptor-value e)))))
       (format stream "~A" name)
       (if (eq indent 't)
         (format stream " ")
@@ -234,12 +234,12 @@ Parameters:
                                      (when slot
                                        (pushnew slot rslots)
                                        (push obj (proto-slot-value object slot)))))
-                                  ((typep msg 'protobuf-enum)
+                                  ((typep msg 'enum-descriptor)
                                    (expect-char stream #\:)
                                    (let* ((name (parse-token stream))
-                                          (enum (find (keywordify name) (protobuf-enum-values msg)
-                                                      :key #'protobuf-enum-value-value))
-                                          (val  (and enum (protobuf-enum-value-value enum))))
+                                          (enum (find (keywordify name) (enum-descriptor-values msg)
+                                                      :key #'enum-value-descriptor-value))
+                                          (val  (and enum (enum-value-descriptor-value enum))))
                                      (when slot
                                        (pushnew slot rslots)
                                        (push val (proto-slot-value object slot)))))
@@ -279,12 +279,12 @@ Parameters:
                                    (let ((obj (deserialize type)))
                                      (when slot
                                        (setf (proto-slot-value object slot) obj))))
-                                  ((typep msg 'protobuf-enum)
+                                  ((typep msg 'enum-descriptor)
                                    (expect-char stream #\:)
                                    (let* ((name (parse-token stream))
-                                          (enum (find (keywordify name) (protobuf-enum-values msg)
-                                                      :key #'protobuf-enum-value-value))
-                                          (val  (and enum (protobuf-enum-value-value enum))))
+                                          (enum (find (keywordify name) (enum-descriptor-values msg)
+                                                      :key #'enum-value-descriptor-value))
+                                          (val  (and enum (enum-value-descriptor-value enum))))
                                      (when slot
                                        (setf (proto-slot-value object slot) val))))
                                   ((typep msg 'protobuf-type-alias)

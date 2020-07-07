@@ -490,7 +490,7 @@
                     ;; For an enum defined at top-level, just use the enum name.
                     enum-name))
          (enum (make-instance
-                'protobuf-enum
+                'enum-descriptor
                 :class class
                 :name name
                 :qualified-name (make-qualified-name desc name)
@@ -518,22 +518,19 @@
             (parse-proto-enum-value stream desc enum name))))))
 
 (defun parse-proto-enum-value (stream desc enum name)
-  "Parse a protobuf enum value from STREAM and store it into ENUM, which is a protobuf-enum
+  "Parse a protobuf enum value from STREAM and store it into ENUM, which is an enum-descriptor
    object. NAME is the name associated with the value. DESC is ignored."
   (declare (ignore desc))
-  (check-type enum protobuf-enum)
+  (check-type enum enum-descriptor)
   (expect-char stream #\= () "enum")
   (let* ((idx  (prog1 (parse-signed-int stream)
                  (parse-proto-field-options stream) ; options ignored for now
                  (expect-char stream #\; () "enum")
                  (maybe-skip-comments stream)))
-         (value (make-instance 'protobuf-enum-value
-                  :name  name
-                  :qualified-name (make-qualified-name enum name)
-                  :index idx
-                  :value (proto->enum-name name)
-                  :parent enum)))
-    (appendf (protobuf-enum-values enum) (list value))
+         (value (make-enum-value-descriptor
+                 :index idx
+                 :value (proto->enum-name name))))
+    (appendf (enum-descriptor-values enum) (list value))
     value))
 
 
