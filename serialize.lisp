@@ -221,17 +221,17 @@ Parameters:
                        (iincf size (+ (backpatch submessage-size)
                                       submessage-size)))))))
            size)
-          ((typep msg 'protobuf-enum)
+          ((typep msg 'enum-descriptor)
            ;; 'proto-packed-p' of enum types returns nil,
            ;; so packed enum fields won't be handled above
            (if packed-p
                (serialize-packed-enum
                 value
-                (protobuf-enum-values msg) index buffer)
+                (enum-descriptor-values msg) index buffer)
                (let ((tag (make-tag $wire-type-varint index)))
                  (doseq (v value size)
                    (iincf size
-                          (serialize-enum v (protobuf-enum-values msg) tag buffer))))))
+                          (serialize-enum v (enum-descriptor-values msg) tag buffer))))))
           ((typep msg 'protobuf-type-alias)
            (let* ((type (proto-proto-type msg))
                   (tag  (make-tag type index)))
@@ -292,8 +292,8 @@ Parameters:
                              (dolist (f (proto-fields msg))
                                (iincf submessage-size (emit-field value f buffer)))))
                       (+ tag-size (backpatch submessage-size) submessage-size))))))
-          ((typep msg 'protobuf-enum)
-           (serialize-enum value (protobuf-enum-values msg)
+          ((typep msg 'enum-descriptor)
+           (serialize-enum value (enum-descriptor-values msg)
                            (make-tag $wire-type-varint index)
                            buffer))
           ((typep msg 'map-descriptor)
@@ -548,10 +548,10 @@ Parameters:
   END-TAG: [For groups only] The tag which ends a group.
   CLASS: The class which will be created and returned."
   (declare (type (simple-array (unsigned-byte 8)) buffer))
-  ;; FIELD-MAP quickly translates a field number to its PROTO-FIELD object
-  ;; without using linear scan
   (let ((index (or index 0))
         (limit (or limit (length buffer)))
+        ;; This quickly translates a field number to its PROTO-FIELD object
+        ;; without using linear scan.
         (field-map (message-field-metadata-vector message))
         offset-list extension-list bool-map
         initargs initargs-final tag)
@@ -698,12 +698,12 @@ Parameters:
          (if enum
              (cond ((length-encoded-tag-p tag)
                     (multiple-value-bind (data new-index)
-                      (deserialize-packed-enum (protobuf-enum-values enum)
+                      (deserialize-packed-enum (enum-descriptor-values enum)
                                                buffer index)
                     (values (nreconc data (car cell)) new-index)))
                    (t
                     (multiple-value-bind (data new-index)
-                      (deserialize-enum (protobuf-enum-values enum)
+                      (deserialize-enum (enum-descriptor-values enum)
                                         buffer index)
                       (values (if repeated-p (cons data (car cell)) data)
                               new-index))))
@@ -792,16 +792,16 @@ Parameters:
                                  (let ((len ,(call-pseudo-method
                                               :serialize msg vval vbuf)))
                                    (iincf ,size (i+ len (backpatch len))))))))))
-          ((typep msg 'protobuf-enum)
+          ((typep msg 'enum-descriptor)
            (let ((tag (make-tag $wire-type-varint index)))
              (if packed-p
                  `(iincf ,size
-                         (serialize-packed-enum ,reader '(,@(protobuf-enum-values msg))
+                         (serialize-packed-enum ,reader '(,@(enum-descriptor-values msg))
                                                 ,index ,vbuf))
                  `(when ,boundp
                     (,iterator (,vval ,reader)
                                (iincf ,size (serialize-enum
-                                             ,vval '(,@(protobuf-enum-values msg))
+                                             ,vval '(,@(enum-descriptor-values msg))
                                              ,tag ,vbuf)))))))
           ((typep msg 'protobuf-type-alias)
            (let* ((class (proto-proto-type msg))
@@ -851,12 +851,12 @@ Parameters:
                       (with-placeholder (,vbuf)
                         (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
                           (iincf ,size (i+ len (backpatch len))))))))))
-          ((typep msg 'protobuf-enum)
+          ((typep msg 'enum-descriptor)
            (let ((tag (make-tag $wire-type-varint index)))
              `(when ,boundp
                 (let ((,vval ,reader))
                   (iincf ,size (serialize-enum
-                                ,vval '(,@(protobuf-enum-values msg))
+                                ,vval '(,@(enum-descriptor-values msg))
                                 ,tag ,vbuf))))))
           ((typep msg 'protobuf-type-alias)
            (let* ((class (proto-proto-type msg))
@@ -1076,17 +1076,17 @@ Parameters:
                             (push ,(call-deserializer msg vbuf 'payload-start vidx)
                                   ,dest))
                          (make-tag $wire-type-string index))))
-            ((typep msg 'protobuf-enum)
+            ((typep msg 'enum-descriptor)
              (let* ((tag (make-tag $wire-type-varint index))
                     (packed-tag (packed-tag index))
                     (non-packed-form `(multiple-value-bind (x idx)
                                           (deserialize-enum
-                                           '(,@(protobuf-enum-values msg)) ,vbuf ,vidx)
+                                           '(,@(enum-descriptor-values msg)) ,vbuf ,vidx)
                                         (setq ,vidx idx)
                                         (push x ,dest)))
                     (packed-form `(multiple-value-bind (x idx)
                                       (deserialize-packed-enum
-                                       '(,@(protobuf-enum-values msg))
+                                       '(,@(enum-descriptor-values msg))
                                        ,vbuf ,vidx)
                                     (setq ,vidx idx)
                                     ;; The reason for nreversing here is that a field that
@@ -1153,10 +1153,10 @@ Parameters:
                      (setq ,vidx (+ payload-start payload-len)
                            ,dest ,(call-deserializer msg vbuf 'payload-start vidx)))
                   (make-tag $wire-type-string index))))
-            ((typep msg 'protobuf-enum)
+            ((typep msg 'enum-descriptor)
              (values
               `(multiple-value-setq (,dest ,vidx)
-                 (deserialize-enum '(,@(protobuf-enum-values msg)) ,vbuf ,vidx))
+                 (deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
               (make-tag $wire-type-varint index)))
             ((typep msg 'protobuf-type-alias)
              (let ((class (proto-proto-type msg)))
