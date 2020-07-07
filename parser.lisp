@@ -528,7 +528,7 @@
                  (expect-char stream #\; () "enum")
                  (maybe-skip-comments stream)))
          (value (make-enum-value-descriptor
-                 :index idx
+                 :value idx
                  :name (proto->enum-name name))))
     (appendf (enum-descriptor-values enum) (list value))
     value))

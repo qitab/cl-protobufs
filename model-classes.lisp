@@ -84,14 +84,6 @@ Parameters:
   (:documentation
    "Shared attributes for most kinds of protobuf objects."))
 
-(defstruct proto-base
-  "Base structure for protobuf meta-objects."
-  (index nil :type (signed-byte 32)))
-
-;; TODO(jgodbout): Remove this temporary override.
-(defmethod proto-index ((proto-message proto-base))
-  (proto-base-index proto-message))
-
 (defun find-qualified-name (name protos
                             &key (proto-key #'proto-name) (full-key #'proto-qualified-name)
                                  relative-to)
@@ -368,10 +360,11 @@ Parameters:
 (defmethod make-load-form ((e enum-descriptor) &optional environment)
   (make-load-form-saving-slots e :environment environment))
 
-(defstruct (enum-value-descriptor (:include proto-base))
+(defstruct enum-value-descriptor
   "The model class that represents a protobuf enum key/value pair."
-  ;; The keyword symbol corresponding to a protobuf enum value.
-  (name nil :type symbol))
+  ;; The keyword symbol corresponding to the enum value key.
+  (name nil :type symbol)
+  (value nil :type (signed-byte 32)))
 
 (defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
   (make-load-form-saving-slots desc :environment environment))
