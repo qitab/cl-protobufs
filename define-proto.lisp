@@ -611,46 +611,39 @@ Arguments:
          (val-default-form (get-default-form val-type $empty-default))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
+    (with-gensyms (obj new-val new-key)
+      `(
+        (declaim (inline (setf ,public-accessor-name)))
+        (defun (setf ,public-accessor-name) (,new-val ,new-key ,obj)
+          (declare (type ,key-type ,new-key)
+                   (type ,val-type ,new-val))
+          (setf (bit (,is-set-accessor ,obj) ,index) 1)
+          (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
+        ; If the map's value type is a message, then the default value returned
+        ; should be nil. However, we do not want to allow the user to insert nil
+        ; into the map, so this binding only applies to the clear and get functions.
+        ,@(let ((val-type (if (find-message val-type)
+                              (list 'or 'null val-type)
+                              val-type)))
+            `((declaim (inline ,public-accessor-name))
+              (defun ,public-accessor-name (,new-key ,obj)
+                (declare (type ,key-type ,new-key))
+                (the (values ,val-type t)
+                     (multiple-value-bind (val flag)
+                         (gethash ,new-key (,hidden-accessor-name ,obj))
+                       (if flag
+                           (values val flag)
+                           (values ,val-default-form nil)))))
 
-    `(
-      (declaim (inline (setf ,public-accessor-name)))
-      (defsetf ,public-accessor-name (new-key obj) (new-val)
-        `(progn
-           ; todo(benkuehnert): get this type checking working
-           ;(declare (type ,',key-type new-key))
-           ;(declare (type ,',val-type new-val))
-           (setf (bit (,',is-set-accessor ,obj) ,',index) 1)
-           (setf (gethash ,new-key (,',hidden-accessor-name ,obj)) ,new-val)))
+              (declaim (inline ,public-remove-name))
+              (defun ,public-remove-name (,new-key ,obj)
+                (declare (type ,key-type ,new-key))
+                (remhash ,new-key (,hidden-accessor-name ,obj))
+                (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
+                    (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
 
-      ; If the map's value type is a message, then the default value returned
-      ; should be nil. However, we do not want to allow the user to insert nil
-      ; into the map, so this binding only applies to the clear and get functions.
-      ,@(let ((val-type (if (find-message val-type)
-                            (list 'or 'null val-type)
-                            val-type))
-              (obj (gensym "OBJ"))
-              (new-key (gensym "NEW-KEY"))
-              (new-val (gensym "NEW-VAL")))
-          `((declaim (inline ,public-accessor-name))
-            (defun ,public-accessor-name (,new-key ,obj)
-              (declare (type ,key-type ,new-key))
-              (the (values ,val-type t)
-                   (multiple-value-bind (val flag)
-                       (gethash ,new-key (,hidden-accessor-name ,obj))
-                     (if flag
-                         (values val flag)
-                         (values ,val-default-form nil)))))
-
-            (declaim (inline ,public-remove-name))
-            (defun ,public-remove-name (,new-key ,obj)
-              (declare (type ,key-type ,new-key))
-              (remhash ,new-key (,hidden-accessor-name ,obj))
-              (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
-                  (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
-
-      (export '(,public-accessor-name
-                ,public-remove-name)))))
-
+        (export '(,public-accessor-name
+                  ,public-remove-name))))))
 
 (defun make-structure-class-forms-lazy (proto-type field public-slot-name)
   "Makes forms for the lazy fields of a proto message using STRUCTURE-CLASS.
