@@ -367,40 +367,40 @@ Parameters:
   CONC-NAME: Prefix to the defaultly generated protobuf enum name.
   ALIAS-FOR: Make this enum an alias for another type.
   VALUES: The possible values for the enum in the form (name :index index)."
-  (let* ((name (or name (class-name->proto type)))
-         (conc-name (conc-name-for-type type conc-name))
-         (enum (make-enum-descriptor
-                :class  type
-                :name   name
-                :alias-for (if (listp alias-for)
-                               alias-for
-                               (list alias-for)))))
+  (let ((name (or name (class-name->proto type)))
+        (prefix (conc-name-for-type type conc-name)))
     (with-collectors ((names collect-name) ; keyword symbols
                       (forms collect-form)
                       (value-descriptors collect-value-descriptor))
       ;; The middle value is :index, useful for readability of generated code...
       (loop for (name nil value) in values do
-        (let* ((val-name (kintern (if conc-name
-                                      (format nil "~A~A" conc-name name)
+        (let* ((val-name (kintern (if prefix
+                                      (format nil "~A~A" prefix name)
                                       (symbol-name name))))
                (val-desc (make-enum-value-descriptor
                           :index value
                           :value val-name)))
           (collect-name val-name)
           (collect-value-descriptor val-desc)))
-      (setf (enum-descriptor-values enum) value-descriptors)
-      (cond ((and alias-for (not (eq type alias-for)))
-             ;; If we've got an alias, define a type that is a subtype of
-             ;; the Lisp enum so that typep and subtypep work.
-             (collect-form `(deftype ,type () ',alias-for)))
-            ((null alias-for)
-             (collect-form `(deftype ,type () '(member ,@names)))
-             (collect-form (make-enum<->numeral-forms type value-descriptors))
-             (collect-form (make-enum-constant-forms type value-descriptors))
-             (collect-form (make-enum-default type value-descriptors))))
-      (collect-form `(record-protobuf-object ',type ,enum :enum))
-      ;; Register it by the full symbol name.
-      (record-protobuf-object type enum :enum)
+      (let ((enum (make-enum-descriptor
+                   :class  type
+                   :name   name
+                   :alias-for (if (listp alias-for)
+                                  alias-for
+                                  (list alias-for))
+                   :values value-descriptors)))
+        (cond ((and alias-for (not (eq type alias-for)))
+               ;; If we've got an alias, define a type that is a subtype of
+               ;; the Lisp enum so that typep and subtypep work.
+               (collect-form `(deftype ,type () ',alias-for)))
+              ((null alias-for)
+               (collect-form `(deftype ,type () '(member ,@names)))
+               (collect-form (make-enum<->numeral-forms type value-descriptors))
+               (collect-form (make-enum-constant-forms type value-descriptors))
+               (collect-form (make-enum-default type value-descriptors))))
+        (collect-form `(record-protobuf-object ',type ,enum :enum))
+        ;; Register it by the full symbol name.
+        (record-protobuf-object type enum :enum))
       ;; This is messy and should be fixed.
       ;; Enums define types and functions that will need to be called
       ;; when creating messages. As such they need to be first

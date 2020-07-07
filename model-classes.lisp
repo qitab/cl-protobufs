@@ -355,9 +355,9 @@ Parameters:
 (defstruct enum-descriptor
   "Describes a protobuf enum."
   ;; The symbol naming the Lisp type for this enum.
-  (class nil :type (or null symbol))
+  (class nil :type symbol)
   ;; The string naming the protobuf type for this enum.
-  (name nil :type (or null string))
+  (name nil :type string)
   ;; Not sure what this is or why it was originally added. Based on the one existing test that uses
   ;; it the type of this slot shouldn't be (list-of enum-value-descriptor). (SBCL doesn't seem to
   ;; care.) Perhaps it can be deleted.
