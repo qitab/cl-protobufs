@@ -441,7 +441,7 @@ Parameters:
                   :class class
                   :qualified-name qual-name
                   :set-type :map
-                  :label '(:optional)
+                  :label :optional
                   :index index
                   :internal-field-name internal-slot-name
                   :external-field-name slot
