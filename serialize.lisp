@@ -894,22 +894,21 @@ Parameters:
   READER: A symbol which evaluates to the field's data.
   VBUF: The buffer to write to.
   SIZE: A symbol which stores the number of bytes serialized."
-  (let ((vval (gensym "VAL")))
-    (let* ((class  (proto-class field))
-           (index  (proto-index field)))
-      (when reader
-        (if (eq (proto-label field) :repeated)
-            (let ((vector-p (vector-field-p field))
-                  (packed-p (proto-packed field)))
-              (or (generate-repeated-field-serializer
-                   class index boundp reader vbuf size vector-p packed-p)
-                  (undefined-field-type "While generating 'serialize-object' for ~S,"
-                                        msg class field)))
-
-            (or (generate-non-repeated-field-serializer
-                 class index boundp reader vbuf size)
+  (let* ((class  (proto-class field))
+         (index  (proto-index field)))
+    (when reader
+      (if (eq (proto-label field) :repeated)
+          (let ((vector-p (vector-field-p field))
+                (packed-p (proto-packed field)))
+            (or (generate-repeated-field-serializer
+                 class index boundp reader vbuf size vector-p packed-p)
                 (undefined-field-type "While generating 'serialize-object' for ~S,"
-                                      msg class field)))))))
+                                      msg class field)))
+
+          (or (generate-non-repeated-field-serializer
+               class index boundp reader vbuf size)
+              (undefined-field-type "While generating 'serialize-object' for ~S,"
+                                    msg class field))))))
 
 ;; Note well: keep this in sync with the main 'serialize-object' method above
 (defun generate-serializer-body (message vobj vbuf size)
@@ -1159,8 +1158,7 @@ Parameters:
                    (setq ,dest (funcall #',(proto-deserializer msg) ,dest)))
                 (make-tag class index))))
             ((typep msg 'map-descriptor)
-             (let* ((start vidx)
-                    (key-class (map-descriptor-key-class msg))
+             (let* ((key-class (map-descriptor-key-class msg))
                     (val-class (map-descriptor-val-class msg)))
                (values
                 `(progn
