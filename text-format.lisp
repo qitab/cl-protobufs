@@ -117,8 +117,8 @@ Parameters:
                                          (val-class (map-descriptor-val-class msg))
                                          (val (read-slot object slot reader)))
                                      (if suppress-pretty-print
-                                         (format stream "~A:" (proto-name field))
-                                         (format stream "~&~VT~A:~%" (+ 2 indent) (proto-name field)))
+                                         (format stream "~A: {" (proto-name field))
+                                         (format stream "~&~VT~A: {~%" (+ 2 indent) (proto-name field)))
                                      (flet ((print-entry (k v)
                                               (format stream "~&~VT" (+ 4 indent))
                                               (print-prim k key-class nil stream nil)
@@ -128,7 +128,8 @@ Parameters:
                                                   (print-text-format v :stream stream
                                                                        :suppress-pretty-print t))
                                               (format stream "~%")))
-                                       (maphash #'print-entry val))))
+                                       (maphash #'print-entry val)
+                                       (format stream "~&~VT}" (+ indent 2)))))
 
                                   (t
                                    (undefined-field-type "While printing ~S to text format,"
