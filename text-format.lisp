@@ -85,7 +85,8 @@ Parameters:
                                                  (and (not suppress-pretty-print) indent))))
                                   ((typep (setq msg (and type (or (find-message type)
                                                                   (find-enum type)
-                                                                  (find-type-alias type))))
+                                                                  (find-type-alias type)
+                                                                  (find-map-descriptor type))))
                                           'message-descriptor)
                                    (let ((v (if slot (read-slot object slot reader) object)))
                                      (when v
@@ -110,6 +111,21 @@ Parameters:
                                              (type (proto-proto-type msg)))
                                          (print-prim v type field stream
                                                      (and (not suppress-pretty-print) indent))))))
+                                  ;; todo(benkuehnert): Sort output by key value/use specified format
+                                  ((typep msg 'map-descriptor)
+                                   (let ((key-class (map-descriptor-key-class msg))
+                                         (val-class (map-descriptor-val-class msg)))
+                                     (flet ((print-entry (k v)
+                                              (format stream "~&~VT" (+ 2 indent))
+                                              (print-prim k key-class nil stream nil)
+                                              (format stream "-> ")
+                                              (if (keywordp val-type)
+                                                  (print-prim v val-class nil stream nil)
+                                                  (print-text-format v :stream stream
+                                                                       :suppress-pretty-print t))
+                                              (format stream "~%")))
+                                       (maphash #'print-entry val)))
+
                                   (t
                                    (undefined-field-type "While printing ~S to text format,"
                                                          object type field)))))))))
@@ -125,7 +141,6 @@ Parameters:
             (format stream "}")
             (format stream "~&}~%"))
         nil))))
-
 
 (defun print-prim (val type field stream indent)
   "Print primitive value to stream
@@ -266,8 +281,8 @@ Parameters:
                                    (expect-char stream #\:)
                                    (let* ((name (parse-token stream))
                                           (enum (find (keywordify name) (enum-descriptor-values msg)
-                                                      :key #'enum-value-descriptor-value))
-                                          (val  (and enum (enum-value-descriptor-value enum))))
+                                                      :key #'enum-value-descriptor-name))
+                                          (val  (and enum (enum-value-descriptor-name enum))))
                                      (when slot
                                        (pushnew slot rslots)
                                        (push val (proto-slot-value object slot)))))
@@ -311,8 +326,8 @@ Parameters:
                                    (expect-char stream #\:)
                                    (let* ((name (parse-token stream))
                                           (enum (find (keywordify name) (enum-descriptor-values msg)
-                                                      :key #'enum-value-descriptor-value))
-                                          (val  (and enum (enum-value-descriptor-value enum))))
+                                                      :key #'enum-value-descriptor-name))
+                                          (val  (and enum (enum-value-descriptor-name enum))))
                                      (when slot
                                        (setf (proto-slot-value object slot) val))))
                                   ((typep msg 'protobuf-type-alias)

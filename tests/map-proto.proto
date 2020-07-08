@@ -1,0 +1,46 @@
+syntax = "proto2";
+
+package map_test;
+
+message MapAll {
+  message InnerMsg {
+    optional string strval = 1;
+  }
+  enum InnerEnum {
+    ONE = 0;
+    TWO = 1;
+  }
+  map<int32,int32> intmap = 1;
+  map<int32,string> stringmap = 2;
+  map<int32,InnerMsg> msgmap = 3;
+  map<int32,InnerEnum> enummap = 4;
+}
+
+message MapProto {
+  optional string strval = 1;
+  map<int32,string> map_field = 2;
+  optional int32 intval = 3;
+}
+
+message MapMessage {
+  message ValMessage {
+    optional string strval = 1;
+  }
+  map<int32,ValMessage> map_field = 1;
+}
+
+message MapEnum {
+  enum MyEnum {
+    ONE = 0;
+    TWO = 1;
+    THREE = 2;
+  }
+  optional int32 before = 1;
+  map<string,MyEnum> map_field = 2;
+  optional int32 after = 3;
+}
+
+message NestedMap {
+  optional string strval = 1;
+  optional MapProto subfield = 2;
+}

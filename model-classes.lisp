@@ -84,14 +84,6 @@ Parameters:
   (:documentation
    "Shared attributes for most kinds of protobuf objects."))
 
-(defstruct proto-base
-  "Base structure for protobuf meta-objects."
-  (index nil :type (signed-byte 32)))
-
-;; TODO(jgodbout): Remove this temporary override.
-(defmethod proto-index ((proto-message proto-base))
-  (proto-base-index proto-message))
-
 (defun find-qualified-name (name protos
                             &key (proto-key #'proto-name) (full-key #'proto-qualified-name)
                                  relative-to)
@@ -230,6 +222,14 @@ Parameters:
     (or (find-message type)
         (find-type-alias type))))
 
+(defvar *maps* (make-hash-table :test 'eq)
+  "Maps map names (symbols) to map-descriptor instances.")
+
+(declaim (inline find-map-descriptor))
+(defun find-map-descriptor (type)
+  "Return a map-descriptor instance named by TYPE (a symbol)."
+  (gethash type *maps*))
+
 (defvar *enums* (make-hash-table :test 'eq)
   "Maps enum names (symbols) to enum-descriptor instances.")
 
@@ -351,6 +351,17 @@ Parameters:
          (end2   (if (eql (char name2 0) #\() (- (length name2) 1) (length name2))))
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
 
+(defstruct map-descriptor
+  "The meta-object for a protobuf map"
+  (class     nil :type symbol)
+  (name      nil :type string)
+  (key-class nil :type symbol) ;; the :class of the key
+  (val-class nil :type symbol) ;; the :class of the value
+  (key-type nil :type symbol)  ;; the lisp type of the key
+  (val-type nil :type symbol)) ;; the lisp type of the value
+
+(defmethod make-load-form ((m map-descriptor) &optional environment)
+  (make-load-form-saving-slots m :environment environment))
 
 (defstruct enum-descriptor
   "Describes a protobuf enum."
@@ -368,14 +379,11 @@ Parameters:
 (defmethod make-load-form ((e enum-descriptor) &optional environment)
   (make-load-form-saving-slots e :environment environment))
 
-;; A Protobufs value within an enumeration
-;;
-;; TODO(cgay): [naming] proto-base has an INDEX field, but it's not indexing anything here; it's a
-;; random int32 value. And the VALUE field is in fact the name. Also shouldn't be (or null symbol).
-(defstruct (enum-value-descriptor (:include proto-base))
-  "The model class that represents a Protobufs enumeration value."
-  ;; The keyword symbol corresponding to a protobuf enum value.
-  (value nil :type (or null symbol)))
+(defstruct enum-value-descriptor
+  "The model class that represents a protobuf enum key/value pair."
+  ;; The keyword symbol corresponding to the enum value key.
+  (name nil :type symbol)
+  (value nil :type (signed-byte 32)))
 
 (defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
   (make-load-form-saving-slots desc :environment environment))
@@ -452,7 +460,8 @@ on the symbol if we are not in SBCL."
      (when (and (slot-boundp message 'qual-name) (proto-qualified-name message))
        (setf (gethash (proto-qualified-name message) *qualified-messages*)
              (proto-class message))))
-    (:alias (setf (gethash symbol *type-aliases*) message))))
+    (:alias (setf (gethash symbol *type-aliases*) message))
+    (:map (setf (gethash symbol *maps*) message))))
 
 (defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*
