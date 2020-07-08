@@ -291,6 +291,32 @@ The type-url must be of the form base-url/qualified-name.
 Creates an any message protobuf message given a protobuf MESSAGE
 and a BASE-URL.
 
+### Map Types
+
+This library supports map types. Defining a proto MSG with map field FIELD
+will generate the following functions:
+
+```lisp
+(defun msg.field-gethash (key object))
+```
+Return the value mapped from KEY in OBJECT. If there is no value set, this
+function returns the default value of the map's value type.
+
+```lisp
+(defun (setf (msg.field-gethash) (value key object)))
+```
+Set the hash of KEY to VALUE in OBJECT. An example of using this function
+would be:
+```lisp
+(setf (msg.field-gethash key object) value)
+```
+Which is in line with Common Lisp's `hash-table`.
+
+```lisp
+(defun msg.field-remhash (key object))
+```
+Remove the hash of KEY in OBJECT.
+
 ### Proto package-rpc2
 
 We will now discuss the api for  a protobuf service in a proto file.
