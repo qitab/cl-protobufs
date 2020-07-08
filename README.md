@@ -317,6 +317,14 @@ Which is in line with Common Lisp's `hash-table`.
 ```
 Remove the hash of KEY in OBJECT.
 
+These three functions are type checked, and interfacing with the map with
+these three functions alone will guarantee that (de)serialization functions
+as well as the `msg.has-field` function will work properly. However, if
+the user wants access to the underlying hash-table then they may use the
+generic accessor `(msg.field (object))` defined above (where `field` is a
+map field). Warning: this accessor is not type checked, so undefined behaviour
+may occur.
+
 ### Proto package-rpc2
 
 We will now discuss the api for  a protobuf service in a proto file.
