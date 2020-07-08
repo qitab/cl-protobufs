@@ -453,8 +453,7 @@ Parameters:
     `(progn
        define-map ; the type of this model
        map-desc   ; the model data.
-       nil        ; this slot is for definer forms, but this is must be done later
-                  ; in
+       ((record-protobuf-object ',class ,map-desc :map)) ;; forms necessary for defining the map
        ,mfield    ; the extra field-data object created by this macro
        ,mslot)))  ; the extra field-descriptor object created by this macro.
 

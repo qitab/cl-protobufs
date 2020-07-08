@@ -360,6 +360,9 @@ Parameters:
   (key-type nil :type symbol)  ; the lisp type of the key
   (val-type nil :type symbol)) ; the lisp type of the value
 
+(defmethod make-load-form ((m map-descriptor) &optional environment)
+  (make-load-form-saving-slots m :environment environment))
+
 (defstruct enum-descriptor
   "Describes a protobuf enum."
   ;; The symbol naming the Lisp type for this enum.
