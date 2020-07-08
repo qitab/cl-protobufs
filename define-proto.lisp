@@ -218,7 +218,7 @@ ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs."
   `(case enum
      ,@(loop for v in enum-values
              collect
-             `(,(enum-value-descriptor-value v) ,(enum-value-descriptor-index v)))))
+             `(,(enum-value-descriptor-name v) ,(enum-value-descriptor-value v)))))
 
 (defun %make-numeral->enum-table (enum-values)
   "Makes a hash table mapping enum values to numerals.
@@ -226,14 +226,12 @@ ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs."
   `(case numeral
      ,@(loop with mapped = (make-hash-table)
              for v in enum-values
-             for proto-index = (enum-value-descriptor-index v)
-             for already-set-p = (gethash proto-index mapped)
+             for enum-value = (enum-value-descriptor-value v)
+             for already-set-p = (gethash enum-value mapped)
              unless already-set-p
-               do
-          (setf (gethash proto-index mapped) t)
+               do (setf (gethash enum-value mapped) t)
              unless already-set-p
-               collect
-             `(,proto-index ,(enum-value-descriptor-value v)))))
+               collect `(,enum-value ,(enum-value-descriptor-name v)))))
 
 (deftype numeral () "byte 32" '(signed-byte 32))
 
@@ -297,13 +295,12 @@ return nil."
 an enum of type TYPE. The default type should be the enum
 with the lowest index value in ENUM-VALUES."
   (let ((default-value))
-    (loop with smallest-index = nil
+    (loop with smallest-value = nil
           for enum in enum-values
-          when (or (not smallest-index)
-                   (< (enum-value-descriptor-index enum) smallest-index))
-            do
-       (setf smallest-index (enum-value-descriptor-index enum)
-             default-value (enum-value-descriptor-value enum)))
+          when (or (not smallest-value)
+                   (< (enum-value-descriptor-value enum) smallest-value))
+            do (setf smallest-value (enum-value-descriptor-value enum)
+                     default-value (enum-value-descriptor-name enum)))
     `(defmethod enum-default-value ((e (eql ',type)))
        ,default-value)))
 
@@ -319,8 +316,8 @@ message, and of +<value_name>+ when the enum is defined at top-level."
          (scope (and dot (subseq enum-name 0 dot)))
          (constants
           (loop for v in enum-values
-                for c = (fintern "+~@[~A.~]~A+" scope (enum-value-descriptor-value v))
-                collect `(defconstant ,c ,(enum-value-descriptor-index v)))))
+                for c = (fintern "+~@[~A.~]~A+" scope (enum-value-descriptor-name v))
+                collect `(defconstant ,c ,(enum-value-descriptor-value v)))))
     `(progn
        ,@constants
        (export ',(mapcar #'second constants)))))
@@ -357,7 +354,7 @@ Parameters:
 
 (defmacro define-enum (type (&key name conc-name alias-for)
                        &body values)
-  "Define a lisp type given the data for a protobuf enum type.
+  "Define a Lisp type given the data for a protobuf enum type.
 Also generates conversion functions between enum values and numerals.  Function names are
 <enum_name>->NUMERAL and NUMERAL-><enum_name>, respectively.
 Both accept an optional default argument.
@@ -367,20 +364,19 @@ Parameters:
   NAME: Override for the protobuf enum type name.
   CONC-NAME: Prefix to the defaultly generated protobuf enum name.
   ALIAS-FOR: Make this enum an alias for another type.
-  VALUES: The possible values for the enum in the form (name :index index)."
+  VALUES: The possible values for the enum in the form (name :index value)."
   (let ((name (or name (class-name->proto type)))
         (prefix (conc-name-for-type type conc-name)))
     (with-collectors ((names collect-name) ; keyword symbols
                       (forms collect-form)
                       (value-descriptors collect-value-descriptor))
       ;; The middle value is :index, useful for readability of generated code...
+      ;; (Except that the value is not actually an index, nor is the slot called index anymore.)
       (loop for (name nil value) in values do
         (let* ((val-name (kintern (if prefix
                                       (format nil "~A~A" prefix name)
                                       (symbol-name name))))
-               (val-desc (make-enum-value-descriptor
-                          :index value
-                          :value val-name)))
+               (val-desc (make-enum-value-descriptor :value value :name val-name)))
           (collect-name val-name)
           (collect-value-descriptor val-desc)))
       (let ((enum (make-enum-descriptor

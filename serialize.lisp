@@ -125,16 +125,15 @@
 
 Parameters:
   OBJECT: The protobuf object which contains the field to be serialized.
-  FIELD: The field of the object to serialize.
+  FIELD: The field-descriptor describing which field of OBJECT to serialize.
   BUFFER: The buffer to serialize to."
   (declare (type field-descriptor field))
   (flet ((read-slot (object slot reader)
-           ;; Don't do a boundp check, we assume the object is fully populated
-           ;; Unpopulated slots should be "nullable" and will contain nil when empty
+           ;; Don't do a boundp check, we assume the object is fully populated.
+           ;; Unpopulated slots should be "nullable" and will contain nil when empty.
            (if reader
                (funcall reader object)
                (slot-value object slot))))
-    "Serialize FIELD in OBJECT to BUFFER"
     (unless
         (if (eq (slot-value field 'message-type) :extends)
             (has-extension object (slot-value field 'internal-field-name))
