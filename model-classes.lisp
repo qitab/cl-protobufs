@@ -355,10 +355,10 @@ Parameters:
   "The meta-object for a protobuf map"
   (class     nil :type symbol)
   (name      nil :type string)
-  (key-class nil :type symbol) ; the :class of the key
-  (val-class nil :type symbol) ; the :class of the value
-  (key-type nil :type symbol)  ; the lisp type of the key
-  (val-type nil :type symbol)) ; the lisp type of the value
+  (key-class nil :type symbol) ;; the :class of the key
+  (val-class nil :type symbol) ;; the :class of the value
+  (key-type nil :type symbol)  ;; the lisp type of the key
+  (val-type nil :type symbol)) ;; the lisp type of the value
 
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))

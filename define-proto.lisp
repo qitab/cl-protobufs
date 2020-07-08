@@ -451,11 +451,11 @@ Parameters:
                     :val-type val-type)))
     (record-protobuf-object class map-desc :map)
     `(progn
-       define-map ; the type of this model
-       map-desc   ; the model data.
+       define-map ;; the type of this model
+       map-desc   ;; the model data.
        ((record-protobuf-object ',class ,map-desc :map)) ;; forms necessary for defining the map
-       ,mfield    ; the extra field-data object created by this macro
-       ,mslot)))  ; the extra field-descriptor object created by this macro.
+       ,mfield    ;; the extra field-data object created by this macro
+       ,mslot)))  ;; the extra field-descriptor object created by this macro.
 
 (declaim (inline proto-%bytes))
 (defun proto-%bytes (obj)
@@ -613,9 +613,9 @@ Arguments:
                    (type ,val-type ,new-val))
           (setf (bit (,is-set-accessor ,obj) ,index) 1)
           (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
-        ; If the map's value type is a message, then the default value returned
-        ; should be nil. However, we do not want to allow the user to insert nil
-        ; into the map, so this binding only applies to the clear and get functions.
+        ;; If the map's value type is a message, then the default value returned
+        ;; should be nil. However, we do not want to allow the user to insert nil
+        ;; into the map, so this binding only applies to the clear and get functions.
         ,@(let ((val-type (if (find-message val-type)
                               (list 'or 'null val-type)
                               val-type)))
@@ -705,7 +705,7 @@ Arguments:
         ,@(make-common-forms-for-structure-class
            proto-type public-slot-name slot-name field)
 
-        ; Make special map forms.
+        ;; Make special map forms.
         ,@(when (typep (find-map-descriptor (proto-class field)) 'map-descriptor)
             (make-map-accessor-forms
              proto-type public-slot-name slot-name field))))))
