@@ -28,20 +28,20 @@ Parameters:
 ; - Test maps with aliased types as the value.
 ; - Test map type text format
 
-; Tests that accessor functions are working: setf, get, remove, has.
+; Tests that accessor functions are working: setf, gethash, remhash, has.
 (deftest accessor-check (map-tests)
   (let ((m (make-map-proto)))
     (assert-true (not (map-proto.has-map-field m)))
-    (setf (map-proto.map-field-get 1 m) "string")
-    (assert-true (string-equal (map-proto.map-field-get 1 m) "string"))
+    (setf (map-proto.map-field-gethash 1 m) "string")
+    (assert-true (string-equal (map-proto.map-field-gethash 1 m) "string"))
     (proto:clear m)
     (assert-true (not (map-proto.has-map-field m)))
     ;; ensure that clear made a new empty hash-table
-    (assert-true (string-equal (map-proto.map-field-get 1 m) ""))
-    (setf (map-proto.map-field-get 1 m) "string")
-    (map-proto.map-field-remove 1 m)
+    (assert-true (string-equal (map-proto.map-field-gethash 1 m) ""))
+    (setf (map-proto.map-field-gethash 1 m) "string")
+    (map-proto.map-field-remhash 1 m)
     ;; ensure that removing a key works
-    (assert-true (string-equal (map-proto.map-field-get 1 m) ""))
+    (assert-true (string-equal (map-proto.map-field-gethash 1 m) ""))
     ;; ensure that if removing a key causes the hash-table to be empty,
     ;; then the is-set vector is properly updated.
     (assert-false (has-field m 'map-field))))
@@ -49,10 +49,10 @@ Parameters:
 ; Verify that the map returns the correct default value when unset.
 (deftest default-check (map-tests)
   (let ((test (make-map-all)))
-    (assert-equal (map-all.intmap-get 0 test) 0)
-    (assert-equal (map-all.stringmap-get 0 test) "")
-    (assert-equal (map-all.msgmap-get 0 test) nil)
-    (assert-equal (map-all.enummap-get 0 test) :one)))
+    (assert-equal (map-all.intmap-gethash 0 test) 0)
+    (assert-equal (map-all.stringmap-gethash 0 test) "")
+    (assert-equal (map-all.msgmap-gethash 0 test) nil)
+    (assert-equal (map-all.enummap-gethash 0 test) :one)))
 
 
 ; Verify that generic (de)serialization works.
@@ -63,12 +63,12 @@ Parameters:
          (test2 (make-map-message))
          (test3 (make-map-enum))
          (test4 (make-nested-map :strval "test" :subfield test1)))
-    (setf (map-proto.map-field-get 1 test1) "one")
-    (setf (map-proto.map-field-get 2 test1) "two")
-    (setf (map-message.map-field-get 1 test2) submsg1)
-    (setf (map-message.map-field-get 2 test2) submsg2)
-    (setf (map-enum.map-field-get "one" test3)  :one)
-    (setf (map-enum.map-field-get "two" test3)  :two)
+    (setf (map-proto.map-field-gethash 1 test1) "one")
+    (setf (map-proto.map-field-gethash 2 test1) "two")
+    (setf (map-message.map-field-gethash 1 test2) submsg1)
+    (setf (map-message.map-field-gethash 2 test2) submsg2)
+    (setf (map-enum.map-field-gethash "one" test3)  :one)
+    (setf (map-enum.map-field-gethash "two" test3)  :two)
     (let* ((t1ser (serialize-object-to-bytes test1 'map-proto))
            (t2ser (serialize-object-to-bytes test2 'map-message))
            (t3ser (serialize-object-to-bytes test3 'map-enum))
@@ -100,12 +100,12 @@ Parameters:
          (test2 (make-map-message))
          (test3 (make-map-enum))
          (test4 (make-nested-map :strval "test" :subfield test1)))
-    (setf (map-proto.map-field-get 1 test1) "one")
-    (setf (map-proto.map-field-get 2 test1) "two")
-    (setf (map-message.map-field-get 1 test2) submsg1)
-    (setf (map-message.map-field-get 2 test2) submsg2)
-    (setf (map-enum.map-field-get "one" test3)  :one)
-    (setf (map-enum.map-field-get "two" test3)  :two)
+    (setf (map-proto.map-field-gethash 1 test1) "one")
+    (setf (map-proto.map-field-gethash 2 test1) "two")
+    (setf (map-message.map-field-gethash 1 test2) submsg1)
+    (setf (map-message.map-field-gethash 2 test2) submsg2)
+    (setf (map-enum.map-field-gethash "one" test3)  :one)
+    (setf (map-enum.map-field-gethash "two" test3)  :two)
     (let* ((t1ser (serialize-object-to-bytes test1 'map-proto))
            (t2ser (serialize-object-to-bytes test2 'map-message))
            (t3ser (serialize-object-to-bytes test3 'map-enum))

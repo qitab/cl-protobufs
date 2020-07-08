@@ -257,9 +257,9 @@ Arguments:
                     (:has 'has)
                     (:clear 'clear)
                     (:get nil)
-                    (:map-get 'get)
-                    (:map-rem 'remove))))
-    (cond ((member f-symbol '(get remove))
+                    (:map-get 'gethash)
+                    (:map-rem 'remhash))))
+    (cond ((member f-symbol '(gethash remhash))
            (intern (nstring-upcase (format nil "~a.~a-~a"
                                            (symbol-name proto-type)
                                            (symbol-name slot)
