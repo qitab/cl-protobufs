@@ -64,6 +64,7 @@ Inside of those macros there may also be define-* macros:
 - define-extend
 - define-service
 - define-type-alias
+- define-map
 
 The most common define-* macros we will see are the macros that
 define messages, which generate PROTOBUF-MESSAGE classes and
@@ -406,6 +407,56 @@ Parameters:
         (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
+
+(defmacro define-map (type-name &key key-type val-type index)
+"Define a lisp type given the data for a protobuf map type.
+
+Parameters:
+  TYPE-NAME: Map type name.
+  KEY-TYPE: The lisp type of the map's keys.
+  VAL-TYPE: The lisp type of the map's values.
+  INDEX: Index of this map type in the field."
+  (check-type index integer)
+  (let* ((slot      type-name)
+         (name      (class-name->proto type-name))
+         (reader    (let ((msg-conc (proto-conc-name *protobuf*)))
+                      (and msg-conc
+                           (fintern "~A~A" msg-conc slot))))
+         (internal-slot-name (fintern "%~A" slot))
+         (qual-name (make-qualified-name *protobuf* (slot-name->proto slot)))
+         (class (fintern (uncamel-case qual-name)))
+         (mslot  (make-field-data
+                  :internal-slot-name internal-slot-name
+                  :external-slot-name slot
+                  :type 'hash-table
+                  :initform '(make-hash-table)
+                  :accessor reader))
+         (mfield (make-instance 'field-descriptor
+                  :name (slot-name->proto slot)
+                  :type "map"
+                  :class class
+                  :qualified-name qual-name
+                  :set-type :map
+                  :label :optional
+                  :index index
+                  :internal-field-name internal-slot-name
+                  :external-field-name slot
+                  :reader reader))
+         (map-desc (make-map-descriptor
+                    :class class
+                    :name name
+                    :key-class (proto-type->keyword key-type)
+                    :val-class (proto-type->keyword val-type)
+                    :key-type key-type
+                    :val-type val-type)))
+    (record-protobuf-object class map-desc :map)
+    `(progn
+       define-map ;; the type of this model
+       map-desc   ;; the model data.
+       ((record-protobuf-object ',class ,map-desc :map)) ;; forms necessary for defining the map
+       ,mfield    ;; the extra field-data object created by this macro
+       ,mslot)))  ;; the extra field-descriptor object created by this macro.
+
 (declaim (inline proto-%bytes))
 (defun proto-%bytes (obj)
   "Returns the %bytes field of the proto object OBJ."
@@ -534,6 +585,60 @@ Arguments:
 
         (export '(,has-function-name ,clear-function-name ,public-accessor-name))))))
 
+
+(defun make-map-accessor-forms (proto-type public-slot-name slot-name field)
+  "This creates forms that define map accessors which are type safe. Using these will
+guarantee that the resulting map can be properly serialized, whereas if one modifies
+the underlying map (which is accessed via the make-common-forms-for-structure-class
+function) then there is no guarantee on the serialize function working properly.
+
+Arguments:
+  PROTO-TYPE: The Lisp type name of the proto message.
+  PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix).
+  SLOT-NAME: Slot name for the field (with the #\% prefix).
+  FIELD: The class object field definition of the field."
+  (let* ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :map-get))
+         (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
+         (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
+         (key-type (map-descriptor-key-type (find-map-descriptor (proto-class field))))
+         (val-type (map-descriptor-val-type (find-map-descriptor (proto-class field))))
+         (val-default-form (get-default-form val-type $empty-default))
+         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
+         (index (proto-field-offset field)))
+    (with-gensyms (obj new-val new-key)
+      `(
+        (declaim (inline (setf ,public-accessor-name)))
+        (defun (setf ,public-accessor-name) (,new-val ,new-key ,obj)
+          (declare (type ,key-type ,new-key)
+                   (type ,val-type ,new-val))
+          (setf (bit (,is-set-accessor ,obj) ,index) 1)
+          (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
+        ;; If the map's value type is a message, then the default value returned
+        ;; should be nil. However, we do not want to allow the user to insert nil
+        ;; into the map, so this binding only applies to the clear and get functions.
+        ,@(let ((val-type (if (find-message val-type)
+                              (list 'or 'null val-type)
+                              val-type)))
+            `((declaim (inline ,public-accessor-name))
+              (defun ,public-accessor-name (,new-key ,obj)
+                (declare (type ,key-type ,new-key))
+                (the (values ,val-type t)
+                     (multiple-value-bind (val flag)
+                         (gethash ,new-key (,hidden-accessor-name ,obj))
+                       (if flag
+                           (values val flag)
+                           (values ,val-default-form nil)))))
+
+              (declaim (inline ,public-remove-name))
+              (defun ,public-remove-name (,new-key ,obj)
+                (declare (type ,key-type ,new-key))
+                (remhash ,new-key (,hidden-accessor-name ,obj))
+                (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
+                    (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
+
+        (export '(,public-accessor-name
+                  ,public-remove-name))))))
+
 (defun make-structure-class-forms-lazy (proto-type field public-slot-name)
   "Makes forms for the lazy fields of a proto message using STRUCTURE-CLASS.
 
@@ -598,7 +703,12 @@ Arguments:
                `(,hidden-accessor-name ,obj)))
 
         ,@(make-common-forms-for-structure-class
-           proto-type public-slot-name slot-name field)))))
+           proto-type public-slot-name slot-name field)
+
+        ;; Make special map forms.
+        ,@(when (typep (find-map-descriptor (proto-class field)) 'map-descriptor)
+            (make-map-accessor-forms
+             proto-type public-slot-name slot-name field))))))
 
 
 (let ((default-form (make-hash-table)))
@@ -651,7 +761,8 @@ Arguments:
               (eq (first type) 'cl:or)
               (eq (second type) 'cl:null))
          nil)
-        ;; The only possibility left is we have an enum.
+        ((eq type :map)
+         '(make-hash-table))
         ((enum-default-value `,type) (enum-default-value `,type))
         (t `(enum-default-value ',type))))))
 
@@ -796,14 +907,14 @@ Arguments:
              (assert (eq (car result) 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-type-form (cdr result))))
-          ((define-extension define-group)
+          ((define-extension define-group define-map)
            (destructuring-bind (&optional progn model-type model definers extra-field extra-slot)
                (macroexpand-1 field env)
              (assert (eq progn 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-form definers)
              (case model-type
-               ((define-group)
+               ((define-group define-map)
                 (when extra-slot
                   (collect-slot extra-slot))
                 (setf (proto-field-offset extra-field) field-offset)
@@ -1190,14 +1301,14 @@ Arguments:
              (assert (eq (car result) 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-form (cdr result))))
-          ((define-extension define-group)
+          ((define-extension define-group define-map)
            (destructuring-bind (&optional progn model-type model definers extra-field extra-slot)
                (macroexpand-1 field env)
              (assert (eq progn 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-type-form definers)
              (case model-type
-               ((define-group)
+               ((define-group define-map)
                 (setf (proto-field-offset extra-field) field-offset)
                 (incf field-offset)
                 (collect-non-lazy-field extra-field)

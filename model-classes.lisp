@@ -222,6 +222,14 @@ Parameters:
     (or (find-message type)
         (find-type-alias type))))
 
+(defvar *maps* (make-hash-table :test 'eq)
+  "Maps map names (symbols) to map-descriptor instances.")
+
+(declaim (inline find-map-descriptor))
+(defun find-map-descriptor (type)
+  "Return a map-descriptor instance named by TYPE (a symbol)."
+  (gethash type *maps*))
+
 (defvar *enums* (make-hash-table :test 'eq)
   "Maps enum names (symbols) to enum-descriptor instances.")
 
@@ -343,6 +351,17 @@ Parameters:
          (end2   (if (eql (char name2 0) #\() (- (length name2) 1) (length name2))))
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
 
+(defstruct map-descriptor
+  "The meta-object for a protobuf map"
+  (class     nil :type symbol)
+  (name      nil :type string)
+  (key-class nil :type symbol) ;; the :class of the key
+  (val-class nil :type symbol) ;; the :class of the value
+  (key-type nil :type symbol)  ;; the lisp type of the key
+  (val-type nil :type symbol)) ;; the lisp type of the value
+
+(defmethod make-load-form ((m map-descriptor) &optional environment)
+  (make-load-form-saving-slots m :environment environment))
 
 (defstruct enum-descriptor
   "Describes a protobuf enum."
@@ -441,7 +460,8 @@ on the symbol if we are not in SBCL."
      (when (and (slot-boundp message 'qual-name) (proto-qualified-name message))
        (setf (gethash (proto-qualified-name message) *qualified-messages*)
              (proto-class message))))
-    (:alias (setf (gethash symbol *type-aliases*) message))))
+    (:alias (setf (gethash symbol *type-aliases*) message))
+    (:map (setf (gethash symbol *maps*) message))))
 
 (defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*

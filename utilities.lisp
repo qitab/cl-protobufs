@@ -249,24 +249,33 @@
 Arguments:
   PROTO-TYPE: The symbol naming a protobuf message, group, etc.
   SLOT: The symbol naming a protobuf field.
-  FUNCTION-TYPE: The type of function name to retrieve: :has, :get, or :clear"
+  FUNCTION-TYPE: The type of function name to retrieve: :has, :get, or :clear.
+                 This can also be :map-get or :map-rem for the special map functions."
   (declare (type symbol proto-type slot)
-           (type (member :has :get :clear) function-type))
+           (type (member :has :get :clear :map-get :map-rem) function-type))
   (let ((f-symbol (ecase function-type
                     (:has 'has)
                     (:clear 'clear)
-                    (:get nil))))
-    (if f-symbol
-        (intern (nstring-upcase (format nil "~a.~a-~a"
-                                        (symbol-name proto-type)
-                                        f-symbol
-                                        (symbol-name slot)))
-                (symbol-package proto-type))
-        (intern (nstring-upcase (format nil "~a.~a"
-                                        (symbol-name proto-type)
-                                        (symbol-name slot)))
-                (symbol-package proto-type)))))
-
+                    (:get nil)
+                    (:map-get 'gethash)
+                    (:map-rem 'remhash))))
+    (cond ((member f-symbol '(gethash remhash))
+           (intern (nstring-upcase (format nil "~a.~a-~a"
+                                           (symbol-name proto-type)
+                                           (symbol-name slot)
+                                           f-symbol))
+                   (symbol-package proto-type)))
+          (f-symbol
+           (intern (nstring-upcase (format nil "~a.~a-~a"
+                                           (symbol-name proto-type)
+                                           f-symbol
+                                           (symbol-name slot)))
+                   (symbol-package proto-type)))
+          (t
+           (intern (nstring-upcase (format nil "~a.~a"
+                                           (symbol-name proto-type)
+                                           (symbol-name slot)))
+                   (symbol-package proto-type))))))
 
 (defmacro with-collectors ((&rest collection-descriptions) &body body)
   "COLLECTION-DESCRIPTIONS is a list of clauses of the form (collection function).
@@ -346,7 +355,6 @@ Arguments:
       '(array * (0))
       '(array * (*))))      ; a 1-dimensional array of any type
 
-
 ;; This corresponds to the :bytes protobuf type
 (deftype byte-vector () '(array (unsigned-byte 8) (*)))
 
@@ -366,6 +374,26 @@ Arguments:
 (deftype  fixed64 () '(unsigned-byte 64))
 (deftype sfixed32 () '(signed-byte 32))
 (deftype sfixed64 () '(signed-byte 64))
+
+(defun proto-type->keyword (type)
+  "Converts from primitive lisp type to associated keywords.
+Enum and message types are left alone.
+
+Parameters:
+  TYPE: Lisp type to convert."
+  (case type
+    (string :string)
+    (int32 :int32)
+    (int64 :int64)
+    (uint32 :uint32)
+    (uint64 :uint64)
+    (sint32 :sint32)
+    (sint64 :sint64)
+    (fixed32 :fixed32)
+    (fixed64 :fixed64)
+    (sfixed32 :sfixed64)
+    (sfixed64 :sfixed64)
+    (t type)))
 
 (defun fixed-width-integer-type-p (type)
   "Check whether TYPE can be serialized in a fixed number of bits."

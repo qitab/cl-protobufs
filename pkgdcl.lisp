@@ -67,6 +67,7 @@
    ;; Code generation
    #:define-schema
    #:define-enum
+   #:define-map
    #:define-message
    #:define-extend
    #:define-extension
@@ -127,6 +128,7 @@
    #:encode-string
    #:encode-uint32
    #:find-enum
+   #:find-map-descriptor
    #:find-field
    #:find-method
    #:find-option
