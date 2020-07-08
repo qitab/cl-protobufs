@@ -211,8 +211,8 @@ Parameters:
       (format stream "~A: " (proto-name field)))
     (let* ((e (find (keywordify val)
                     (enum-descriptor-values enum)
-                    :key #'enum-value-descriptor-value))
-           (value (and e (enum-value-descriptor-value e)))
+                    :key #'enum-value-descriptor-name))
+           (value (and e (enum-value-descriptor-name e)))
            (proto-keyword-value (substitute #\_ #\- (string value))))
       (format stream "~A" proto-keyword-value)
       (if indent
