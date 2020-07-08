@@ -187,11 +187,12 @@ Parameters:
     (if indent
       (format stream "~&~VT~A: " (+ indent 2) (proto-name field))
       (format stream "~A: " (proto-name field)))
-    (let ((name (let ((e (find (keywordify val)
-                               (enum-descriptor-values enum)
-                               :key #'enum-value-descriptor-value)))
-                  (and e (enum-value-descriptor-value e)))))
-      (format stream "~A" name)
+    (let* ((e (find (keywordify val)
+                    (enum-descriptor-values enum)
+                    :key #'enum-value-descriptor-value))
+           (value (and e (enum-value-descriptor-value e)))
+           (proto-keyword-value (substitute #\_ #\- (string value))))
+      (format stream "~A" proto-keyword-value)
       (if indent
         (format stream "~%")
         (format stream " ")))))
