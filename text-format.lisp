@@ -114,17 +114,21 @@ Parameters:
                                   ;; todo(benkuehnert): Sort output by key value/use specified format
                                   ((typep msg 'map-descriptor)
                                    (let ((key-class (map-descriptor-key-class msg))
-                                         (val-class (map-descriptor-val-class msg)))
+                                         (val-class (map-descriptor-val-class msg))
+                                         (val (read-slot object slot reader)))
+                                     (if suppress-pretty-print
+                                         (format stream "~A:" (proto-name field))
+                                         (format stream "~&~VT~A:~%" (+ 2 indent) (proto-name field)))
                                      (flet ((print-entry (k v)
-                                              (format stream "~&~VT" (+ 2 indent))
+                                              (format stream "~&~VT" (+ 4 indent))
                                               (print-prim k key-class nil stream nil)
                                               (format stream "-> ")
-                                              (if (keywordp val-type)
+                                              (if (keywordp val-class)
                                                   (print-prim v val-class nil stream nil)
                                                   (print-text-format v :stream stream
                                                                        :suppress-pretty-print t))
                                               (format stream "~%")))
-                                       (maphash #'print-entry val)))
+                                       (maphash #'print-entry val))))
 
                                   (t
                                    (undefined-field-type "While printing ~S to text format,"
@@ -148,7 +152,9 @@ Parameters:
 Parameters:
   VAL: The data for the value to print.
   TYPE: The type of val.
-  FIELD: The field which contains this value.
+  FIELD: The field which contains this value. This parameter
+         can be nil. In this case, the name of the field will
+         not be printed.
   STREAM: The stream to print to.
   INDENT: Either a number or nil.
           - If indent is a number, indent this print
@@ -157,8 +163,9 @@ Parameters:
           - If indent is nil, then do not indent and
             do not write a newline."
   (when (or val (eq type :bool))
-    (if indent
-      (format stream "~&~VT~A: " (+ indent 2) (proto-name field))
+    (when indent
+      (format stream "~&~VT" (+ indent 2)))
+    (when field
       (format stream "~A: " (proto-name field)))
     (ecase type
       ((:int32 :uint32 :int64 :uint64 :sint32 :sint64
