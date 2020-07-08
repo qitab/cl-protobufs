@@ -41,6 +41,6 @@ message MapEnum {
 }
 
 message NestedMap {
-  optional string intval = 1;
-  repeated MapProto  subfield = 2;
+  optional string strval = 1;
+  optional MapProto subfield = 2;
 }
