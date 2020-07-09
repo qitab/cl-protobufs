@@ -193,9 +193,16 @@
            (t
             (values (class-name->proto type) type))))))
 
-(defun primitive-p (type)
-  "Returns true if the given Protobufs type is a scalar type."
-  
+(defun scalarp (type)
+  "Returns true if the given Protobufs type is a scalar type. Scalar types
+are defined by the protobuf documentation. The symbol type is included here,
+as it is just a renaming of the string type.
+
+https://developers.google.com/protocol-buffers/docs/proto#scalar "
+  (member type '(:double :float :int32 :int64 :uint32 :uint64 :sint32
+                 :sint32 :sint64 :fixed32 :fixed64 :sfixed32 :sfixed64
+                 :bool :string :bytes :symbol)))
+
 
 (defun packed-type-p (type)
   "Returns true if the given Protobufs type can use a packed field."

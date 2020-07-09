@@ -1629,8 +1629,8 @@ Arguments
    If 'alias-for' is given, no Lisp 'deftype' will be defined."
   (multiple-value-bind (type-str proto)
       (lisp-type-to-protobuf-type proto-type)
-    (assert (keywordp proto) ()
-            "The alias ~S must resolve to a Protobufs primitive type"
+    (assert (scalarp proto) ()
+            "The alias ~S must resolve to a Protobufs scalar type"
             type)
     (let* ((name  (or name (class-name->proto type)))
            (alias (make-instance 'protobuf-type-alias

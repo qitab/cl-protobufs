@@ -183,7 +183,7 @@ Parameters:
            ;; Packed enums get handled below
            (serialize-packed
             value type index buffer))
-          ((keywordp type)
+          ((scalarp type)
            (let ((tag (make-tag type index)))
              (doseq (v value)
                (iincf size (serialize-scalar v type tag buffer)))
@@ -253,7 +253,7 @@ Parameters:
   (let ((size 0)
         msg)
     (declare (fixnum size))
-    (cond ((keywordp type)
+    (cond ((scalarp type)
            (serialize-scalar value type (make-tag type index)
                              buffer))
           ((typep (setq msg (and type (or (find-message type)
@@ -675,7 +675,7 @@ Parameters:
   CELL: [For repeated fields only]: The current list (or vector) of
         deserialized objects to add to."
   (cond
-    ((keywordp type) ; a wire-level scalar
+    ((scalarp type)
      (cond ((and (packed-type-p type)
                  (length-encoded-tag-p tag))
             (multiple-value-bind (data new-index)
@@ -756,14 +756,14 @@ Parameters:
   PACKED-P: True if and only if the field is packed."
   (let ((vval (gensym "VAL"))
         (iterator (if vector-p 'dovector 'dolist))
-        (msg (and class (not (keywordp class))
+        (msg (and class (not (scalarp class))
                   (or (find-message class)
                       (find-enum class)
                       (find-type-alias class)
                       (find-map-descriptor class)))))
     (cond ((and packed-p (packed-type-p class))
            `(iincf ,size (serialize-packed ,reader ,class ,index ,vbuf ,vector-p)))
-          ((keywordp class)
+          ((scalarp class)
            (let ((tag (make-tag class index)))
              `(when ,boundp
                 (,iterator (,vval ,reader)
@@ -820,12 +820,12 @@ Parameters:
   VBUF: The symbol-name of the buffer to write to
   SIZE: The symbol-name of the variable which keeps track of the length serialized."
   (let ((vval (gensym "VAL"))
-        (msg (and class (not (keywordp class))
+        (msg (and class (not (scalarp class))
                   (or (find-message class)
                       (find-enum class)
                       (find-type-alias class)
                       (find-map-descriptor class)))))
-    (cond ((keywordp class)
+    (cond ((scalarp class)
            (let ((tag (make-tag class index)))
              `(when ,boundp
                 (let ((,vval ,reader))
@@ -919,7 +919,7 @@ Parameters:
      (dolist (field (proto-fields message) serializers)
        ;; TODO(shaunm): class is duplicated
        (let* ((class (proto-class field))
-              (msg (and class (not (keywordp class))
+              (msg (and class (not (scalarp class))
                         (or (find-message class)
                             (find-enum class)
                             (find-type-alias class))))
@@ -1013,7 +1013,7 @@ Parameters:
   DEST: The symbol name for the destination of deserialized data.
   RAW-P: If true, return a list of the arguments passed to any recursive
          deserialization call instead of calling the function."
-  (let ((msg (and class (not (keywordp class))
+  (let ((msg (and class (not (scalarp class))
                   (or (find-message class)
                       (find-enum class)
                       (find-type-alias class)
@@ -1022,7 +1022,7 @@ Parameters:
              (if raw-p
                  `(list ,vbuf ,start ,end ,end-tag)
                  (call-pseudo-method :deserialize msg vbuf start end end-tag))))
-      (cond ((keywordp class)
+      (cond ((scalarp class)
              (let* ((tag (make-tag class index))
                     (packed-tag (when (packed-type-p class)
                                   (packed-tag index)))
@@ -1113,7 +1113,7 @@ Parameters:
   RAW-P: If true, return a list of the arguments passed to any recursive
          deserialization call instead of calling the function."
 
-  (let ((msg (and class (not (keywordp class))
+  (let ((msg (and class (not (scalarp class))
                   (or (find-message class)
                       (find-enum class)
                       (find-type-alias class)
@@ -1122,7 +1122,7 @@ Parameters:
              (if raw-p
                  `(list ,vbuf ,start ,end ,end-tag)
                  (call-pseudo-method :deserialize msg vbuf start end end-tag))))
-      (cond ((keywordp class)
+      (cond ((scalarp class)
              (values
               `(multiple-value-setq (,dest ,vidx)
                  (deserialize-scalar ,class ,vbuf ,vidx))
