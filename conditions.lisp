@@ -26,7 +26,7 @@
           :reader error-field
           :initarg :field))
   (:documentation "Indicates that a schema contains a message with a field whose type is not a
-                   primitive type and is not a known message (or extend) or enum.")
+                   scalar type and is not a known message (or extend) or enum.")
   (:report (lambda (condition stream)
              (format stream "~? Qualified Field ~A has unknown type ~A"
                      (simple-condition-format-control condition)

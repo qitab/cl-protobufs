@@ -46,7 +46,7 @@ Parameters:
   #-sbcl ()
   (val buf &aux (size 0))
   (let ((i (aliased-struct-i val)))
-    (incf size (proto-impl::serialize-prim i :int32  +TAG-I+ buf)))
+    (incf size (proto-impl::serialize-scalar i :int32  +TAG-I+ buf)))
   size)
 
 (deftest serialize-aliased (alias-tests)

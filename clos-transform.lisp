@@ -38,7 +38,7 @@
 (defun clos-type-to-protobuf-type (type &optional type-filter enum-filter)
   "Given a Lisp TYPE, returns up to five values:
      1. a Protobuf type,
-     2. a class or primitive type,
+     2. a class or keyword denoting a scalar type,
      3. whether or not to pack the field,
      4. a set of enum values (only when ENUM-FILTER is provided),
      5. the originally specified lisp type of the root, if it is a lisp type, e.g.
@@ -157,9 +157,9 @@
                 (equal type expanded-type)))
        (clos-type-to-protobuf-type expanded-type))
       (t
-       (multiple-value-bind (pb-type primtive-type)
+       (multiple-value-bind (pb-type scalar-type)
            (lisp-type-to-protobuf-type type)
-         (values pb-type primtive-type nil nil type))))))
+         (values pb-type scalar-type nil nil type))))))
 
 (defun lisp-type-to-protobuf-type (type)
   (case type
@@ -192,6 +192,10 @@
             (values "bytes" :bytes))
            (t
             (values (class-name->proto type) type))))))
+
+(defun primitive-p (type)
+  "Returns true if the given Protobufs type is a scalar type."
+  
 
 (defun packed-type-p (type)
   "Returns true if the given Protobufs type can use a packed field."

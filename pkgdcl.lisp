@@ -153,7 +153,7 @@
    #:proto-service-name
    #:proto-source-location              ; should be proto-source-pathname now?
    #:proto-streams-name
-   #:serialize-prim
+   #:serialize-scalar
 
    ;; For ASDF
    #:process-imports

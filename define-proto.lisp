@@ -1623,7 +1623,7 @@ Arguments
                              &key lisp-type proto-type serializer deserializer)
   "Define a Protobufs type alias Lisp 'deftype' named 'type'.
    'lisp-type' is the name of the Lisp type.
-   'proto-type' is the name of a primitive Protobufs type, e.g., 'int32' or 'string'.
+   'proto-type' is the name of a scalar Protobufs type, e.g., 'int32' or 'string'.
    'serializer' is a function that takes a Lisp object and generates a Protobufs object.
    'deserializer' is a function that takes a Protobufs object and generates a Lisp object.
    If 'alias-for' is given, no Lisp 'deftype' will be defined."
