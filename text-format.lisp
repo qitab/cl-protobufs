@@ -111,14 +111,15 @@ Parameters:
                                              (type (proto-proto-type msg)))
                                          (print-prim v type field stream
                                                      (and (not suppress-pretty-print) indent))))))
-                                  ;; todo(benkuehnert): Sort output by key value/use specified format
+                                  ;; todo(benkuehnert): use specified map format
                                   ((typep msg 'map-descriptor)
                                    (let ((key-class (map-descriptor-key-class msg))
                                          (val-class (map-descriptor-val-class msg))
                                          (val (read-slot object slot reader)))
                                      (if suppress-pretty-print
                                          (format stream "~A: {" (proto-name field))
-                                         (format stream "~&~VT~A: {~%" (+ 2 indent) (proto-name field)))
+                                         (format stream "~&~VT~A: {~%" (+ 2 indent)
+                                                 (proto-name field)))
                                      (flet ((print-entry (k v)
                                               (format stream "~&~VT" (+ 4 indent))
                                               (print-prim k key-class nil stream nil)
