@@ -118,6 +118,9 @@
   (:nicknames :proto-impl)
   (:use :common-lisp :protobufs)
 
+  (:import-from :alexandria
+                #:define-constant)
+
   (:shadow
    #:find-method)
 

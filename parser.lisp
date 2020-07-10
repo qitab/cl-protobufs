@@ -6,10 +6,11 @@
 
 (in-package "PROTO-IMPL")
 
-(defparameter +SCALAR-TYPES+
+(define-constant +SCALAR-TYPES+
   '("int32" "int64" "uint32" "uint64" "sint32" "sint64" "fixed32" "fixed64"
     "sfixed32" "sfixed64" "string" "bytes" "bool" "float" "double")
-  "These are the scalar types that may appear in protobufs.")
+  :test #'equal
+  :documentation "These are the scalar types that may appear in protobufs.")
 
 ;;; .proto file parsing
 
