@@ -382,7 +382,6 @@
                      ;; Try to put symbols into the right package
                      (make-package (string-upcase lisp-package-name) :use ())
                      *protobuf-package*)))
-    (setf (proto-lisp-package file-desc) lisp-package-name)
     (setq *protobuf-package* package)))
 
 (defmethod resolve-lisp-names ((file-desc file-descriptor))
@@ -406,11 +405,9 @@
   (let* ((package  (prog1 (parse-token stream)
                      (expect-char stream terminator () "package")
                      (maybe-skip-comments stream)))
-         (lisp-pkg (or (proto-lisp-package file-desc)
-                       (substitute #\- #\_ package))))
+         (lisp-pkg (substitute #\- #\_ package)))
     (setf (proto-package file-desc) package)
-    (unless (proto-lisp-package file-desc)
-      (set-lisp-package file-desc lisp-pkg))))
+    (set-lisp-package file-desc lisp-pkg)))
 
 (defun parse-proto-import (stream file-desc &optional (terminator #\;))
   "Parse a protobuf import line from STREAM and store it in FILE-DESC.
@@ -490,7 +487,7 @@
                     ;; For an enum defined at top-level, just use the enum name.
                     enum-name))
          (enum (make-instance
-                'protobuf-enum
+                'enum-descriptor
                 :class class
                 :name name
                 :qualified-name (make-qualified-name desc name)
@@ -518,22 +515,19 @@
             (parse-proto-enum-value stream desc enum name))))))
 
 (defun parse-proto-enum-value (stream desc enum name)
-  "Parse a protobuf enum value from STREAM and store it into ENUM, which is a protobuf-enum
+  "Parse a protobuf enum value from STREAM and store it into ENUM, which is an enum-descriptor
    object. NAME is the name associated with the value. DESC is ignored."
   (declare (ignore desc))
-  (check-type enum protobuf-enum)
+  (check-type enum enum-descriptor)
   (expect-char stream #\= () "enum")
   (let* ((idx  (prog1 (parse-signed-int stream)
                  (parse-proto-field-options stream) ; options ignored for now
                  (expect-char stream #\; () "enum")
                  (maybe-skip-comments stream)))
-         (value (make-instance 'protobuf-enum-value
-                  :name  name
-                  :qualified-name (make-qualified-name enum name)
-                  :index idx
-                  :value (proto->enum-name name)
-                  :parent enum)))
-    (appendf (protobuf-enum-values enum) (list value))
+         (value (make-enum-value-descriptor
+                 :value idx
+                 :name (proto->enum-name name))))
+    (appendf (enum-descriptor-values enum) (list value))
     value))
 
 

@@ -33,7 +33,6 @@
    #:base-message
 
    ;; Descriptor types
-   ;; TODO(cgay): rename from protobuf-* to *-descriptor
    #:extension-descriptor
    #:field-descriptor
    #:file-descriptor
@@ -41,8 +40,8 @@
    #:method-descriptor
    #:option-descriptor
    #:service-descriptor
-   #:protobuf-enum
-   #:protobuf-enum-value
+   #:enum-descriptor
+   #:enum-value-descriptor
    #:protobuf-type-alias                ; Lisp-only extension
 
    ;; Conditions
@@ -68,6 +67,7 @@
    ;; Code generation
    #:define-schema
    #:define-enum
+   #:define-map
    #:define-message
    #:define-extend
    #:define-extension
@@ -128,6 +128,7 @@
    #:encode-string
    #:encode-uint32
    #:find-enum
+   #:find-map-descriptor
    #:find-field
    #:find-method
    #:find-option

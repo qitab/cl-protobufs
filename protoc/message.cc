@@ -69,9 +69,10 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
                                       const std::string& lisp_name,
                                       const int tag,
                                       const FieldDescriptor::Label label) {
-  // Print group or message
-  // Since we know the immediate next thing we emit is a newline we don't
-  // need the extra space.
+  // If descriptor_ describes a map entry message, ignore it. We do not use
+  // this generated message for map types.
+  if (descriptor_->options().map_entry())
+    return;
   const bool group = tag >= 0;
   printer->Print("\n");
   printer->Print((group ? "(proto:define-group $name$" :

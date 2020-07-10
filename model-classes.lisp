@@ -84,14 +84,6 @@ Parameters:
   (:documentation
    "Shared attributes for most kinds of protobuf objects."))
 
-(defstruct proto-base
-  "Base structure for protobuf meta-objects."
-  (index nil :type (signed-byte 32)))
-
-;; TODO(jgodbout): Remove this temporary override.
-(defmethod proto-index ((proto-message proto-base))
-  (proto-base-index proto-message))
-
 (defun find-qualified-name (name protos
                             &key (proto-key #'proto-name) (full-key #'proto-qualified-name)
                                  relative-to)
@@ -230,12 +222,20 @@ Parameters:
     (or (find-message type)
         (find-type-alias type))))
 
+(defvar *maps* (make-hash-table :test 'eq)
+  "Maps map names (symbols) to map-descriptor instances.")
+
+(declaim (inline find-map-descriptor))
+(defun find-map-descriptor (type)
+  "Return a map-descriptor instance named by TYPE (a symbol)."
+  (gethash type *maps*))
+
 (defvar *enums* (make-hash-table :test 'eq)
-  "Maps enum names (symbols) to protobuf-enum instances.")
+  "Maps enum names (symbols) to enum-descriptor instances.")
 
 (declaim (inline find-enum))
 (defun find-enum (type)
-  "Return a protobuf-enum instance named by TYPE (a symbol)."
+  "Return a enum-descriptor instance named by TYPE (a symbol)."
   (gethash type *enums*))
 
 (defgeneric find-service (protobuf name)
@@ -351,25 +351,42 @@ Parameters:
          (end2   (if (eql (char name2 0) #\() (- (length name2) 1) (length name2))))
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
 
+(defstruct map-descriptor
+  "The meta-object for a protobuf map"
+  (class     nil :type symbol)
+  (name      nil :type string)
+  (key-class nil :type symbol) ;; the :class of the key
+  (val-class nil :type symbol) ;; the :class of the value
+  (key-type nil :type symbol)  ;; the lisp type of the key
+  (val-type nil :type symbol)) ;; the lisp type of the value
 
-;; A Protobufs enumeration
-(defstruct protobuf-enum
-  "The meta-object for a protobuf-enum"
-  (class nil :type (or null symbol))
-  (name nil :type (or null string))
-  (alias-for nil :type (list-of protobuf-enum-value))           ; the numeric value of the enum
-  (values nil :type (list-of protobuf-enum-value)))           ; the Lisp value of the enum
+(defmethod make-load-form ((m map-descriptor) &optional environment)
+  (make-load-form-saving-slots m :environment environment))
 
-(defmethod make-load-form ((e protobuf-enum) &optional environment)
+(defstruct enum-descriptor
+  "Describes a protobuf enum."
+  ;; The symbol naming the Lisp type for this enum.
+  (class nil :type symbol)
+  ;; The string naming the protobuf type for this enum.
+  (name nil :type string)
+  ;; Not sure what this is or why it was originally added. Based on the one existing test that uses
+  ;; it the type of this slot shouldn't be (list-of enum-value-descriptor). (SBCL doesn't seem to
+  ;; care.) Perhaps it can be deleted.
+  (alias-for nil :type (list-of enum-value-descriptor))
+  ;; The name and integer value of each enum element.
+  (values nil :type (list-of enum-value-descriptor)))
+
+(defmethod make-load-form ((e enum-descriptor) &optional environment)
   (make-load-form-saving-slots e :environment environment))
 
-;; A Protobufs value within an enumeration
-(defstruct (protobuf-enum-value (:include proto-base))
-  "The model class that represents a Protobufs enumeration value."
-  (value nil :type (or null symbol)))           ; the Lisp value of the enum
+(defstruct enum-value-descriptor
+  "The model class that represents a protobuf enum key/value pair."
+  ;; The keyword symbol corresponding to the enum value key.
+  (name nil :type keyword)
+  (value nil :type sfixed32))
 
-(defmethod make-load-form ((v protobuf-enum-value) &optional environment)
-  (make-load-form-saving-slots v :environment environment))
+(defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
+  (make-load-form-saving-slots desc :environment environment))
 
 ;; An object describing a Protobufs message. Confusingly most local variables that hold
 ;; instances of this struct are named MESSAGE, but the C API makes it clear that
@@ -443,7 +460,8 @@ on the symbol if we are not in SBCL."
      (when (and (slot-boundp message 'qual-name) (proto-qualified-name message))
        (setf (gethash (proto-qualified-name message) *qualified-messages*)
              (proto-class message))))
-    (:alias (setf (gethash symbol *type-aliases*) message))))
+    (:alias (setf (gethash symbol *type-aliases*) message))
+    (:map (setf (gethash symbol *maps*) message))))
 
 (defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*
