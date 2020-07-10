@@ -45,10 +45,10 @@ Parameters:
                         msg)
                    (when (has-struct-field-p object field)
                      (cond ((eq (proto-label field) :repeated)
-                            (cond ((keywordp type)
+                            (cond ((scalarp type)
                                    (doseq (v (read-slot object slot reader))
-                                     (print-prim v type field stream
-                                                 (and pretty-print indent))))
+                                     (print-scalar v type field stream
+                                                   (and pretty-print indent))))
                                   ((typep (setq msg (and type (or (find-message type)
                                                                   (find-enum type)
                                                                   (find-type-alias type))))
@@ -76,16 +76,16 @@ Parameters:
                                    (let ((type (proto-proto-type msg)))
                                      (doseq (v (read-slot object slot reader))
                                        (let ((v (funcall (proto-serializer msg) v)))
-                                         (print-prim v type field stream
-                                                     (and pretty-print indent))))))
+                                         (print-scalar v type field stream
+                                                       (and pretty-print indent))))))
                                   (t
                                    (undefined-field-type "While printing ~S to text format,"
                                                          object type field))))
                            (t
-                            (cond ((keywordp type)
+                            (cond ((scalarp type)
                                    (let ((v (read-slot object slot reader)))
-                                     (print-prim v type field stream
-                                                 (and pretty-print indent))))
+                                     (print-scalar v type field stream
+                                                   (and pretty-print indent))))
                                   ((typep (setq msg (and type (or (find-message type)
                                                                   (find-enum type)
                                                                   (find-type-alias type)
@@ -112,8 +112,8 @@ Parameters:
                                      (when v
                                        (let ((v    (funcall (proto-serializer msg) v))
                                              (type (proto-proto-type msg)))
-                                         (print-prim v type field stream
-                                                     (and pretty-print indent))))))
+                                         (print-scalar v type field stream
+                                                       (and pretty-print indent))))))
                                   ;; todo(benkuehnert): use specified map format
                                   ((typep msg 'map-descriptor)
                                    (let ((key-class (map-descriptor-key-class msg))
@@ -125,10 +125,10 @@ Parameters:
                                          (format stream "~A: {" (proto-name field)))
                                      (flet ((print-entry (k v)
                                               (format stream "~&~VT" (+ 4 indent))
-                                              (print-prim k key-class nil stream nil)
+                                              (print-scalar k key-class nil stream nil)
                                               (format stream "-> ")
-                                              (if (keywordp val-class)
-                                                  (print-prim v val-class nil stream nil)
+                                              (if (scalarp val-class)
+                                                  (print-scalar v val-class nil stream nil)
                                                   (print-text-format v :stream stream
                                                                        :pretty-print nil))
                                               (format stream "~%")))
@@ -151,8 +151,8 @@ Parameters:
             (format stream "}"))
         nil))))
 
-(defun print-prim (val type field stream indent)
-  "Print primitive value to stream
+(defun print-scalar (val type field stream indent)
+  "Print scalar value to stream
 
 Parameters:
   VAL: The data for the value to print.
@@ -268,7 +268,7 @@ Parameters:
                    (if (null field)
                      (skip-field stream)
                      (cond ((and field (eq (proto-label field) :repeated))
-                            (cond ((keywordp type)
+                            (cond ((scalarp type)
                                    (expect-char stream #\:)
                                    (let ((val (case type
                                                 ((:float) (parse-float stream))
@@ -305,7 +305,10 @@ Parameters:
                                                   ((:float) (parse-float stream))
                                                   ((:double) (parse-double stream))
                                                   ((:string) (parse-string stream))
-                                                  ((:bool)   (if (boolean-true-p (parse-token stream)) t nil))
+                                                  ((:bool)   (if (boolean-true-p
+                                                                  (parse-token stream))
+                                                                 t
+                                                                 nil))
                                                   (otherwise (parse-signed-int stream)))))
                                        (when slot
                                          (pushnew slot rslots)
@@ -315,13 +318,15 @@ Parameters:
                                    (undefined-field-type "While parsing ~S from text format,"
                                                          msg-desc type field))))
                            (t
-                            (cond ((keywordp type)
+                            (cond ((scalarp type)
                                    (expect-char stream #\:)
                                    (let ((val (case type
                                                 ((:float) (parse-float stream))
                                                 ((:double) (parse-double stream))
                                                 ((:string) (parse-string stream))
-                                                ((:bool)   (if (boolean-true-p (parse-token stream)) t nil))
+                                                ((:bool)   (if (boolean-true-p (parse-token stream))
+                                                               t
+                                                               nil))
                                                 (otherwise (parse-signed-int stream)))))
                                      (when slot
                                        (setf (proto-slot-value object slot) val))))
