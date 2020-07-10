@@ -203,7 +203,6 @@ https://developers.google.com/protocol-buffers/docs/proto#scalar "
                  :sint32 :sint64 :fixed32 :fixed64 :sfixed32 :sfixed64
                  :bool :string :bytes :symbol)))
 
-
 (defun packed-type-p (type)
   "Returns true if the given Protobufs type can use a packed field."
   (assert (symbolp type))
