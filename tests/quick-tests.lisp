@@ -23,15 +23,6 @@ Parameters:
     (assert (= (slot-value result 'clunit::failed) 0))
     (assert (= (slot-value result 'clunit::errors) 0))))
 
-#|
-(defvar *golden-directory*
-  #.(make-pathname
-     :directory (pathname-directory (or *load-truename* *compile-file-truename*))))
-
-(defvar *golden-pathname* (merge-pathnames "golden.data" *golden-directory*))
-(defvar *serial-pathname* (merge-pathnames "serialized.data" *golden-directory*))
-|#
-
 (deftest default-and-clear (quick-tests)
   ;; Assert-True that required strings are made unbound by 'clear'
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol)))
