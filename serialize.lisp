@@ -176,30 +176,29 @@ Parameters:
   (declare (fixnum index)
            (buffer buffer))
   (let ((size 0)
-        msg)
+        desc)
     (declare (fixnum size))
     (cond ((and packed-p (packed-type-p type))
-           ;; This is where we handle packed primitive types
-           ;; Packed enums get handled below
-           (serialize-packed
-            value type index buffer))
+           ;; Handle primitive types. proto-packed-p of enum types returns nil,
+           ;; so packed enum fields are handled below.
+           (serialize-packed value type index buffer))
           ((keywordp type)
            (let ((tag (make-tag type index)))
              (doseq (v value)
                (iincf size (serialize-prim v type tag buffer)))
              size))
-          ((typep (setq msg (and type (or (find-message type)
-                                          (find-enum type)
-                                          (find-type-alias type))))
+          ((typep (setq desc (and type (or (find-message type) ; Why would TYPE ever be nil?
+                                           (find-enum type)
+                                           (find-type-alias type))))
                   'message-descriptor)
-           (if (eq (proto-message-type msg) :group)
+           (if (eq (proto-message-type desc) :group)
                (doseq (v value)
                  ;; To serialize a group, we encode a start tag,
                  ;; serialize the fields, then encode an end tag
                  (let ((tag1 (make-tag $wire-type-start-group index))
                        (tag2 (make-tag $wire-type-end-group   index)))
                    (iincf size (encode-uint32 tag1 buffer))
-                   (dolist (f (proto-fields msg))
+                   (dolist (f (proto-fields desc))
                      (iincf size (emit-field v f buffer)))
                    (iincf size (encode-uint32 tag2 buffer))))
                ;; I don't understand this at all - if there is a slot, then the slot
@@ -215,27 +214,25 @@ Parameters:
                        (if custom-serializer
                            (iincf submessage-size
                                   (funcall custom-serializer v buffer))
-                           (dolist (f (proto-fields msg))
+                           (dolist (f (proto-fields desc))
                              (iincf submessage-size (emit-field v f buffer))))
                        (iincf size (+ (backpatch submessage-size)
                                       submessage-size)))))))
            size)
-          ((typep msg 'enum-descriptor)
-           ;; 'proto-packed-p' of enum types returns nil,
-           ;; so packed enum fields won't be handled above
+          ((typep desc 'enum-descriptor)
            (if packed-p
                (serialize-packed-enum
                 value
-                (enum-descriptor-values msg) index buffer)
+                (enum-descriptor-values desc) index buffer)
                (let ((tag (make-tag $wire-type-varint index)))
                  (doseq (v value size)
                    (iincf size
-                          (serialize-enum v (enum-descriptor-values msg) tag buffer))))))
-          ((typep msg 'protobuf-type-alias)
-           (let* ((type (proto-proto-type msg))
+                          (serialize-enum v (enum-descriptor-values desc) tag buffer))))))
+          ((typep desc 'protobuf-type-alias)
+           (let* ((type (proto-proto-type desc))
                   (tag  (make-tag type index)))
              (doseq (v value size)
-               (let ((v (funcall (proto-serializer msg) v)))
+               (let ((v (funcall (proto-serializer desc) v)))
                  (iincf size (serialize-prim v type tag buffer))))))
           (t nil))))
 
@@ -251,22 +248,22 @@ Parameters:
   (declare (fixnum index)
            (buffer buffer))
   (let ((size 0)
-        msg)
+        desc)
     (declare (fixnum size))
     (cond ((keywordp type)
            (serialize-prim value type (make-tag type index)
                            buffer))
-          ((typep (setq msg (and type (or (find-message type)
-                                          (find-enum type)
-                                          (find-type-alias type)
-                                          (find-map-descriptor type))))
+          ((typep (setq desc (and type (or (find-message type)
+                                           (find-enum type)
+                                           (find-type-alias type)
+                                           (find-map-descriptor type))))
                   'message-descriptor)
            (cond ((not value) 0)
-                 ((eq (proto-message-type msg) :group)
+                 ((eq (proto-message-type desc) :group)
                   (let ((tag1 (make-tag $wire-type-start-group index))
                         (tag2 (make-tag $wire-type-end-group   index)))
                     (iincf size (encode-uint32 tag1 buffer))
-                    (dolist (f (proto-fields msg)
+                    (dolist (f (proto-fields desc)
                                (i+ size (encode-uint32 tag2 buffer)))
                       (iincf size (emit-field value f buffer)))))
                  (t
@@ -274,9 +271,9 @@ Parameters:
                                                 (proto-%bytes value)))
                         (custom-serializer (custom-serializer type))
                         (tag-size
-                          (encode-uint32 (make-tag $wire-type-string
-                                                   index)
-                                         buffer))
+                         (encode-uint32 (make-tag $wire-type-string
+                                                  index)
+                                        buffer))
                         (submessage-size 0))
                     (with-placeholder (buffer)
                       (cond (precomputed-bytes
@@ -288,34 +285,34 @@ Parameters:
                              (setq submessage-size
                                    (funcall custom-serializer value buffer)))
                             (t
-                             (dolist (f (proto-fields msg))
+                             (dolist (f (proto-fields desc))
                                (iincf submessage-size (emit-field value f buffer)))))
                       (+ tag-size (backpatch submessage-size) submessage-size))))))
-          ((typep msg 'enum-descriptor)
-           (serialize-enum value (enum-descriptor-values msg)
+          ((typep desc 'enum-descriptor)
+           (serialize-enum value (enum-descriptor-values desc)
                            (make-tag $wire-type-varint index)
                            buffer))
-          ((typep msg 'map-descriptor)
+          ((typep desc 'map-descriptor)
            (let* ((tag (make-tag $wire-type-string index))
-                  (key-class (map-descriptor-key-class msg))
-                  (val-class (map-descriptor-val-class msg)))
+                  (key-class (map-descriptor-key-class desc))
+                  (val-class (map-descriptor-val-class desc)))
              (flet ((serialize-pair (k v)
                       (let ((ret-len (encode-uint32 tag buffer))
                             (map-len 0))
                         (with-placeholder (buffer)
-                          ; key types are always scalar, so serialize-prim works.
+                          ;; Key types are always scalar, so serialize-prim works.
                           (iincf map-len (serialize-prim k key-class
                                                          (make-tag key-class 1) buffer))
-                          ; value types are arbitrary, non-map, non-repeated.
+                          ;; Value types are arbitrary, non-map, non-repeated.
                           (iincf map-len (emit-non-repeated-field v val-class 2 buffer))
                           (i+ ret-len (i+ map-len (backpatch map-len)))))))
                (loop for k being the hash-keys of value
                        using (hash-value v)
                      sum (serialize-pair k v)))))
-          ((typep msg 'protobuf-type-alias)
+          ((typep desc 'protobuf-type-alias)
            (if value
-               (let* ((value (funcall (proto-serializer msg) value))
-                      (type  (proto-proto-type msg))
+               (let* ((value (funcall (proto-serializer desc) value))
+                      (type  (proto-proto-type desc))
                       (tag   (make-tag type index)))
                  (serialize-prim value type tag buffer))
                0))

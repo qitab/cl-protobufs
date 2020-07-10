@@ -61,6 +61,22 @@ Parameters:
     (assert-true (equal '("First" "Second")  (cl-protobufs.test-proto:string-fields msg-parse)))
     (assert-true (equal '(:NONE :TWENTY-ONE) (cl-protobufs.test-proto:enum-vals msg-parse)))))
 
+; tests a round trip of proto message -> text -> proto.
+(deftest test-roundtrip-text-format (text-format-tests)
+  (let* ((msg (make-text-format-test :int-field 100
+                                     :sint-field -1
+                                     :uint-field 1
+                                     :float-field 1.5
+                                     :double-field 1.5d0
+                                     :string-field "A string"
+                                     :string-fields (list "First" "Second")
+                                     :enum-vals (list :none :twenty-one)))
+         (out-stream (make-string-output-stream)))
+    (print-text-format msg :stream out-stream)
+    (let* ((text (get-output-stream-string out-stream))
+           (msg-parse (proto:parse-text-format 'cl-protobufs.test-proto:text-format-test
+                                               :stream (make-string-input-stream text))))
+      (assert-true (proto:proto-equal msg-parse msg)))))
 
 (deftest test-parse-text-format-nested-symbol-names (text-format-tests)
   (assert-true (find-message-for-class 'cl-protobufs.test-proto:text-format-test))
