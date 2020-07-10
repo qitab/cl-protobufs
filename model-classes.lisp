@@ -382,8 +382,8 @@ Parameters:
 (defstruct enum-value-descriptor
   "The model class that represents a protobuf enum key/value pair."
   ;; The keyword symbol corresponding to the enum value key.
-  (name nil :type symbol)
-  (value nil :type (signed-byte 32)))
+  (name nil :type keyword)
+  (value nil :type sfixed32))
 
 (defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
   (make-load-form-saving-slots desc :environment environment))

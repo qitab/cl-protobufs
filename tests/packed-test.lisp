@@ -103,48 +103,45 @@ Parameters:
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (unpacked-enum m2)))
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (packed-enum packed))))))
 
-;; TODO(jgodbout): Fix these tests.
-;; (progn
-;;   (deftest inner-packed-fast-function-test ()
-;;     (dolist (class '(test-packed-inner test-packed-outer))
-;;       ;; Generate fast serializers for the interesting messages
-;;       (eval (proto-impl::generate-serializer (proto-impl::find-message-for-class class))))
+(deftest inner-packed-fast-function-test (packed-tests)
+  (dolist (class '(test-packed-inner test-packed-outer))
+    ;; Generate fast serializers for the interesting messages
+    (eval (proto-impl::generate-serializer (proto-impl::find-message-for-class class))))
 
-;;     (let* ((packed (make-instance 'test-packed-inner))
-;;            (outer1 (make-instance 'test-packed-outer
-;;                                   :packed packed)))
-;;       (push 10 (packed-int32 packed))
-;;       (push 20 (packed-int32 packed))
-;;       (push 30 (packed-int32 packed))
-;;       (let* ((bytes (cl-protobufs:serialize-object-to-bytes outer1))
-;;              (outer2 (cl-protobufs:deserialize-object 'test-packed-outer bytes)))
-;;         ;; 10: tag  6: length of the inner message.
-;;         ;; 210 5 3 30 20 10: content of the inner message.
-;;         ;; The tag is (210 5), here, rather than (208 5), because it's packed, so the 0 in the lower 3
-;;         ;; bits is replaced by a 2
-;;         (assert-true (equalp #(10 6 210 5 3 30 20 10) bytes))
-;;         (assert-true (equalp '(30 20 10) (packed-int32 (packed outer2)))))))
+  (let* ((packed (make-test-packed-inner))
+         (outer1 (make-test-packed-outer :packed packed)))
+    (push 10 (packed-int32 packed))
+    (push 20 (packed-int32 packed))
+    (push 30 (packed-int32 packed))
+    (let* ((bytes (cl-protobufs:serialize-object-to-bytes outer1))
+           (outer2 (cl-protobufs:deserialize-object 'test-packed-outer bytes)))
+      ;; 10: tag  6: length of the inner message.
+      ;; 210 5 3 30 20 10: content of the inner message.
+      ;; The tag is (210 5), here, rather than (208 5), because it's packed, so the 0 in the lower 3
+      ;; bits is replaced by a 2
+      (assert-true (equalp #(10 6 210 5 3 30 20 10) bytes))
+      (assert-true (equalp '(30 20 10) (packed-int32 (packed outer2)))))))
 
-;;   (deftest inner-packed-enum-fast-function-test ()
-;;     (dolist (class '(test-packed-inner test-packed-outer))
-;;       ;; Generate fast serializers for the interesting messages
-;;       (eval (proto-impl::generate-serializer (proto-impl::find-message-for-class class)))
-;;       (eval (proto-impl::generate-deserializer (proto-impl::find-message-for-class class))))
+(deftest inner-packed-enum-fast-function-test (packed-tests)
+  (dolist (class '(test-packed-inner test-packed-outer))
+    ;; Generate fast serializers for the interesting messages
+    (eval (proto-impl::generate-serializer (proto-impl::find-message-for-class class)))
+    (eval (proto-impl::generate-deserializer (proto-impl::find-message-for-class class))))
 
-;;     (let* ((packed (make-instance 'test-packed-inner))
-;;            (outer1 (make-instance 'test-packed-outer
-;;                                   :packed packed)))
-;;       (push :foreign-foo (packed-enum packed))
-;;       (push :foreign-bar (packed-enum packed))
-;;       (push :foreign-baz (packed-enum packed))
-;;       (let* ((bytes (cl-protobufs:serialize-object-to-bytes outer1))
-;;              (outer2 (cl-protobufs:deserialize-object 'test-packed-outer bytes)))
-;;         ;; 10: tag  6: length of the inner message.
-;;         ;; 210 5 3 30 20 10: content of the inner message.
-;;         ;; The tag is (186 6), here, rather than (184 6), because it's packed, so the 0 in the lower 3
-;;         ;; bits is replaced by a 2
-;;         (assert-true (equalp #(10 6 186 6 3 6 5 4) bytes))
-;;         (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (packed-enum (packed outer2))))))))
+  (let* ((packed (make-test-packed-inner))
+         (outer1 (make-test-packed-outer :packed packed)))
+    (push :foreign-foo (packed-enum packed))
+    (push :foreign-bar (packed-enum packed))
+    (push :foreign-baz (packed-enum packed))
+    (let* ((bytes (cl-protobufs:serialize-object-to-bytes outer1))
+           (outer2 (cl-protobufs:deserialize-object 'test-packed-outer bytes)))
+      ;; 10: tag  6: length of the inner message.
+      ;; 210 5 3 30 20 10: content of the inner message.
+      ;; The tag is (186 6), here, rather than (184 6), because it's packed, so the 0 in the lower 3
+      ;; bits is replaced by a 2
+      (assert-true (equalp #(10 6 186 6 3 6 5 4) bytes))
+      (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo)
+                           (packed-enum (packed outer2)))))))
 
 (deftest deserialize-unpacked-packed (packed-tests)
   "If a field is declared as packed, but it was serialized unpacked, we should still be able to
