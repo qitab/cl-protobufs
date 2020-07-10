@@ -195,15 +195,15 @@ Parameters:
                (doseq (v value)
                  ;; To serialize a group, we encode a start tag,
                  ;; serialize the fields, then encode an end tag
-                 (let ((tag1 (make-tag $wire-type-start-group index))
-                       (tag2 (make-tag $wire-type-end-group   index)))
+                 (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                       (tag2 (make-wire-tag $wire-type-end-group   index)))
                    (iincf size (encode-uint32 tag1 buffer))
                    (dolist (f (proto-fields desc))
                      (iincf size (emit-field v f buffer)))
                    (iincf size (encode-uint32 tag2 buffer))))
                ;; I don't understand this at all - if there is a slot, then the slot
                ;; holds a list of objects, otherwise just serialize this object?
-               (let ((tag (make-tag $wire-type-string index))
+               (let ((tag (make-wire-tag $wire-type-string index))
                      (custom-serializer (custom-serializer type)))
                  (doseq (v value)
                    ;; To serialize an embedded message, first say that it's
@@ -224,7 +224,7 @@ Parameters:
                (serialize-packed-enum
                 value
                 (enum-descriptor-values desc) index buffer)
-               (let ((tag (make-tag $wire-type-varint index)))
+               (let ((tag (make-wire-tag $wire-type-varint index)))
                  (doseq (v value size)
                    (iincf size
                           (serialize-enum v (enum-descriptor-values desc) tag buffer))))))
@@ -260,8 +260,8 @@ Parameters:
                   'message-descriptor)
            (cond ((not value) 0)
                  ((eq (proto-message-type desc) :group)
-                  (let ((tag1 (make-tag $wire-type-start-group index))
-                        (tag2 (make-tag $wire-type-end-group   index)))
+                  (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                        (tag2 (make-wire-tag $wire-type-end-group   index)))
                     (iincf size (encode-uint32 tag1 buffer))
                     (dolist (f (proto-fields desc)
                                (i+ size (encode-uint32 tag2 buffer)))
@@ -271,8 +271,7 @@ Parameters:
                                                 (proto-%bytes value)))
                         (custom-serializer (custom-serializer type))
                         (tag-size
-                         (encode-uint32 (make-tag $wire-type-string
-                                                  index)
+                         (encode-uint32 (make-wire-tag $wire-type-string index)
                                         buffer))
                         (submessage-size 0))
                     (with-placeholder (buffer)
@@ -290,10 +289,10 @@ Parameters:
                       (+ tag-size (backpatch submessage-size) submessage-size))))))
           ((typep desc 'enum-descriptor)
            (serialize-enum value (enum-descriptor-values desc)
-                           (make-tag $wire-type-varint index)
+                           (make-wire-tag $wire-type-varint index)
                            buffer))
           ((typep desc 'map-descriptor)
-           (let* ((tag (make-tag $wire-type-string index))
+           (let* ((tag (make-wire-tag $wire-type-string index))
                   (key-class (map-descriptor-key-class desc))
                   (val-class (map-descriptor-val-class desc)))
              (flet ((serialize-pair (k v)
@@ -769,14 +768,14 @@ Parameters:
            (if (eq (proto-message-type msg) :group)
                ;; The end tag for a group is the field index shifted and
                ;; and-ed with a constant.
-               (let ((tag1 (make-tag $wire-type-start-group index))
-                     (tag2 (make-tag $wire-type-end-group   index)))
+               (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                     (tag2 (make-wire-tag $wire-type-end-group   index)))
                  `(when ,boundp
                     (,iterator (,vval ,reader)
                                (iincf ,size (encode-uint32 ,tag1 ,vbuf))
                                (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
                                (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
-               (let ((tag (make-tag $wire-type-string index)))
+               (let ((tag (make-wire-tag $wire-type-string index)))
                  `(when ,boundp
                     (,iterator (,vval ,reader)
                                (iincf ,size (encode-uint32 ,tag ,vbuf))
@@ -785,7 +784,7 @@ Parameters:
                                               :serialize msg vval vbuf)))
                                    (iincf ,size (i+ len (backpatch len))))))))))
           ((typep msg 'enum-descriptor)
-           (let ((tag (make-tag $wire-type-varint index)))
+           (let ((tag (make-wire-tag $wire-type-varint index)))
              (if packed-p
                  `(iincf ,size
                          (serialize-packed-enum ,reader '(,@(enum-descriptor-values msg))
@@ -829,14 +828,14 @@ Parameters:
                   (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf))))))
           ((typep msg 'message-descriptor)
            (if (eq (proto-message-type msg) :group)
-               (let ((tag1 (make-tag $wire-type-start-group index))
-                     (tag2 (make-tag $wire-type-end-group   index)))
+               (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                     (tag2 (make-wire-tag $wire-type-end-group   index)))
                  `(let ((,vval ,reader))
                     (when ,vval
                       (iincf ,size (encode-uint32 ,tag1 ,vbuf))
                       (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
                       (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
-               (let ((tag (make-tag $wire-type-string index)))
+               (let ((tag (make-wire-tag $wire-type-string index)))
                  `(let ((,vval ,reader))
                     (when ,vval
                       (iincf ,size (encode-uint32 ,tag ,vbuf))
@@ -844,7 +843,7 @@ Parameters:
                         (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
                           (iincf ,size (i+ len (backpatch len))))))))))
           ((typep msg 'enum-descriptor)
-           (let ((tag (make-tag $wire-type-varint index)))
+           (let ((tag (make-wire-tag $wire-type-varint index)))
              `(when ,boundp
                 (let ((,vval ,reader))
                   (iincf ,size (serialize-enum
@@ -858,7 +857,7 @@ Parameters:
                   (let ((,vval (funcall #',(proto-serializer msg) ,vval)))
                     (iincf ,size (serialize-prim ,vval ,class ,tag ,vbuf)))))))
           ((typep msg 'map-descriptor)
-           (let* ((tag      (make-tag $wire-type-string index))
+           (let* ((tag      (make-wire-tag $wire-type-string index))
                   (key-class (map-descriptor-key-class msg))
                   (val-class (map-descriptor-val-class msg)))
              `(when ,boundp
@@ -1046,8 +1045,8 @@ Parameters:
                    (values non-packed-form tag))))
             ((typep msg 'message-descriptor)
              (if (eq (proto-message-type msg) :group)
-                 (let ((tag1 (make-tag $wire-type-start-group index))
-                       (tag2 (make-tag $wire-type-end-group index)))
+                 (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                       (tag2 (make-wire-tag $wire-type-end-group index)))
                    (values `(multiple-value-bind (obj end)
                                 ,(call-deserializer msg vbuf vidx nil tag2)
                               (setq ,vidx end)
@@ -1062,9 +1061,9 @@ Parameters:
                             (setq ,vidx (+ payload-start payload-len))
                             (push ,(call-deserializer msg vbuf 'payload-start vidx)
                                   ,dest))
-                         (make-tag $wire-type-string index))))
+                         (make-wire-tag $wire-type-string index))))
             ((typep msg 'enum-descriptor)
-             (let* ((tag (make-tag $wire-type-varint index))
+             (let* ((tag (make-wire-tag $wire-type-varint index))
                     (packed-tag (packed-tag index))
                     (non-packed-form `(multiple-value-bind (x idx)
                                           (deserialize-enum
@@ -1126,8 +1125,8 @@ Parameters:
               (make-tag class index)))
             ((typep msg 'message-descriptor)
              (if (eq (proto-message-type msg) :group)
-                 (let ((tag1 (make-tag $wire-type-start-group index))
-                       (tag2 (make-tag $wire-type-end-group index)))
+                 (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                       (tag2 (make-wire-tag $wire-type-end-group index)))
                    (values
                     `(multiple-value-bind (obj end)
                          ,(call-deserializer msg vbuf vidx nil tag2)
@@ -1139,12 +1138,12 @@ Parameters:
                        (decode-uint32 ,vbuf ,vidx)
                      (setq ,vidx (+ payload-start payload-len)
                            ,dest ,(call-deserializer msg vbuf 'payload-start vidx)))
-                  (make-tag $wire-type-string index))))
+                  (make-wire-tag $wire-type-string index))))
             ((typep msg 'enum-descriptor)
              (values
               `(multiple-value-setq (,dest ,vidx)
                  (deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
-              (make-tag $wire-type-varint index)))
+              (make-wire-tag $wire-type-varint index)))
             ((typep msg 'protobuf-type-alias)
              (let ((class (proto-proto-type msg)))
                (values
@@ -1179,7 +1178,7 @@ Parameters:
                              (deserialize-prim ,key-class ,vbuf ,vidx))
                            ,(generate-non-repeated-field-deserializer
                              val-class 2 vbuf vidx 'val-data)))))
-                (make-tag $wire-type-string index))))
+                (make-wire-tag $wire-type-string index))))
             (t nil)))))
 
 (defun slot-value-to-slot-name-symbol (slot-value)

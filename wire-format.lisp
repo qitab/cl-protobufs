@@ -38,26 +38,35 @@
   )       ;eval-when
 
 
+(declaim (inline make-wire-tag))
+(defun make-wire-tag (wire-type field-number)
+  "Create a protobuf field tag, the combination of a WIRE-TYPE (3 bits) and a
+   FIELD-NUMBER (29 bits) that precedes the field data itself."
+  (declare (type (unsigned-byte 3) wire-type)
+           (type (unsigned-byte 29) field-number))
+  (the (unsigned-byte 32)
+       (ilogior wire-type (iash field-number 3))))
+
 (defun make-tag (type index)
-  "Given a wire type or the name of a protobuf type and a field index,
-   return the tag that encodes both of them."
+  "Given the name of a protobuf type (a keyword symbol) and a field index,
+   return the field tag that encodes both of them."
+  (declare (type (unsigned-byte 29) index))
   (locally (declare #.$optimize-serialization)
-    (if (typep type 'fixnum)
-      (ilogior type (iash index 3))
-      (let ((type (ecase type
-                    ((:int32 :uint32) $wire-type-varint)
-                    ((:int64 :uint64) $wire-type-varint)
-                    ((:sint32 :sint64) $wire-type-varint)
-                    ((:fixed32 :sfixed32) $wire-type-32bit)
-                    ((:fixed64 :sfixed64) $wire-type-64bit)
-                    ((:string :bytes) $wire-type-string)
-                    ((:bool) $wire-type-varint)
-                    ((:float) $wire-type-32bit)
-                    ((:double) $wire-type-64bit)
-                    ;; A few of our homegrown types
-                    ((:symbol) $wire-type-string)
-                    ((:date :time :datetime :timestamp) $wire-type-64bit))))
-        (ilogior type (iash index 3))))))
+    (let ((tag-bits (ecase type
+                      ((:int32 :uint32) $wire-type-varint)
+                      ((:int64 :uint64) $wire-type-varint)
+                      ((:sint32 :sint64) $wire-type-varint)
+                      ((:fixed32 :sfixed32) $wire-type-32bit)
+                      ((:fixed64 :sfixed64) $wire-type-64bit)
+                      ((:string :bytes) $wire-type-string)
+                      ((:bool) $wire-type-varint)
+                      ((:float) $wire-type-32bit)
+                      ((:double) $wire-type-64bit)
+                      ;; A few of our homegrown types
+                      ((:symbol) $wire-type-string)
+                      ((:date :time :datetime :timestamp) $wire-type-64bit))))
+      (declare (type (unsigned-byte 3) tag-bits))
+      (make-wire-tag tag-bits index))))
 
 (define-compiler-macro make-tag (&whole form type index)
   (setq type (fold-symbol type))
@@ -107,8 +116,8 @@
 
 (defun packed-tag (index)
   "Takes a field INDEX, and returns a tag for a packed field with that same index."
-  (declare (type (unsigned-byte 32) index))
-  (make-tag $wire-type-string index))
+  (declare (type (unsigned-byte 29) index))
+  (make-wire-tag $wire-type-string index))
 
 (defun length-encoded-tag-p (tag)
   "Returns non-nil if TAG represents a length-encoded field.
@@ -374,40 +383,41 @@
     in MAX-BITS.
 
     Watch out, this function turns off all type checking and array bounds checking."
-  (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (flet ((get-byte ()
-             (prog1 (aref buffer (the array-index index))
-               (iincf index)))
-         (return-as-correct-size (value)
-           ;; Negative numbers are always encoded as ten bytes. We need to return just the MAX-BITS
-           ;; low bits.
-           (return-from %decode-rest-of-uint (values (ldb (byte max-bits 0) value) index))))
-    (let ((fixnum-bits (* (floor (integer-length most-negative-fixnum) 7) 7))
-          (bits-read 14)
-          (low-word start-value))
-      (declare (type fixnum low-word fixnum-bits))
+  (declare #.$optimize-serialization)
+  (let ((idx index))
+    (flet ((get-byte ()
+             (prog1 (aref buffer (the array-index idx))
+               (iincf idx)))
+           (return-as-correct-size (value)
+             ;; Negative numbers are always encoded as ten bytes. We need to
+             ;; return just the MAX-BITS low bits.
+             (return-from %decode-rest-of-uint (values (ldb (byte max-bits 0) value) idx))))
+      (let ((fixnum-bits (* (floor (integer-length most-negative-fixnum) 7) 7))
+            (bits-read 14)
+            (low-word start-value))
+        (declare (type fixnum low-word fixnum-bits))
 
-      ;; Read as much as we can fit in a fixnum, and return as soon as we're done
-      (loop for place from bits-read by 7 below fixnum-bits
-            for byte fixnum = (get-byte)
-            for bits = (ildb (byte 7 0) byte)
-            do (setq low-word (ilogior (the fixnum low-word) (the fixnum (iash bits place))))
-               (when (i< byte 128)
-                 (return-as-correct-size low-word)))
-
-      ;; Value doesn't fit into a fixnum. Read any additional values into another fixnum, and then
-      ;; shift left and add to the low fixnum.
-      (let ((high-word 0))
-        (declare (type fixnum high-word))
-        (loop for place from 0 by 7 below fixnum-bits
+        ;; Read as much as we can fit in a fixnum, and return as soon as we're done
+        (loop for place from bits-read by 7 below fixnum-bits
               for byte fixnum = (get-byte)
               for bits = (ildb (byte 7 0) byte)
-              do (setq high-word (ilogior (the fixnum high-word) (the fixnum (iash bits place))))
+              do (setq low-word (ilogior (the fixnum low-word) (the fixnum (iash bits place))))
                  (when (i< byte 128)
-                   (return-as-correct-size (+ (ash high-word fixnum-bits) low-word)))))
+                   (return-as-correct-size low-word)))
 
-      ;; We shouldn't get here unless we're reading a value that doesn't fit in two fixnums.
-      (assert nil nil "The value doesn't fit into ~A bits" (* 2 fixnum-bits)))))
+        ;; Value doesn't fit into a fixnum. Read any additional values into another fixnum, and then
+        ;; shift left and add to the low fixnum.
+        (let ((high-word 0))
+          (declare (type fixnum high-word))
+          (loop for place from 0 by 7 below fixnum-bits
+                for byte fixnum = (get-byte)
+                for bits = (ildb (byte 7 0) byte)
+                do (setq high-word (ilogior (the fixnum high-word) (the fixnum (iash bits place))))
+                   (when (i< byte 128)
+                     (return-as-correct-size (+ (ash high-word fixnum-bits) low-word)))))
+
+        ;; We shouldn't get here unless we're reading a value that doesn't fit in two fixnums.
+        (assert nil nil "The value doesn't fit into ~A bits" (* 2 fixnum-bits))))))
 
 
 ;; TODO(jgodbout): Find all of the different instances of word-size
@@ -423,17 +433,18 @@
              #+sbcl (type sb-ext:word word)
              #+sbcl (type sb-int:index index)
              (optimize (safety 0)))
-    (let ((shift 0))
+    (let ((shift 0)
+          (idx index))
       (dotimes (i 10)
-        (let ((byte (aref a index)))
-          (incf index)
+        (let ((byte (aref a idx)))
+          (incf idx)
           (setf word
                 (logior (logand (ash (logand byte 127) (the (mod 64) shift))
                                 #+sbcl sb-ext:most-positive-word)
                         word))
           (unless (logbitp 7 byte) (return)))
-        (incf shift 7)))
-    (values word index)))
+        (incf shift 7))
+      (values word idx))))
 
 ;; Decode the value from the buffer at the given index,
 ;; then return the value and new index into the buffer
@@ -1233,13 +1244,14 @@
    Watch out, this function turns off all type checking and all array bounds checking."
   (declare #.$optimize-serialization)
   (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
-           (array-index index)
+           (type array-index index)
            (type (unsigned-byte 32) tag))
   (case (ilogand tag #x7)
     ((#.$wire-type-varint)
-     (loop for byte fixnum = (prog1 (aref buffer index) (iincf index))
-           until (i< byte 128))
-     index)
+     (let ((idx index))
+       (loop for byte fixnum = (prog1 (aref buffer idx) (iincf idx))
+             until (i< byte 128))
+       idx))
     ((#.$wire-type-string)
      (multiple-value-bind (len idx)
          (decode-uint32 buffer index)
