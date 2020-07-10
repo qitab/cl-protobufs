@@ -80,6 +80,13 @@ as a type with enum-name being (MEMBER :enum-1 :enum-2 ...).
 It also creates methods to access the default-enum, and convert
 from the enum keyword to the enum index and back.
 
+If the enum being defined is at top level in the proto then
+then we output the result of the macro directly.
+If the enum is nested in other define forms, then we
+save the output of define-enum in a global and output the
+enum definitions before any other definitions. This guarantees
+the enum type is available for other messages definitions.
+
 DEFINE-EXTENSION:
 
 The define-extension macro defines a PROTOBUF-EXTENSION meta-object and
