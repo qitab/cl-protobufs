@@ -87,9 +87,8 @@ only if the same fields have been explicitly set."
             = (when slot-value-1
                 (slot-value message-2 (proto-internal-field-name field)))
 
-          ;; Basic wire types are listed as keywords.
           when (and (not (eq lisp-type :bool))
-                    (or (keywordp lisp-type) (find-enum lisp-type)))
+                    (or (scalarp lisp-type) (find-enum lisp-type)))
             do (unless (scalar-field-equal slot-value-1 slot-value-2)
                  (return-from proto-equal nil))
           when (not (and slot-value-1 slot-value-2))
