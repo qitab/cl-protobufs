@@ -193,7 +193,12 @@
            (t
             (values (class-name->proto type) type))))))
 
+(defun lisp-type-to-protobuf-class (type)
+  "Return protobuf class associated with the lisp type TYPE."
+  (nth-value 1 (lisp-type-to-protobuf-type type)))
 (defun scalarp (type)
+
+
   "Returns true if the given Protobufs type is a scalar type. Scalar types
 are defined by the protobuf documentation. The symbol type is included here,
 as it is just a renaming of the string type.
