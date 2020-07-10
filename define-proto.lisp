@@ -452,8 +452,8 @@ Parameters:
          (map-desc (make-map-descriptor
                     :class class
                     :name name
-                    :key-class (proto-type->keyword key-type)
-                    :val-class (proto-type->keyword val-type)
+                    :key-class (lisp-type-to-protobuf-class key-type)
+                    :val-class (lisp-type-to-protobuf-class val-type)
                     :key-type key-type
                     :val-type val-type)))
     (record-protobuf-object class map-desc :map)

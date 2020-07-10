@@ -193,6 +193,10 @@
            (t
             (values (class-name->proto type) type))))))
 
+(defun lisp-type-to-protobuf-class (type)
+  "Return protobuf class associated with the lisp type TYPE."
+  (nth-value 1 (lisp-type-to-protobuf-type type)))
+
 (defun packed-type-p (type)
   "Returns true if the given Protobufs type can use a packed field."
   (assert (symbolp type))
