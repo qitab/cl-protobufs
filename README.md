@@ -218,11 +218,6 @@ Deprecated, instead use the accessors specified below.
 The setf function for proto-slot-value.
 Deprecated, do not use.
 
-```lisp
-(defun proto-slot-is-set (object slot))
-```
-Deprecated, instead use the accessors setter specified below.
-
 ### Proto package
 
 We assume that the protobuf assigned lisp package package, and a message:
@@ -254,7 +249,6 @@ For example, for an int32 field it should return 0 if unset.
 (defmethod field (object 'msg))
 ```
 Same as msg.field.
-Deprecated.
 
 ```lisp
 (defun msg.has-field (object))
