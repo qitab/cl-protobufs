@@ -1630,14 +1630,14 @@ Arguments
                              &key lisp-type proto-type serializer deserializer)
   "Define a Protobufs type alias Lisp 'deftype' named 'type'.
    'lisp-type' is the name of the Lisp type.
-   'proto-type' is the name of a primitive Protobufs type, e.g., 'int32' or 'string'.
+   'proto-type' is the name of a scalar Protobufs type, e.g., 'int32' or 'string'.
    'serializer' is a function that takes a Lisp object and generates a Protobufs object.
    'deserializer' is a function that takes a Protobufs object and generates a Lisp object.
    If 'alias-for' is given, no Lisp 'deftype' will be defined."
   (multiple-value-bind (type-str proto)
       (lisp-type-to-protobuf-type proto-type)
-    (assert (keywordp proto) ()
-            "The alias ~S must resolve to a Protobufs primitive type"
+    (assert (scalarp proto) ()
+            "The alias ~S must resolve to a Protobufs scalar type"
             type)
     (let* ((name  (or name (class-name->proto type)))
            (alias (make-instance 'protobuf-type-alias

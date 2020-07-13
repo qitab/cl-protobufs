@@ -118,6 +118,9 @@
   (:nicknames :proto-impl)
   (:use :common-lisp :protobufs)
 
+  (:import-from :alexandria
+                #:define-constant)
+
   (:shadow
    #:find-method)
 
@@ -153,7 +156,7 @@
    #:proto-service-name
    #:proto-source-location              ; should be proto-source-pathname now?
    #:proto-streams-name
-   #:serialize-prim
+   #:serialize-scalar
 
    ;; For ASDF
    #:process-imports

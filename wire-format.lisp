@@ -94,8 +94,8 @@
 ;; Suppose the following have been defined:
 ;;  (defconstant a 'b)
 ;;  (defconstant b :bool)
-;; Then (SERIALIZE-PRIM x a tag buffer) should generate a runtime error, because the symbol B,
-;; which is what the function receives, is not a known primitive.
+;; Then (SERIALIZE-SCALAR x a tag buffer) should generate a runtime error, because the symbol B,
+;; which is what the function receives, is not a known scalar value type.
 ;; However FOLD-SYMBOL translates A into :BOOL.
 ;; Compiler-macros should never alter a form's semantics.
 ;;
@@ -160,14 +160,19 @@
 
 ;;; Serializers
 
-;; Serialize 'val' of primitive type 'type' into the buffer
+;; Serialize 'val' of scalar type 'type' into the buffer
 (declaim (ftype (function (t t (unsigned-byte 32) t) (values fixnum &optional))
-                serialize-prim))
-(defun serialize-prim (val type tag buffer)
-  "Serializes a Protobufs primitive (scalar) value into the buffer at the given index.
-   The value is given by 'val', the primitive type by 'type'.
+                serialize-scalar))
+(defun serialize-scalar (val type tag buffer)
+  "Serializes a Protobufs scalar value into the buffer at the given index.
    Modifies the buffer in place, and returns the new index into the buffer.
-   Watch out, this function turns off most type checking and all array bounds checking."
+   Watch out, this function turns off most type checking and all array bounds checking.
+
+Parameters:
+  VAL: The value to serialize.
+  TYPE: The type of VAL.
+  TAG: The protobuf tag to serialize.
+  BUFFER: The buffer to serialize to."
   (declare (type (unsigned-byte 32) tag))
   (locally (declare #.$optimize-serialization)
     (i+
@@ -199,7 +204,9 @@
        ((:date :time :datetime :timestamp)
         (encode-int64 val buffer))))))
 
-(defun get-prim-encoder-form (type val buffer)
+(defun get-scalar-encoder-form (type val buffer)
+  "Returns a form that encodes a value VAL with type
+ TYPE to buffer BUFFER."
   (case type
     (:uint32   `(encode-uint32 ,val ,buffer))
     (:uint64   `(encode-uint64 ,val ,buffer))
@@ -217,7 +224,9 @@
     (:float    `(encode-single ,val ,buffer))
     (:double   `(encode-double ,val ,buffer))))
 
-(defun get-prim-encoder-lambda (type)
+(defun get-scalar-encoder-lambda (type)
+  "Given a type TYPE, return a function that takes a value of type TYPE
+and a buffer which encodes the value to the buffer."
   (ecase type
     (:uint32   (lambda (val b) (encode-uint32 val b)))
     (:uint64   (lambda (val b) (encode-uint64 val b)))
@@ -235,10 +244,10 @@
     (:float    (lambda (val b) (encode-single val b)))
     (:double   (lambda (val b) (encode-double val b)))))
 
-(define-compiler-macro serialize-prim (&whole form val type tag buffer)
+(define-compiler-macro serialize-scalar (&whole form val type tag buffer)
   (setq type (fold-symbol type)
         tag  (fold-symbol tag))
-  (let ((encoder (get-prim-encoder-form type val buffer)))
+  (let ((encoder (get-scalar-encoder-form type val buffer)))
     (if encoder
         `(locally (declare #.$optimize-serialization)
            (+ (encode-uint32 ,tag ,buffer) ,encoder))
@@ -248,7 +257,7 @@
                 packed-size))
 (defun serialize-packed (values type index buffer &optional vectorp)
   "Serializes a set of packed values into the buffer at the given index.
-   The values are given by 'values', the primitive type by 'type'.
+   The values are given by 'values', the scalar type by 'type'.
    Modifies the buffer in place, and returns the new index into the buffer.
    Watch out, this function turns off most type checking and all array bounds checking."
   (declare (type (unsigned-byte 32) index))
@@ -262,9 +271,9 @@
     ;; act as a higher-order function. We can do slightly better by
     ;; actually specializing for two subtypes of sequence though.
     ;; Of course, we *could* dispatch on both the sequence type and the
-    ;; primitive wire type, to create 22 (= 11 x 2) cases,
+    ;; scalar wire type, to create 22 (= 11 x 2) cases,
     ;; but I'm too lazy to hand-roll that, or even think of a macroish way.
-    (let* ((encoder (get-prim-encoder-lambda type))
+    (let* ((encoder (get-scalar-encoder-lambda type))
            (tag-len (encode-uint32 (packed-tag index) buffer))
            (payload-len (packed-size values type))
            (prefix-len (encode-uint32 payload-len buffer))
@@ -291,8 +300,8 @@
   (setq type (fold-symbol type)
         index (fold-symbol index))
   (if vectorp-supplied-p
-      (let ((encode (or (get-prim-encoder-form type 'val buffer)
-                        (error "No primitive encoder for ~S" type))))
+      (let ((encode (or (get-scalar-encoder-form type 'val buffer)
+                        (error "No scalar encoder for ~S" type))))
         ;; FIXME: probably should have ONCE-ONLY for BUFFER
         ;; [Same goes for a lot of the compiler macros]
         `(locally (declare #.$optimize-serialization)
@@ -546,9 +555,9 @@
 ;; Deserialize the next object of type 'type'
 ;; FIXME: most of these are bad. QPX does not do much decoding,
 ;; so I'll not touch them for the time being.
-(defun deserialize-prim (type buffer index)
-  "Deserializes the next object of primitive type 'type'.
-   Deserializes from the byte vector 'buffer' starting at 'index'.
+(defun deserialize-scalar (type buffer index)
+  "Deserializes the next object of scalar type TYPE.
+   Deserializes from the byte vector BUFFER starting at INDEX.
    Returns the value and the new index into the buffer.
    Watch out, this function turns off most type checking and all array bounds checking."
   (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
@@ -587,7 +596,7 @@
       ((:date :time :datetime :timestamp)
        (decode-uint64 buffer index)))))
 
-(define-compiler-macro deserialize-prim (&whole form type buffer index)
+(define-compiler-macro deserialize-scalar (&whole form type buffer index)
   (setq type (fold-symbol type))
   (let ((decoder
           (case type
