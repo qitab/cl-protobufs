@@ -274,7 +274,7 @@ Parameters:
                                                 ((:float) (parse-float stream))
                                                 ((:double) (parse-double stream))
                                                 ((:string) (parse-string stream))
-                                                ((:bool)   (if (boolean-true-p (parse-token stream)) t nil))
+                                                ((:bool)   (boolean-true-p (parse-token stream)))
                                                 (otherwise (parse-signed-int stream)))))
                                      (when slot
                                        (pushnew slot rslots)
@@ -305,10 +305,7 @@ Parameters:
                                                   ((:float) (parse-float stream))
                                                   ((:double) (parse-double stream))
                                                   ((:string) (parse-string stream))
-                                                  ((:bool)   (if (boolean-true-p
-                                                                  (parse-token stream))
-                                                                 t
-                                                                 nil))
+                                                  ((:bool)   (boolean-true-p (parse-token stream)))
                                                   (otherwise (parse-signed-int stream)))))
                                        (when slot
                                          (pushnew slot rslots)
@@ -324,9 +321,7 @@ Parameters:
                                                 ((:float) (parse-float stream))
                                                 ((:double) (parse-double stream))
                                                 ((:string) (parse-string stream))
-                                                ((:bool)   (if (boolean-true-p (parse-token stream))
-                                                               t
-                                                               nil))
+                                                ((:bool)   (boolean-true-p (parse-token stream)))
                                                 (otherwise (parse-signed-int stream)))))
                                      (when slot
                                        (setf (proto-slot-value object slot) val))))
@@ -354,7 +349,7 @@ Parameters:
                                                   ((:float) (parse-float stream))
                                                   ((:double) (parse-double stream))
                                                   ((:string) (parse-string stream))
-                                                  ((:bool)   (if (boolean-true-p (parse-token stream)) t nil))
+                                                  ((:bool)   (boolean-true-p (parse-token stream)))
                                                   (otherwise (parse-signed-int stream)))))
                                        (when slot
                                          (setf (proto-slot-value object slot)
