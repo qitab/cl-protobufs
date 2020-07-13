@@ -41,10 +41,10 @@ The definition of initialized is all required-fields are set."
     (object-initialized-p object message)))
 
 (defun scalar-field-equal (object-1 object-2)
-  "Check if two objects with scalar type in proto-fields are equal.
+  "Check if two objects with scalar type are equal.
 Parameters:
   OBJECT-1: The first scalar object.
-  OBJECT-2: The second sclaar object."
+  OBJECT-2: The second scalar object."
   (typecase object-1
     (string (string= object-1 object-2))
     (t (equalp object-1 object-2))))
