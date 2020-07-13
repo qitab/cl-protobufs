@@ -299,32 +299,29 @@ will generate the following functions:
 ```lisp
 (defun msg.field-gethash (key object))
 ```
-Return the value mapped from KEY in OBJECT. If there is no value set, this
-function returns the default value of the map's value type.
+Return the value mapped from KEY in message object OBJECT. If there is no
+value set, this function returns the default value of the map's value type.
 
 ```lisp
 (defun (setf (msg.field-gethash) (value key object)))
 ```
-Set the hash of KEY to VALUE in OBJECT. An example of using this function
-would be:
+Set the value of KEY to VALUE in message object OBJECT. An example of
+using this function is:
 ```lisp
 (setf (msg.field-gethash key object) value)
 ```
-Which is in line with Common Lisp's `hash-table`.
+This is in line with Common Lisp's `hash-table`.
 
 ```lisp
 (defun msg.field-remhash (key object))
 ```
-Remove the hash of KEY in OBJECT.
+Remove the hash of KEY in message object OBJECT.
 
 These three functions are type checked, and interfacing with the map with
 these three functions alone will guarantee that (de)serialization functions
-as well as the `msg.has-field` function will work properly. However, if
-the user wants access to the underlying hash-table then they may use the
-generic accessor `(msg.field (object))` defined above (where `field` is a
-map field). Warning: this accessor is not type checked, so undefined behaviour
-may occur.
-
+as well as the `msg.has-field` function will work properly. The underlying
+hash table may be accessed directly via `(msg.field msg)`, but doing so
+may result in undefined behavior.
 ### Proto package-rpc2
 
 We will now discuss the api for  a protobuf service in a proto file.
