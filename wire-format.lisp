@@ -156,9 +156,14 @@
                 serialize-scalar))
 (defun serialize-scalar (val type tag buffer)
   "Serializes a Protobufs scalar value into the buffer at the given index.
-   The value is given by 'val', the scalar type by 'type'.
    Modifies the buffer in place, and returns the new index into the buffer.
-   Watch out, this function turns off most type checking and all array bounds checking."
+   Watch out, this function turns off most type checking and all array bounds checking.
+
+Parameters:
+  VAL: The value to serialize.
+  TYPE: The type of VAL.
+  TAG: The protobuf tag to serialize.
+  BUFFER: The buffer to serialize to."
   (declare (type (unsigned-byte 32) tag))
   (locally (declare #.$optimize-serialization)
     (i+
@@ -191,6 +196,8 @@
         (encode-int64 val buffer))))))
 
 (defun get-scalar-encoder-form (type val buffer)
+  "Returns a form that encodes a value VAL with type
+ TYPE to buffer BUFFER."
   (case type
     (:uint32   `(encode-uint32 ,val ,buffer))
     (:uint64   `(encode-uint64 ,val ,buffer))
@@ -209,6 +216,8 @@
     (:double   `(encode-double ,val ,buffer))))
 
 (defun get-scalar-encoder-lambda (type)
+  "Given a type TYPE, return a function that takes a value of type TYPE
+and a buffer which encodes the value to the buffer."
   (ecase type
     (:uint32   (lambda (val b) (encode-uint32 val b)))
     (:uint64   (lambda (val b) (encode-uint64 val b)))
@@ -536,8 +545,8 @@
 ;; FIXME: most of these are bad. QPX does not do much decoding,
 ;; so I'll not touch them for the time being.
 (defun deserialize-scalar (type buffer index)
-  "Deserializes the next object of scalar type 'type'.
-   Deserializes from the byte vector 'buffer' starting at 'index'.
+  "Deserializes the next object of scalar type TYPE.
+   Deserializes from the byte vector BUFFER starting at INDEX.
    Returns the value and the new index into the buffer.
    Watch out, this function turns off most type checking and all array bounds checking."
   (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
