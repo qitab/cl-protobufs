@@ -643,6 +643,89 @@ Arguments:
 
         (export '(,has-function-name ,clear-function-name ,public-accessor-name))))))
 
+(defun make-oneof-accessor-forms (proto-type oneof)
+  (let* ((public-slot-name (oneof-descriptor-external-name oneof))
+         (hidden-slot-name (oneof-descriptor-internal-name oneof))
+         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
+         (hidden-accessor-name (fintern "~A-~A" proto-type hidden-slot-name))
+         (index (oneof-descriptor-index oneof))
+         (case-function-name (proto-slot-function-name proto-type public-slot-name :case))
+         (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
+         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear)))
+    (with-gensyms (obj)
+      `(
+        (declaim (inline ,case-function-name))
+        (defun ,case-function-name (,obj)
+          (case (oneof-data-set-field (,hidden-accessor-name ,obj))
+            ,@(loop for field across (oneof-descriptor-fields oneof)
+                    collect
+                    (let ((offset (proto-oneof-offset field))
+                          (keyword (keywordify (proto-external-field-name field))))
+                      `((,offset) ,keyword)))
+            ((nil) :%unset)))
+
+        (declaim (inline ,has-function-name))
+        (defun ,has-function-name (,obj)
+          (= (bit (,is-set-accessor ,obj) ,index) 1))
+
+        (declaim (inline ,clear-function-name))
+        (defun ,clear-function-name (,obj)
+          (setf (oneof-data-value (,hidden-accessor-name ,obj)) nil)
+          (setf (bit (,is-set-accessor ,obj) ,index) 0)
+          (setf (oneof-data-set-field (,hidden-accessor-name ,obj)) nil))
+
+        (export '(,case-function-name ,has-function-name ,clear-function-name))
+
+        ,@(loop
+            for field across (oneof-descriptor-fields oneof)
+            append
+            (let* ((public-slot-name (proto-external-field-name field))
+                   (public-accessor-name (proto-slot-function-name
+                                          proto-type public-slot-name :get))
+                   (has-function-name    (proto-slot-function-name
+                                          proto-type public-slot-name :has))
+                   (clear-function-name  (proto-slot-function-name
+                                          proto-type public-slot-name :clear))
+                   (default-form (get-default-form (proto-set-type field)
+                                                   (proto-default field)))
+                   (field-type (proto-set-type field)))
+              (with-gensyms (obj new-value)
+                `((declaim (inline ,public-accessor-name))
+                  (defun ,public-accessor-name (,obj)
+                    (if (eq (oneof-data-set-field (,hidden-accessor-name ,obj))
+                            ,(proto-oneof-offset field))
+                        (oneof-data-value (,hidden-accessor-name ,obj))
+                        ,default-form))
+
+                  (declaim (inline (setf ,public-accessor-name)))
+                  (defun (setf ,public-accessor-name) (,new-value ,obj)
+                    (declare (type ,field-type ,new-value))
+                    (setf (bit (,is-set-accessor ,obj) ,index) 1)
+                    (setf (oneof-data-set-field (,hidden-accessor-name ,obj))
+                          ,(proto-oneof-offset field))
+                    (setf (oneof-data-value (,hidden-accessor-name ,obj)) ,new-value))
+
+                  (declaim (inline ,has-function-name))
+                  (defun ,has-function-name (,obj)
+                    (and (= (bit (,is-set-accessor ,obj) ,index) 1)
+                         (eq (oneof-data-set-field (,hidden-accessor-name ,obj))
+                             ,(proto-oneof-offset field))))
+
+                  (declaim (inline ,clear-function-name))
+                  (defun ,clear-function-name (,obj)
+                    (when (,has-function-name ,obj)
+                      (setf (bit (,is-set-accessor ,obj) ,index) 0)
+                      (setf (oneof-data-value (,hidden-accessor-name ,obj)) nil)
+                      (setf (oneof-data-set-field (,hidden-accessor-name ,obj)) nil)))
+
+                  (defmethod ,public-slot-name ((,obj ,proto-type))
+                    (,public-accessor-name ,obj))
+
+                  (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
+                    (setf (,public-accessor-name ,obj) ,new-value))
+
+                  (export '(,has-function-name ,clear-function-name
+                            ,public-accessor-name))))))))))
 
 (defun make-map-accessor-forms (proto-type public-slot-name slot-name field)
   "This creates forms that define map accessors which are type safe. Using these will
@@ -824,14 +907,15 @@ Arguments:
         ((enum-default-value `,type) (enum-default-value `,type))
         (t `(enum-default-value ',type))))))
 
-(defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields)
+(defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
   "Makes the definition forms for the define-group and define-message macros.
 
 Arguments:
   PROTO-TYPE: The Lisp type name of the proto message.
   SLOTS: Slot definitions created by PROCESS-FIELD.
   NON-LAZY-FIELDS: Field definitions for non-lazy fields.
-  LAZY-FIELDS: Field definitions for lazy fields."
+  LAZY-FIELDS: Field definitions for lazy fields.
+  ONEOFS: A list of oneof descriptors for the message/group."
   (let* ((public-constructor-name (fintern "MAKE-~A" proto-type))
          (hidden-constructor-name (fintern "%MAKE-~A" proto-type))
          (public-lazy-slot-names (mapcar #'proto-external-field-name lazy-fields))
@@ -842,7 +926,9 @@ Arguments:
                        (find-if #'(lambda (el)
                                     (eq (field-data-internal-slot-name el) '%%is-set))
                                 slots)))
-         (additional-slots '(%%is-set)))
+         (additional-slots '(%%is-set))
+         (oneof-fields (loop for oneof in oneofs
+                             append (coerce (oneof-descriptor-fields oneof) 'list))))
     (with-gensyms (obj)
       `(progn
          ;; DEFSTRUCT form.
@@ -853,13 +939,18 @@ Arguments:
                                  ;; todo(jgodbout):delete asap
                                  (:predicate nil))
            ,@(remove nil
-              (mapcar (lambda (slot)
+              (append
+               (mapcar (lambda (slot)
                         (let ((name (field-data-internal-slot-name slot))
                               (type (field-data-type slot))
                               (initform (field-data-initform slot)))
                           (unless (eq type 'boolean)
                             `(,name ,(get-default-form type initform) :type ,type))))
-                      slots)))
+                       slots)
+               (mapcar (lambda (oneof)
+                         (let ((name (oneof-descriptor-internal-name oneof)))
+                           `(,name (make-instance 'oneof-data) :type oneof-data)))
+                       oneofs))))
          ;; Define public accessors for fields.
          ,@(mapcan (lambda (field public-slot-name)
                      (make-structure-class-forms-non-lazy proto-type
@@ -870,6 +961,11 @@ Arguments:
                      (make-structure-class-forms-lazy proto-type field public-slot-name))
                    lazy-fields public-lazy-slot-names)
 
+         ;; Define public accessors for oneofs.
+         ,@(mapcan (lambda (oneof)
+                     (make-oneof-accessor-forms proto-type oneof))
+                   oneofs)
+
          ;; Define public constructor.
          (declaim (inline ,public-constructor-name))
          (defun ,public-constructor-name
@@ -877,23 +973,25 @@ Arguments:
               ,@(loop for sn in public-non-lazy-slot-names
                       collect `(,sn :%unset))
               ,@(loop for sn in public-lazy-slot-names
-                      collect `(,sn :%unset)))
+                      collect `(,sn :%unset))
+              ,@(loop for field in oneof-fields
+                      collect `(,(proto-external-field-name field) :%unset)))
            (let ((,obj (,hidden-constructor-name)))
              ,@(mapcan
-                (lambda (slot)
-                  (let* ((name (field-data-internal-slot-name slot))
-                         (type (field-data-type slot))
-                         (public-slot-name (field-data-external-slot-name slot))
+                (lambda (field)
+                  (let* ((type (proto-set-type field))
+                         (public-slot-name (proto-external-field-name field))
                          (set-check (if (eq type 'cl:boolean)
                                         `(eq ,public-slot-name :%unset)
                                         `(or (eq ,public-slot-name :%unset)
                                              (not ,public-slot-name)))))
-                    (unless (or (eq name '%%is-set) (eq name '%bytes) (eq name '%%bool-values))
-                      (let* ((public-accessor-name
-                              (proto-slot-function-name proto-type public-slot-name :get)))
-                        `((unless ,set-check
-                            (setf (,public-accessor-name ,obj) ,public-slot-name)))))))
-                slots)
+                    (let ((public-accessor-name
+                            (proto-slot-function-name proto-type public-slot-name :get)))
+                      `((unless ,set-check
+                          (setf (,public-accessor-name ,obj) ,public-slot-name))))))
+                (append non-lazy-fields
+                        lazy-fields
+                        oneof-fields))
              ,obj))
 
          ;; Define clear functions.
@@ -905,7 +1003,8 @@ Arguments:
            ,@(mapcan (lambda (name)
                        (let ((clear-name (fintern "~A.CLEAR-~A" proto-type name)))
                          `((,clear-name ,obj))))
-                     (append public-non-lazy-slot-names additional-slots)))))))
+                     (append public-non-lazy-slot-names additional-slots
+                             (mapcar #'oneof-descriptor-external-name oneofs))))))))
 
 (defun non-repeated-bool-field (field)
   "Determine if a field given by a FIELD is a non-repeated boolean."
@@ -946,14 +1045,14 @@ Arguments:
          (bool-count (count-if #'non-repeated-bool-field fields))
          (bool-index -1)
          (bool-values (make-array bool-count :element-type 'bit :initial-element 0)))
-
     (with-collectors ((slots collect-slot)
                       (forms collect-form)
                       ;; The typedef needs to be first in forms otherwise ccl warns.
                       ;; We'll collect them separately and splice them in first.
                       (type-forms collect-type-form)
                       (lazy-fields collect-lazy-field)
-                      (non-lazy-fields collect-non-lazy-field))
+                      (non-lazy-fields collect-non-lazy-field)
+                      (oneofs collect-oneof))
       (dolist (field fields)
         (case (car field)
           ((define-enum)
@@ -1010,6 +1109,7 @@ Arguments:
                      ;; TODO(cgay): this should probably refer to the external field name but I'll
                      ;; wait since I've no idea if that slot is bound at this point.
                      (proto-internal-field-name field) (proto-class msg-desc))
+             ;; todo(benkuehnert: What does this do?
              (setq index idx)
              (when slot
                (collect-slot slot))
@@ -1061,7 +1161,7 @@ Arguments:
               (collect-form `(record-protobuf-object ',alias-for ,msg-desc :message))))
           ;; If no alias, define the class now
           (collect-type-form
-           (make-structure-class-forms type slots non-lazy-fields lazy-fields)))
+           (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs)))
       ;; Register it by the full symbol name.
       (record-protobuf-object type msg-desc :message)
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
@@ -1362,7 +1462,8 @@ Arguments:
                       ;; We'll collect them separately and splice them in first.
                       (type-forms collect-type-form)
                       (lazy-fields collect-lazy-field)
-                      (non-lazy-fields collect-non-lazy-field))
+                      (non-lazy-fields collect-non-lazy-field)
+                      (oneofs collect-oneof))
       (dolist (field fields)
         (case (car field)
           ((define-enum define-message define-extend define-type-alias)
@@ -1445,7 +1546,7 @@ Arguments:
         (unless (or (eq type alias-for) (find-class type nil))
           (collect-type-form `(deftype ,type () ',alias-for)))
           (collect-type-form
-           (make-structure-class-forms type slots non-lazy-fields lazy-fields)))
+           (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs)))
       (collect-form `(record-protobuf-object ',type ,message :message))
       ;; Group can never be a top level element.
       `(progn
