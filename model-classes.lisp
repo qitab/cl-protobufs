@@ -363,6 +363,28 @@ Parameters:
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
 
+(defstruct oneof-data
+  (value nil)
+  ;; This slot stores data to tell which field is set in the oneof.
+  ;; It is either nil or a number. If it is nil, then nothing is set.
+  ;; if it is a number, say N, then the N-th field in the oneof is set.
+  (set-field nil :type (or null (unsigned-byte 32))))
+
+(defstruct oneof-descriptor
+  "The meta-object for a protobuf map"
+  ;; While oneofs do not have indices, each of its fields has a 'field-offset'
+  ;; which tracks the order that the fields are defined in the message. Since
+  ;; these fields share a single slot, they share the same field-offset. This
+  ;; slot holds this value.
+  (index nil :type (unsigned-byte 29))
+  (fields nil :type array)         ; A vector which stores the oneof's field descriptors.
+  (internal-name nil :type symbol) ; This is the external name, but with '%' prepended.
+  (external-name nil :type symbol) ; A symbol whose name is the name of the oneof.
+  (reader nil :type symbol))       ; A reader used to access the oneof-data struct.
+
+(defmethod make-load-form ((o oneof-descriptor) &optional environment)
+  (make-load-form-saving-slots o :environment environment))
+
 (defstruct enum-descriptor
   "Describes a protobuf enum."
   ;; The symbol naming the Lisp type for this enum.
@@ -409,6 +431,11 @@ Parameters:
    (fields :type (list-of field-descriptor)
            :accessor proto-fields
            :initarg :fields
+           :initform ())
+   ;; A list of all oneof descriptors defined in this message.
+   (oneofs :type (list-of oneof-descriptor)
+           :accessor proto-oneofs
+           :initarg :oneofs
            :initform ())
    ;; The FIELDS slot (more or less) as a vector. If the index space is dense,
    ;; the vector is accessed by field index, otherwise it requires linear scan.
@@ -543,6 +570,13 @@ on the symbol if we are not in SBCL."
    (field-offset :type (or null (unsigned-byte 29))
                  :accessor proto-field-offset
                  :initarg :field-offset)
+   ;; If this field is contained in a oneof, this holds the order of this field
+   ;; as it was defined in the oneof. This slot is nil if and only if the field
+   ;; is not part of a oneof.
+   (oneof-offset :type (or null (unsigned-byte 29))
+                 :accessor proto-oneof-offset
+                 :initarg :oneof-offset
+                 :initform nil)
    ;; The name of the slot holding the field value.
    ;; TODO(cgay): there's no deep reason we must have internal and external field names. It's a
    ;; historical artifact that can probably be removed once the QPX protobuf code has been updated.
@@ -636,7 +670,6 @@ on the symbol if we are not in SBCL."
     (let ((default (proto-default field)))
       (or (eq default $empty-vector)
           (and (vectorp default) (not (stringp default)))))))
-
 
 (defclass extension-descriptor (abstract-descriptor)
   ;; The start of the extension range.
