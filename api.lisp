@@ -78,6 +78,31 @@ only if the same fields have been explicitly set."
                             (slot-value message-2 '%%bool-values))))
       (return-from proto-equal nil))
 
+    (loop for oneof in (proto-oneofs message)
+          for slot-value-1
+            = (slot-value message-1 (oneof-descriptor-internal-name oneof))
+          for slot-value-2
+            = (slot-value message-2 (oneof-descriptor-internal-name oneof))
+          for lisp-type
+            = (when slot-value-1 (proto-class
+                                  (aref (oneof-descriptor-fields oneof)
+                                        (oneof-data-set-field slot-value-1))))
+          when (not (and slot-value-1 slot-value-2))
+            do (when (or slot-value-1 slot-value-2)
+                 (return-from proto-equal nil))
+          when (not (equal (oneof-data-set-field slot-value-1)
+                           (oneof-data-set-field slot-value-2)))
+            do (return-from proto-equal nil)
+          when (or (keywordp lisp-type) (find-enum lisp-type))
+            do (unless (primitive-field-equal (oneof-data-value slot-value-1)
+                                              (oneof-data-value slot-value-2))
+                 (return-from proto-equal nil))
+          when (find-message lisp-type)
+            do (unless (proto-equal (oneof-data-value slot-value-1)
+                                    (oneof-data-value slot-value-2)
+                                    :exact exact)
+                 (return-from proto-equal nil)))
+
     (loop for field in (proto-fields message)
           for lisp-type = (proto-class field)
           for slot-value-1
