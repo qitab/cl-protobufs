@@ -981,6 +981,17 @@ Arguments:
                 (push extra-field (proto-fields msg-desc)))
                ((define-extension)
                 (push model (proto-extensions msg-desc))))))
+          ((define-oneof)
+           (push `(:conc-name ,conc-name :field-offset ,field-offset)
+                 (cdr (nthcdr 0 field)))
+           (destructuring-bind (&optional progn oneof-desc)
+               (macroexpand-1 field env)
+             (assert (eq progn 'progn) ()
+                     "The macroexpansion for ~S failed" field)
+             (incf field-offset)
+             (when oneof-desc
+               (push oneof-desc (proto-oneofs msg-desc))
+               (collect-oneof oneof-desc))))
           (otherwise
            (multiple-value-bind (field slot idx lazy-reader)
                (process-field field :conc-name conc-name
@@ -1375,6 +1386,17 @@ Arguments:
                 (appendf (proto-fields message) (list extra-field)))
                ((define-extension)
                 (appendf (proto-extensions message) (list model))))))
+          ((define-oneof)
+           (push `(:conc-name ,conc-name :field-offset ,field-offset)
+                 (cdr (nthcdr 0 field)))
+           (destructuring-bind (&optional progn oneof-desc)
+               (macroexpand-1 field env)
+             (assert (eq progn 'progn) ()
+                     "The macroexpansion for ~S failed" field)
+             (incf field-offset)
+             (when oneof-desc
+               (push oneof-desc (proto-oneofs msg-desc))
+               (collect-oneof oneof-desc))))
           (otherwise
            (multiple-value-bind (field slot idx)
                (process-field field :conc-name conc-name
