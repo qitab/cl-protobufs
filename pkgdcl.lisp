@@ -83,8 +83,8 @@
    #:deserialize-object-from-file
    #:deserialize-object-from-stream
    #:deserialize-object-from-bytes
-   #:deserialize-object-to-bytes
    #:deserialize-object
+   #:make-message-with-bytes
    #:set-method-do-not-deserialize-input
 
    ;; Text format

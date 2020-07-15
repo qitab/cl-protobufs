@@ -957,7 +957,7 @@ Arguments:
       ;; Not required, but this will have the proto-fields serialized
       ;; in the order they were defined.
       (setf (proto-fields msg-desc) (nreverse (proto-fields msg-desc)))
-      ;; One extra slot for the deserialize-object-to-bytes feature
+      ;; One extra slot for the make-message-with-bytes feature.
       (collect-slot
        (make-field-data
         :internal-slot-name 'proto-impl::%bytes

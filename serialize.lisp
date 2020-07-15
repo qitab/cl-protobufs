@@ -722,10 +722,8 @@ Parameters:
                               (deserializer (custom-deserializer type))
                               (obj
                                 (cond (lazy-p
-                                       ;; For lazy fields, just store bytes in the %bytes
-                                       ;; field.
-                                       (deserialize-object-to-bytes
-                                        type (subseq buffer start end)))
+                                       ;; For lazy fields, just store bytes in the %bytes field.
+                                       (make-message-with-bytes type (subseq buffer start end)))
                                       (deserializer
                                        (funcall deserializer buffer
                                                 start end end-tag))
@@ -1317,10 +1315,10 @@ Parameters:
                  (otherwise
                   (setq ,vidx (skip-element ,vbuf ,vidx tag))))))))))))
 
-(defun deserialize-object-to-bytes (type buffer)
-  "Creates an instance of TYPE with BUFFER used as the pre-computed proto serialization bytes to
-   return when deserializing.  Useful when an object is being passed through without ever being
-   deserialized.  Note that BUFFER is not actually deserialized here."
+(defun make-message-with-bytes (type buffer)
+  "Creates an instance of TYPE with BUFFER used as the pre-computed proto
+   serialization bytes to return when deserializing.  Useful for passing an
+   object through without ever needing to deserialize it."
   (let* ((message (find-message-for-class type))
          (message-name (or (proto-alias-for message) (proto-class message)))
          (object  #+sbcl (make-instance message-name)
