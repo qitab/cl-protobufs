@@ -249,17 +249,20 @@
 Arguments:
   PROTO-TYPE: The symbol naming a protobuf message, group, etc.
   SLOT: The symbol naming a protobuf field.
-  FUNCTION-TYPE: The type of function name to retrieve: :has, :get, or :clear.
-                 This can also be :map-get or :map-rem for the special map functions."
+  FUNCTION-TYPE: The type of function name to retrieve:
+                 This can be :has, :get, or :clear (for normal fields).
+                 This can also be :map-get or :map-rem for the special map functions.
+                 Finally, it can be :case for the special oneof function."
   (declare (type symbol proto-type slot)
-           (type (member :has :get :clear :map-get :map-rem) function-type))
+           (type (member :has :get :clear :map-get :map-rem :case) function-type))
   (let ((f-symbol (ecase function-type
                     (:has 'has)
                     (:clear 'clear)
                     (:get nil)
                     (:map-get 'gethash)
-                    (:map-rem 'remhash))))
-    (cond ((member f-symbol '(gethash remhash))
+                    (:map-rem 'remhash)
+                    (:case 'case))))
+    (cond ((member f-symbol '(gethash remhash case))
            (intern (nstring-upcase (format nil "~a.~a-~a"
                                            (symbol-name proto-type)
                                            (symbol-name slot)
