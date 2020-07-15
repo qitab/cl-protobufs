@@ -414,7 +414,6 @@ Parameters:
         (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
-
 (defmacro define-map (type-name &key key-type val-type index)
 "Define a lisp type given the data for a protobuf map type.
 
@@ -463,6 +462,58 @@ Parameters:
        ((record-protobuf-object ',class ,map-desc :map)) ;; forms necessary for defining the map
        ,mfield    ;; the extra field-data object created by this macro
        ,mslot)))  ;; the extra field-descriptor object created by this macro.
+
+(defmacro define-oneof ((&key conc-name field-offset) oneof-slot &body fields)
+  "Define a protobuf oneof. This macro creates the representation for
+the oneof, as well as the representation/defining forms for its fields.
+Warning: This macro assumes the variables 'conc-name', 'field-offset',
+and 'index' are bound when macroexpanding.
+
+Parameters:
+  NAME: The name of the oneof.
+  FIELDS: Field as output by protoc."
+  (let* ((internal-name (fintern "%~A" oneof-slot))
+         (desc (make-oneof-descriptor
+                :internal-name internal-name
+                :external-name oneof-slot
+                :fields (make-array (length fields)
+                                    :element-type 'field-descriptor)
+                :index field-offset))
+         (oneof-offset 0))
+    (loop for field in fields
+          do (destructuring-bind (slot &key type typename name (default nil default-p)
+                                         lazy index documentation &allow-other-keys)
+                 field
+               (let ((internal-slot-name (fintern "%~A" slot))
+                     (reader (and conc-name (fintern "~A~A" conc-name slot)))
+                     (default (if default-p default $empty-default)))
+                 (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
+                     (clos-type-to-protobuf-type type)
+                   (declare (ignore packed-p enum-values))
+                   (assert index)
+                   (setf (aref (oneof-descriptor-fields desc) oneof-offset)
+                         (make-instance 'field-descriptor
+                                        :name (or name (slot-name->proto slot))
+                                        :type (or typename ptype)
+                                        :lisp-type (when root-lisp-type (qualified-symbol-name
+                                                                         root-lisp-type))
+                                        :set-type type
+                                        :class pclass
+                                        :qualified-name (make-qualified-name
+                                                         *protobuf* (or name
+                                                                        (slot-name->proto slot)))
+                                        :label :optional
+                                        :index index
+                                        :internal-field-name internal-name
+                                        :external-field-name slot
+                                        :field-offset field-offset
+                                        :oneof-offset oneof-offset
+                                        :default default
+                                        :lazy (and lazy t) ; todo(benkuehnert): why AND with t?
+                                        :documentation documentation))
+                   (incf oneof-offset)))))
+    `(progn
+       ,desc)))
 
 (declaim (inline proto-%bytes))
 (defun proto-%bytes (obj)

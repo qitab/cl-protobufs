@@ -68,6 +68,7 @@
    #:define-schema
    #:define-enum
    #:define-map
+   #:define-oneof
    #:define-message
    #:define-extend
    #:define-extension
