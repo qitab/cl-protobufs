@@ -463,7 +463,7 @@ Parameters:
        ,mfield    ;; the extra field-data object created by this macro
        ,mslot)))  ;; the extra field-descriptor object created by this macro.
 
-(defmacro define-oneof ((&key conc-name field-offset) oneof-slot &body fields)
+(defmacro define-oneof ((&key field-offset) oneof-slot &body fields)
   "Define a protobuf oneof. This macro creates the representation for
 the oneof, as well as the representation/defining forms for its fields.
 Warning: This macro assumes the variables 'conc-name', 'field-offset',
@@ -485,7 +485,6 @@ Parameters:
                                          lazy index documentation &allow-other-keys)
                  field
                (let ((internal-slot-name (fintern "%~A" slot))
-                     (reader (and conc-name (fintern "~A~A" conc-name slot)))
                      (default (if default-p default $empty-default)))
                  (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
                      (clos-type-to-protobuf-type type)
@@ -1094,7 +1093,7 @@ Arguments:
                ((define-extension)
                 (push model (proto-extensions msg-desc))))))
           ((define-oneof)
-           (push `(:conc-name ,conc-name :field-offset ,field-offset)
+           (push `(:field-offset ,field-offset)
                  (cdr (nthcdr 0 field)))
            (destructuring-bind (&optional progn oneof-desc)
                (macroexpand-1 field env)
@@ -1501,7 +1500,7 @@ Arguments:
                ((define-extension)
                 (appendf (proto-extensions message) (list model))))))
           ((define-oneof)
-           (push `(:conc-name ,conc-name :field-offset ,field-offset)
+           (push `(:field-offset ,field-offset)
                  (cdr (nthcdr 0 field)))
            (destructuring-bind (&optional progn oneof-desc)
                (macroexpand-1 field env)
