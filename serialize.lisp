@@ -117,8 +117,19 @@
 (defmethod serialize-object (object (msg-desc message-descriptor) buffer)
   (declare (buffer buffer))
   (let ((size 0))
-    (dolist (field (proto-fields msg-desc) size)
-      (iincf size (emit-field object field buffer)))))
+    (dolist (field (proto-fields msg-desc))
+      (iincf size (emit-field object field buffer)))
+    (dolist (oneof (proto-oneofs msg-desc) size)
+      (let* ((fields    (oneof-descriptor-fields oneof))
+             (data      (slot-value object (oneof-descriptor-internal-name oneof)))
+             (set-field (oneof-data-set-field data))
+             (value     (oneof-data-value data)))
+        (unless (eq set-field :unset)
+          (let* ((field (aref fields set-field))
+                 (type  (proto-class field))
+                 (index (proto-index field)))
+            (iincf size
+                   (emit-non-repeated-field value type index buffer))))))))
 
 (defun emit-field (object field buffer)
   "Serialize a single field from an object to buffer
@@ -214,8 +225,23 @@ Parameters:
                        (if custom-serializer
                            (iincf submessage-size
                                   (funcall custom-serializer v buffer))
-                           (dolist (f (proto-fields desc))
-                             (iincf submessage-size (emit-field v f buffer))))
+                           ;; todo(benkuehnert): There's some repeated code that could
+                           ;; be avoided here if we call serialize-object instead.
+                           (progn
+                             (dolist (f (proto-fields desc))
+                               (iincf submessage-size (emit-field v f buffer)))
+                             (dolist (oneof (proto-oneofs desc))
+                               (let* ((fields (oneof-descriptor-fields oneof))
+                                      (data (slot-value v (oneof-descriptor-internal-name
+                                                           oneof)))
+                                      (set-field (oneof-data-set-field data))
+                                      (value (oneof-data-value data)))
+                                 (unless (eq set-field :unset)
+                                   (let* ((field (aref fields set-field))
+                                          (type  (proto-class field))
+                                          (index (proto-index field)))
+                                     (iincf submessage-size
+                                            (emit-non-repeated-field value type index buffer))))))))
                        (iincf size (+ (backpatch submessage-size)
                                       submessage-size)))))))
            size)
@@ -285,8 +311,23 @@ Parameters:
                              (setq submessage-size
                                    (funcall custom-serializer value buffer)))
                             (t
+                             ;; todo(benkuehnert): There's some repeated code that could
+                             ;; be avoided here if we call serialize-object instead.
                              (dolist (f (proto-fields desc))
-                               (iincf submessage-size (emit-field value f buffer)))))
+                               (iincf submessage-size (emit-field value f buffer)))
+                             (dolist (oneof (proto-oneofs desc))
+                               (let* ((fields (oneof-descriptor-fields oneof))
+                                      (data (slot-value value (oneof-descriptor-internal-name
+                                                               oneof)))
+                                      (set-field (oneof-data-set-field data))
+                                      (value     (oneof-data-value data)))
+                                 (unless (eq set-field :unset)
+                                   (let* ((field (aref fields set-field))
+                                          (type  (proto-class field))
+                                          (index (proto-index field)))
+                                     (iincf submessage-size
+                                            (emit-non-repeated-field value type index
+                                                                     buffer))))))))
                       (+ tag-size (backpatch submessage-size) submessage-size))))))
           ((typep desc 'enum-descriptor)
            (serialize-enum value (enum-descriptor-values desc)
