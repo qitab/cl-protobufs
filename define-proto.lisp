@@ -974,6 +974,8 @@ Arguments:
                       collect `(,sn :%unset))
               ,@(loop for sn in public-lazy-slot-names
                       collect `(,sn :%unset))
+              ,@(loop for oneof in oneofs
+                      collect`(,(oneof-descriptor-external-name oneof) :%unset))
               ,@(loop for field in oneof-fields
                       collect `(,(proto-external-field-name field) :%unset)))
            (let ((,obj (,hidden-constructor-name)))
@@ -992,6 +994,17 @@ Arguments:
                 (append non-lazy-fields
                         lazy-fields
                         oneof-fields))
+             ,@(mapcan
+                (lambda (oneof)
+                  (let* ((public-slot-name (oneof-descriptor-external-name oneof))
+                         (hidden-slot-name (oneof-descriptor-internal-name oneof))
+                         (index            (oneof-descriptor-index oneof))
+                         (set-check `(or (eq ,public-slot-name :%unset)
+                                         (not ,public-slot-name))))
+                         `((unless ,set-check
+                             (setf (slot-value ,obj ,hidden-slot-name) ,public-slot-name)
+                             (setf (bit (,is-set-name ,obj) ,index) 1)))))
+                oneofs)
              ,obj))
 
          ;; Define clear functions.
