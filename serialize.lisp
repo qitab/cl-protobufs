@@ -493,13 +493,17 @@ See field-descriptor for the distinction between index, offset, and bool-number.
             (when (= (field-index field) field-number)
               (return field)))))))
 
-;; Lazily compute and memoize a field map for SCHEMA-MESSAGE
-;; This is not needed unless the generic deserializer is executed.
-(defun message-field-metadata-vector (schema-message)
-  (if (slot-boundp schema-message 'field-vect)
-      (proto-field-vect schema-message)
-      (setf (proto-field-vect schema-message)
-            (make-field-map (proto-fields schema-message)))))
+(defun message-field-metadata-vector (message)
+  "Lazily compute and memoize a field map for message-descriptor
+   MESSAGE. This is not needed unless the generic deserializer is
+   executed."
+  (if (slot-boundp message 'field-vect)
+      (proto-field-vect message)
+      (setf (proto-field-vect message)
+            (make-field-map (append
+                             (proto-fields message)
+                             (loop for oneof in (proto-oneofs message)
+                                   append (coerce (oneof-descriptor-fields oneof) 'list)))))))
 
 ;; The generic deserializer for structure-object collects all fields' values before
 ;; applying the object constructor. This is identical to the the way that the
@@ -605,7 +609,14 @@ Parameters:
                   (bool-index (field-bool-index field)))
              (rplaca cell (field-initarg field))
              ;; Get the full metadata from the brief metadata.
-             (let ((field (field-complex-field field)))
+             (let* ((field (field-complex-field field))
+                    (oneof-offset (proto-oneof-offset field)))
+               ;; Fields contained in a oneof need to be wrapped in
+               ;; a oneof-data struct.
+               (when oneof-offset
+                 (setf (cadr cell) (make-oneof-data
+                                    :value (cadr cell)
+                                    :set-field oneof-offset)))
                (when (eq (proto-label field) :repeated)
                  (let ((data (nreverse (cadr cell))))
                    (setf (cadr cell)
