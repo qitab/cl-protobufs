@@ -1063,6 +1063,24 @@ Parameters:
                                  nslot rslot)))
                    (undefined-field-type "While generating 'deserialize-object' for ~S,"
                                          message class field))))
+            ;; If this field is contained in a oneof, we need to put the value in the
+            ;; proper slot in the one-of data struct.
+            (oneof-offset
+             (let ((oneof-val (gensym "ONEOF-VAL")))
+               (multiple-value-bind (deserializer tag)
+                   (generate-non-repeated-field-deserializer
+                    class index vbuf vidx oneof-val :raw-p raw-p)
+                 (when deserializer
+                   (setf deserializer
+                         `(progn
+                            (let ((,oneof-val))
+                              ,deserializer
+                              (setf (oneof-data-value ,temp) ,oneof-val)
+                              (setf (oneof-data-set-field ,temp) ,oneof-offset))))
+                   (return-from generate-field-deserializer
+                     (values (list tag) (list deserializer) nil nil temp)))
+                 (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                                       message class field))))
             ;; Non-repeated field.
             (t
              (setf nslot temp)
@@ -1070,19 +1088,11 @@ Parameters:
                  (generate-non-repeated-field-deserializer
                   class index vbuf vidx temp :raw-p raw-p)
                (if deserializer
-                   ;; Fields contained in a oneof need to be wrapped in
-                   ;; the oneof-data struct.
-                   (let ((oneof-offset (proto-oneof-offset field)))
-                     (when oneof-offset
-                       (setf deserializer
-                             `(make-oneof-data
-                               :value ,deserializer
-                               :set-field ,oneof-offset)))
-                     (return-from generate-field-deserializer
-                       (values (list tag) (list deserializer)
-                               nslot rslot))))
-               (undefined-field-type "While generating 'deserialize-object' for ~S,"
-                                     message class field))))))
+                   (return-from generate-field-deserializer
+                     (values (list tag) (list deserializer)
+                             nslot rslot))
+                   (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                                         message class field)))))))
 
   (assert nil))
 
@@ -1331,7 +1341,9 @@ Parameters:
                       ;; Nonrepeating slots
                       (nslots collect-nslot)
                       ;; For tracking repeated slots that will need to be reversed
-                      (rslots collect-rslot))
+                      (rslots collect-rslot)
+                      ;; For tracking oneof slots
+                      (oneofslots collect-oneofslot))
       (flet ((include-field (field)
                (or (eq include-fields :all)
                    (member (proto-external-field-name field)
@@ -1342,7 +1354,7 @@ Parameters:
         (dolist (field fields)
           (when (and (include-field field)
                      (not (skip-field field)))
-            (multiple-value-bind (tags deserializers nslot rslot)
+            (multiple-value-bind (tags deserializers nslot rslot oneofslot)
                 (generate-field-deserializer message field vbuf vidx :raw-p raw-p)
               (assert tags)
               (assert deserializers)
@@ -1354,10 +1366,13 @@ Parameters:
                        (when nslot
                          (collect-nslot nslot))
                        (when rslot
-                         (collect-rslot rslot)))))))
+                         (collect-rslot rslot))
+                       (when oneofslot
+                         (collect-oneofslot oneofslot)))))))
       (let* ((rslots  (delete-duplicates rslots :key #'first))
              (rfields (mapcar #'first  rslots))
              (rtemps  (mapcar #'second rslots))
+             (oneofslots (delete-duplicates oneofslots :test #'string= :key #'symbol-name))
              (lisp-type (or (proto-alias-for message) (proto-class message)))
              (lisp-class (find-class lisp-type nil))
              (constructor (or constructor
@@ -1378,6 +1393,8 @@ Parameters:
                     (type array-index ,vidx ,vlim))
            (let (,@(loop for slot in nslots
                          collect `(,slot ,missing-value))
+                 ,@(loop for oneofslot in oneofslots
+                         collect `(,oneofslot (make-instance 'oneof-data)))
                  ,@rtemps)
              (loop
                (multiple-value-setq (tag ,vidx)
@@ -1388,6 +1405,10 @@ Parameters:
                     (,@(if constructor (list constructor)
                            #+sbcl`(make-instance ',lisp-type)
                            #-sbcl`(funcall (get-constructor-name ',lisp-type)))
+                     ;; oneofs
+                     ,@(loop for temp in oneofslots
+                             for mtemp = (slot-value-to-slot-name-symbol temp)
+                             nconc (list (intern (string mtemp) :keyword) temp))
                      ;; nonrepeating slots
                      ,@(loop for temp in nslots
                              for mtemp = (slot-value-to-slot-name-symbol temp)
