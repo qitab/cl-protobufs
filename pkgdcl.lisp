@@ -112,7 +112,9 @@
    #:enum->numeral
 
    ;; Miscellany
-   #:enum-values))
+   #:enum-values
+   #:find-option
+   ))
 
 (defpackage protobufs-implementation
   (:nicknames :proto-impl)
@@ -134,7 +136,6 @@
    #:find-map-descriptor
    #:find-field
    #:find-method
-   #:find-option
    #:make-deserializer
    #:make-serializer
    #:make-tag

@@ -280,41 +280,14 @@ Parameters:
   (make-instance 'option-descriptor
                  :name name :value value :type type))
 
-(defgeneric find-option (protobuf name)
-  (:documentation
-   "Given a Protobufs schema, message, enum, etc and the name of an option,
-    returns the value of the option and its (Lisp) type. The third value is
-    true if an option was found, otherwise it is false."))
-
-(defmethod find-option ((desc descriptor) (name string))
+(defun find-option (desc name)
+  "Given a protobuf descriptor DESC and the NAME of an option, returns the
+   value of the option and its Lisp type. The third value is T if an option was
+   found, otherwise NIL."
+  (declare (type descriptor desc) (type string name))
   (let ((option (find name (proto-options desc) :key #'proto-name :test #'option-name=)))
     (when option
       (values (proto-value option) (proto-type option) t))))
-
-(defmethod find-option ((options list) (name string))
-  (let ((option (find name options :key #'proto-name :test #'option-name=)))
-    (when option
-      (values (proto-value option) (proto-type option) t))))
-
-(defgeneric add-option (descriptor name value &optional type)
-  (:documentation
-   "Given a protobuf descriptor (schema, message, enum, etc) add the option called 'name' with the
-    value 'value' and type 'type'.  If the option was previoously present, it is replaced."))
-
-(defmethod add-option ((desc descriptor) (name string) value &optional (type 'string))
-  (let ((option (find name (proto-options desc) :key #'proto-name :test #'option-name=)))
-    (if option
-      ;; This side-effects the old option (meaning what? it's deprecated? --cgay)
-      (setf (proto-value option) value
-            (proto-type option)  type)
-      (setf (proto-options desc)
-            (append (proto-options desc)
-                    (list (make-option name value type)))))))
-
-(defmethod add-option ((options list) (name string) value &optional (type 'string))
-  (let ((option (find name options :key #'proto-name :test #'option-name=)))
-    (append (remove option options)
-            (list (make-option name value type)))))
 
 (defgeneric remove-options (descriptor &rest names)
   (:documentation
