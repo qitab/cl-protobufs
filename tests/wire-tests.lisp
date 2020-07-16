@@ -291,7 +291,7 @@ Paramaters:
      (#x-8000000000000000 (#x00 #x00 #x00 #x00 #x00 #x00 #x00 #x80)))))
 
 ;;--- We need more tests:
-;;---  (de)serialize-prim, (de)serialize-packed, (de)serialize-enum
+;;---  (de)serialize-scalar, (de)serialize-packed, (de)serialize-enum
 ;;---  prim-size, packed-size, enum-size
 ;;---  encode/decode-single/double
 

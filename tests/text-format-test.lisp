@@ -45,6 +45,9 @@ Parameters:
   string_fields: \"Second\"
   enum_vals: NONE
   enum_vals: TWENTY_ONE
+  two_level_nesting {
+    int_field: 2
+  }
 }
 ")
 
@@ -59,7 +62,9 @@ Parameters:
     (assert-true (eql 1.5d0 (cl-protobufs.test-proto:double-field msg-parse)))
     (assert-true (string-equal "A string" (cl-protobufs.test-proto:string-field msg-parse)))
     (assert-true (equal '("First" "Second")  (cl-protobufs.test-proto:string-fields msg-parse)))
-    (assert-true (equal '(:NONE :TWENTY-ONE) (cl-protobufs.test-proto:enum-vals msg-parse)))))
+    (assert-true (equal '(:NONE :TWENTY-ONE) (cl-protobufs.test-proto:enum-vals msg-parse)))
+    (assert-true (equal 2 (cl-protobufs.test-proto:int-field
+                           (cl-protobufs.test-proto:two-level-nesting msg-parse))))))
 
 ; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-text-format (text-format-tests)

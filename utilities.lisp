@@ -378,26 +378,6 @@ Arguments:
 (deftype sfixed32 () '(signed-byte 32))
 (deftype sfixed64 () '(signed-byte 64))
 
-(defun proto-type->keyword (type)
-  "Converts from primitive lisp type to associated keywords.
-Enum and message types are left alone.
-
-Parameters:
-  TYPE: Lisp type to convert."
-  (case type
-    (string :string)
-    (int32 :int32)
-    (int64 :int64)
-    (uint32 :uint32)
-    (uint64 :uint64)
-    (sint32 :sint32)
-    (sint64 :sint64)
-    (fixed32 :fixed32)
-    (fixed64 :fixed64)
-    (sfixed32 :sfixed64)
-    (sfixed64 :sfixed64)
-    (t type)))
-
 (defun fixed-width-integer-type-p (type)
   "Check whether TYPE can be serialized in a fixed number of bits."
   (member type '(fixed32 fixed64 sfixed32 sfixed64)))

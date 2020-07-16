@@ -23,12 +23,11 @@ Parameters:
     (assert (= (slot-value result 'clunit::failed) 0))
     (assert (= (slot-value result 'clunit::errors) 0))))
 
-(deftest test-deserialize-object-to-bytes (deserialize-tests)
-  (let* ((msg
-          (cl-protobufs.test-proto:make-message :i 100))
+(deftest test-make-message-with-bytes (deserialize-tests)
+  (let* ((msg (cl-protobufs.test-proto:make-message :i 100))
          (msg-bytes (proto:serialize-object-to-bytes msg)))
     ;; make a new msg using msg's proto serialization bytes
-    (let* ((msg-clone (proto:deserialize-object-to-bytes
+    (let* ((msg-clone (proto:make-message-with-bytes
                        'cl-protobufs.test-proto:message msg-bytes)))
       (assert-false (cl-protobufs.test-proto:message.has-i msg-clone))
       (assert-true (equalp msg-bytes (proto:serialize-object-to-bytes msg-clone)))
@@ -46,7 +45,7 @@ Parameters:
   (let* ((msg
           (cl-protobufs.test-proto:make-message :i 100))
          (msg-bytes (proto:serialize-object-to-bytes msg))
-         (msg-clone (proto:deserialize-object-to-bytes 'cl-protobufs.test-proto:message msg-bytes))
+         (msg-clone (proto:make-message-with-bytes 'cl-protobufs.test-proto:message msg-bytes))
          (outer-with-native
           (cl-protobufs.test-proto:make-outer-message :message msg))
          (outer-with-clone

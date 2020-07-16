@@ -93,11 +93,11 @@ Parameters:
   (incf *callcount-serialize*)
   (let ((val (slot-value obj '%code)))
     (when val (proto-impl::iincf size
-                  (proto-impl::serialize-prim val :string 10 buf))))
+                  (proto-impl::serialize-scalar val :string 10 buf))))
   ;; skip the FANCYTHING slot
   (let ((val (slot-value obj '%othercode)))
     (when val (proto-impl::iincf size
-                  (proto-impl::serialize-prim val :string 26 buf))))
+                  (proto-impl::serialize-scalar val :string 26 buf))))
   size)
 
 (defun (:protobuf :deserialize submessage)
@@ -121,10 +121,10 @@ Parameters:
                  index)))
      (case proto-impl::tag
        ((10) (multiple-value-setq (code index)
-               (proto-impl::deserialize-prim
+               (proto-impl::deserialize-scalar
                 :string buffer index)))
        ((26) (multiple-value-setq (othercode index)
-               (proto-impl::deserialize-prim :string buffer index)))
+               (proto-impl::deserialize-scalar :string buffer index)))
        (otherwise (setq index (proto-impl::skip-element
                                buffer index proto-impl::tag)))))))
 

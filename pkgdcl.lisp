@@ -84,8 +84,8 @@
    #:deserialize-object-from-file
    #:deserialize-object-from-stream
    #:deserialize-object-from-bytes
-   #:deserialize-object-to-bytes
    #:deserialize-object
+   #:make-message-with-bytes
    #:set-method-do-not-deserialize-input
 
    ;; Text format
@@ -113,11 +113,16 @@
    #:enum->numeral
 
    ;; Miscellany
-   #:enum-values))
+   #:enum-values
+   #:find-option
+   ))
 
 (defpackage protobufs-implementation
   (:nicknames :proto-impl)
   (:use :common-lisp :protobufs)
+
+  (:import-from :alexandria
+                #:define-constant)
 
   (:shadow
    #:find-method)
@@ -132,7 +137,6 @@
    #:find-map-descriptor
    #:find-field
    #:find-method
-   #:find-option
    #:make-deserializer
    #:make-serializer
    #:make-tag
@@ -154,7 +158,7 @@
    #:proto-service-name
    #:proto-source-location              ; should be proto-source-pathname now?
    #:proto-streams-name
-   #:serialize-prim
+   #:serialize-scalar
 
    ;; For ASDF
    #:process-imports

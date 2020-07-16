@@ -40,6 +40,5 @@ message TextFormatTest {
 
   optional NestedMessage1 one_level_nesting = 18;
   repeated TextEnumValues enum_vals = 19;
-  // TODO(dlroxe) inner nesting doesn't work yet
-  // optional NestedMessage1.NestedMessage2 two_level_nesting = 19;
+  optional NestedMessage1.NestedMessage2 two_level_nesting = 20;
 }

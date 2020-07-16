@@ -40,11 +40,11 @@ The definition of initialized is all required-fields are set."
             "There is no Protobufs message for the class ~S" class)
     (object-initialized-p object message)))
 
-(defun primitive-field-equal (object-1 object-2)
-  "Check if two primitive objects in proto-fields are equal.
+(defun scalar-field-equal (object-1 object-2)
+  "Check if two objects with scalar type are equal.
 Parameters:
-  OBJECT-1: The first primitive object.
-  OBJECT-2: The second primitive object."
+  OBJECT-1: The first scalar object.
+  OBJECT-2: The second scalar object."
   (typecase object-1
     (string (string= object-1 object-2))
     (t (equalp object-1 object-2))))
@@ -112,10 +112,9 @@ only if the same fields have been explicitly set."
             = (when slot-value-1
                 (slot-value message-2 (proto-internal-field-name field)))
 
-          ;; Basic wire types are listed as keywords.
           when (and (not (eq lisp-type :bool))
-                    (or (keywordp lisp-type) (find-enum lisp-type)))
-            do (unless (primitive-field-equal slot-value-1 slot-value-2)
+                    (or (scalarp lisp-type) (find-enum lisp-type)))
+            do (unless (scalar-field-equal slot-value-1 slot-value-2)
                  (return-from proto-equal nil))
           when (not (and slot-value-1 slot-value-2))
             do (when (or slot-value-1 slot-value-2)

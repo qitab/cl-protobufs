@@ -34,9 +34,13 @@ Parameters:
     (assert (= (slot-value result 'clunit::failed) 0))
     (assert (= (slot-value result 'clunit::errors) 0))))
 
+(defun find-message-with-string (message name)
+  (proto-impl::find-message (intern (nstring-upcase (proto-impl::uncamel-case name))
+                                    (symbol-package (proto-impl::proto-class message)))))
+
 (deftest cross-package-reference-test (reference-tests)
   (flet ((find-by-name (name proto-object)
-           (proto-impl::find-message-with-string proto-object name))
+           (find-message-with-string proto-object name))
          (find-by-name-in-list (name proto-objects)
            (find name proto-objects :key #'proto-name :test #'string=)))
     (let* ((schema (find-schema 'package_test1))
@@ -127,7 +131,7 @@ Parameters:
            (find name proto-objects :key #'proto-name :test #'string=)))
     (let* ((schema (find-schema 'cl-protobufs.protobuf-forward-reference-unittest:forward_reference))
            (message-with-forward-reference
-            (proto-impl::find-message-with-string schema "MessageWithForwardReference"))
+            (find-message-with-string schema "MessageWithForwardReference"))
            (foo (find-by-name "foo" (proto-fields message-with-forward-reference)))
            ;; (bar (find-by-name "bar" (proto-fields message-with-forward-reference)))
            (service-with-forward-reference

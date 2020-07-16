@@ -6,10 +6,11 @@
 
 (in-package "PROTO-IMPL")
 
-(defparameter +PRIMITIVE-TYPES+
+(define-constant +SCALAR-TYPES+
   '("int32" "int64" "uint32" "uint64" "sint32" "sint64" "fixed32" "fixed64"
     "sfixed32" "sfixed64" "string" "bytes" "bool" "float" "double")
-  "These are the primitive types that may appear in protobufs.")
+  :test #'equal
+  :documentation "These are the scalar types that may appear in protobufs.")
 
 ;;; .proto file parsing
 
@@ -708,7 +709,7 @@
 (defmethod resolve-lisp-names ((field field-descriptor))
   "Resolves the protobuf type of FIELD to a Lisp type and stores it in the field's proto-class."
   (let* ((type  (proto-type field))
-         (ptype (when (member type +PRIMITIVE-TYPES+ :test #'string=)
+         (ptype (when (member type +SCALAR-TYPES+ :test #'string=)
                   (kintern type)))
          (message (unless ptype
                     (or (find-message type)

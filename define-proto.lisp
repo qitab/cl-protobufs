@@ -451,8 +451,8 @@ Parameters:
          (map-desc (make-map-descriptor
                     :class class
                     :name name
-                    :key-class (proto-type->keyword key-type)
-                    :val-class (proto-type->keyword val-type)
+                    :key-class (lisp-type-to-protobuf-class key-type)
+                    :val-class (lisp-type-to-protobuf-class val-type)
                     :key-type key-type
                     :val-type val-type)))
     (record-protobuf-object class map-desc :map)
@@ -1131,7 +1131,7 @@ Arguments:
       ;; Not required, but this will have the proto-fields serialized
       ;; in the order they were defined.
       (setf (proto-fields msg-desc) (nreverse (proto-fields msg-desc)))
-      ;; One extra slot for the deserialize-object-to-bytes feature
+      ;; One extra slot for the make-message-with-bytes feature.
       (collect-slot
        (make-field-data
         :internal-slot-name 'proto-impl::%bytes
@@ -1816,14 +1816,14 @@ Arguments
                              &key lisp-type proto-type serializer deserializer)
   "Define a Protobufs type alias Lisp 'deftype' named 'type'.
    'lisp-type' is the name of the Lisp type.
-   'proto-type' is the name of a primitive Protobufs type, e.g., 'int32' or 'string'.
+   'proto-type' is the name of a scalar Protobufs type, e.g., 'int32' or 'string'.
    'serializer' is a function that takes a Lisp object and generates a Protobufs object.
    'deserializer' is a function that takes a Protobufs object and generates a Lisp object.
    If 'alias-for' is given, no Lisp 'deftype' will be defined."
   (multiple-value-bind (type-str proto)
       (lisp-type-to-protobuf-type proto-type)
-    (assert (keywordp proto) ()
-            "The alias ~S must resolve to a Protobufs primitive type"
+    (assert (scalarp proto) ()
+            "The alias ~S must resolve to a Protobufs scalar type"
             type)
     (let* ((name  (or name (class-name->proto type)))
            (alias (make-instance 'protobuf-type-alias
