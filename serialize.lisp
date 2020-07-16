@@ -967,7 +967,8 @@ Parameters:
   VOBJ: A gensym'd symbol which will hold the object to be serialized.
   VBUF: A gensym'd symbol which will hold the buffer to serialize to.
   SIZE: A gensym'd symbol which will hold the number of bytes serialized."
-  (when (null (proto-fields message))
+  (when (and (null (proto-fields message))
+             (null (proto-oneofs message)))
     (return-from generate-serializer-body nil))
   (nreverse
    (let (serializers)
