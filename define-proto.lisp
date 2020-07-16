@@ -1002,7 +1002,7 @@ Arguments:
                          (set-check `(or (eq ,public-slot-name :%unset)
                                          (not ,public-slot-name))))
                          `((unless ,set-check
-                             (setf (slot-value ,obj ,hidden-slot-name) ,public-slot-name)
+                             (setf (slot-value ,obj ',hidden-slot-name) ,public-slot-name)
                              (setf (bit (,is-set-name ,obj) ,index) 1)))))
                 oneofs)
              ,obj))
