@@ -1069,9 +1069,17 @@ Parameters:
                  (generate-non-repeated-field-deserializer
                   class index vbuf vidx temp :raw-p raw-p)
                (if deserializer
-                   (return-from generate-field-deserializer
-                     (values (list tag) (list deserializer)
-                             nslot rslot)))
+                   ;; Fields contained in a oneof need to be wrapped in
+                   ;; the oneof-data struct.
+                   (let ((oneof-offset (proto-oneof-offset field)))
+                     (when oneof-offset
+                       (setf deserializer
+                             `(make-oneof-data
+                               :value ,deserializer
+                               :set-field ,oneof-offset)))
+                     (return-from generate-field-deserializer
+                       (values (list tag) (list deserializer)
+                               nslot rslot))))
                (undefined-field-type "While generating 'deserialize-object' for ~S,"
                                      message class field))))))
 
@@ -1301,8 +1309,14 @@ Parameters:
   (let ((vbuf (gensym "BUFFER"))
         (vidx (gensym "INDEX"))
         (vlim (gensym "LIMIT"))
-        (vendtag (gensym "ENDTAG")))
-    (when (null (proto-fields message))
+        (vendtag (gensym "ENDTAG"))
+        ;; Add oneof fields to the list of field descriptors, since we need to
+        ;; create a deserializer for each.
+        (fields (append (proto-fields message)
+                        (loop for oneof in (proto-oneofs message)
+                              append (coerce (oneof-descriptor-fields oneof)
+                                             'list)))))
+    (when (null fields)
       (return-from generate-deserializer
         (def-pseudo-method :deserialize name
           `(,vbuf ,vidx ,vlim &optional (,vendtag 0))
@@ -1326,7 +1340,7 @@ Parameters:
              (skip-field (field)
                (member (proto-external-field-name field)
                        skip-fields)))
-        (dolist (field (proto-fields message))
+        (dolist (field fields)
           (when (and (include-field field)
                      (not (skip-field field)))
             (multiple-value-bind (tags deserializers nslot rslot)
