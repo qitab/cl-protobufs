@@ -960,12 +960,18 @@ Parameters:
 
 ;; Note well: keep this in sync with the main 'serialize-object' method above
 (defun generate-serializer-body (message vobj vbuf size)
-  "Generate the body of a 'serialize-object' method for the given message."
+  "Generate the body of a 'serialize-object' method for the given message.
+
+Parameters:
+  MESSAGE: The message-descriptor to generate a serializer for.
+  VOBJ: A gensym'd symbol which will hold the object to be serialized.
+  VBUF: A gensym'd symbol which will hold the buffer to serialize to.
+  SIZE: A gensym'd symbol which will hold the number of bytes serialized."
   (when (null (proto-fields message))
     (return-from generate-serializer-body nil))
   (nreverse
    (let (serializers)
-     (dolist (field (proto-fields message) serializers)
+     (dolist (field (proto-fields message))
        ;; TODO(shaunm): class is duplicated
        (let* ((class (proto-class field))
               (msg (and class (not (keywordp class))
@@ -981,7 +987,10 @@ Parameters:
                           (proto-class message) field-name :has)
                         ,vobj)))
          (push (generate-field-serializer msg field boundp reader vbuf size)
-               serializers))))))
+               serializers)))
+     (dolist (oneof (proto-oneofs message) serializers)
+       (push (generate-oneof-serializer message oneof vobj vbuf size)
+             serializers)))))
 
 (defmacro make-serializer (message-name)
   "Create the serializer for a message.
@@ -1002,6 +1011,26 @@ Parameters:
            (type fixnum ,size))
           ,@serializers
           ,size)))))
+
+(defun generate-oneof-serializer (message oneof vobj vbuf size)
+  (let ((fields (oneof-descriptor-fields oneof)))
+    `(let* ((oneof-data (slot-value ,vobj ',(oneof-descriptor-internal-name oneof)))
+            (set-field  (oneof-data-set-field oneof-data))
+            (value      (oneof-data-value oneof-data)))
+       (ecase set-field
+         ,@(loop for field across fields
+                 collect
+                 (let ((class (proto-class field))
+                       (index (proto-index field))
+                       (offset (proto-oneof-offset field)))
+                   ;; BOUNDP is always true here, since if we get to this point
+                   ;; then the slot must be bound.
+                   `((,offset) ,(or (generate-non-repeated-field-serializer
+                                         class index t 'value vbuf size)
+                                        (undefined-field-type
+                                         "While generating 'serialize-object' for ~S,"
+                                         msg class field)))))
+         ((:unset) nil)))))
 
 (defun generate-field-deserializer (message field vbuf vidx &key raw-p)
   "Generate a deserializer for a single field.
