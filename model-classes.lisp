@@ -204,14 +204,6 @@ or that's named by the class-name of TYPE."
        For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message."
   (gethash qualified-name *qualified-messages*))
 
-;; Do not use in production at run time.
-(defun find-message-with-string (message name)
-  "Return the message-descriptor instance in the package of
-MESSAGE named by NAME (a string)."
-  (declare (type string name))
-  (find-message (intern (nstring-upcase (uncamel-case name))
-                        (symbol-package (proto-class message)))))
-
 (defun find-message-for-class (class)
   "Find a message for class.
 Parameters:
