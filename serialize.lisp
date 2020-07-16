@@ -1218,10 +1218,8 @@ Parameters:
                  (let ((tag1 (make-tag $wire-type-start-group index))
                        (tag2 (make-tag $wire-type-end-group index)))
                    (values
-                    `(multiple-value-bind (obj end)
-                         ,(call-deserializer msg vbuf vidx nil tag2)
-                       (setq ,vidx end
-                             ,dest obj))
+                    `(multiple-value-setq (,dest ,vidx)
+                       ,(call-deserializer msg vbuf vidx nil tag2))
                     tag1))
                  (values
                   `(multiple-value-bind (payload-len payload-start)
@@ -1240,7 +1238,7 @@ Parameters:
                 `(progn
                    (multiple-value-setq (,dest ,vidx)
                      (deserialize-prim ,class ,vbuf ,vidx))
-                   (setq ,dest (funcall #',(proto-deserializer msg) ,dest)))
+                   (setq ,dest (funcall #',(proto-deserializer msg) obj)))
                 (make-tag class index))))
             ((typep msg 'map-descriptor)
              (let* ((key-class (map-descriptor-key-class msg))
