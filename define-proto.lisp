@@ -481,12 +481,9 @@ Parameters:
   NAME: The name of the oneof.
   FIELDS: Field as output by protoc."
   (let* ((internal-name (fintern "%~A" name))
-         (desc (make-oneof-descriptor
-                :internal-name internal-name
-                :external-name name
-                :fields (make-array (length fields)
-                                    :element-type 'field-descriptor)))
-         (oneof-offset 0))
+         (oneof-offset 0)
+         (field-list (make-array (length fields)
+                                 :element-type 'field-descriptor)))
     (loop for field in fields
           do (destructuring-bind (slot &key type typename name (default nil default-p)
                                          lazy index documentation &allow-other-keys)
@@ -497,7 +494,7 @@ Parameters:
                      (clos-type-to-protobuf-type type)
                    (declare (ignore packed-p enum-values))
                    (assert index)
-                   (setf (aref (oneof-descriptor-fields desc) oneof-offset)
+                   (setf (aref field-list oneof-offset)
                          (make-instance 'field-descriptor
                                         :name (or name (slot-name->proto slot))
                                         :type (or typename ptype)
@@ -518,7 +515,10 @@ Parameters:
                                         :documentation documentation))
                    (incf oneof-offset)))))
     `(progn
-       ,desc)))
+       ,(make-oneof-descriptor
+         :internal-name internal-name
+         :external-name name
+         :fields field-list))))
 
 (declaim (inline proto-%bytes))
 (defun proto-%bytes (obj)
