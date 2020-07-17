@@ -330,6 +330,10 @@ Parameters:
 
 (defstruct oneof
   ;; This slot stores the data which is set in the oneof.
+  ;; Typing this slot as an OR of the oneof's field types doesn't seem
+  ;; to get us any additional space savings. Furthermore, trying to add
+  ;; a type would require making a new oneof defstruct for each oneof
+  ;; defined, which greatly adds to the code's complexity.
   (value nil)
   ;; This slot indicates which field is set in the oneof
   ;; It is either nil or a number. If it is nil, then nothing is set.
