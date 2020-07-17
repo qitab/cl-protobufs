@@ -99,7 +99,7 @@ only if the same fields have been explicitly set."
             do (return-from proto-equal nil)
           when (or (scalarp lisp-type) (find-enum lisp-type))
             do (unless (scalar-field-equal (oneof-value slot-value-1)
-                                              (oneof-value slot-value-2))
+                                           (oneof-value slot-value-2))
                  (return-from proto-equal nil))
           when (find-message lisp-type)
             do (unless (proto-equal (oneof-value slot-value-1)
