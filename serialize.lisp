@@ -1021,8 +1021,9 @@ Parameters:
                  (let ((class (proto-class field))
                        (index (proto-index field))
                        (offset (proto-oneof-offset field)))
-                   ;; BOUNDP is always true here, since if we get to this point
-                   ;; then the slot must be bound.
+                   ;; The BOUNDP argument is T here, since if we get to this point
+                   ;; then the slot must be bound, as SET-FIELD indicates that a
+                   ;; field is set.
                    `((,offset) ,(or (generate-non-repeated-field-serializer
                                          class index t 'value vbuf size)
                                         (undefined-field-type
