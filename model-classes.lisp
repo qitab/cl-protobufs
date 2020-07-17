@@ -347,8 +347,7 @@ Parameters:
   ;; The external name, but with '%' prepended.
   (internal-name nil :type symbol)
   ;; A symbol whose name is the name of the oneof.
-  (external-name nil :type symbol)
-  (reader nil :type symbol))
+  (external-name nil :type symbol))
 
 (defmethod make-load-form ((o oneof-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
