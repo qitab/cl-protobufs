@@ -93,16 +93,20 @@ Parameters:
            (let* ((test1 (make-oneof-proto :outside 1 :strval "red" :after 2))
                   (test2 (make-nested-oneof :outside 2 :nested test1))
                   (intlist (make-oneof-test.int-list :ints (list 1 2 3 4 5)))
-                  (test3 (make-oneof-test :list-of-ints intlist)))
+                  (test3 (make-oneof-test :list-of-ints intlist))
+                  (test4 (make-oneof-proto :outside 1)))
              (let* ((tser1 (serialize-object-to-bytes test1 'oneof-proto))
                     (tser2 (serialize-object-to-bytes test2 'nested-oneof))
                     (tser3 (serialize-object-to-bytes test3 'oneof-test))
+                    (tser4 (serialize-object-to-bytes test4 'oneof-proto))
                     (t1res (deserialize-object-from-bytes 'oneof-proto tser1))
                     (t2res (deserialize-object-from-bytes 'nested-oneof tser2))
-                    (t3res (deserialize-object-from-bytes 'oneof-test tser3)))
+                    (t3res (deserialize-object-from-bytes 'oneof-test tser3))
+                    (t4res (deserialize-object-from-bytes 'oneof-proto tser4)))
                (assert-true (proto:proto-equal test1 t1res))
                (assert-true (proto:proto-equal test2 t2res))
-               (assert-true (proto:proto-equal test3 t3res))))))
+               (assert-true (proto:proto-equal test3 t3res))
+               (assert-true (proto:proto-equal test4 t4res))))))
 
 ;; Protobuf specifies that if multiple members of a oneof appear on the wire,
 ;; then only the last one on the wire is saved.
