@@ -481,10 +481,10 @@ Parameters:
   NAME: The name of the oneof.
   FIELDS: Field as output by protoc."
   (let* ((internal-name (fintern "%~A" name))
-         (oneof-offset 0)
          (field-list (make-array (length fields)
                                  :element-type 'field-descriptor)))
     (loop for field in fields
+          for oneof-offset from 0
           do (destructuring-bind (slot &key type typename name (default nil default-p)
                                          lazy index documentation &allow-other-keys)
                  field
@@ -512,8 +512,7 @@ Parameters:
                                         :oneof-offset oneof-offset
                                         :default default
                                         :lazy (and lazy t)
-                                        :documentation documentation))
-                   (incf oneof-offset)))))
+                                        :documentation documentation))))))
     `(progn
        ,(make-oneof-descriptor
          :internal-name internal-name
