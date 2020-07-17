@@ -344,7 +344,7 @@ Parameters:
   ;; slot holds this value.
   (index nil :type (unsigned-byte 29))
   ;; A vector which stores the oneof's field descriptor.
-  (fields nil :type array)
+  (fields nil :type (array field-descriptor))
   ;; The external name, but with '%' prepended.
   (internal-name nil :type symbol)
   ;; A symbol whose name is the name of the oneof.
