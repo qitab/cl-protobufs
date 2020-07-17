@@ -346,7 +346,7 @@ Parameters:
   ;; which tracks the order that the fields are defined in the message. Since
   ;; these fields share a single slot, they share the same field-offset. This
   ;; slot holds this value.
-  (index nil :type (unsigned-byte 29))
+  (index nil :type (or null (unsigned-byte 29)))
   ;; A vector which stores the oneof's field descriptor.
   (fields nil :type (array field-descriptor))
   ;; The external name, but with '%' prepended.

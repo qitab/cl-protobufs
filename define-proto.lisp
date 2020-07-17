@@ -463,11 +463,9 @@ Parameters:
        ,mfield    ;; the extra field-data object created by this macro
        ,mslot)))  ;; the extra field-descriptor object created by this macro.
 
-(defmacro define-oneof ((&key field-offset) name &body fields)
+(defmacro define-oneof (name &body fields)
   "Define a protobuf oneof. This macro creates the representation for
 the oneof, as well as the representation/defining forms for its fields.
-Warning: This macro assumes the variables 'conc-name', 'field-offset',
-and 'index' are bound when macroexpanding.
 
 Parameters:
   NAME: The name of the oneof.
@@ -477,8 +475,7 @@ Parameters:
                 :internal-name internal-name
                 :external-name name
                 :fields (make-array (length fields)
-                                    :element-type 'field-descriptor)
-                :index field-offset))
+                                    :element-type 'field-descriptor)))
          (oneof-offset 0))
     (loop for field in fields
           do (destructuring-bind (slot &key type typename name (default nil default-p)
@@ -505,7 +502,6 @@ Parameters:
                                         :index index
                                         :internal-field-name internal-name
                                         :external-field-name slot
-                                        :field-offset field-offset
                                         :oneof-offset oneof-offset
                                         :default default
                                         :lazy (and lazy t)
@@ -1109,13 +1105,19 @@ Arguments:
                ((define-extension)
                 (push model (proto-extensions msg-desc))))))
           ((define-oneof)
-           (push `(:field-offset ,field-offset)
-                 (cdr (nthcdr 0 field)))
            (destructuring-bind (&optional progn oneof-desc)
                (macroexpand-1 field env)
              (assert (eq progn 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (incf field-offset)
+             ;; The oneof descriptor and its nested fields all share
+             ;; the same field-offset, since they occupy one bit in the
+             ;; is-set vector. Since we don't have access to the
+             ;; field-offset variable inside of the macroexpansion of
+             ;; define-oneof, we set these slots here.
+             (setf (oneof-descriptor-index oneof-desc) field-offset)
+             (dovector (oneof-field (oneof-descriptor-fields oneof-desc))
+               (setf (proto-field-offset oneof-field) field-offset))
              (when oneof-desc
                (push oneof-desc (proto-oneofs msg-desc))
                (collect-oneof oneof-desc))))
@@ -1516,12 +1518,13 @@ Arguments:
                ((define-extension)
                 (appendf (proto-extensions message) (list model))))))
           ((define-oneof)
-           (push `(:field-offset ,field-offset)
-                 (cdr (nthcdr 0 field)))
            (destructuring-bind (&optional progn oneof-desc)
                (macroexpand-1 field env)
              (assert (eq progn 'progn) ()
                      "The macroexpansion for ~S failed" field)
+             (setf (oneof-descriptor-index oneof-desc) field-offset)
+             (dovector (oneof-field (oneof-descriptor-fields oneof-desc))
+               (setf (proto-field-offset oneof-field) field-offset))
              (incf field-offset)
              (when oneof-desc
                (push oneof-desc (proto-oneofs msg-desc))
