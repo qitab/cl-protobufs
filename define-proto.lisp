@@ -706,14 +706,15 @@ Paramters:
                                           proto-type public-slot-name :clear))
                    (default-form (get-default-form (proto-set-type field)
                                                    (proto-default field)))
-                   (field-type (proto-set-type field)))
+                   (field-type (proto-set-type field))
+                   (oneof-offset (proto-oneof-offset field)))
               ;; If a field isn't currently set inside of the oneof, just return its
               ;; default value.
               (with-gensyms (obj new-value)
                 `((declaim (inline ,public-accessor-name))
                   (defun ,public-accessor-name (,obj)
                     (if (eq (oneof-set-field (,hidden-accessor-name ,obj))
-                            ,(proto-oneof-offset field))
+                            ,oneof-offset)
                         (oneof-value (,hidden-accessor-name ,obj))
                         ,default-form))
 
@@ -722,14 +723,14 @@ Paramters:
                     (declare (type ,field-type ,new-value))
                     (setf (bit (,is-set-accessor ,obj) ,index) 1)
                     (setf (oneof-set-field (,hidden-accessor-name ,obj))
-                          ,(proto-oneof-offset field))
+                          ,oneof-offset)
                     (setf (oneof-value (,hidden-accessor-name ,obj)) ,new-value))
 
                   (declaim (inline ,has-function-name))
                   (defun ,has-function-name (,obj)
                     (and (= (bit (,is-set-accessor ,obj) ,index) 1)
                          (eq (oneof-set-field (,hidden-accessor-name ,obj))
-                             ,(proto-oneof-offset field))))
+                             ,oneof-offset)))
 
                   (declaim (inline ,clear-function-name))
                   (defun ,clear-function-name (,obj)
