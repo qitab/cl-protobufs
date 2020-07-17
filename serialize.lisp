@@ -124,7 +124,8 @@
              (data      (slot-value object (oneof-descriptor-internal-name oneof)))
              (set-field (oneof-set-field data))
              (value     (oneof-value data)))
-        (when set-field
+        ;; set-field being -1 indicates that no field is set.
+        (unless (equal set-field -1)
           (let* ((field (aref fields set-field))
                  (type  (proto-class field))
                  (index (proto-index field)))
@@ -236,7 +237,7 @@ Parameters:
                                                            oneof)))
                                       (set-field (oneof-set-field data))
                                       (value (oneof-value data)))
-                                 (when set-field
+                                 (unless (equal set-field -1)
                                    (let* ((field (aref fields set-field))
                                           (type  (proto-class field))
                                           (index (proto-index field)))
@@ -320,7 +321,7 @@ Parameters:
                                                                oneof)))
                                       (set-field (oneof-set-field data))
                                       (value     (oneof-value data)))
-                                 (when set-field
+                                 (unless (equal set-field -1)
                                    (let* ((field (aref fields set-field))
                                           (type  (proto-class field))
                                           (index (proto-index field)))
@@ -1029,7 +1030,7 @@ Parameters:
                                         (undefined-field-type
                                          "While generating 'serialize-object' for ~S,"
                                          msg class field)))))
-         ((nil) nil)))))
+         ((-1) nil)))))
 
 (defun generate-field-deserializer (message field vbuf vidx &key raw-p)
   "Generate a deserializer for a single field.

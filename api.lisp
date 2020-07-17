@@ -88,11 +88,13 @@ only if the same fields have been explicitly set."
           for set-field-2
             = (oneof-set-field slot-value-2)
           for lisp-type
-            = (when set-field-1 (proto-class
-                                 (aref (oneof-descriptor-fields oneof)
-                                      set-field-1)))
-          unless (and set-field-1 set-field-2)
-            do (when (or set-field-1 set-field-2)
+            = (unless (equal set-field-1 -1)
+                (proto-class
+                 (aref (oneof-descriptor-fields oneof)
+                       set-field-1)))
+          when (and (equal set-field-1 -1)
+                    (equal set-field-2 -1))
+            do (unless (equal set-field-1 set-field-2)
                  (return-from proto-equal nil))
           unless (equal (oneof-set-field slot-value-1)
                         (oneof-set-field slot-value-2))

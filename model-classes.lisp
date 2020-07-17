@@ -336,9 +336,9 @@ Parameters:
   ;; defined, which greatly adds to the code's complexity.
   (value nil)
   ;; This slot indicates which field is set in the oneof
-  ;; It is either nil or a number. If it is nil, then nothing is set.
-  ;; if it is a number, say N, then the N-th field in the oneof is set.
-  (set-field nil :type (or null (unsigned-byte 32))))
+  ;; If it is set to -1, then there is no field set. Ifif it is a number,
+  ;; say N, then the N-th field (0 indexed) in the oneof is set.
+  (set-field -1 :type (signed-byte 32)))
 
 (defstruct oneof-descriptor
   "The meta-object for a protobuf map"
