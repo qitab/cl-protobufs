@@ -463,7 +463,7 @@ Parameters:
        ,mfield    ;; the extra field-data object created by this macro
        ,mslot)))  ;; the extra field-descriptor object created by this macro.
 
-(defmacro define-oneof ((&key field-offset) oneof-slot &body fields)
+(defmacro define-oneof ((&key field-offset) name &body fields)
   "Define a protobuf oneof. This macro creates the representation for
 the oneof, as well as the representation/defining forms for its fields.
 Warning: This macro assumes the variables 'conc-name', 'field-offset',
@@ -472,10 +472,10 @@ and 'index' are bound when macroexpanding.
 Parameters:
   NAME: The name of the oneof.
   FIELDS: Field as output by protoc."
-  (let* ((internal-name (fintern "%~A" oneof-slot))
+  (let* ((internal-name (fintern "%~A" name))
          (desc (make-oneof-descriptor
                 :internal-name internal-name
-                :external-name oneof-slot
+                :external-name name
                 :fields (make-array (length fields)
                                     :element-type 'field-descriptor)
                 :index field-offset))
