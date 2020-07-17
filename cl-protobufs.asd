@@ -214,8 +214,7 @@ which means ASDF loads both the .lisp file and the .fasl file."
     :pathname ""
     :depends-on ("models" "parsing" "schema" "serialization")
     :components
-    ((:file "api")
-     (:file "process-imports")))
+    ((:file "api")))
    (:module "well-known-types"
     :serial t
     :pathname ""

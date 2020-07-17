@@ -175,6 +175,14 @@ e.g.:
 (defvar *protobuf* nil
   "The current proto-schema, proto-message, or group object we're compiling.")
 
+(defun validate-imports (file-descriptor imports)
+  "Validates that all of the IMPORTS (a list of file names) have
+   already been imported by FILE-DESCRIPTOR."
+  (dolist (import (reverse imports))
+    (let* ((imported (proto:find-schema (if (stringp import) (pathname import) import))))
+      (unless imported
+        (error "Could not find imported file-descriptor: ~A for: ~S" file-descriptor import)))))
+
 (defun define-schema (type &key name syntax package import
                            optimize options documentation)
   "Define a schema named TYPE, corresponding to a .proto file of that name.
@@ -217,7 +225,7 @@ e.g.:
                     :documentation documentation)))
     (record-schema schema)
     (setf *protobuf* schema)
-    (process-imports schema imports)))
+    (validate-imports schema imports)))
 
 (defun %make-enum->numeral-table (enum-values)
   "Makes a hash table mapping enum values to numerals.

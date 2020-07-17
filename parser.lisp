@@ -417,7 +417,7 @@
   (let ((import (prog1 (parse-string stream)
                   (expect-char stream terminator () "import")
                   (maybe-skip-comments stream))))
-    (process-imports file-desc (list import))
+    (validate-imports file-desc (list import))
     (appendf (proto-imports file-desc) (list import))))
 
 (defun parse-proto-option (stream desc &optional (terminators '(#\;)))

@@ -113,10 +113,6 @@ Parameters:
             :accessor proto-imports
             :initarg :imports
             :initform ())
-   ;; TODO(cgay): rename to imported-files or just imports?
-   (schemas :type (list-of file-descriptor)  ; the schemas that were successfully imported
-            :accessor proto-imported-schemas ; this gets used for chasing namespaces
-            :initform ())
    (services :type (list-of service-descriptor)
              :accessor proto-services
              :initarg :services

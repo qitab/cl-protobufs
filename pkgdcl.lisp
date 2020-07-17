@@ -160,7 +160,7 @@
    #:serialize-scalar
 
    ;; For ASDF
-   #:process-imports
+   #:validate-imports
 
    ;; For RPC stubs
    #:*rpc-call-function*
