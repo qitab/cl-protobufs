@@ -82,7 +82,7 @@ Parameters:
     (assert-true (oneof-proto.boolval msg))))
 
 (deftest serialization-test (oneof-tests)
-  (loop :for optimized :in '(nil)
+  (loop :for optimized :in '(nil t)
         :do
            (when optimized
              (dolist (class '(oneof-proto nested-oneof oneof-test.int-list oneof-test))
