@@ -328,9 +328,10 @@ Parameters:
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
 
-(defstruct oneof-data
+(defstruct oneof
+  ;; This slot stores the data which is set in the oneof.
   (value nil)
-  ;; This slot stores data to tell which field is set in the oneof.
+  ;; This slot indicates which field is set in the oneof
   ;; It is either nil or a number. If it is nil, then nothing is set.
   ;; if it is a number, say N, then the N-th field in the oneof is set.
   (set-field nil :type (or null (unsigned-byte 32))))

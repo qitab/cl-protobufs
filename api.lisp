@@ -84,9 +84,9 @@ only if the same fields have been explicitly set."
           for slot-value-2
             = (slot-value message-2 (oneof-descriptor-internal-name oneof))
           for set-field-1
-            = (oneof-data-set-field slot-value-1)
+            = (oneof-set-field slot-value-1)
           for set-field-2
-            = (oneof-data-set-field slot-value-2)
+            = (oneof-set-field slot-value-2)
           for lisp-type
             = (when set-field-1 (proto-class
                                  (aref (oneof-descriptor-fields oneof)
@@ -94,16 +94,16 @@ only if the same fields have been explicitly set."
           when (not (and set-field-1 set-field-2))
             do (when (or set-field-1 set-field-2)
                  (return-from proto-equal nil))
-          when (not (equal (oneof-data-set-field slot-value-1)
-                           (oneof-data-set-field slot-value-2)))
+          when (not (equal (oneof-set-field slot-value-1)
+                           (oneof-set-field slot-value-2)))
             do (return-from proto-equal nil)
           when (or (scalarp lisp-type) (find-enum lisp-type))
-            do (unless (scalar-field-equal (oneof-data-value slot-value-1)
-                                              (oneof-data-value slot-value-2))
+            do (unless (scalar-field-equal (oneof-value slot-value-1)
+                                              (oneof-value slot-value-2))
                  (return-from proto-equal nil))
           when (find-message lisp-type)
-            do (unless (proto-equal (oneof-data-value slot-value-1)
-                                    (oneof-data-value slot-value-2)
+            do (unless (proto-equal (oneof-value slot-value-1)
+                                    (oneof-value slot-value-2)
                                     :exact exact)
                  (return-from proto-equal nil)))
 

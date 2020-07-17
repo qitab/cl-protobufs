@@ -655,7 +655,7 @@ Arguments:
       `(
         (declaim (inline ,case-function-name))
         (defun ,case-function-name (,obj)
-          (case (oneof-data-set-field (,hidden-accessor-name ,obj))
+          (case (oneof-set-field (,hidden-accessor-name ,obj))
             ,@(loop for field across (oneof-descriptor-fields oneof)
                     collect
                     (let ((offset (proto-oneof-offset field))
@@ -669,9 +669,9 @@ Arguments:
 
         (declaim (inline ,clear-function-name))
         (defun ,clear-function-name (,obj)
-          (setf (oneof-data-value (,hidden-accessor-name ,obj)) nil)
+          (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
           (setf (bit (,is-set-accessor ,obj) ,index) 0)
-          (setf (oneof-data-set-field (,hidden-accessor-name ,obj)) nil))
+          (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil))
 
         (export '(,case-function-name ,has-function-name ,clear-function-name))
 
@@ -691,31 +691,31 @@ Arguments:
               (with-gensyms (obj new-value)
                 `((declaim (inline ,public-accessor-name))
                   (defun ,public-accessor-name (,obj)
-                    (if (eq (oneof-data-set-field (,hidden-accessor-name ,obj))
+                    (if (eq (oneof-set-field (,hidden-accessor-name ,obj))
                             ,(proto-oneof-offset field))
-                        (oneof-data-value (,hidden-accessor-name ,obj))
+                        (oneof-value (,hidden-accessor-name ,obj))
                         ,default-form))
 
                   (declaim (inline (setf ,public-accessor-name)))
                   (defun (setf ,public-accessor-name) (,new-value ,obj)
                     (declare (type ,field-type ,new-value))
                     (setf (bit (,is-set-accessor ,obj) ,index) 1)
-                    (setf (oneof-data-set-field (,hidden-accessor-name ,obj))
+                    (setf (oneof-set-field (,hidden-accessor-name ,obj))
                           ,(proto-oneof-offset field))
-                    (setf (oneof-data-value (,hidden-accessor-name ,obj)) ,new-value))
+                    (setf (oneof-value (,hidden-accessor-name ,obj)) ,new-value))
 
                   (declaim (inline ,has-function-name))
                   (defun ,has-function-name (,obj)
                     (and (= (bit (,is-set-accessor ,obj) ,index) 1)
-                         (eq (oneof-data-set-field (,hidden-accessor-name ,obj))
+                         (eq (oneof-set-field (,hidden-accessor-name ,obj))
                              ,(proto-oneof-offset field))))
 
                   (declaim (inline ,clear-function-name))
                   (defun ,clear-function-name (,obj)
                     (when (,has-function-name ,obj)
                       (setf (bit (,is-set-accessor ,obj) ,index) 0)
-                      (setf (oneof-data-value (,hidden-accessor-name ,obj)) nil)
-                      (setf (oneof-data-set-field (,hidden-accessor-name ,obj)) nil)))
+                      (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
+                      (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
 
                   (defmethod ,public-slot-name ((,obj ,proto-type))
                     (,public-accessor-name ,obj))
@@ -948,7 +948,7 @@ Arguments:
                        slots)
                (mapcar (lambda (oneof)
                          (let ((name (oneof-descriptor-internal-name oneof)))
-                           `(,name (make-instance 'oneof-data) :type oneof-data)))
+                           `(,name (make-instance 'oneof) :type oneof)))
                        oneofs))))
          ;; Define public accessors for fields.
          ,@(mapcan (lambda (field public-slot-name)

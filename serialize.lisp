@@ -122,8 +122,8 @@
     (dolist (oneof (proto-oneofs msg-desc) size)
       (let* ((fields    (oneof-descriptor-fields oneof))
              (data      (slot-value object (oneof-descriptor-internal-name oneof)))
-             (set-field (oneof-data-set-field data))
-             (value     (oneof-data-value data)))
+             (set-field (oneof-set-field data))
+             (value     (oneof-value data)))
         (when set-field
           (let* ((field (aref fields set-field))
                  (type  (proto-class field))
@@ -234,8 +234,8 @@ Parameters:
                                (let* ((fields (oneof-descriptor-fields oneof))
                                       (data (slot-value v (oneof-descriptor-internal-name
                                                            oneof)))
-                                      (set-field (oneof-data-set-field data))
-                                      (value (oneof-data-value data)))
+                                      (set-field (oneof-set-field data))
+                                      (value (oneof-value data)))
                                  (when set-field
                                    (let* ((field (aref fields set-field))
                                           (type  (proto-class field))
@@ -318,8 +318,8 @@ Parameters:
                                (let* ((fields (oneof-descriptor-fields oneof))
                                       (data (slot-value value (oneof-descriptor-internal-name
                                                                oneof)))
-                                      (set-field (oneof-data-set-field data))
-                                      (value     (oneof-data-value data)))
+                                      (set-field (oneof-set-field data))
+                                      (value     (oneof-value data)))
                                  (when set-field
                                    (let* ((field (aref fields set-field))
                                           (type  (proto-class field))
@@ -611,9 +611,9 @@ Parameters:
              (let* ((field (field-complex-field field))
                     (oneof-offset (proto-oneof-offset field)))
                ;; Fields contained in a oneof need to be wrapped in
-               ;; a oneof-data struct.
+               ;; a oneof struct.
                (when oneof-offset
-                 (setf (cadr cell) (make-oneof-data
+                 (setf (cadr cell) (make-oneof
                                     :value (cadr cell)
                                     :set-field oneof-offset)))
                (when (eq (proto-label field) :repeated)
@@ -1012,9 +1012,9 @@ Parameters:
 
 (defun generate-oneof-serializer (message oneof vobj vbuf size)
   (let ((fields (oneof-descriptor-fields oneof)))
-    `(let* ((oneof-data (slot-value ,vobj ',(oneof-descriptor-internal-name oneof)))
-            (set-field  (oneof-data-set-field oneof-data))
-            (value      (oneof-data-value oneof-data)))
+    `(let* ((oneof (slot-value ,vobj ',(oneof-descriptor-internal-name oneof)))
+            (set-field  (oneof-set-field oneof))
+            (value      (oneof-value oneof)))
        (ecase set-field
          ,@(loop for field across fields
                  collect
@@ -1073,8 +1073,8 @@ Parameters:
                          `(progn
                             (let ((,oneof-val))
                               ,deserializer
-                              (setf (oneof-data-value ,temp) ,oneof-val)
-                              (setf (oneof-data-set-field ,temp) ,oneof-offset))))
+                              (setf (oneof-value ,temp) ,oneof-val)
+                              (setf (oneof-set-field ,temp) ,oneof-offset))))
                    (return-from generate-field-deserializer
                      (values (list tag) (list deserializer) nil nil temp)))
                  (undefined-field-type "While generating 'deserialize-object' for ~S,"
@@ -1392,7 +1392,7 @@ Parameters:
            (let (,@(loop for slot in nslots
                          collect `(,slot ,missing-value))
                  ,@(loop for oneofslot in oneofslots
-                         collect `(,oneofslot (make-instance 'oneof-data)))
+                         collect `(,oneofslot (make-instance 'oneof)))
                  ,@rtemps)
              (loop
                (multiple-value-setq (tag ,vidx)
