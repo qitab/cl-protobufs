@@ -508,7 +508,7 @@ Parameters:
                                         :field-offset field-offset
                                         :oneof-offset oneof-offset
                                         :default default
-                                        :lazy (and lazy t) ; todo(benkuehnert): why AND with t?
+                                        :lazy (and lazy t)
                                         :documentation documentation))
                    (incf oneof-offset)))))
     `(progn
