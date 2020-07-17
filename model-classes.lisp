@@ -342,10 +342,13 @@ Parameters:
   ;; these fields share a single slot, they share the same field-offset. This
   ;; slot holds this value.
   (index nil :type (unsigned-byte 29))
-  (fields nil :type array)         ; A vector which stores the oneof's field descriptors.
-  (internal-name nil :type symbol) ; This is the external name, but with '%' prepended.
-  (external-name nil :type symbol) ; A symbol whose name is the name of the oneof.
-  (reader nil :type symbol))       ; A reader used to access the oneof-data struct.
+  ;; A vector which stores the oneof's field descriptor.
+  (fields nil :type array)
+  ;; The external name, but with '%' prepended.
+  (internal-name nil :type symbol)
+  ;; A symbol whose name is the name of the oneof.
+  (external-name nil :type symbol)
+  (reader nil :type symbol))
 
 (defmethod make-load-form ((o oneof-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
