@@ -65,6 +65,7 @@ Inside of those macros there may also be define-* macros:
 - define-service
 - define-type-alias
 - define-map
+- define-oneof
 
 The most common define-* macros we will see are the macros that
 define messages, which generate PROTOBUF-MESSAGE classes and
@@ -160,7 +161,16 @@ e.g.:
       :proto-type string
       :serializer integer-to-date
       :deserializer date-to-integer)
+
+DEFINE-ONEOF:
+
+The define-oneof macro takes a body of field defintions and creates a ONEOF-DESCRIPTOR
+meta-object which holds field descriptors for the fields in its body. This
+ONEOF-DESCRIPTOR gets appended to the message's PROTO-ONEOFS slot. Then,
+MAKE-STRUCTURE-CLASS-FORMS will use the PROTO-ONEOFS slot to create forms for accessing
+the oneof and its nested fields.
 |#
+
 
 ;; TODO(jgodbout): remove this, we already have field-descriptor
 (defstruct field-data
