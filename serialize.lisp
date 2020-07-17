@@ -1342,7 +1342,7 @@ Parameters:
                       ;; For tracking repeated slots that will need to be reversed
                       (rslots collect-rslot)
                       ;; For tracking oneof slots
-                      (oneofslots collect-oneofslot))
+                      (oneof-slots collect-oneof-slot))
       (flet ((include-field (field)
                (or (eq include-fields :all)
                    (member (proto-external-field-name field)
@@ -1353,7 +1353,7 @@ Parameters:
         (dolist (field fields)
           (when (and (include-field field)
                      (not (skip-field field)))
-            (multiple-value-bind (tags deserializers nslot rslot oneofslot)
+            (multiple-value-bind (tags deserializers nslot rslot oneof-slot)
                 (generate-field-deserializer message field vbuf vidx :raw-p raw-p)
               (assert tags)
               (assert deserializers)
@@ -1366,12 +1366,12 @@ Parameters:
                          (collect-nslot nslot))
                        (when rslot
                          (collect-rslot rslot))
-                       (when oneofslot
-                         (collect-oneofslot oneofslot)))))))
+                       (when oneof-slot
+                         (collect-oneof-slot oneof-slot)))))))
       (let* ((rslots  (delete-duplicates rslots :key #'first))
              (rfields (mapcar #'first  rslots))
              (rtemps  (mapcar #'second rslots))
-             (oneofslots (delete-duplicates oneofslots :test #'string= :key #'symbol-name))
+             (oneof-slots (delete-duplicates oneof-slots :test #'string= :key #'symbol-name))
              (lisp-type (or (proto-alias-for message) (proto-class message)))
              (lisp-class (find-class lisp-type nil))
              (constructor (or constructor
@@ -1392,8 +1392,8 @@ Parameters:
                     (type array-index ,vidx ,vlim))
            (let (,@(loop for slot in nslots
                          collect `(,slot ,missing-value))
-                 ,@(loop for oneofslot in oneofslots
-                         collect `(,oneofslot (make-instance 'oneof)))
+                 ,@(loop for oneof-slot in oneof-slots
+                         collect `(,oneof-slot (make-instance 'oneof)))
                  ,@rtemps)
              (loop
                (multiple-value-setq (tag ,vidx)
@@ -1405,7 +1405,7 @@ Parameters:
                            #+sbcl`(make-instance ',lisp-type)
                            #-sbcl`(funcall (get-constructor-name ',lisp-type)))
                      ;; oneofs
-                     ,@(loop for temp in oneofslots
+                     ,@(loop for temp in oneof-slots
                              for mtemp = (slot-value-to-slot-name-symbol temp)
                              nconc (list (intern (string mtemp) :keyword) temp))
                      ;; nonrepeating slots
