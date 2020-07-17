@@ -669,7 +669,7 @@ Paramters:
         ;; is currently set.
         (declaim (inline ,case-function-name))
         (defun ,case-function-name (,obj)
-          (case (oneof-set-field (,hidden-accessor-name ,obj))
+          (ecase (oneof-set-field (,hidden-accessor-name ,obj))
             ,@(loop for field across (oneof-descriptor-fields oneof)
                     collect
                     (let ((offset (proto-oneof-offset field))
