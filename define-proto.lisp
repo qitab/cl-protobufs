@@ -643,6 +643,11 @@ Arguments:
         (export '(,has-function-name ,clear-function-name ,public-accessor-name))))))
 
 (defun make-oneof-accessor-forms (proto-type oneof)
+  "Make and return forms that define accessor functions for a oneof and its fields.
+
+Paramters:
+  PROTO-TYPE: The lisp name of the containing message of this oneof.
+  ONEOF: The oneof-descriptor of the oneof to make accessors for."
   (let* ((public-slot-name (oneof-descriptor-external-name oneof))
          (hidden-slot-name (oneof-descriptor-internal-name oneof))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
@@ -653,6 +658,10 @@ Arguments:
          (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear)))
     (with-gensyms (obj)
       `(
+        ;; Since the oneof struct stores an integer to indicate which field is set, it is not
+        ;; particularly useful for the user when writing code surrounding oneof types. This
+        ;; creates a function which returns a keyword with the same name as the field which
+        ;; is currently set.
         (declaim (inline ,case-function-name))
         (defun ,case-function-name (,obj)
           (case (oneof-set-field (,hidden-accessor-name ,obj))
@@ -675,6 +684,11 @@ Arguments:
 
         (export '(,case-function-name ,has-function-name ,clear-function-name))
 
+        ;; Fields inside of a oneof need special accessors, since they need to consult
+        ;; with the oneof struct. This creates those special accessors for each field.
+        ;; This mostly mirrors what happens in make-common-forms-for-structure-class
+        ;; and make-structure-class-forms-non-lazy, but they consult the oneof struct
+        ;; to checkk if they are set.
         ,@(loop
             for field across (oneof-descriptor-fields oneof)
             append
@@ -688,6 +702,8 @@ Arguments:
                    (default-form (get-default-form (proto-set-type field)
                                                    (proto-default field)))
                    (field-type (proto-set-type field)))
+              ;; If a field isn't currently set inside of the oneof, just return its
+              ;; default value.
               (with-gensyms (obj new-value)
                 `((declaim (inline ,public-accessor-name))
                   (defun ,public-accessor-name (,obj)
