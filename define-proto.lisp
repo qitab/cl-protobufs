@@ -488,12 +488,12 @@ Parameters:
           do (destructuring-bind (slot &key type typename name (default nil default-p)
                                          lazy index documentation &allow-other-keys)
                  field
+               (assert index)
                (let ((internal-slot-name (fintern "%~A" slot))
                      (default (if default-p default $empty-default)))
                  (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
                      (clos-type-to-protobuf-type type)
                    (declare (ignore packed-p enum-values))
-                   (assert index)
                    (setf (aref field-list oneof-offset)
                          (make-instance 'field-descriptor
                                         :name (or name (slot-name->proto slot))
