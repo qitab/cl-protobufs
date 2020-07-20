@@ -743,6 +743,8 @@ Paramters:
                   (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
                     (setf (,public-accessor-name ,obj) ,new-value))
 
+                  (proto-impl::set-functions-in-hash-table ',proto-type ',public-slot-name)
+
                   (export '(,has-function-name ,clear-function-name
                             ,public-accessor-name))))))))))
 
