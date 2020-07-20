@@ -488,8 +488,7 @@ Parameters:
                                          lazy index documentation &allow-other-keys)
                  field
                (assert index)
-               (let ((internal-slot-name (fintern "%~A" slot))
-                     (default (if default-p default $empty-default)))
+               (let ((default (if default-p default $empty-default)))
                  (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
                      (clos-type-to-protobuf-type type)
                    (declare (ignore packed-p enum-values))
