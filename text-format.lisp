@@ -58,13 +58,15 @@ Parameters:
                                 (and (not (proto-lazy-p field))
                                      reader))
                      (list object))
-                 field indent
+                 field
+                 :indent indent
                  :stream stream
                  :print-name print-name
                  :pretty-print pretty-print)
                 (print-non-repeated-field
                  (if slot (read-slot object slot reader) object)
-                 field indent
+                 field
+                 :indent indent
                  :stream stream
                  :print-name print-name
                  :pretty-print pretty-print)))))
@@ -74,7 +76,7 @@ Parameters:
       nil)))
 
 (defun print-repeated-field
-    (values field indent &key (stream *standard-output*) (print-name t) (pretty-print t))
+    (values field &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
   "Print the text format of a single field which is not repeated.
 
 Parameters:
@@ -119,7 +121,7 @@ Parameters:
                              object type field)))))
 
 (defun print-non-repeated-field
-    (value field (indent 0) &key (stream *standard-output*) (print-name t) (pretty-print t))
+    (value field &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
   "Print the text format of a single field which is not repeated.
 
 Parameters:
