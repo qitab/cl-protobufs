@@ -1185,10 +1185,11 @@ Arguments:
        (make-field-data
         :internal-slot-name 'proto-impl::%%is-set
         :external-slot-name 'proto-impl::%%is-set
-        :type `(bit-vector ,(length fields))
+        :type `(bit-vector ,(+ (length fields) (length oneofs)))
         :initarg :%%is-set
-        :initform `(make-array ,(length fields) :element-type 'bit
-                                                :initial-element 0)))
+        :initform `(make-array ,(+ (length fields) (length oneofs))
+                               :element-type 'bit
+                               :initial-element 0)))
       (if alias-for
           ;; If we've got an alias, define a type that is the subtype of the Lisp class so that
           ;; typep and subtypep work.  Unless alias-for is a type which is not yet defined (as is
@@ -1566,10 +1567,11 @@ Arguments:
        (make-field-data
           :internal-slot-name 'proto-impl::%%is-set
           :external-slot-name 'proto-impl::%%is-set
-          :type `(bit-vector ,(length fields))
+          :type `(bit-vector ,(+ (length fields) (length oneofs)))
           :initarg :%%is-set
-          :initform `(make-array ,(length fields) :element-type 'bit
-                                                  :initial-element 0)))
+          :initform `(make-array ,(+ (length fields) (length oneofs))
+                                 :element-type 'bit
+                                 :initial-element 0)))
 
       (unless (= bool-index -1)
         (collect-slot
