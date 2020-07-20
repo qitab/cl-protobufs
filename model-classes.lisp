@@ -371,6 +371,8 @@ Parameters:
           :initarg :alias-for
           :initform nil)
    ;; All fields for this message, including local ones and extended ones.
+   ;; This does NOT include fields that are inside of a oneof. These field descriptors can
+   ;; be accessed via the FIELDS slot in each oneof-descriptor stored in the ONEOFS slot.
    (fields :type (list-of field-descriptor)
            :accessor proto-fields
            :initarg :fields
