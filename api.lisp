@@ -131,8 +131,7 @@ Parameters:
                    *proto-function-table*))
          (get-function
           (second (gethash slot proto-table))))
-    (funcall get-function object))
-  (funcall slot object))
+    (funcall get-function object)))
 
 (declaim (inline (setf proto-slot-value)))
 (defun (setf proto-slot-value) (value object slot)
