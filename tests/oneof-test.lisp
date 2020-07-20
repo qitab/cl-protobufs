@@ -15,10 +15,6 @@
 
 (defsuite oneof-tests ())
 
-;; todo(benkuehnert): add test for the case when we serialize two fields
-;; that are part of the same oneof from the wire. The expected behavior
-;; is that the last one on the wire is set.
-
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.
 Parameters:
