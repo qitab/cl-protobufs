@@ -18,12 +18,12 @@ message NestedOneof {
 }
 
 message OneofTest {
-  message int_list {
+  message IntList {
     repeated int32 ints = 1;
   }
 
   oneof MyOneof {
-    int_list list_of_ints = 1;
+    IntList list_of_ints = 1;
     int32 single_int = 2;
   }
 }
