@@ -28,7 +28,7 @@ Parameters:
 (deftest accessor-check (oneof-tests)
   (let ((msg (make-oneof-proto)))
     (assert-false (oneof-proto.has-intval msg))
-    (assert-false(oneof-proto.has-strval msg))
+    (assert-false (oneof-proto.has-strval msg))
     (setf (oneof-proto.intval msg) 1)
     (assert-true (oneof-proto.has-intval msg))
     (assert-false (oneof-proto.has-strval msg))
