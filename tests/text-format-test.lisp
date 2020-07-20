@@ -68,14 +68,16 @@ Parameters:
 
 ; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-text-format (text-format-tests)
-  (let* ((msg (make-text-format-test :int-field 100
+  (let* ((nested (make-text-format-test.nested-message1 :int-field 2))
+         (msg (make-text-format-test :int-field 100
                                      :sint-field -1
                                      :uint-field 1
                                      :float-field 1.5
                                      :double-field 1.5d0
                                      :string-field "A string"
                                      :string-fields (list "First" "Second")
-                                     :enum-vals (list :none :twenty-one)))
+                                     :enum-vals (list :none :twenty-one)
+                                     :one-level-nesting nested))
          (out-stream (make-string-output-stream)))
     (print-text-format msg :stream out-stream)
     (let* ((text (get-output-stream-string out-stream))
