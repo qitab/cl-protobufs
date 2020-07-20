@@ -747,7 +747,7 @@ on the symbol if we are not in SBCL."
   ;; slot holds this value.
   (index nil :type (or null (unsigned-byte 29)))
   ;; A vector which stores the oneof's field descriptor.
-  (fields nil :type (array field-descriptor))
+  (fields nil :type array)
   ;; The external name, but with '%' prepended.
   (internal-name nil :type symbol)
   ;; A symbol whose name is the name of the oneof.
