@@ -41,13 +41,22 @@ Parameters:
                   (serialize-object-to-bytes obj 'cl-protobufs.test-proto:message))))
 
 ;; Serialization of the aliased (explicit) message
-
-(defun #+sbcl (:protobuf :serialize cl-protobufs.test-proto::aliased-message)
-  #-sbcl ()
-  (val buf &aux (size 0))
+(defun internal-serialize-message (val buf &aux (size 0))
+  "Serialization function for message.
+   VAL: The message being serialized.
+   BUF: The buffer to serialize to.
+   SIZE: Auxiliar variable to increment."
   (let ((i (aliased-struct-i val)))
     (incf size (proto-impl::serialize-scalar i :int32  +TAG-I+ buf)))
   size)
+#+sbcl
+(defun (:protobuf :serialize cl-protobufs.test-proto::aliased-message)
+    (val buf)
+  (internal-serialize-message val buf))
+#-sbcl
+(setf (get 'cl-protobufs.test-proto::aliased-message :serialize)
+      (lambda (val buf)
+        (internal-serialize-message val buf)))
 
 (deftest serialize-aliased (alias-tests)
   (let ((struct (make-aliased-struct :i 99)))
