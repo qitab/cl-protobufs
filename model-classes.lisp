@@ -483,16 +483,27 @@ on the symbol if we are not in SBCL."
 
 (defmethod find-field ((msg-desc message-descriptor) (name symbol) &optional relative-to)
   (declare (ignore relative-to))
-  (find name (proto-fields msg-desc) :key #'proto-internal-field-name))
+  (or
+   (find name (proto-fields msg-desc) :key #'proto-internal-field-name)
+   (loop for oneof in (proto-oneofs msg-desc)
+           thereis (find name (oneof-descriptor-fields oneof)
+                         :key #'proto-internal-field-name))))
 
 (defmethod find-field ((msg-desc message-descriptor) (name string) &optional relative-to)
-  (find-qualified-name name (proto-fields msg-desc)
-                       :relative-to (or relative-to msg-desc)))
+  (or
+   (find-qualified-name name (proto-fields msg-desc)
+                        :relative-to (or relative-to msg-desc))
+   (loop for oneof in (proto-oneofs msg-desc)
+           thereis (find-qualified-name name (oneof-descriptor-fields oneof)
+                                        :relative-to (or relative-to msg-desc)))))
 
 (defmethod find-field ((msg-desc message-descriptor) (index integer) &optional relative-to)
   (declare (ignore relative-to))
-  (find index (proto-fields msg-desc) :key #'proto-index))
-
+  (or
+   (find index (proto-fields msg-desc) :key #'proto-index)
+   (loop for oneof in (proto-oneofs msg-desc)
+           thereis (find index (oneof-descriptor-fields oneof)
+                         :key #'proto-index))))
 
 ;; Extensions protocol
 (defgeneric get-extension (object slot)
