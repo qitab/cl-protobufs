@@ -1011,10 +1011,11 @@ Parameters:
           ,@serializers
           ,size)))))
 
-(defun generate-oneof-serializer (oneof vobj vbuf size)
+(defun generate-oneof-serializer (message oneof vobj vbuf size)
   "Creates and returns the code that serializes a oneof.
 
 Parameters:
+  MESSAGE: The message-descriptor for the containing message.
   ONEOF: The oneof-descriptor to create a serializer for.
   VOBJ: A symbol which will store the protobuf object to serialize.
   VBUF: A symbol which will store the buffer to serialize to.
@@ -1036,7 +1037,7 @@ Parameters:
                                          class index t 'value vbuf size)
                                         (undefined-field-type
                                          "While generating 'serialize-object' for ~S,"
-                                         msg class field)))))
+                                         message class field)))))
          ((-1) nil)))))
 
 (defun generate-field-deserializer (message field vbuf vidx &key raw-p)
