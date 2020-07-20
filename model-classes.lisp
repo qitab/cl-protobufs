@@ -328,36 +328,6 @@ Parameters:
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
 
-(defstruct oneof
-  "The struct which stores dynamic oneof data."
-  ;; This slot stores the data which is set in the oneof.
-  ;; Typing this slot as an OR of the oneof's field types doesn't seem
-  ;; to get us any additional space savings. Furthermore, trying to add
-  ;; a type would require making a new oneof defstruct for each oneof
-  ;; defined, which greatly adds to the code's complexity.
-  (value nil)
-  ;; This slot indicates which field is set in the oneof
-  ;; If it is set to -1, then there is no field set. Ifif it is a number,
-  ;; say N, then the N-th field (0 indexed) in the oneof is set.
-  (set-field -1 :type (signed-byte 32)))
-
-(defstruct oneof-descriptor
-  "The meta-object for a protobuf map"
-  ;; While oneofs do not have indices, each of its fields has a 'field-offset'
-  ;; which tracks the order that the fields are defined in the message. Since
-  ;; these fields share a single slot, they share the same field-offset. This
-  ;; slot holds this value.
-  (index nil :type (or null (unsigned-byte 29)))
-  ;; A vector which stores the oneof's field descriptor.
-  (fields nil :type (array field-descriptor))
-  ;; The external name, but with '%' prepended.
-  (internal-name nil :type symbol)
-  ;; A symbol whose name is the name of the oneof.
-  (external-name nil :type symbol))
-
-(defmethod make-load-form ((o oneof-descriptor) &optional environment)
-  (make-load-form-saving-slots o :environment environment))
-
 (defstruct enum-descriptor
   "Describes a protobuf enum."
   ;; The symbol naming the Lisp type for this enum.
@@ -476,35 +446,6 @@ on the symbol if we are not in SBCL."
               (and (slot-boundp msg-desc 'message-type)
                    (eq (proto-message-type msg-desc) :extends))))
     (format stream "~S" (and (slot-boundp msg-desc 'class) (proto-class msg-desc)))))
-
-(defgeneric find-field (message name &optional relative-to)
-  (:documentation
-   "Given a Protobufs message and a slot name, field name or index,
-    returns the Protobufs field having that name."))
-
-(defmethod find-field ((msg-desc message-descriptor) (name symbol) &optional relative-to)
-  (declare (ignore relative-to))
-  (or
-   (find name (proto-fields msg-desc) :key #'proto-internal-field-name)
-   (loop for oneof in (proto-oneofs msg-desc)
-           thereis (find name (oneof-descriptor-fields oneof)
-                         :key #'proto-internal-field-name))))
-
-(defmethod find-field ((msg-desc message-descriptor) (name string) &optional relative-to)
-  (or
-   (find-qualified-name name (proto-fields msg-desc)
-                        :relative-to (or relative-to msg-desc))
-   (loop for oneof in (proto-oneofs msg-desc)
-           thereis (find-qualified-name name (oneof-descriptor-fields oneof)
-                                        :relative-to (or relative-to msg-desc)))))
-
-(defmethod find-field ((msg-desc message-descriptor) (index integer) &optional relative-to)
-  (declare (ignore relative-to))
-  (or
-   (find index (proto-fields msg-desc) :key #'proto-index)
-   (loop for oneof in (proto-oneofs msg-desc)
-           thereis (find index (oneof-descriptor-fields oneof)
-                         :key #'proto-index))))
 
 ;; Extensions protocol
 (defgeneric get-extension (object slot)
@@ -785,6 +726,64 @@ on the symbol if we are not in SBCL."
               (and (slot-boundp m 'otype) (proto-output-type m))))
     (format stream "~S" (proto-class m))))
 
+(defstruct oneof
+  "The struct which stores dynamic oneof data."
+  ;; This slot stores the data which is set in the oneof.
+  ;; Typing this slot as an OR of the oneof's field types doesn't seem
+  ;; to get us any additional space savings. Furthermore, trying to add
+  ;; a type would require making a new oneof defstruct for each oneof
+  ;; defined, which greatly adds to the code's complexity.
+  (value nil)
+  ;; This slot indicates which field is set in the oneof
+  ;; If it is set to -1, then there is no field set. Ifif it is a number,
+  ;; say N, then the N-th field (0 indexed) in the oneof is set.
+  (set-field -1 :type (signed-byte 32)))
+
+(defstruct oneof-descriptor
+  "The meta-object for a protobuf map"
+  ;; While oneofs do not have indices, each of its fields has a 'field-offset'
+  ;; which tracks the order that the fields are defined in the message. Since
+  ;; these fields share a single slot, they share the same field-offset. This
+  ;; slot holds this value.
+  (index nil :type (or null (unsigned-byte 29)))
+  ;; A vector which stores the oneof's field descriptor.
+  (fields nil :type (array field-descriptor))
+  ;; The external name, but with '%' prepended.
+  (internal-name nil :type symbol)
+  ;; A symbol whose name is the name of the oneof.
+  (external-name nil :type symbol))
+
+(defmethod make-load-form ((o oneof-descriptor) &optional environment)
+  (make-load-form-saving-slots o :environment environment))
+
+(defgeneric find-field (message name &optional relative-to)
+  (:documentation
+   "Given a Protobufs message and a slot name, field name or index,
+    returns the Protobufs field having that name."))
+
+(defmethod find-field ((msg-desc message-descriptor) (name symbol) &optional relative-to)
+  (declare (ignore relative-to))
+  (or
+   (find name (proto-fields msg-desc) :key #'proto-internal-field-name)
+   (loop for oneof in (proto-oneofs msg-desc)
+           thereis (find name (oneof-descriptor-fields oneof)
+                         :key #'proto-internal-field-name))))
+
+(defmethod find-field ((msg-desc message-descriptor) (name string) &optional relative-to)
+  (or
+   (find-qualified-name name (proto-fields msg-desc)
+                        :relative-to (or relative-to msg-desc))
+   (loop for oneof in (proto-oneofs msg-desc)
+           thereis (find-qualified-name name (oneof-descriptor-fields oneof)
+                                        :relative-to (or relative-to msg-desc)))))
+
+(defmethod find-field ((msg-desc message-descriptor) (index integer) &optional relative-to)
+  (declare (ignore relative-to))
+  (or
+   (find index (proto-fields msg-desc) :key #'proto-index)
+   (loop for oneof in (proto-oneofs msg-desc)
+           thereis (find index (oneof-descriptor-fields oneof)
+                         :key #'proto-index))))
 
 ;;; Lisp-only extensions
 
