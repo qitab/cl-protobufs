@@ -34,7 +34,6 @@ Parameters:
                       (funcall ,reader ,object)
 
                       (slot-value ,object ,slot))))
-      (declare (dynamic-extent #'do-field))
       (let ((name (or name (proto-name message))))
         (if print-name
             (if pretty-print
