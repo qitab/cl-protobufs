@@ -1011,11 +1011,10 @@ Parameters:
           ,@serializers
           ,size)))))
 
-(defun generate-oneof-serializer (message oneof vobj vbuf size)
+(defun generate-oneof-serializer (oneof vobj vbuf size)
   "Creates and returns the code that serializes a oneof.
 
-Paramters:
-  MESSAGE: The message-descriptor for the containing message.
+Parameters:
   ONEOF: The oneof-descriptor to create a serializer for.
   VOBJ: A symbol which will store the protobuf object to serialize.
   VBUF: A symbol which will store the buffer to serialize to.
