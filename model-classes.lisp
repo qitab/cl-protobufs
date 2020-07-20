@@ -329,6 +329,7 @@ Parameters:
   (make-load-form-saving-slots m :environment environment))
 
 (defstruct oneof
+  "The struct which stores dynamic oneof data."
   ;; This slot stores the data which is set in the oneof.
   ;; Typing this slot as an OR of the oneof's field types doesn't seem
   ;; to get us any additional space savings. Furthermore, trying to add
