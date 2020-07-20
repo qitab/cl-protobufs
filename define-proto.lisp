@@ -1535,7 +1535,7 @@ Arguments:
                (setf (proto-field-offset oneof-field) field-offset))
              (incf field-offset)
              (when oneof-desc
-               (push oneof-desc (proto-oneofs msg-desc))
+               (appendf (proto-oneofs message) (list oneof-desc))
                (collect-oneof oneof-desc))))
           (otherwise
            (multiple-value-bind (field slot idx)
