@@ -1173,9 +1173,9 @@ Arguments:
        (make-field-data
         :internal-slot-name 'proto-impl::%%is-set
         :external-slot-name 'proto-impl::%%is-set
-        :type `(bit-vector ,(length fields))
+        :type `(bit-vector ,(length (proto-fields msg-desc)))
         :initarg :%%is-set
-        :initform `(make-array ,(length fields)
+        :initform `(make-array ,(length (proto-fields msg-desc))
                                :element-type 'bit
                                :initial-element 0)))
       (if alias-for
@@ -1551,9 +1551,9 @@ Arguments:
        (make-field-data
           :internal-slot-name 'proto-impl::%%is-set
           :external-slot-name 'proto-impl::%%is-set
-          :type `(bit-vector ,(length fields))
+          :type `(bit-vector ,(length (proto-fields message)))
           :initarg :%%is-set
-          :initform `(make-array ,(length fields)
+          :initform `(make-array ,(length (proto-fields message))
                                  :element-type 'bit
                                  :initial-element 0)))
 
