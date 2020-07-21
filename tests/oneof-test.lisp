@@ -107,13 +107,27 @@ Parameters:
 ;; Protobuf specifies that if multiple members of a oneof appear on the wire,
 ;; then only the last one on the wire is saved.
 (deftest multiple-oneof-test (oneof-tests)
-  (let ((bytes (make-array 6 :initial-contents '(26 2 68 69 18 4)
-                             :element-type '(unsigned-byte 8))))
-    (proto-impl::make-serializer oneof-proto)
-    (loop :for optimized :in '(nil t)
-          :do (let ((message))
+  (let ((bytes1 (make-array 6 :initial-contents '(26 2 104 105 16 4)
+                              :element-type '(unsigned-byte 8)))
+        (bytes2 (make-array 6 :initial-contents '(16 4 26 2 104 105)
+                              :element-type '(unsigned-byte 8))))
+    (proto-impl::make-deserializer oneof-proto)
+    (loop :for optimized :in '(nil)
+          :do (let (msg1 msg2)
                 (if optimized
-                    (setf message (deserialize-object-from-bytes 'oneof-proto bytes))
-                    (setf message (proto-impl::%deserialize-object 'oneof-proto bytes 0 (length bytes))))
-                (assert-true (eq (oneof-proto.my-oneof-case message) :intval))
-                (assert-true (not (oneof-proto.has-strval message)))))))
+                    (progn
+                      (setf msg1 (deserialize-object-from-bytes
+                                  'oneof-proto bytes1))
+                      (setf msg2 (deserialize-object-from-bytes
+                                  'oneof-proto bytes2)))
+                    (progn
+                      (setf msg1 (proto-impl::%deserialize-object
+                                  'oneof-proto bytes1 0 (length bytes1)))
+                      (setf msg2 (proto-impl::%deserialize-object
+                                  'oneof-proto bytes2 0 (length bytes2)))))
+                (assert-true (eq (oneof-proto.my-oneof-case msg1) :intval))
+                (assert-true (= (oneof-proto.intval msg1) 4))
+                (assert-false (oneof-proto.has-strval msg1))
+                (assert-true (eq (oneof-proto.my-oneof-case msg2) :strval))
+                (assert-true (string= (oneof-proto.strval msg2) "hi"))
+                (assert-false (oneof-proto.has-intval msg2))))))
