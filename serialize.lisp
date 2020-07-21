@@ -434,18 +434,19 @@ Parameters:
     (deserialize-structure-object
      msg-desc buffer start end end-tag class)))
 
-(defstruct (field (:constructor make-field (index offset bool-index initarg complex-field))
+(defstruct (field (:constructor make-field (index offset bool-index oneof-p initarg complex-field))
                   (:print-object
                    (lambda (self stream)
                      (format stream "#<~D~S>" (field-index self) (field-initarg self)))))
   "Field metadata for a protocol buffer.
 Contains the INDEX of the field as according to protobuf, an internal
-OFFSET, the BOOL-NUMBER (for simple boolean fields), the INITARG, the COMPLEX-FIELD
-datastructure.
+OFFSET, the BOOL-NUMBER (for simple boolean fields), a flag ONEOF-P which indicates if the field
+is part of a oneof, the INITARG, the COMPLEX-FIELD datastructure.
 See field-descriptor for the distinction between index, offset, and bool-number."
   index
   offset
   bool-index
+  oneof-p
   initarg
   complex-field)
 
@@ -467,6 +468,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                (make-field (proto-index field)
                            (proto-field-offset field)
                            (proto-bool-index field)
+                           (and (proto-oneof-offset field) t)
                            (keywordify (proto-internal-field-name field))
                            field)))
         (if (< max (* count 2)) ; direct map
@@ -540,6 +542,10 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                ;; First return value is the cons cell for the pair,
                ;; second is the list as a whole, which is now headed by this pair.
                (values pair pair)))
+           (insert-at-end (head &aux (rest (cdr head)))
+             (if (not rest)
+                 (insert-after head)
+                 (insert-at-end (cdr rest))))
            (insert-after (tail)
              ;; A picture: list is (#<FIELD A> a-val #<FIELD C> c-val #<FIELD D> d-val ...)
              ;;                                ^--- TAIL points here
@@ -565,14 +571,22 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                           (insert-in (cdr rest))))))))
     (if (not field-list)
         (insert-at-front)
-        (let* ((field (car field-list))
-               (index (field-index field)))
-          (cond ((i> field-number index) ; greater than any field number seen thus far
-                 (insert-at-front))
-                ((i= field-number index) ; a field number which has been seen before
-                 (values field-list field-list))
-                (t                       ; keep on looking
-                 (insert-in (cdr field-list))))))))
+        (let* ((cur-field (find-in-field-map field-number field-map))
+               (top-field (car field-list))
+               (index (field-index top-field)))
+          (if (field-oneof-p cur-field)
+              ;; If a field is part of a oneof, put it at the end of the plist.
+              ;; This is to preserve the behavior that if two fields from the same
+              ;; oneof are recieved on the wire, then only the last one is set. Since
+              ;; this list sorts fields by their index, this information is lost here,
+              ;; so oneofs need to ignore this heuristic.
+              (insert-at-end (cdr field-list))
+              (cond ((i> field-number index) ; greater than any field number seen thus far
+                     (insert-at-front))
+                    ((i= field-number index) ; a field number which has been seen before
+                     (values field-list field-list))
+                    (t                       ; keep on looking
+                     (insert-in (cdr field-list)))))))))
 
 (defun deserialize-structure-object (message buffer index limit end-tag class)
   "Deserialize a message.
