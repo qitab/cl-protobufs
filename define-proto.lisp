@@ -693,7 +693,7 @@ Paramters:
         ;; with the oneof struct. This creates those special accessors for each field.
         ;; This mostly mirrors what happens in make-common-forms-for-structure-class
         ;; and make-structure-class-forms-non-lazy, but they consult the oneof struct
-        ;; to checkk if they are set.
+        ;; to check if they are set.
         ,@(loop
             for field across (oneof-descriptor-fields oneof)
             append
