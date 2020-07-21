@@ -505,6 +505,10 @@ Parameters:
                                                                         (slot-name->proto slot)))
                                         :label :optional
                                         :index index
+                                        ;; Oneof fields don't have a bit in the %%is-set vector, but
+                                        ;; if they don't have an offset, then some code treats them
+                                        ;; as extension fields.
+                                        :field-offset -1
                                         :internal-field-name internal-name
                                         :external-field-name slot
                                         :oneof-offset oneof-offset
@@ -655,7 +659,6 @@ Paramters:
          (hidden-slot-name (oneof-descriptor-internal-name oneof))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (hidden-accessor-name (fintern "~A-~A" proto-type hidden-slot-name))
-         (index (oneof-descriptor-index oneof))
          (case-function-name (proto-slot-function-name proto-type public-slot-name :case))
          (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
          (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear)))
@@ -677,12 +680,11 @@ Paramters:
 
         (declaim (inline ,has-function-name))
         (defun ,has-function-name (,obj)
-          (= (bit (,is-set-accessor ,obj) ,index) 1))
+          (not (= (oneof-set-field (,hidden-accessor-name ,obj)) -1)))
 
         (declaim (inline ,clear-function-name))
         (defun ,clear-function-name (,obj)
           (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
-          (setf (bit (,is-set-accessor ,obj) ,index) 0)
           (setf (oneof-set-field (,hidden-accessor-name ,obj)) -1))
 
         (export '(,case-function-name ,has-function-name ,clear-function-name))
@@ -719,21 +721,18 @@ Paramters:
                   (declaim (inline (setf ,public-accessor-name)))
                   (defun (setf ,public-accessor-name) (,new-value ,obj)
                     (declare (type ,field-type ,new-value))
-                    (setf (bit (,is-set-accessor ,obj) ,index) 1)
                     (setf (oneof-set-field (,hidden-accessor-name ,obj))
                           ,oneof-offset)
                     (setf (oneof-value (,hidden-accessor-name ,obj)) ,new-value))
 
                   (declaim (inline ,has-function-name))
                   (defun ,has-function-name (,obj)
-                    (and (= (bit (,is-set-accessor ,obj) ,index) 1)
-                         (eq (oneof-set-field (,hidden-accessor-name ,obj))
-                             ,oneof-offset)))
+                    (eq (oneof-set-field (,hidden-accessor-name ,obj))
+                        ,oneof-offset))
 
                   (declaim (inline ,clear-function-name))
                   (defun ,clear-function-name (,obj)
                     (when (,has-function-name ,obj)
-                      (setf (bit (,is-set-accessor ,obj) ,index) 0)
                       (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
                       (setf (oneof-set-field (,hidden-accessor-name ,obj)) -1)))
 
@@ -1019,12 +1018,10 @@ Arguments:
                 (lambda (oneof)
                   (let* ((public-slot-name (oneof-descriptor-external-name oneof))
                          (hidden-slot-name (oneof-descriptor-internal-name oneof))
-                         (index            (oneof-descriptor-index oneof))
                          (set-check `(or (eq ,public-slot-name :%unset)
                                          (not ,public-slot-name))))
                          `((unless ,set-check
-                             (setf (slot-value ,obj ',hidden-slot-name) ,public-slot-name)
-                             (setf (bit (,is-set-name ,obj) ,index) 1)))))
+                             (setf (slot-value ,obj ',hidden-slot-name) ,public-slot-name)))))
                 oneofs)
              ,obj))
 
@@ -1119,15 +1116,6 @@ Arguments:
                (macroexpand-1 field env)
              (assert (eq progn 'progn) ()
                      "The macroexpansion for ~S failed" field)
-             (incf field-offset)
-             ;; The oneof descriptor and its nested fields all share
-             ;; the same field-offset, since they occupy one bit in the
-             ;; is-set vector. Since we don't have access to the
-             ;; field-offset variable inside of the macroexpansion of
-             ;; define-oneof, we set these slots here.
-             (setf (oneof-descriptor-index oneof-desc) field-offset)
-             (dovector (oneof-field (oneof-descriptor-fields oneof-desc))
-               (setf (proto-field-offset oneof-field) field-offset))
              (when oneof-desc
                (push oneof-desc (proto-oneofs msg-desc))
                (collect-oneof oneof-desc))))
@@ -1185,9 +1173,9 @@ Arguments:
        (make-field-data
         :internal-slot-name 'proto-impl::%%is-set
         :external-slot-name 'proto-impl::%%is-set
-        :type `(bit-vector ,(+ (length fields) (length oneofs)))
+        :type `(bit-vector ,(length fields))
         :initarg :%%is-set
-        :initform `(make-array ,(+ (length fields) (length oneofs))
+        :initform `(make-array ,(length fields)
                                :element-type 'bit
                                :initial-element 0)))
       (if alias-for
@@ -1533,10 +1521,6 @@ Arguments:
                (macroexpand-1 field env)
              (assert (eq progn 'progn) ()
                      "The macroexpansion for ~S failed" field)
-             (setf (oneof-descriptor-index oneof-desc) field-offset)
-             (dovector (oneof-field (oneof-descriptor-fields oneof-desc))
-               (setf (proto-field-offset oneof-field) field-offset))
-             (incf field-offset)
              (when oneof-desc
                (appendf (proto-oneofs message) (list oneof-desc))
                (collect-oneof oneof-desc))))
@@ -1567,9 +1551,9 @@ Arguments:
        (make-field-data
           :internal-slot-name 'proto-impl::%%is-set
           :external-slot-name 'proto-impl::%%is-set
-          :type `(bit-vector ,(+ (length fields) (length oneofs)))
+          :type `(bit-vector ,(length fields))
           :initarg :%%is-set
-          :initform `(make-array ,(+ (length fields) (length oneofs))
+          :initform `(make-array ,(length fields)
                                  :element-type 'bit
                                  :initial-element 0)))
 

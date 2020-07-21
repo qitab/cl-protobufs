@@ -742,13 +742,8 @@ on the symbol if we are not in SBCL."
   (set-field -1 :type (signed-byte 32)))
 
 (defstruct oneof-descriptor
-  "The meta-object for a protobuf map"
-  ;; While oneofs do not have indices, each of its fields has a 'field-offset'
-  ;; which tracks the order that the fields are defined in the message. Since
-  ;; these fields share a single slot, they share the same field-offset. This
-  ;; slot holds this value.
-  (index nil :type (or null (unsigned-byte 29)))
-  ;; A vector which stores the oneof's field descriptor.
+  "The meta-object for a protobuf oneof"
+  ;; A vector which stores the oneof's field descriptors.
   (fields nil :type array)
   ;; The external name, but with '%' prepended.
   (internal-name nil :type symbol)

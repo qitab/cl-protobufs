@@ -606,30 +606,33 @@ Parameters:
             do
            (let* ((field (car cell))
                   (inner-index (field-offset field))
-                  (bool-index (field-bool-index field)))
-             (rplaca cell (field-initarg field))
-             ;; Get the full metadata from the brief metadata.
-             (let* ((field (field-complex-field field))
-                    (oneof-offset (proto-oneof-offset field)))
-               ;; Fields contained in a oneof need to be wrapped in
-               ;; a oneof struct.
-               (when oneof-offset
-                 (setf (cadr cell) (make-oneof
-                                    :value (cadr cell)
-                                    :set-field oneof-offset)))
-               (when (eq (proto-label field) :repeated)
-                 (let ((data (nreverse (cadr cell))))
-                   (setf (cadr cell)
-                         (if (vector-field-p field) (coerce data 'vector) data)))))
-             (cond ((eq (proto-message-type (field-complex-field field)) :extends)
+                  (bool-index (field-bool-index field))
+                  (initargs (field-initarg field))
+                  ;; Get the full metadata from the brief metadata.
+                  (field (field-complex-field field))
+                  (oneof-offset (proto-oneof-offset field)))
+             (rplaca cell initargs)
+             (when (eq (proto-label field) :repeated)
+               (let ((data (nreverse (cadr cell))))
+                 (setf (cadr cell)
+                       (if (vector-field-p field) (coerce data 'vector) data))))
+             (cond ((eq (proto-message-type field) :extends)
                     ;; If an extension we'll have to set it manually later...
                     (progn
-                      (push `(,(proto-internal-field-name (field-complex-field field)) ,(cadr cell))
+                      (push `(,(proto-internal-field-name field) ,(cadr cell))
                             extension-list)))
                    (bool-index
                     (push (cons bool-index (cadr cell)) bool-map)
                     (when inner-index
                       (push inner-index offset-list)))
+                   ;; Fields contained in a oneof need to be wrapped in
+                   ;; a oneof struct.
+                   (oneof-offset
+                    (push (make-oneof
+                           :value (cadr cell)
+                           :set-field oneof-offset)
+                          initargs-final)
+                    (push (car cell) initargs-final))
                    ;; Otherwise we have to mark is set later.
                    (t
                     (progn
