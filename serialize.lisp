@@ -124,8 +124,7 @@
              (data      (slot-value object (oneof-descriptor-internal-name oneof)))
              (set-field (oneof-set-field data))
              (value     (oneof-value data)))
-        ;; set-field being -1 indicates that no field is set.
-        (unless (equal set-field -1)
+        (when set-field
           (let* ((field (aref fields set-field))
                  (type  (proto-class field))
                  (index (proto-index field)))
@@ -237,7 +236,7 @@ Parameters:
                                                            oneof)))
                                       (set-field (oneof-set-field data))
                                       (value (oneof-value data)))
-                                 (unless (equal set-field -1)
+                                 (when set-field
                                    (let* ((field (aref fields set-field))
                                           (type  (proto-class field))
                                           (index (proto-index field)))
@@ -321,7 +320,7 @@ Parameters:
                                                                oneof)))
                                       (set-field (oneof-set-field data))
                                       (value     (oneof-value data)))
-                                 (unless (equal set-field -1)
+                                 (when set-field
                                    (let* ((field (aref fields set-field))
                                           (type  (proto-class field))
                                           (index (proto-index field)))
@@ -1055,7 +1054,7 @@ Parameters:
                                         (undefined-field-type
                                          "While generating 'serialize-object' for ~S,"
                                          message class field)))))
-         ((-1) nil)))))
+         ((nil) nil)))))
 
 (defun generate-field-deserializer (message field vbuf vidx &key raw-p)
   "Generate a deserializer for a single field.

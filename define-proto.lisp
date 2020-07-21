@@ -676,7 +676,7 @@ Paramters:
                     (let ((offset (proto-oneof-offset field))
                           (keyword (keywordify (proto-external-field-name field))))
                       `((,offset) ,keyword)))
-            ((-1) :%unset)))
+            ((nil) :%unset)))
 
         (declaim (inline ,has-function-name))
         (defun ,has-function-name (,obj)
@@ -685,7 +685,7 @@ Paramters:
         (declaim (inline ,clear-function-name))
         (defun ,clear-function-name (,obj)
           (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
-          (setf (oneof-set-field (,hidden-accessor-name ,obj)) -1))
+          (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil))
 
         (export '(,case-function-name ,has-function-name ,clear-function-name))
 
@@ -734,7 +734,7 @@ Paramters:
                   (defun ,clear-function-name (,obj)
                     (when (,has-function-name ,obj)
                       (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
-                      (setf (oneof-set-field (,hidden-accessor-name ,obj)) -1)))
+                      (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
 
                   (defmethod ,public-slot-name ((,obj ,proto-type))
                     (,public-accessor-name ,obj))
