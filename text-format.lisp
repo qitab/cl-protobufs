@@ -357,7 +357,7 @@ return T as a second value."
           ((typep msg 'map-descriptor)
            (let ((key-type (map-descriptor-key-class msg))
                  (val-type (map-descriptor-val-class msg)))
-             (flet ((parse-map-etry (key-type val-type stream)
+             (flet ((parse-map-entry (key-type val-type stream)
                       (let (key val)
                         (expect-char stream #\{)
                         (assert (string= "key" (parse-token stream)))
@@ -373,16 +373,18 @@ return T as a second value."
                   (expect-char stream #\[)
                   (loop
                     with pairs = ()
-                    when (eql (peek-char nil stream nil) #\])
-                      do (return pairs)
                     do (skip-whitespace stream)
-                       (push (parse-map-entry key-type val-type
-                                              :stream stream)
-                             pairs)))
+                       (push (parse-map-entry key-type val-type stream)
+                             pairs)
+                       (if (eql (peek-char nil stream nil) #\,)
+                           (read-char stream)
+                           (progn
+                             (skip-whitespace stream)
+                             (expect-char #\])
+                             (return pairs)))))
                  (t
                   (skip-whitespace stream)
-                  (list (parse-map-entry key-type val-type
-                                         :stream stream)))))))
+                  (list (parse-map-entry key-type val-type stream)))))))
         (t (values nil t)))))
 
 (defun skip-field (stream)
