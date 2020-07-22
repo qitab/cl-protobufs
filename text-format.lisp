@@ -91,7 +91,7 @@ Parameters:
     (cond
       ((scalarp type)
        (doseq (v values)
-              (print-scalar v type field stream
+              (print-scalar v type (proto-name field) stream
                             (and pretty-print indent))))
       ((typep (setq msg (and type (or (find-message type)
                                       (find-enum type)
@@ -114,7 +114,7 @@ Parameters:
        (let ((type (proto-proto-type msg)))
          (doseq (v values)
                 (let ((v (funcall (proto-serializer msg) v)))
-                  (print-scalar v type field stream
+                  (print-scalar v type (proto-name field) stream
                                 (and pretty-print indent))))))
       (t
        (undefined-field-type "While printing ~S to text format,"
@@ -135,7 +135,7 @@ Parameters:
         (msg))
     (cond
       ((scalarp type)
-       (print-scalar value type field stream
+       (print-scalar value type (proto-name field) stream
                      (and pretty-print indent)))
       ((typep (setq msg (and type (or (find-message type)
                                       (find-enum type)
@@ -157,7 +157,7 @@ Parameters:
        (when value
          (let ((value (funcall (proto-serializer msg) value))
                (type  (proto-proto-type msg)))
-           (print-scalar value type field stream
+           (print-scalar value type (proto-name field) stream
                          (and pretty-print indent)))))
       ;; todo(benkuehnert): use specified map format
       ((typep msg 'map-descriptor)
@@ -183,15 +183,14 @@ Parameters:
        (undefined-field-type "While printing ~S to text format,"
                              object type field)))))
 
-(defun print-scalar (val type field stream indent)
+(defun print-scalar (val type name stream indent)
   "Print scalar value to stream
 
 Parameters:
   VAL: The data for the value to print.
   TYPE: The type of val.
-  FIELD: The field which contains this value. This parameter
-         can be nil. In this case, the name of the field will
-         not be printed.
+  NAME: The name to print before the value. If nil, then no
+        name will be printed.
   STREAM: The stream to print to.
   INDENT: Either a number or nil.
           - If indent is a number, indent this print
@@ -202,8 +201,8 @@ Parameters:
   (when (or val (eq type :bool))
     (when indent
       (format stream "~&~V,0T" (+ indent 2)))
-    (when field
-      (format stream "~A: " (proto-name field)))
+    (when name
+      (format stream "~A: " name))
     (ecase type
       ((:int32 :uint32 :int64 :uint64 :sint32 :sint64
         :fixed32 :sfixed32 :fixed64 :sfixed64)
@@ -300,7 +299,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
         (if (null field)
             (skip-field stream)
             (multiple-value-bind (val error-p)
-                (parse-field type :stream stream :parse-name parse-name)
+                (parse-field type :stream stream)
               (cond
                 (error-p
                  (undefined-field-type "While parsing ~S from text format,"
@@ -317,11 +316,10 @@ attempt to parse the name of the message and match it against MSG-DESC."
                  (when slot
                    (setf (proto-slot-value object slot) val))))))))))
 
-(defun parse-field (type &key (stream *standard-output*) (parse-name t))
+(defun parse-field (type &key (stream *standard-output*))
   "Parse data of type TYPE from STREAM. This function returns
 the object parsed. If the parsing fails, the function will
-return T as a second value. PARSE-NAME is passed to any recursive calls
-to PARSE-TEXT-FORMAT."
+return T as a second value."
   (let ((msg (or (find-message type)
                  (find-enum type)
                  (find-type-alias type)
