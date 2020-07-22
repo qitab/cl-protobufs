@@ -309,6 +309,10 @@ attempt to parse the name of the message and match it against MSG-DESC."
                  (when slot
                    (pushnew slot rslots)
                    (push val (proto-slot-value object slot))))
+                ((eq (proto-set-type field) :map)
+                 (dolist (pair val)
+                   (setf (gethash (car pair) (proto-slot-value object slot))
+                         (cdr pair))))
                 (t
                  (when slot
                    (setf (proto-slot-value object slot) val))))))))))
@@ -320,7 +324,8 @@ return T as a second value. PARSE-NAME is passed to any recursive calls
 to PARSE-TEXT-FORMAT."
   (let ((msg (or (find-message type)
                  (find-enum type)
-                 (find-type-alias type))))
+                 (find-type-alias type)
+                 (find-map-descriptor type))))
     (cond ((scalarp type)
            (expect-char stream #\:)
            (case type
@@ -337,7 +342,8 @@ to PARSE-TEXT-FORMAT."
                               :parse-name nil))
           ((typep msg 'enum-descriptor)
            (expect-char stream #\:)
-           (let* ((name (parse-token stream))
+           (let* ((name (
+                         parse-token stream))
                   (enum (find (keywordify name) (enum-descriptor-values msg)
                               :key #'enum-value-descriptor-name)))
              (and enum (enum-value-descriptor-name enum))))
@@ -350,7 +356,37 @@ to PARSE-TEXT-FORMAT."
                ((:string) (parse-string stream))
                ((:bool)   (boolean-true-p (parse-token stream)))
                (otherwise (parse-signed-int stream)))))
+          ((typep msg 'map-descriptor)
+           (let ((key-type (map-descriptor-key-class msg))
+                 (val-type (map-descriptor-val-class msg)))
+             (case (peek-char nil stream nil)
+               ((#\:)
+                (expect-char stream #\:)
+                (expect-char stream #\[)
+                (loop
+                  with pairs = ()
+                  when (eql (peek-char nil stream nil) #\])
+                    do (return pairs)
+                  do (skip-whitespace stream)
+                     (push (parse-map-entry key-type val-type
+                                            :stream stream)
+                           pairs)))
+               (t
+                (skip-whitespace stream)
+                (list (parse-map-entry key-type val-type
+                                       :stream stream))))))
         (t (values nil t)))))
+
+(defun parse-map-entry (key-type val-type &key (stream *standard-input*))
+  (let (key val)
+    (expect-char stream #\{)
+    (assert (string= "key" (parse-token stream)))
+    (setf key (parse-field key-type :stream stream))
+    (expect-char stream #\,)
+    (assert (string= "value" (parse-token stream)))
+    (setf val (parse-field val-type :stream stream))
+    (expect-char stream #\})
+    (cons key val)))
 
 (defun skip-field (stream)
   "Skip either a token or a balanced {}-pair."
