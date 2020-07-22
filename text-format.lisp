@@ -272,6 +272,9 @@ Parameters:
 
 (defmethod parse-text-format ((msg-desc message-descriptor)
                               &key (stream *standard-input*) (parse-name t))
+  "Parse a protobuf message with descriptor MSG-DESC from STREAM. This method
+returns the parsed object. PARSE-NAME is a flag used for recursive calls. If true,
+attempt to parse the name of the message and match it against MSG-DESC."
   (when parse-name
     (let ((name (parse-token stream)))
       (assert (string= name (proto-name msg-desc)) ()
