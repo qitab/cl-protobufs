@@ -313,11 +313,10 @@ attempt to parse the name of the message and match it against MSG-DESC."
                  (when slot
                    (setf (proto-slot-value object slot) val))))))))))
 
-(defun parse-field (type &key (stream *standard-output*) (parse-name t))
+(defun parse-field (type &key (stream *standard-output*))
   "Parse data of type TYPE from STREAM. This function returns
 the object parsed. If the parsing fails, the function will
-return T as a second value. PARSE-NAME is passed to any recursive calls
-to PARSE-TEXT-FORMAT."
+return T as a second value."
   (let ((msg (or (find-message type)
                  (find-enum type)
                  (find-type-alias type))))
