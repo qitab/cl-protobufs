@@ -357,34 +357,33 @@ return T as a second value."
           ((typep msg 'map-descriptor)
            (let ((key-type (map-descriptor-key-class msg))
                  (val-type (map-descriptor-val-class msg)))
-             (case (peek-char nil stream nil)
-               ((#\:)
-                (expect-char stream #\:)
-                (expect-char stream #\[)
-                (loop
-                  with pairs = ()
-                  when (eql (peek-char nil stream nil) #\])
-                    do (return pairs)
-                  do (skip-whitespace stream)
-                     (push (parse-map-entry key-type val-type
-                                            :stream stream)
-                           pairs)))
-               (t
-                (skip-whitespace stream)
-                (list (parse-map-entry key-type val-type
-                                       :stream stream))))))
+             (flet ((parse-map-etry (key-type val-type stream)
+                      (let (key val)
+                        (expect-char stream #\{)
+                        (assert (string= "key" (parse-token stream)))
+                        (setf key (parse-field key-type :stream stream))
+                        (expect-char stream #\,)
+                        (assert (string= "value" (parse-token stream)))
+                        (setf val (parse-field val-type :stream stream))
+                        (expect-char stream #\})
+                        (cons key val))))
+               (case (peek-char nil stream nil)
+                 ((#\:)
+                  (expect-char stream #\:)
+                  (expect-char stream #\[)
+                  (loop
+                    with pairs = ()
+                    when (eql (peek-char nil stream nil) #\])
+                      do (return pairs)
+                    do (skip-whitespace stream)
+                       (push (parse-map-entry key-type val-type
+                                              :stream stream)
+                             pairs)))
+                 (t
+                  (skip-whitespace stream)
+                  (list (parse-map-entry key-type val-type
+                                         :stream stream)))))))
         (t (values nil t)))))
-
-(defun parse-map-entry (key-type val-type &key (stream *standard-input*))
-  (let (key val)
-    (expect-char stream #\{)
-    (assert (string= "key" (parse-token stream)))
-    (setf key (parse-field key-type :stream stream))
-    (expect-char stream #\,)
-    (assert (string= "value" (parse-token stream)))
-    (setf val (parse-field val-type :stream stream))
-    (expect-char stream #\})
-    (cons key val)))
 
 (defun skip-field (stream)
   "Skip either a token or a balanced {}-pair."
