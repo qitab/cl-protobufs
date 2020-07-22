@@ -91,7 +91,7 @@ Parameters:
     (cond
       ((scalarp type)
        (doseq (v values)
-              (print-scalar v type field stream
+              (print-scalar v type (proto-name field) stream
                             (and pretty-print indent))))
       ((typep (setq msg (and type (or (find-message type)
                                       (find-enum type)
@@ -114,7 +114,7 @@ Parameters:
        (let ((type (proto-proto-type msg)))
          (doseq (v values)
                 (let ((v (funcall (proto-serializer msg) v)))
-                  (print-scalar v type field stream
+                  (print-scalar v type (proto-name field) stream
                                 (and pretty-print indent))))))
       (t
        (undefined-field-type "While printing ~S to text format,"
@@ -135,7 +135,7 @@ Parameters:
         (msg))
     (cond
       ((scalarp type)
-       (print-scalar value type field stream
+       (print-scalar value type (proto-name field) stream
                      (and pretty-print indent)))
       ((typep (setq msg (and type (or (find-message type)
                                       (find-enum type)
@@ -157,7 +157,7 @@ Parameters:
        (when value
          (let ((value (funcall (proto-serializer msg) value))
                (type  (proto-proto-type msg)))
-           (print-scalar value type field stream
+           (print-scalar value type (proto-name field) stream
                          (and pretty-print indent)))))
       ;; todo(benkuehnert): use specified map format
       ((typep msg 'map-descriptor)
@@ -183,15 +183,14 @@ Parameters:
        (undefined-field-type "While printing ~S to text format,"
                              object type field)))))
 
-(defun print-scalar (val type field stream indent)
+(defun print-scalar (val type name stream indent)
   "Print scalar value to stream
 
 Parameters:
   VAL: The data for the value to print.
   TYPE: The type of val.
-  FIELD: The field which contains this value. This parameter
-         can be nil. In this case, the name of the field will
-         not be printed.
+  NAME: The name to print before the value. If nil, then no
+        name will be printed.
   STREAM: The stream to print to.
   INDENT: Either a number or nil.
           - If indent is a number, indent this print
@@ -202,8 +201,8 @@ Parameters:
   (when (or val (eq type :bool))
     (when indent
       (format stream "~&~V,0T" (+ indent 2)))
-    (when field
-      (format stream "~A: " (proto-name field)))
+    (when name
+      (format stream "~A: " name))
     (ecase type
       ((:int32 :uint32 :int64 :uint64 :sint32 :sint64
         :fixed32 :sfixed32 :fixed64 :sfixed64)
