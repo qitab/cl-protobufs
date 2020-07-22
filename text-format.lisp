@@ -48,28 +48,48 @@ Parameters:
                           (proto-field-offset field))
                      1)
                   (has-extension object (proto-internal-field-name field)))
-          (let ((type   (slot-value field 'class))
-                (slot   (slot-value field 'internal-field-name))
-                (reader (slot-value field 'reader)))
-            (if (eq (proto-label field) :repeated)
-                (print-repeated-field
-                 (if slot
-                     (read-slot object slot
-                                (and (not (proto-lazy-p field))
-                                     reader))
-                     (list object))
-                 field
-                 :indent indent
-                 :stream stream
-                 :print-name print-name
-                 :pretty-print pretty-print)
+          (let* ((type   (slot-value field 'class))
+                 (slot   (slot-value field 'internal-field-name))
+                 (reader (slot-value field 'reader))
+                 (map-desc (find-map-descriptor type)))
+            (cond
+              ((eq (proto-label field) :repeated)
+               (print-repeated-field
+                (if slot
+                    (read-slot object slot
+                               (and (not (proto-lazy-p field))
+                                    reader))
+                    (list object))
+                field
+                :indent indent
+                :stream stream
+                :print-name print-name
+                :pretty-print pretty-print))
+              (map-desc
+               (let ((table (read-slot object slot
+                                       (and (not (proto-lazy-p field))
+                                            reader)))
+                     (key-type (map-descriptor-key-class map-desc))
+                     (val-type (map-descriptor-val-class map-desc))
+                     (name     (proto-name field)))
+                 (loop for k being the hash-keys of table using (hash-value v)
+                       do (if pretty-print
+                              (format stream "~&~V,0T~A { " (+ indent 2) name)
+                              (format stream "~A { " name))
+                          (print-scalar k key-type "key" stream nil)
+                          (format stream ", ")
+                          (print-scalar v val-type "value" stream nil)
+                          (format stream " }")
+                          (when pretty-print
+                            (format stream "~%")))))
+               (t
                 (print-non-repeated-field
                  (if slot (read-slot object slot reader) object)
                  field
                  :indent indent
                  :stream stream
                  :print-name print-name
-                 :pretty-print pretty-print)))))
+                 :pretty-print pretty-print))))))
       (if pretty-print
           (format stream "~&~V,0T}~%" indent)
           (format stream "} "))
@@ -159,26 +179,6 @@ Parameters:
                (type  (proto-proto-type msg)))
            (print-scalar value type (proto-name field) stream
                          (and pretty-print indent)))))
-      ;; todo(benkuehnert): use specified map format
-      ((typep msg 'map-descriptor)
-       (let ((key-class (map-descriptor-key-class msg))
-             (val-class (map-descriptor-val-class msg)))
-         (if pretty-print
-             (format stream "~&~VT~A: {~%" (+ 2 indent)
-                     (proto-name field))
-             (format stream "~A: {" (proto-name field)))
-         (flet ((print-entry (k v)
-                  (format stream "~&~VT" (+ 4 indent))
-                  (print-scalar k key-class nil stream nil)
-                  (format stream "-> ")
-                  (if (scalarp val-class)
-                      (print-scalar v val-class nil stream nil)
-                      (print-text-format v :stream stream
-                                           :pretty-print nil))
-                  (format stream "~%")))
-           (maphash #'print-entry value)
-           (format stream "~&~VT}" (+ indent 2)))))
-
       (t
        (undefined-field-type "While printing ~S to text format,"
                              object type field)))))
