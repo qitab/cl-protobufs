@@ -224,8 +224,7 @@ Parameters:
       ((:date :time :datetime :timestamp)
        (format stream "~D" val)))
     (if indent
-      (format stream "~%")
-      (format stream " "))))
+      (format stream "~%"))))
 
 (defun print-enum (val enum field stream indent)
   "Print enum to stream
