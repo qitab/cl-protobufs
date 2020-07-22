@@ -300,7 +300,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
         (if (null field)
             (skip-field stream)
             (multiple-value-bind (val error-p)
-                (parse-field type :stream stream :parse-name parse-name)
+                (parse-field type :stream stream)
               (cond
                 (error-p
                  (undefined-field-type "While parsing ~S from text format,"
