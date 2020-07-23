@@ -4,38 +4,38 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.service-test
+(defpackage #:cl-protobufs.service-test
   (:use #:cl
         #:clunit
         #:cl-protobufs.protobuf-package-unittest1
         #:cl-protobufs.protobuf-package-unittest1-rpc
-        #:cl-protobufs.third-party.lisp.cl-protobufs.tests
-        #:cl-protobufs.third-party.lisp.cl-protobufs.tests-rpc)
+        #:cl-protobufs.service-test-pb
+        #:cl-protobufs.service-test-pb-rpc)
   (:export :run))
 
-(in-package #:cl-protobufs.test.service-test)
+(in-package #:cl-protobufs.service-test)
 
-(defsuite service-tests ())
+(defsuite service-test ())
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.
 Parameters:
   INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'service-tests :use-debugger interactive-p)))
+  (let ((result (run-suite 'service-test :use-debugger interactive-p)))
     (print result)
     (assert (= (slot-value result 'clunit::failed) 0))
     (assert (= (slot-value result 'clunit::errors) 0))))
 
-(deftest test-service-name-is-exported (service-tests)
+(deftest test-service-name-is-exported (service-test)
   (assert-true 'cl-protobufs.protobuf-package-unittest1:service-with-cross-package-input-output))
 
-(deftest test-rpc-method-names-are-exported (service-tests)
+(deftest test-rpc-method-names-are-exported (service-test)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:bloop-impl)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:call-bloop)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:beep-impl)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:call-beep))
 
-(deftest test-camel-spitting-request (service-tests)
+(deftest test-camel-spitting-request (service-test)
   (let* ((service
           (proto:find-service
            'cl-protobufs.protobuf-package-unittest1:package_test1
@@ -49,12 +49,10 @@ Parameters:
     (assert-true (string= "protobuf_package_unittest1.Record2fLookupRequest" input))
     (assert-true (string= "protobuf_package_unittest1.Record2fLookupResponse" output))))
 
-(deftest test-method-options (service-tests)
-  (let* ((service
-          (proto:find-service
-           'cl-protobufs.third-party.lisp.cl-protobufs.tests:service-test
-           'cl-protobufs.third-party.lisp.cl-protobufs.tests:foo-service))
-         (method (proto-impl::find-method service 'cl-protobufs.third-party.lisp.cl-protobufs.tests::bar-method)))
+(deftest test-method-options (service-test)
+  (let* ((service (proto:find-service 'cl-protobufs.service-test-pb:service-test
+                                      'cl-protobufs.service-test-pb:foo-service))
+         (method (proto-impl::find-method service 'cl-protobufs.service-test-pb::bar-method)))
     (assert-true (eq :udp (proto-impl::find-option method "protocol")))
     (assert-true (eql 30.0d0 (proto-impl::find-option method "deadline")))
     (assert-true (eq t (proto-impl::find-option method "duplicate_suppression")))

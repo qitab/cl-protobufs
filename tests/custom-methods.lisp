@@ -84,49 +84,83 @@ Parameters:
   (unless (slot-boundp self '%fancything)
     (setf (slot-value self '%fancything) "-unset-")))
 
-(defvar *callcount-serialize* 0)
-(defun (:protobuf :serialize submessage) (obj buf &aux (size 0))
+(defvar *callcount-serialize* 0
+  "The number of times we've called the customer serialize function.")
+
+(defun internal-serialize-submessage (obj buf &aux (size 0))
+  "Serialization function for submessage.
+   OBJ: The message being serialized.
+   BUF: The buffer to serialize to.
+   SIZE: Auxiliary variable to increment."
   (declare (optimize (speed 3) (safety 0) (debug 0)))
   (declare (type submessage obj)
            (type fixnum size))
   ;; as a double-check that this was called.
   (incf *callcount-serialize*)
   (let ((val (slot-value obj '%code)))
-    (when val (proto-impl::iincf size
-                  (proto-impl::serialize-prim val :string 10 buf))))
+    (when val
+        (proto-impl::iincf
+         size (proto-impl::serialize-scalar val :string 10 buf))))
   ;; skip the FANCYTHING slot
   (let ((val (slot-value obj '%othercode)))
-    (when val (proto-impl::iincf size
-                  (proto-impl::serialize-prim val :string 26 buf))))
+    (when val
+      (proto-impl::iincf
+       size (proto-impl::serialize-scalar val :string 26 buf))))
   size)
 
-(defun (:protobuf :deserialize submessage)
-    (buffer index limit
-     &optional (endtag 0)
-     &aux proto-impl::tag)
-  (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (declare (type proto-impl::array-index index limit))
+#+sbcl
+(defun (:protobuf :serialize submessage) (obj buf)
+  (internal-serialize-submessage obj buf))
+
+#-sbcl
+(setf (get 'submessage :serialize)
+      (lambda (obj buf)
+        (internal-serialize-submessage obj buf)))
+
+(defun internal-deserialize-submessage
+    (buffer index limit endtag &aux proto-impl::tag)
+  "Deserialization function for submessage.
+   BUFFER: The buffer to deserialize.
+   INDEX: The index in buffer to start deserializing.
+   LIMIT: The end index to not read after.
+   ENDTAG: The end tag to know we're done deserializing.
+   PROTO-IMPL::TAG: Tag to deserialize."
+  (declare (optimize (speed 3) (safety 0) (debug 0))
+           (type proto-impl::array-index index limit))
   (let (code othercode)
     (loop
-     (multiple-value-setq (proto-impl::tag index)
-       (if (proto-impl::i< index limit)
-           (proto-impl::decode-uint32 buffer index)
-           (values 0 index)))
-     (when (proto-impl::i= proto-impl::tag endtag)
-       (return-from :deserialize
-         (values (make-submessage
-                  :code code
-                  :fancything (format nil "Reconstructed[~A,~A]" code othercode)
-                  :othercode othercode)
-                 index)))
-     (case proto-impl::tag
-       ((10) (multiple-value-setq (code index)
-               (proto-impl::deserialize-prim
-                :string buffer index)))
-       ((26) (multiple-value-setq (othercode index)
-               (proto-impl::deserialize-prim :string buffer index)))
-       (otherwise (setq index (proto-impl::skip-element
-                               buffer index proto-impl::tag)))))))
+      (multiple-value-setq (proto-impl::tag index)
+        (if (proto-impl::i< index limit)
+            (proto-impl::decode-uint32 buffer index)
+            (values 0 index)))
+      (when (proto-impl::i= proto-impl::tag endtag)
+        (return-from internal-deserialize-submessage
+          (values (make-submessage
+                   :code code
+                   :fancything (format nil "Reconstructed[~A,~A]" code othercode)
+                   :othercode othercode)
+                  index)))
+      (case proto-impl::tag
+        ((10) (multiple-value-setq (code index)
+                (proto-impl::deserialize-scalar
+                 :string buffer index)))
+        ((26) (multiple-value-setq (othercode index)
+                (proto-impl::deserialize-scalar :string buffer index)))
+        (otherwise (setq index (proto-impl::skip-element
+                                buffer index proto-impl::tag)))))))
+
+#+sbcl
+(defun (:protobuf :deserialize submessage)
+    (buffer index limit &optional (endtag 0))
+  (internal-deserialize-submessage
+   buffer index limit endtag))
+
+#-sbcl
+(setf (get 'submessage :deserialize)
+      (lambda (buffer index limit
+               &optional (endtag 0))
+        (internal-deserialize-submessage
+         buffer index limit endtag)))
 
 (defparameter *sending-test*
   (cl-protobufs.test.custom-proto-test::make-example-parent
@@ -135,7 +169,8 @@ Parameters:
    :submessage (cl-protobufs.test.custom-proto-test::make-submessage
                 :code "feeps"
                 :othercode "B"
-                :fancything "do-not-send-me")))
+                :fancything "do-not-send-me"))
+  "Protobuf message used to test custom sending.")
 
 (defparameter *expect*
   (cl-protobufs.test.custom-proto-test::make-example-parent
@@ -144,7 +179,8 @@ Parameters:
    :submessage (cl-protobufs.test.custom-proto-test::make-submessage
                 :code "feeps"
                 :othercode "B"
-                :fancything "Reconstructed[feeps,B]")))
+                :fancything "Reconstructed[feeps,B]"))
+  "Protobuf message used to test outcome of custom sending.")
 
 (deftest test-custom-method (custom-proto-tests)
   (let ((octets (serialize-object-to-bytes *sending-test*)))

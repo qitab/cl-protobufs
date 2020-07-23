@@ -6,7 +6,7 @@
 
 syntax = "proto2";
 
-package third_party.lisp.cl_protobufs.tests;
+package service_test_pb;
 
 message BarRequest {
 }

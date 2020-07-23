@@ -34,9 +34,13 @@ Parameters:
     (assert (= (slot-value result 'clunit::failed) 0))
     (assert (= (slot-value result 'clunit::errors) 0))))
 
+(defun find-message-with-string (message name)
+  (proto-impl::find-message (intern (nstring-upcase (proto-impl::uncamel-case name))
+                                    (symbol-package (proto-impl::proto-class message)))))
+
 (deftest cross-package-reference-test (reference-tests)
   (flet ((find-by-name (name proto-object)
-           (proto-impl::find-message-with-string proto-object name))
+           (find-message-with-string proto-object name))
          (find-by-name-in-list (name proto-objects)
            (find name proto-objects :key #'proto-name :test #'string=)))
     (let* ((schema (find-schema 'package_test1))
@@ -127,7 +131,7 @@ Parameters:
            (find name proto-objects :key #'proto-name :test #'string=)))
     (let* ((schema (find-schema 'cl-protobufs.protobuf-forward-reference-unittest:forward_reference))
            (message-with-forward-reference
-            (proto-impl::find-message-with-string schema "MessageWithForwardReference"))
+            (find-message-with-string schema "MessageWithForwardReference"))
            (foo (find-by-name "foo" (proto-fields message-with-forward-reference)))
            ;; (bar (find-by-name "bar" (proto-fields message-with-forward-reference)))
            (service-with-forward-reference
@@ -177,120 +181,3 @@ Parameters:
       (assert-true (equal 123 (cl-protobufs.protobuf-forward-reference-unittest:baz
                           (cl-protobufs.protobuf-forward-reference-unittest:foo new))))
     (assert-true (equal :baa (cl-protobufs.protobuf-forward-reference-unittest:bar new))))))
-
-(defparameter *test-proto-preamble*
-  "syntax = \"proto2\";
-
-package proto_test;
-
-message DefinedMessage {
-  optional string foo = 1;
-}
-
-")
-
-(defmacro assert-error (&body body)
-  (let ((e (gensym "E")))
-    `(let ((,e (nth-value 1 (ignore-errors ,@body))))
-       (assert-true ,e)
-       ,e)))
-
-
-;; This tests the parser.
-;; I'm not worried about the parser, I'm strictly worried about protoc working.
-;; It would make me happy for someone to work on this later
-;; (deftest undefined-types-test ()
-;;   (labels ((parse-schema-containing (string)
-;;              (with-input-from-string (s (concatenate 'string *test-proto-preamble* string))
-;;                (parse-schema-from-stream s
-;;                                          ;; Parsing from a string doesn't produce a name, so supply
-;;                                          ;; it
-;;                                          :name "proto_test"
-;;                                          :class 'dummy
-;;                                          :conc-name nil)))
-;;            (parse-message-with-field-type (type)
-;;              (parse-schema-containing (format nil "message MessageWithUndefinedFieldType {~%~
-;;                                                    ~&  optional ~A bar = 1;~%~
-;;                                                    }~%" type)))
-;;            (parse-service-with-rpc (rpc)
-;;              (parse-schema-containing (format nil "service ServiceWithUndefinedMethodType {~%~
-;;                                                    ~&  ~A~%~
-;;                                                    }~%" rpc)))
-;;            (poor-mans-assert-regex-equal (assert-trueed-strings actual-string)
-;;              (assert-true
-;;               (loop with index = 0
-;;                     for assert-trueed-string in assert-trueed-strings
-;;                     as position = (search assert-trueed-string actual-string :start2 index)
-;;                     always position
-;;                     do (setf index (+ position (length assert-trueed-string))))))
-;;            (do-field-test (field-type)
-;;              (let ((condition (assert-error (parse-message-with-field-type field-type))))
-;;                (poor-mans-assert-regex-equal
-;;                 (list "Undefined type: Field "
-;;                       "BAR"
-;;                       "in message "
-;;                       "MESSAGE-WITH-UNDEFINED-FIELD-TYPE"
-;;                       (format nil "has unknown type ~A" field-type))
-;;                 (princ-to-string condition))
-;;                (assert-true (equal field-type (error-type-name condition)))
-;;                (assert-true (equal "bar" (proto-name (error-field condition))))))
-;;            (method-test-assertions (condition where method-lisp-name method-proto-name type)
-;;              (poor-mans-assert-regex-equal
-;;               (list (format nil "Undefined type: ~A type for RPC " where)
-;;                     (format nil "~A" method-lisp-name)
-;;                     "in service "
-;;                     "ServiceWithUndefinedMethodType"
-;;                     (format nil "has unknown type ~A" type))
-;;               (princ-to-string condition))
-;;              (assert-true (equal type (error-type-name condition)))
-;;              (assert-true (equal method-proto-name (proto-name (error-method condition)))))
-;;            (do-method-input-test (input-type)
-;;              (let ((condition (assert-error
-;;                                 (parse-service-with-rpc
-;;                                  (format nil "rpc MethodWithUndefinedInput (~A) ~
-;;                                               returns (DefinedMessage);" input-type)))))
-;;                (method-test-assertions condition "Input" "METHOD-WITH-UNDEFINED-INPUT"
-;;                                        "MethodWithUndefinedInput" input-type)))
-;;            (do-method-output-test (output-type)
-;;              (let ((condition (assert-error
-;;                                 (parse-service-with-rpc
-;;                                  (format nil "rpc MethodWithUndefinedOutput (DefinedMessage) ~
-;;                                               returns (~A);" output-type)))))
-;;                (method-test-assertions condition "Output" "METHOD-WITH-UNDEFINED-OUTPUT"
-;;                                        "MethodWithUndefinedOutput" output-type)))
-;;            (do-method-stream-test (stream-type)
-;;              (let ((condition (assert-error
-;;                                 (parse-service-with-rpc
-;;                                  (format nil "rpc MethodWithUndefinedStream (DefinedMessage) ~
-;;                                               returns (DefinedMessage) {~
-;;                                               ~&    option stream_type = \"~A\";~
-;;                                               ~&  };" stream-type)))))
-;;                (method-test-assertions condition "Stream" "METHOD-WITH-UNDEFINED-STREAM"
-;;                                        "MethodWithUndefinedStream" stream-type))))
-
-;;     (parse-message-with-field-type "int32")
-;;     (do-field-test "int")
-;;     (parse-message-with-field-type "DefinedMessage")
-;;     (do-field-test "UndefinedMessage")
-;;     (do-field-test "other_package.DefinedMessage")
-
-;;     (parse-service-with-rpc
-;;      "rpc MethodWithDefinedInputOutput (DefinedMessage) returns (DefinedMessage);")
-;;     (do-method-input-test "UndefinedMessage")
-;;     ;; my understanding is that primitive types are not allowed for method input/output; if this is
-;;     ;; incorrect, change to "int"
-;;     (do-method-input-test "int32")
-;;     (do-method-input-test "other_package.DefinedMessage")
-
-;;     (do-method-output-test "UndefinedMessage")
-;;     (do-method-output-test "int32")
-;;     (do-method-output-test "other_package.DefinedMessage")
-
-;;     ;; stream_type is required to be fully qualified
-;;     (parse-service-with-rpc (format nil "rpc MethodWithDefinedInputOutput (DefinedMessage) ~
-;;                                          returns (DefinedMessage) {~
-;;                                          ~&    option stream_type = \"proto_test.DefinedMessage\";~
-;;                                          ~&  };"))
-;;     (do-method-stream-test "proto_test.UndefinedMessage")
-;;     (do-method-stream-test "int32")
-;;     (do-method-stream-test "other_package.DefinedMessage")))

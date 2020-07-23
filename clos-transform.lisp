@@ -38,7 +38,7 @@
 (defun clos-type-to-protobuf-type (type &optional type-filter enum-filter)
   "Given a Lisp TYPE, returns up to five values:
      1. a Protobuf type,
-     2. a class or primitive type,
+     2. a class or keyword denoting a scalar type,
      3. whether or not to pack the field,
      4. a set of enum values (only when ENUM-FILTER is provided),
      5. the originally specified lisp type of the root, if it is a lisp type, e.g.
@@ -157,9 +157,9 @@
                 (equal type expanded-type)))
        (clos-type-to-protobuf-type expanded-type))
       (t
-       (multiple-value-bind (pb-type primtive-type)
+       (multiple-value-bind (pb-type scalar-type)
            (lisp-type-to-protobuf-type type)
-         (values pb-type primtive-type nil nil type))))))
+         (values pb-type scalar-type nil nil type))))))
 
 (defun lisp-type-to-protobuf-type (type)
   (case type
@@ -192,6 +192,22 @@
             (values "bytes" :bytes))
            (t
             (values (class-name->proto type) type))))))
+
+(defun lisp-type-to-protobuf-class (type)
+  "Return protobuf class associated with the lisp type TYPE."
+  (nth-value 1 (lisp-type-to-protobuf-type type)))
+
+(defun scalarp (type)
+  "Returns true if the given Protobufs type TYPE is a scalar type. Scalar
+types are defined by the protobuf documentation. The cl-protobufs specific
+type :symbol is included as a scalar type, as it is treated as a synonym
+to the :string type. This is because symbol types are identified by their
+names in cl-protobufs.
+
+https://developers.google.com/protocol-buffers/docs/proto#scalar "
+  (member type '(:double :float :int32 :int64 :uint32 :uint64 :sint32
+                 :sint32 :sint64 :fixed32 :fixed64 :sfixed32 :sfixed64
+                 :bool :string :bytes :symbol)))
 
 (defun packed-type-p (type)
   "Returns true if the given Protobufs type can use a packed field."

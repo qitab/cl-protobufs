@@ -113,10 +113,6 @@ Parameters:
             :accessor proto-imports
             :initarg :imports
             :initform ())
-   ;; TODO(cgay): rename to imported-files or just imports?
-   (schemas :type (list-of file-descriptor)  ; the schemas that were successfully imported
-            :accessor proto-imported-schemas ; this gets used for chasing namespaces
-            :initform ())
    (services :type (list-of service-descriptor)
              :accessor proto-services
              :initarg :services
@@ -204,14 +200,6 @@ or that's named by the class-name of TYPE."
        For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message."
   (gethash qualified-name *qualified-messages*))
 
-;; Do not use in production at run time.
-(defun find-message-with-string (message name)
-  "Return the message-descriptor instance in the package of
-MESSAGE named by NAME (a string)."
-  (declare (type string name))
-  (find-message (intern (nstring-upcase (uncamel-case name))
-                        (symbol-package (proto-class message)))))
-
 (defun find-message-for-class (class)
   "Find a message for class.
 Parameters:
@@ -221,6 +209,14 @@ Parameters:
                    (class-name class))))
     (or (find-message type)
         (find-type-alias type))))
+
+(defvar *maps* (make-hash-table :test 'eq)
+  "Maps map names (symbols) to map-descriptor instances.")
+
+(declaim (inline find-map-descriptor))
+(defun find-map-descriptor (type)
+  "Return a map-descriptor instance named by TYPE (a symbol)."
+  (gethash type *maps*))
 
 (defvar *enums* (make-hash-table :test 'eq)
   "Maps enum names (symbols) to enum-descriptor instances.")
@@ -280,41 +276,14 @@ Parameters:
   (make-instance 'option-descriptor
                  :name name :value value :type type))
 
-(defgeneric find-option (protobuf name)
-  (:documentation
-   "Given a Protobufs schema, message, enum, etc and the name of an option,
-    returns the value of the option and its (Lisp) type. The third value is
-    true if an option was found, otherwise it is false."))
-
-(defmethod find-option ((desc descriptor) (name string))
+(defun find-option (desc name)
+  "Given a protobuf descriptor DESC and the NAME of an option, returns the
+   value of the option and its Lisp type. The third value is T if an option was
+   found, otherwise NIL."
+  (declare (type descriptor desc) (type string name))
   (let ((option (find name (proto-options desc) :key #'proto-name :test #'option-name=)))
     (when option
       (values (proto-value option) (proto-type option) t))))
-
-(defmethod find-option ((options list) (name string))
-  (let ((option (find name options :key #'proto-name :test #'option-name=)))
-    (when option
-      (values (proto-value option) (proto-type option) t))))
-
-(defgeneric add-option (descriptor name value &optional type)
-  (:documentation
-   "Given a protobuf descriptor (schema, message, enum, etc) add the option called 'name' with the
-    value 'value' and type 'type'.  If the option was previoously present, it is replaced."))
-
-(defmethod add-option ((desc descriptor) (name string) value &optional (type 'string))
-  (let ((option (find name (proto-options desc) :key #'proto-name :test #'option-name=)))
-    (if option
-      ;; This side-effects the old option (meaning what? it's deprecated? --cgay)
-      (setf (proto-value option) value
-            (proto-type option)  type)
-      (setf (proto-options desc)
-            (append (proto-options desc)
-                    (list (make-option name value type)))))))
-
-(defmethod add-option ((options list) (name string) value &optional (type 'string))
-  (let ((option (find name options :key #'proto-name :test #'option-name=)))
-    (append (remove option options)
-            (list (make-option name value type)))))
 
 (defgeneric remove-options (descriptor &rest names)
   (:documentation
@@ -343,6 +312,17 @@ Parameters:
          (end2   (if (eql (char name2 0) #\() (- (length name2) 1) (length name2))))
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
 
+(defstruct map-descriptor
+  "The meta-object for a protobuf map"
+  (class     nil :type symbol)
+  (name      nil :type string)
+  (key-class nil :type symbol) ;; the :class of the key
+  (val-class nil :type symbol) ;; the :class of the value
+  (key-type nil :type symbol)  ;; the lisp type of the key
+  (val-type nil :type symbol)) ;; the lisp type of the value
+
+(defmethod make-load-form ((m map-descriptor) &optional environment)
+  (make-load-form-saving-slots m :environment environment))
 
 (defstruct enum-descriptor
   "Describes a protobuf enum."
@@ -363,8 +343,8 @@ Parameters:
 (defstruct enum-value-descriptor
   "The model class that represents a protobuf enum key/value pair."
   ;; The keyword symbol corresponding to the enum value key.
-  (name nil :type symbol)
-  (value nil :type (signed-byte 32)))
+  (name nil :type keyword)
+  (value nil :type sfixed32))
 
 (defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
   (make-load-form-saving-slots desc :environment environment))
@@ -441,7 +421,8 @@ on the symbol if we are not in SBCL."
      (when (and (slot-boundp message 'qual-name) (proto-qualified-name message))
        (setf (gethash (proto-qualified-name message) *qualified-messages*)
              (proto-class message))))
-    (:alias (setf (gethash symbol *type-aliases*) message))))
+    (:alias (setf (gethash symbol *type-aliases*) message))
+    (:map (setf (gethash symbol *maps*) message))))
 
 (defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*

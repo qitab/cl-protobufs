@@ -38,26 +38,35 @@
   )       ;eval-when
 
 
+(declaim (inline make-wire-tag))
+(defun make-wire-tag (wire-type field-number)
+  "Create a protobuf field tag, the combination of a WIRE-TYPE (3 bits) and a
+   FIELD-NUMBER (29 bits) that precedes the field data itself."
+  (declare (type (unsigned-byte 3) wire-type)
+           (type (unsigned-byte 29) field-number))
+  (the (unsigned-byte 32)
+       (ilogior wire-type (iash field-number 3))))
+
 (defun make-tag (type index)
-  "Given a wire type or the name of a Protobufs type and a field index,
-   return the tag that encodes both of them."
+  "Given the name of a protobuf type (a keyword symbol) and a field index,
+   return the field tag that encodes both of them."
+  (declare (type (unsigned-byte 29) index))
   (locally (declare #.$optimize-serialization)
-    (if (typep type 'fixnum)
-      (ilogior type (iash index 3))
-      (let ((type (ecase type
-                    ((:int32 :uint32) $wire-type-varint)
-                    ((:int64 :uint64) $wire-type-varint)
-                    ((:sint32 :sint64) $wire-type-varint)
-                    ((:fixed32 :sfixed32) $wire-type-32bit)
-                    ((:fixed64 :sfixed64) $wire-type-64bit)
-                    ((:string :bytes) $wire-type-string)
-                    ((:bool) $wire-type-varint)
-                    ((:float) $wire-type-32bit)
-                    ((:double) $wire-type-64bit)
-                    ;; A few of our homegrown types
-                    ((:symbol) $wire-type-string)
-                    ((:date :time :datetime :timestamp) $wire-type-64bit))))
-        (ilogior type (iash index 3))))))
+    (let ((tag-bits (ecase type
+                      ((:int32 :uint32) $wire-type-varint)
+                      ((:int64 :uint64) $wire-type-varint)
+                      ((:sint32 :sint64) $wire-type-varint)
+                      ((:fixed32 :sfixed32) $wire-type-32bit)
+                      ((:fixed64 :sfixed64) $wire-type-64bit)
+                      ((:string :bytes) $wire-type-string)
+                      ((:bool) $wire-type-varint)
+                      ((:float) $wire-type-32bit)
+                      ((:double) $wire-type-64bit)
+                      ;; A few of our homegrown types
+                      ((:symbol) $wire-type-string)
+                      ((:date :time :datetime :timestamp) $wire-type-64bit))))
+      (declare (type (unsigned-byte 3) tag-bits))
+      (make-wire-tag tag-bits index))))
 
 (define-compiler-macro make-tag (&whole form type index)
   (setq type (fold-symbol type))
@@ -85,8 +94,8 @@
 ;; Suppose the following have been defined:
 ;;  (defconstant a 'b)
 ;;  (defconstant b :bool)
-;; Then (SERIALIZE-PRIM x a tag buffer) should generate a runtime error, because the symbol B,
-;; which is what the function receives, is not a known primitive.
+;; Then (SERIALIZE-SCALAR x a tag buffer) should generate a runtime error, because the symbol B,
+;; which is what the function receives, is not a known scalar value type.
 ;; However FOLD-SYMBOL translates A into :BOOL.
 ;; Compiler-macros should never alter a form's semantics.
 ;;
@@ -107,8 +116,8 @@
 
 (defun packed-tag (index)
   "Takes a field INDEX, and returns a tag for a packed field with that same index."
-  (declare (type (unsigned-byte 32) index))
-  (make-tag $wire-type-string index))
+  (declare (type (unsigned-byte 29) index))
+  (make-wire-tag $wire-type-string index))
 
 (defun length-encoded-tag-p (tag)
   "Returns non-nil if TAG represents a length-encoded field.
@@ -151,14 +160,19 @@
 
 ;;; Serializers
 
-;; Serialize 'val' of primitive type 'type' into the buffer
+;; Serialize 'val' of scalar type 'type' into the buffer
 (declaim (ftype (function (t t (unsigned-byte 32) t) (values fixnum &optional))
-                serialize-prim))
-(defun serialize-prim (val type tag buffer)
-  "Serializes a Protobufs primitive (scalar) value into the buffer at the given index.
-   The value is given by 'val', the primitive type by 'type'.
+                serialize-scalar))
+(defun serialize-scalar (val type tag buffer)
+  "Serializes a Protobufs scalar value into the buffer at the given index.
    Modifies the buffer in place, and returns the new index into the buffer.
-   Watch out, this function turns off most type checking and all array bounds checking."
+   Watch out, this function turns off most type checking and all array bounds checking.
+
+Parameters:
+  VAL: The value to serialize.
+  TYPE: The type of VAL.
+  TAG: The protobuf tag to serialize.
+  BUFFER: The buffer to serialize to."
   (declare (type (unsigned-byte 32) tag))
   (locally (declare #.$optimize-serialization)
     (i+
@@ -190,7 +204,9 @@
        ((:date :time :datetime :timestamp)
         (encode-int64 val buffer))))))
 
-(defun get-prim-encoder-form (type val buffer)
+(defun get-scalar-encoder-form (type val buffer)
+  "Returns a form that encodes a value VAL with type
+ TYPE to buffer BUFFER."
   (case type
     (:uint32   `(encode-uint32 ,val ,buffer))
     (:uint64   `(encode-uint64 ,val ,buffer))
@@ -208,7 +224,9 @@
     (:float    `(encode-single ,val ,buffer))
     (:double   `(encode-double ,val ,buffer))))
 
-(defun get-prim-encoder-lambda (type)
+(defun get-scalar-encoder-lambda (type)
+  "Given a type TYPE, return a function that takes a value of type TYPE
+and a buffer which encodes the value to the buffer."
   (ecase type
     (:uint32   (lambda (val b) (encode-uint32 val b)))
     (:uint64   (lambda (val b) (encode-uint64 val b)))
@@ -226,10 +244,10 @@
     (:float    (lambda (val b) (encode-single val b)))
     (:double   (lambda (val b) (encode-double val b)))))
 
-(define-compiler-macro serialize-prim (&whole form val type tag buffer)
+(define-compiler-macro serialize-scalar (&whole form val type tag buffer)
   (setq type (fold-symbol type)
         tag  (fold-symbol tag))
-  (let ((encoder (get-prim-encoder-form type val buffer)))
+  (let ((encoder (get-scalar-encoder-form type val buffer)))
     (if encoder
         `(locally (declare #.$optimize-serialization)
            (+ (encode-uint32 ,tag ,buffer) ,encoder))
@@ -239,7 +257,7 @@
                 packed-size))
 (defun serialize-packed (values type index buffer &optional vectorp)
   "Serializes a set of packed values into the buffer at the given index.
-   The values are given by 'values', the primitive type by 'type'.
+   The values are given by 'values', the scalar type by 'type'.
    Modifies the buffer in place, and returns the new index into the buffer.
    Watch out, this function turns off most type checking and all array bounds checking."
   (declare (type (unsigned-byte 32) index))
@@ -253,9 +271,9 @@
     ;; act as a higher-order function. We can do slightly better by
     ;; actually specializing for two subtypes of sequence though.
     ;; Of course, we *could* dispatch on both the sequence type and the
-    ;; primitive wire type, to create 22 (= 11 x 2) cases,
+    ;; scalar wire type, to create 22 (= 11 x 2) cases,
     ;; but I'm too lazy to hand-roll that, or even think of a macroish way.
-    (let* ((encoder (get-prim-encoder-lambda type))
+    (let* ((encoder (get-scalar-encoder-lambda type))
            (tag-len (encode-uint32 (packed-tag index) buffer))
            (payload-len (packed-size values type))
            (prefix-len (encode-uint32 payload-len buffer))
@@ -282,8 +300,8 @@
   (setq type (fold-symbol type)
         index (fold-symbol index))
   (if vectorp-supplied-p
-      (let ((encode (or (get-prim-encoder-form type 'val buffer)
-                        (error "No primitive encoder for ~S" type))))
+      (let ((encode (or (get-scalar-encoder-form type 'val buffer)
+                        (error "No scalar encoder for ~S" type))))
         ;; FIXME: probably should have ONCE-ONLY for BUFFER
         ;; [Same goes for a lot of the compiler macros]
         `(locally (declare #.$optimize-serialization)
@@ -299,45 +317,59 @@
                  (i+ tag-len prefix-len payload-len)))))
       form))
 
-(defun serialize-enum (val enum-values tag buffer)
-  "Serializes a Protobufs enum value into the buffer at the given index.
-   The value is given by 'val', the enum values are in 'enum-values'.
-   Modifies the buffer in place, and returns the new index into the buffer.
-   Watch out, this function turns off most type checking and all array bounds checking."
-  (declare (type list enum-values)
+(declaim (inline find-enum-value))
+(defun find-enum-value (name value-descriptors)
+  "Find the enum value corresponding to NAME by searching for it in
+   VALUE-DESCRIPTORS."
+  (declare (type keyword name))
+  (let* ((desc (find name value-descriptors :key #'enum-value-descriptor-name)))
+    (assert desc () "There is no enum value for name ~S" name)
+    (the sfixed32 (enum-value-descriptor-value desc))))
+
+(declaim (inline find-enum-name))
+(defun find-enum-name (value value-descriptors)
+  "Find the enum name corresponding to VALUE by searching for it in
+   VALUE-DESCRIPTORS."
+  (declare (type sfixed32 value))
+  (let* ((desc (find value value-descriptors :key #'enum-value-descriptor-value)))
+    (assert desc () "There is no enum value name for value ~S" value)
+    (the keyword (enum-value-descriptor-name desc))))
+
+(defun serialize-enum (name value-descriptors tag buffer)
+  "Serializes the protobuf enum value corresponding to NAME (a keyword symbol)
+   into BUFFER.  The enum values are in VALUE-DESCRIPTORS. Modifies BUFFER in
+   place, and returns the new index into the buffer. TAG is the protobuf field
+   number with wire-type tag bits added. Watch out, this function turns off
+   most type checking and all array bounds checking."
+  (declare (type list value-descriptors)
            (type (unsigned-byte 32) tag))
   (locally (declare #.$optimize-serialization)
-    (let ((val (let ((e (find val enum-values :key #'enum-value-descriptor-name)))
-                 ;; This was not type-safe. What if E isn't found?
-                 ;; It was emitting the low 32 bits of the NIL's machine representation.
-                 ;; Seems perhaps better to emit something more concrete, namely 0.
-                 (if e (enum-value-descriptor-value e) 0))))
+    (let ((val (find-enum-value name value-descriptors)))
       (declare (type (unsigned-byte 32) val))
       (i+ (encode-uint32 tag buffer) (encode-uint32 val buffer)))))
 
-(defun serialize-packed-enum (values enum-values index buffer)
-  "Serializes Protobufs enum values into the buffer at the given index.
-   The values are given by 'values', the enum values are in 'enum-values'.
-   Modifies the buffer in place, and returns the new index into the buffer.
-   Watch out, this function turns off most type checking and all array bounds checking."
-  (declare (type list enum-values)
+(defun serialize-packed-enum (names value-descriptors index buffer)
+  "Serializes protobuf enum values corresponding to NAMES (keyword symbols)
+   into BUFFER at the given INDEX. The enum value descriptors are in
+   VALUE-DESCRIPTORS.  Modifies BUFFER in place, and returns the new index into
+   the buffer.  Watch out, this function turns off most type checking and all
+   array bounds checking."
+  (declare (type list value-descriptors)
            (type (unsigned-byte 32) index))
-  (when (zerop (length values))
+  (when (zerop (length names))
     (return-from serialize-packed-enum 0))
   (locally (declare #.$optimize-serialization)
     (let* ((tag-len (encode-uint32 (packed-tag index) buffer))
-           (payload-len (packed-enum-size values enum-values))
+           (payload-len (packed-enum-size names value-descriptors))
            (prefix-len (encode-uint32 payload-len buffer))
            (sum 0)) ; for double-check
       (declare (type fixnum sum))
       (map nil
-           (lambda (val)
-             (let ((val (let ((e (find val enum-values :key #'enum-value-descriptor-name)))
-                          (unless e (error "No such val ~S in amongst ~S" val enum-values))
-                          (enum-value-descriptor-value e))))
+           (lambda (name)
+             (let ((val (find-enum-value name value-descriptors)))
                (declare (type (unsigned-byte 32) val))
                (iincf sum (encode-uint32 (ldb (byte 32 0) val) buffer))))
-           values)
+           names)
       (assert (= sum payload-len))
       (i+ tag-len prefix-len payload-len))))
 
@@ -360,40 +392,41 @@
     in MAX-BITS.
 
     Watch out, this function turns off all type checking and array bounds checking."
-  (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (flet ((get-byte ()
-             (prog1 (aref buffer (the array-index index))
-               (iincf index)))
-         (return-as-correct-size (value)
-           ;; Negative numbers are always encoded as ten bytes. We need to return just the MAX-BITS
-           ;; low bits.
-           (return-from %decode-rest-of-uint (values (ldb (byte max-bits 0) value) index))))
-    (let ((fixnum-bits (* (floor (integer-length most-negative-fixnum) 7) 7))
-          (bits-read 14)
-          (low-word start-value))
-      (declare (type fixnum low-word fixnum-bits))
+  (declare #.$optimize-serialization)
+  (let ((idx index))
+    (flet ((get-byte ()
+             (prog1 (aref buffer (the array-index idx))
+               (iincf idx)))
+           (return-as-correct-size (value)
+             ;; Negative numbers are always encoded as ten bytes. We need to
+             ;; return just the MAX-BITS low bits.
+             (return-from %decode-rest-of-uint (values (ldb (byte max-bits 0) value) idx))))
+      (let ((fixnum-bits (* (floor (integer-length most-negative-fixnum) 7) 7))
+            (bits-read 14)
+            (low-word start-value))
+        (declare (type fixnum low-word fixnum-bits))
 
-      ;; Read as much as we can fit in a fixnum, and return as soon as we're done
-      (loop for place from bits-read by 7 below fixnum-bits
-            for byte fixnum = (get-byte)
-            for bits = (ildb (byte 7 0) byte)
-            do (setq low-word (ilogior (the fixnum low-word) (the fixnum (iash bits place))))
-               (when (i< byte 128)
-                 (return-as-correct-size low-word)))
-
-      ;; Value doesn't fit into a fixnum. Read any additional values into another fixnum, and then
-      ;; shift left and add to the low fixnum.
-      (let ((high-word 0))
-        (declare (type fixnum high-word))
-        (loop for place from 0 by 7 below fixnum-bits
+        ;; Read as much as we can fit in a fixnum, and return as soon as we're done
+        (loop for place from bits-read by 7 below fixnum-bits
               for byte fixnum = (get-byte)
               for bits = (ildb (byte 7 0) byte)
-              do (setq high-word (ilogior (the fixnum high-word) (the fixnum (iash bits place))))
+              do (setq low-word (ilogior (the fixnum low-word) (the fixnum (iash bits place))))
                  (when (i< byte 128)
-                   (return-as-correct-size (+ (ash high-word fixnum-bits) low-word)))))
+                   (return-as-correct-size low-word)))
 
-      ;; We shouldn't get here unless we're reading a value that doesn't fit in two fixnums.
-      (assert nil nil "The value doesn't fit into ~A bits" (* 2 fixnum-bits)))))
+        ;; Value doesn't fit into a fixnum. Read any additional values into another fixnum, and then
+        ;; shift left and add to the low fixnum.
+        (let ((high-word 0))
+          (declare (type fixnum high-word))
+          (loop for place from 0 by 7 below fixnum-bits
+                for byte fixnum = (get-byte)
+                for bits = (ildb (byte 7 0) byte)
+                do (setq high-word (ilogior (the fixnum high-word) (the fixnum (iash bits place))))
+                   (when (i< byte 128)
+                     (return-as-correct-size (+ (ash high-word fixnum-bits) low-word)))))
+
+        ;; We shouldn't get here unless we're reading a value that doesn't fit in two fixnums.
+        (assert nil nil "The value doesn't fit into ~A bits" (* 2 fixnum-bits))))))
 
 
 ;; TODO(jgodbout): Find all of the different instances of word-size
@@ -409,17 +442,18 @@
              #+sbcl (type sb-ext:word word)
              #+sbcl (type sb-int:index index)
              (optimize (safety 0)))
-    (let ((shift 0))
+    (let ((shift 0)
+          (idx index))
       (dotimes (i 10)
-        (let ((byte (aref a index)))
-          (incf index)
+        (let ((byte (aref a idx)))
+          (incf idx)
           (setf word
                 (logior (logand (ash (logand byte 127) (the (mod 64) shift))
                                 #+sbcl sb-ext:most-positive-word)
                         word))
           (unless (logbitp 7 byte) (return)))
-        (incf shift 7)))
-    (values word index)))
+        (incf shift 7))
+      (values word idx))))
 
 ;; Decode the value from the buffer at the given index,
 ;; then return the value and new index into the buffer
@@ -521,10 +555,10 @@
 ;; Deserialize the next object of type 'type'
 ;; FIXME: most of these are bad. QPX does not do much decoding,
 ;; so I'll not touch them for the time being.
-(defun deserialize-prim (type buffer index)
-  "Deserializes the next object of primitive type 'type'.
-   Deserializes from the byte vector 'buffer' starting at 'index'.
-   Returns the value and and the new index into the buffer.
+(defun deserialize-scalar (type buffer index)
+  "Deserializes the next object of scalar type TYPE.
+   Deserializes from the byte vector BUFFER starting at INDEX.
+   Returns the value and the new index into the buffer.
    Watch out, this function turns off most type checking and all array bounds checking."
   (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
            (array-index index))
@@ -562,7 +596,7 @@
       ((:date :time :datetime :timestamp)
        (decode-uint64 buffer index)))))
 
-(define-compiler-macro deserialize-prim (&whole form type buffer index)
+(define-compiler-macro deserialize-scalar (&whole form type buffer index)
   (setq type (fold-symbol type))
   (let ((decoder
           (case type
@@ -600,7 +634,7 @@
 (defun deserialize-packed (type buffer index)
   "Deserializes the next packed values of type 'type'.
    Deserializes from the byte vector 'buffer' starting at 'index'.
-   Returns the value and and the new index into the buffer.
+   Returns the value and the new index into the buffer.
    Watch out, this function turns off most type checking and all array bounds checking."
   (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
            (array-index index))
@@ -709,27 +743,27 @@
                    (setq idx nidx))))))))
     form))
 
-(defun deserialize-enum (enum-values buffer index)
-  "Deserializes the next enum value take from 'enum-values'.
-   Deserializes from the byte vector 'buffer' starting at 'index'.
-   Returns the value and and the new index into the buffer.
+(defun deserialize-enum (value-descriptors buffer index)
+  "Deserializes the next enum value taken from VALUE-DESCRIPTORS.
+   Deserializes from the byte vector BUFFER starting at INDEX.
+   Returns the enum value name (a keyword symbol) and the new index into the buffer.
    Watch out, this function turns off most type checking and all array bounds checking."
-  (declare (type list enum-values)
+  (declare (type list value-descriptors)
            (type (simple-array (unsigned-byte 8) (*)) buffer)
            (array-index index))
   (locally (declare #.$optimize-serialization)
     (multiple-value-bind (val idx)
         (decode-int32 buffer index)
-      (let ((val (let ((e (find val enum-values :key #'enum-value-descriptor-value)))
-                   (and e (enum-value-descriptor-name e)))))
-        (values val idx)))))
+      (let ((name (find-enum-name val value-descriptors)))
+        (values (the keyword name) idx)))))
 
-(defun deserialize-packed-enum (enum-values buffer index)
-  "Deserializes the next packed enum values given in 'enum-values'.
-   Deserializes from the byte vector 'buffer' starting at 'index'.
-   Returns the value and and the new index into the buffer.
-   Watch out, this function turns off most type checking and all array bounds checking."
-  (declare (type list enum-values)
+(defun deserialize-packed-enum (value-descriptors buffer index)
+  "Deserializes the next packed enum value given in VALUE-DESCRIPTORS.
+   Deserializes from the byte vector BUFFER starting at INDEX.  Returns the
+   enum value name (a keyword symbol) and the new index into the buffer.  Watch
+   out, this function turns off most type checking and all array bounds
+   checking."
+  (declare (type list value-descriptors)
            (type (simple-array (unsigned-byte 8) (*)) buffer)
            (array-index index))
   (locally (declare #.$optimize-serialization)
@@ -739,17 +773,14 @@
                (type fixnum idx))
       (let ((end (i+ idx len)))
         (declare (type (unsigned-byte 32) end))
-        (with-collectors ((values collect-value))
+        (with-collectors ((names collect-name))
           (loop
             (when (>= idx end)
-              (return-from deserialize-packed-enum (values values idx)))
+              (return-from deserialize-packed-enum (values names idx)))
             (multiple-value-bind (val nidx)
                 (decode-int32 buffer idx)
-              (let ((val (let ((e (find val enum-values
-                                        :key #'enum-value-descriptor-value)))
-                           (and e (enum-value-descriptor-name e)))))
-                (collect-value val)
-                (setq idx nidx)))))))))
+              (collect-name (find-enum-name val value-descriptors))
+              (setq idx nidx))))))))
 
 (defun packed-size (values type &optional vectorp)
   "Returns the size in bytes that the packed object will take when serialized.
@@ -798,20 +829,18 @@
              sum))
         form)))
 
-(defun packed-enum-size (values enum-values)
-  "Returns the size in bytes that the enum values will take when serialized."
-  (declare (type list enum-values))
+(defun packed-enum-size (names value-descriptors)
+  "Returns the size in bytes that the enum values corresponding to
+   NAMES (keyword symbols) will take when serialized. VALUE-DESCRIPTORS are the
+   enum-value-descriptor objects for the enum."
+  (declare (type list value-descriptors))
   (let ((sum 0))
     (declare (type fixnum sum))
     (map nil
-         (lambda (val)
-           ;; TODO(cgay): this (find val enum-values ...) is done in various places and only
-           ;; sometimes does it assert the result is non-nil. Use an inline function.
-           (let ((idx (let ((e (find val enum-values :key #'enum-value-descriptor-name)))
-                        (and e (enum-value-descriptor-value e)))))
-             (assert idx () "There is no enum value for ~S" val)
-             (iincf sum (length32 (ldb (byte 32 0) idx)))))
-         values)
+         (lambda (name)
+           (let ((val (find-enum-value name value-descriptors)))
+             (iincf sum (length32 (ldb (byte 32 0) val)))))
+         names)
     sum))
 
 ;;; Wire-level encoders
@@ -1224,13 +1253,14 @@
    Watch out, this function turns off all type checking and all array bounds checking."
   (declare #.$optimize-serialization)
   (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
-           (array-index index)
+           (type array-index index)
            (type (unsigned-byte 32) tag))
   (case (ilogand tag #x7)
     ((#.$wire-type-varint)
-     (loop for byte fixnum = (prog1 (aref buffer index) (iincf index))
-           until (i< byte 128))
-     index)
+     (let ((idx index))
+       (loop for byte fixnum = (prog1 (aref buffer idx) (iincf idx))
+             until (i< byte 128))
+       idx))
     ((#.$wire-type-string)
      (multiple-value-bind (len idx)
          (decode-uint32 buffer index)

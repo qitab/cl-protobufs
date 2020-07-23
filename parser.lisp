@@ -6,10 +6,11 @@
 
 (in-package "PROTO-IMPL")
 
-(defparameter +PRIMITIVE-TYPES+
+(define-constant +SCALAR-TYPES+
   '("int32" "int64" "uint32" "uint64" "sint32" "sint64" "fixed32" "fixed64"
     "sfixed32" "sfixed64" "string" "bytes" "bool" "float" "double")
-  "These are the primitive types that may appear in protobufs.")
+  :test #'equal
+  :documentation "These are the scalar types that may appear in protobufs.")
 
 ;;; .proto file parsing
 
@@ -382,7 +383,6 @@
                      ;; Try to put symbols into the right package
                      (make-package (string-upcase lisp-package-name) :use ())
                      *protobuf-package*)))
-    (setf (proto-lisp-package file-desc) lisp-package-name)
     (setq *protobuf-package* package)))
 
 (defmethod resolve-lisp-names ((file-desc file-descriptor))
@@ -406,11 +406,9 @@
   (let* ((package  (prog1 (parse-token stream)
                      (expect-char stream terminator () "package")
                      (maybe-skip-comments stream)))
-         (lisp-pkg (or (proto-lisp-package file-desc)
-                       (substitute #\- #\_ package))))
+         (lisp-pkg (substitute #\- #\_ package)))
     (setf (proto-package file-desc) package)
-    (unless (proto-lisp-package file-desc)
-      (set-lisp-package file-desc lisp-pkg))))
+    (set-lisp-package file-desc lisp-pkg)))
 
 (defun parse-proto-import (stream file-desc &optional (terminator #\;))
   "Parse a protobuf import line from STREAM and store it in FILE-DESC.
@@ -419,7 +417,7 @@
   (let ((import (prog1 (parse-string stream)
                   (expect-char stream terminator () "import")
                   (maybe-skip-comments stream))))
-    (process-imports file-desc (list import))
+    (validate-imports file-desc (list import))
     (appendf (proto-imports file-desc) (list import))))
 
 (defun parse-proto-option (stream desc &optional (terminators '(#\;)))
@@ -711,7 +709,7 @@
 (defmethod resolve-lisp-names ((field field-descriptor))
   "Resolves the protobuf type of FIELD to a Lisp type and stores it in the field's proto-class."
   (let* ((type  (proto-type field))
-         (ptype (when (member type +PRIMITIVE-TYPES+ :test #'string=)
+         (ptype (when (member type +SCALAR-TYPES+ :test #'string=)
                   (kintern type)))
          (message (unless ptype
                     (or (find-message type)

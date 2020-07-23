@@ -1,4 +1,3 @@
-
 ;;; Copyright 2012-2020 Google LLC
 ;;;
 ;;; Use of this source code is governed by an MIT-style
@@ -76,8 +75,7 @@
     :depends-on ("object-level-tests")
     :components ((:protobuf-source-file "testproto1")
                  (:protobuf-source-file "testproto2")
-                 (:file "quick-tests")
-                 (:static-file "golden.data")))
+                 (:file "quick-tests")))
 
    (:module "lisp-reference-tests"
     :serial t
@@ -120,6 +118,12 @@
     :pathname ""
     :components ((:protobuf-source-file "enum-mapping")
                  (:file "enum-mapping-test")))
+
+   (:module "map-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "map-proto")
+                 (:file "map-test")))
 
    (:module "import-test"
     :serial t
@@ -198,6 +202,7 @@
   (uiop:symbol-call (find-package 'cl-protobufs.test.custom-proto-test)      '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.deserialize-test)       '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.enum-mapping-test)      '#:run)
+  (uiop:symbol-call (find-package 'cl-protobufs.test.map-test)               '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.import-test)            '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.lazy-structure-test)    '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.lazy-test)              '#:run)
@@ -207,4 +212,3 @@
   (uiop:symbol-call (find-package 'cl-protobufs.test.text-format-test)       '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.zigzag-test)            '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.well-known-types-test)  '#:run))
-
