@@ -21,7 +21,8 @@ Parameters:
   INDENT: Indent the output by INDENT spaces.
   STREAM: The stream to print to.
   NAME: A string. If supplied (and PRINT-NAME is T), this string will be
-    used as the name in printing.
+    used as the name in printing. If not supplied, then the PROTO-NAME slot
+    of OBJECT's message descriptor will be used.
   PRINT-NAME: Bool for printing the name of the top level proto message.
   PRETTY-PRINT: When true, generate line breaks and other human readable output
     in the text format. When false, replace line breaks with spaces."
@@ -82,7 +83,7 @@ Parameters:
 Parameters:
   VALUES: The list or vector of values in the field to print.
   FIELD: The field-descriptor of the field.
-  INDENT: If supplied, print indent the text by INDENT spaces.
+  INDENT: If supplied, indent the text by INDENT spaces.
   STREAM: The stream to output to.
   PRINT-NAME: Whether or not to print the name of the field.
   PRETTY-PRINT: When true, print newlines and indentation."
@@ -127,7 +128,7 @@ Parameters:
 Parameters:
   VALUE: The value in the field to print.
   FIELD: The field-descriptor of the field.
-  INDENT: If supplied, print indent the text by INDENT spaces.
+  INDENT: If supplied, indent the text by INDENT spaces.
   STREAM: The stream to output to.
   PRINT-NAME: Whether or not to print the name of the field.
   PRETTY-PRINT: When true, print newlines and indentation."
@@ -280,7 +281,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
               "The message is not of the expected type ~A" (proto-name msg-desc))))
   (let ((object (make-instance (or (proto-alias-for msg-desc)
                                    (proto-class msg-desc))))
-        (rslots ()))
+        (rslots ())) ; repeated slot names, tracks which slots need to be nreversed.
     (expect-char stream #\{)
     (loop
       (skip-whitespace stream)
