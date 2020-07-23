@@ -40,7 +40,7 @@ Parameters:
 ;; Test that special oneof forms work.
 (deftest oneof-accessor-check (oneof-tests)
   (let ((msg (make-oneof-proto)))
-    (assert-true (eq (oneof-proto.my-oneof-case msg) :unset))
+    (assert-true (eq (oneof-proto.my-oneof-case msg) nil))
     (assert-false (oneof-proto.has-intval msg))
     (assert-true (not (oneof-proto.has-strval msg)))
     (setf (oneof-proto.intval msg) 1)
@@ -54,7 +54,7 @@ Parameters:
     (assert-false (oneof-proto.has-intval msg))
     (assert-true (oneof-proto.has-strval msg))
     (proto:clear msg)
-    (assert-true (eq (oneof-proto.my-oneof-case msg) :unset))
+    (assert-true (eq (oneof-proto.my-oneof-case msg) nil))
     (assert-false (oneof-proto.has-intval msg))
     (assert-false (oneof-proto.has-strval msg)))))
 
