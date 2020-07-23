@@ -508,7 +508,7 @@ Parameters:
                                         ;; Oneof fields don't have a bit in the %%is-set vector, but
                                         ;; if they don't have an offset, then some code treats them
                                         ;; as extension fields.
-                                        :field-offset 0
+                                        :field-offset nil
                                         :internal-field-name internal-name
                                         :external-field-name slot
                                         :oneof-offset oneof-offset
