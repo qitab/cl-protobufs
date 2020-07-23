@@ -1113,7 +1113,7 @@ Arguments:
            (destructuring-bind (&optional progn oneof-desc)
                (macroexpand-1 field env)
              (assert (eq progn 'progn) ()
-                     "The macroexpansion for ~S failed" field)
+                     "The macroexpansion for ~S failed in DEFINE-MESSAGE" field)
              (when oneof-desc
                (push oneof-desc (proto-oneofs msg-desc))
                (collect-oneof oneof-desc))))
