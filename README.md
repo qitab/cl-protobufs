@@ -344,9 +344,9 @@ These have the same functionality as the above 3 functions respectively.
 
 These functions are type checked, and interfacing with the map with these
 functions alone will guarantee that (de)serialization functions as well as the
-`dict.has-map-field` function will work properly. The underlying hash table may
-be accessed directly via `(dictionary.map-field dict)`, but doing so may result
-in undefined behavior.
+`(dictionary.has-map-field dict)` function will work properly. The underlying
+hash table may be accessed directly via `(dictionary.map-field dict)`, but doing
+so may result in undefined behavior.
 
 ### Oneof
 
