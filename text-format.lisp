@@ -90,13 +90,13 @@ Parameters:
   (unless values
     nil) ; If values is NIL, then there is nothing to do.
   (let ((type (proto-class field))
-        (msg))
+        (desc))
     (cond
       ((scalarp type)
        (doseq (v values)
               (print-scalar v type (proto-name field) stream
                             (and pretty-print indent))))
-      ((typep (setq msg (or (find-message type)
+      ((typep (setq desc (or (find-message type)
                             (find-enum type)
                             (find-type-alias type)))
               'message-descriptor)
@@ -108,14 +108,14 @@ Parameters:
                                 :name (proto-name field)
                                 :print-name print-name
                                 :pretty-print pretty-print))))
-      ((typep msg 'enum-descriptor)
+      ((typep desc 'enum-descriptor)
        (doseq (v values)
-              (print-enum v msg field stream
+              (print-enum v desc field stream
                           (and pretty-print indent))))
-      ((typep msg 'protobuf-type-alias)
-       (let ((type (proto-proto-type msg)))
+      ((typep desc 'protobuf-type-alias)
+       (let ((type (proto-proto-type desc)))
          (doseq (v values)
-                (let ((v (funcall (proto-serializer msg) v)))
+                (let ((v (funcall (proto-serializer desc) v)))
                   (print-scalar v type (proto-name field) stream
                                 (and pretty-print indent))))))
       (t
@@ -136,12 +136,12 @@ Parameters:
   (unless value
     nil) ; If value is nil, there is nothing to do.
   (let ((type (proto-class field))
-        (msg))
+        (desc))
     (cond
       ((scalarp type)
        (print-scalar value type (proto-name field) stream
                      (and pretty-print indent)))
-      ((typep (setq msg (or (find-message type)
+      ((typep (setq desc (or (find-message type)
                             (find-enum type)
                             (find-type-alias type)
                             (find-map-descriptor type)))
@@ -152,20 +152,20 @@ Parameters:
                                   :name (proto-name field)
                                   :print-name print-name
                                   :pretty-print pretty-print)))
-      ((typep msg 'enum-descriptor)
+      ((typep desc 'enum-descriptor)
        (when (not (eql value (proto-default field)))
-         (print-enum value msg field stream
+         (print-enum value desc field stream
                      (and pretty-print indent))))
-      ((typep msg 'protobuf-type-alias)
+      ((typep desc 'protobuf-type-alias)
        (when value
-         (let ((value (funcall (proto-serializer msg) value))
-               (type  (proto-proto-type msg)))
+         (let ((value (funcall (proto-serializer desc) value))
+               (type  (proto-proto-type desc)))
            (print-scalar value type (proto-name field) stream
                          (and pretty-print indent)))))
       ;; todo(benkuehnert): use specified map format
-      ((typep msg 'map-descriptor)
-       (let ((key-class (map-descriptor-key-class msg))
-             (val-class (map-descriptor-val-class msg)))
+      ((typep desc 'map-descriptor)
+       (let ((key-class (map-descriptor-key-class desc))
+             (val-class (map-descriptor-val-class desc)))
          (if pretty-print
              (format stream "~&~VT~A: {~%" (+ 2 indent)
                      (proto-name field))
@@ -321,7 +321,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
   "Parse data of type TYPE from STREAM. This function returns
 the object parsed. If the parsing fails, the function will
 return T as a second value."
-  (let ((msg (or (find-message type)
+  (let ((desc (or (find-message type)
                  (find-enum type)
                  (find-type-alias type))))
     (cond ((scalarp type)
@@ -332,20 +332,20 @@ return T as a second value."
              ((:string) (parse-string stream))
              ((:bool)   (boolean-true-p (parse-token stream)))
              (otherwise (parse-signed-int stream))))
-          ((typep msg 'message-descriptor)
+          ((typep desc 'message-descriptor)
            (when (eql (peek-char nil stream nil) #\:)
              (read-char stream))
            (parse-text-format (find-message type)
                               :stream stream
                               :parse-name nil))
-          ((typep msg 'enum-descriptor)
+          ((typep desc 'enum-descriptor)
            (expect-char stream #\:)
            (let* ((name (parse-token stream))
-                  (enum (find (keywordify name) (enum-descriptor-values msg)
+                  (enum (find (keywordify name) (enum-descriptor-values desc)
                               :key #'enum-value-descriptor-name)))
              (and enum (enum-value-descriptor-name enum))))
-          ((typep msg 'protobuf-type-alias)
-           (let ((type (proto-proto-type msg)))
+          ((typep desc 'protobuf-type-alias)
+           (let ((type (proto-proto-type desc)))
              (expect-char stream #\:)
              (case type
                ((:float) (parse-float stream))
