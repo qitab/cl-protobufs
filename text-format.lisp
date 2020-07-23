@@ -77,7 +77,7 @@ Parameters:
                               (format stream "~&~V,0T~A { " (+ indent 2) name)
                               (format stream "~A { " name))
                           (print-scalar k key-type "key" stream nil)
-                          (format stream ", ")
+                          (format stream " ")
                           (print-scalar v val-type "value" stream nil)
                           (format stream " }")
                           (when pretty-print
@@ -361,7 +361,7 @@ return T as a second value."
                         (expect-char stream #\{)
                         (assert (string= "key" (parse-token stream)))
                         (setf key (parse-field key-type :stream stream))
-                        (expect-char stream #\,)
+                        (skip-whitespace stream)
                         (assert (string= "value" (parse-token stream)))
                         (setf val (parse-field val-type :stream stream))
                         (expect-char stream #\})
