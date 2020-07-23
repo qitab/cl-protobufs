@@ -367,9 +367,16 @@ Parameters:
           :initarg :alias-for
           :initform nil)
    ;; All fields for this message, including local ones and extended ones.
+   ;; This does NOT include fields that are inside of a oneof. These field descriptors can
+   ;; be accessed via the FIELDS slot in each oneof-descriptor stored in the ONEOFS slot.
    (fields :type (list-of field-descriptor)
            :accessor proto-fields
            :initarg :fields
+           :initform ())
+   ;; A list of all oneof descriptors defined in this message.
+   (oneofs :type (list-of oneof-descriptor)
+           :accessor proto-oneofs
+           :initarg :oneofs
            :initform ())
    ;; The FIELDS slot (more or less) as a vector. If the index space is dense,
    ;; the vector is accessed by field index, otherwise it requires linear scan.
@@ -438,24 +445,6 @@ on the symbol if we are not in SBCL."
                    (eq (proto-message-type msg-desc) :extends))))
     (format stream "~S" (and (slot-boundp msg-desc 'class) (proto-class msg-desc)))))
 
-(defgeneric find-field (message name &optional relative-to)
-  (:documentation
-   "Given a Protobufs message and a slot name, field name or index,
-    returns the Protobufs field having that name."))
-
-(defmethod find-field ((msg-desc message-descriptor) (name symbol) &optional relative-to)
-  (declare (ignore relative-to))
-  (find name (proto-fields msg-desc) :key #'proto-internal-field-name))
-
-(defmethod find-field ((msg-desc message-descriptor) (name string) &optional relative-to)
-  (find-qualified-name name (proto-fields msg-desc)
-                       :relative-to (or relative-to msg-desc)))
-
-(defmethod find-field ((msg-desc message-descriptor) (index integer) &optional relative-to)
-  (declare (ignore relative-to))
-  (find index (proto-fields msg-desc) :key #'proto-index))
-
-
 ;; Extensions protocol
 (defgeneric get-extension (object slot)
   (:documentation
@@ -504,6 +493,13 @@ on the symbol if we are not in SBCL."
    (field-offset :type (or null (unsigned-byte 29))
                  :accessor proto-field-offset
                  :initarg :field-offset)
+   ;; If this field is contained in a oneof, this holds the order of this field
+   ;; as it was defined in the oneof. This slot is nil if and only if the field
+   ;; is not part of a oneof.
+   (oneof-offset :type (or null (unsigned-byte 29))
+                 :accessor proto-oneof-offset
+                 :initarg :oneof-offset
+                 :initform nil)
    ;; The name of the slot holding the field value.
    ;; TODO(cgay): there's no deep reason we must have internal and external field names. It's a
    ;; historical artifact that can probably be removed once the QPX protobuf code has been updated.
@@ -597,7 +593,6 @@ on the symbol if we are not in SBCL."
     (let ((default (proto-default field)))
       (or (eq default $empty-vector)
           (and (vectorp default) (not (stringp default)))))))
-
 
 (defclass extension-descriptor (abstract-descriptor)
   ;; The start of the extension range.
@@ -729,6 +724,59 @@ on the symbol if we are not in SBCL."
               (and (slot-boundp m 'otype) (proto-output-type m))))
     (format stream "~S" (proto-class m))))
 
+(defstruct oneof
+  "Object which stores all necessary data for a oneof slot."
+  ;; This slot stores the data which is set in the oneof.
+  ;; Typing this slot as an OR of the oneof's field types doesn't seem
+  ;; to get us any additional space savings. Furthermore, trying to add
+  ;; a type would require making a new oneof defstruct for each oneof
+  ;; defined, which greatly adds to the code's complexity.
+  (value nil)
+  ;; This slot indicates which field is set in the oneof
+  ;; It is either nil or a number. If it is nil, then nothing is set.
+  ;; if it is a number, say N, then the N-th field in the oneof is set.
+  (set-field nil :type (or null (unsigned-byte 32))))
+
+(defstruct oneof-descriptor
+  "The meta-object for a protobuf oneof"
+  ;; A vector which stores the oneof's field descriptor.
+  (fields nil :type array)
+  ;; The external name, but with '%' prepended.
+  (internal-name nil :type symbol)
+  ;; A symbol whose name is the name of the oneof.
+  (external-name nil :type symbol))
+
+(defmethod make-load-form ((o oneof-descriptor) &optional environment)
+  (make-load-form-saving-slots o :environment environment))
+
+(defgeneric find-field (message name &optional relative-to)
+  (:documentation
+   "Given a Protobufs message and a slot name, field name or index,
+    returns the Protobufs field having that name."))
+
+(defmethod find-field ((msg-desc message-descriptor) (name symbol) &optional relative-to)
+  (declare (ignore relative-to))
+  (or
+   (find name (proto-fields msg-desc) :key #'proto-internal-field-name)
+   (loop for oneof in (proto-oneofs msg-desc)
+           thereis (find name (oneof-descriptor-fields oneof)
+                         :key #'proto-internal-field-name))))
+
+(defmethod find-field ((msg-desc message-descriptor) (name string) &optional relative-to)
+  (or
+   (find-qualified-name name (proto-fields msg-desc)
+                        :relative-to (or relative-to msg-desc))
+   (loop for oneof in (proto-oneofs msg-desc)
+           thereis (find-qualified-name name (oneof-descriptor-fields oneof)
+                                        :relative-to (or relative-to msg-desc)))))
+
+(defmethod find-field ((msg-desc message-descriptor) (index integer) &optional relative-to)
+  (declare (ignore relative-to))
+  (or
+   (find index (proto-fields msg-desc) :key #'proto-index)
+   (loop for oneof in (proto-oneofs msg-desc)
+           thereis (find index (oneof-descriptor-fields oneof)
+                         :key #'proto-index))))
 
 ;;; Lisp-only extensions
 

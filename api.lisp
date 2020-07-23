@@ -78,10 +78,39 @@ only if the same fields have been explicitly set."
                             (slot-value message-2 '%%bool-values))))
       (return-from proto-equal nil))
 
+    (loop for oneof in (proto-oneofs message)
+          for slot-value-1
+            = (slot-value message-1 (oneof-descriptor-internal-name oneof))
+          for slot-value-2
+            = (slot-value message-2 (oneof-descriptor-internal-name oneof))
+          for set-field-1
+            = (oneof-set-field slot-value-1)
+          for set-field-2
+            = (oneof-set-field slot-value-2)
+          for lisp-type
+            = (when set-field-1 (proto-class
+                                 (aref (oneof-descriptor-fields oneof)
+                                      set-field-1)))
+          unless (and set-field-1 set-field-2)
+            do (when (or set-field-1 set-field-2)
+                 (return-from proto-equal nil))
+          unless (equal (oneof-set-field slot-value-1)
+                        (oneof-set-field slot-value-2))
+            do (return-from proto-equal nil)
+          when (or (scalarp lisp-type) (find-enum lisp-type))
+            do (unless (scalar-field-equal (oneof-value slot-value-1)
+                                           (oneof-value slot-value-2))
+                 (return-from proto-equal nil))
+          when (find-message lisp-type)
+            do (unless (proto-equal (oneof-value slot-value-1)
+                                    (oneof-value slot-value-2)
+                                    :exact exact)
+                 (return-from proto-equal nil)))
+
     (loop for field in (proto-fields message)
           for lisp-type = (proto-class field)
           for slot-value-1
-            = (when (not (eq lisp-type :bool))
+            = (unless (eq lisp-type :bool)
                 (slot-value message-1 (proto-internal-field-name field)))
           for slot-value-2
             = (when slot-value-1
@@ -91,7 +120,7 @@ only if the same fields have been explicitly set."
                     (or (scalarp lisp-type) (find-enum lisp-type)))
             do (unless (scalar-field-equal slot-value-1 slot-value-2)
                  (return-from proto-equal nil))
-          when (not (and slot-value-1 slot-value-2))
+          unless (and slot-value-1 slot-value-2)
             do (when (or slot-value-1 slot-value-2)
                  (return-from proto-equal nil))
           when (and slot-value-1 (find-message lisp-type))
