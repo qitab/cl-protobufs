@@ -614,6 +614,8 @@ Arguments:
   FIELD: The class object field definition of the field."
   (let* ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :map-get))
          (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
+         (method-accessor-name (fintern "~A-gethash" public-slot-name))
+         (method-remove-name (fintern "~A-remhash" public-slot-name))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
          (key-type (map-descriptor-key-type (find-map-descriptor (proto-class field))))
          (val-type (map-descriptor-val-type (find-map-descriptor (proto-class field))))
@@ -628,6 +630,7 @@ Arguments:
                    (type ,val-type ,new-val))
           (setf (bit (,is-set-accessor ,obj) ,index) 1)
           (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
+
         ;; If the map's value type is a message, then the default value returned
         ;; should be nil. However, we do not want to allow the user to insert nil
         ;; into the map, so this binding only applies to the clear and get functions.
@@ -651,8 +654,22 @@ Arguments:
                 (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
                     (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
 
+        ;; These defmethods have the same functionality as the functions defined above
+        ;; but they don't require a refernece to the message type, so using them is more
+        ;; convenient.
+        (defmethod (setf ,method-accessor-name) (,new-val ,new-key (,obj ,proto-type))
+          (setf (,public-accessor-name ,new-key ,obj) ,new-val))
+
+        (defmethod ,method-accessor-name (,new-key (,obj ,proto-type))
+          (,public-accessor-name ,new-key ,obj))
+
+        (defmethod ,method-remove-name (,new-key (,obj ,proto-type))
+          (,public-remove-name ,new-key ,obj))
+
         (export '(,public-accessor-name
-                  ,public-remove-name))))))
+                  ,public-remove-name
+                  ,method-accessor-name
+                  ,method-remove-name))))))
 
 (defun make-structure-class-forms-lazy (proto-type field public-slot-name)
   "Makes forms for the lazy fields of a proto message using STRUCTURE-CLASS.

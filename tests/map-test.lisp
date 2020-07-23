@@ -28,7 +28,7 @@ Parameters:
 ; - Test maps with aliased types as the value.
 ; - Test map type text format
 
-; Tests that accessor functions are working: setf, gethash, remhash, has.
+;; Tests that accessor functions are working: setf, gethash, remhash, has.
 (deftest accessor-check (map-tests)
   (let ((m (make-map-proto)))
     (assert-true (not (map-proto.has-map-field m)))
@@ -46,7 +46,20 @@ Parameters:
     ;; then the is-set vector is properly updated.
     (assert-false (has-field m 'map-field))))
 
-; Verify that the map returns the correct default value when unset.
+;; The same as accessor-check above, except this uses the defmethods.
+(deftest method-check (map-tests)
+  (let ((m (make-map-proto)))
+    (assert-true (not (has-field m 'map-field)))
+    (setf (map-field-gethash 1 m) "string")
+    (assert-true (string-equal (map-field-gethash 1 m) "string"))
+    (proto:clear m)
+    (assert-true (string-equal (map-field-gethash 1 m) ""))
+    (setf (map-field-gethash 1 m) "string")
+    (map-field-remhash 1 m)
+    (assert-true (string-equal (map-field-gethash 1 m) ""))
+    (assert-false (has-field m 'map-field))))
+
+;; Verify that the map returns the correct default value when unset.
 (deftest default-check (map-tests)
   (let ((test (make-map-all)))
     (assert-equal (map-all.intmap-gethash 0 test) 0)
@@ -55,7 +68,7 @@ Parameters:
     (assert-equal (map-all.enummap-gethash 0 test) :one)))
 
 
-; Verify that generic (de)serialization works.
+;; Verify that generic (de)serialization works.
 (deftest serialization-test (map-tests)
   (let* ((test1 (make-map-proto :strval "test" :intval 1))
          (submsg1 (make-map-message.val-message :strval "one"))
@@ -82,7 +95,7 @@ Parameters:
       (assert-true (proto:proto-equal test3 t3res))
       (assert-true (proto:proto-equal test4 t4res)))))
 
-; Verify that optimized (de)serialization works.
+;; Verify that optimized (de)serialization works.
 (deftest optimized-serialization-test (map-tests)
   (proto-impl:make-serializer map-proto)
   (proto-impl:make-serializer map-message.val-message)
