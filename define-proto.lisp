@@ -677,7 +677,7 @@ Paramters:
 
         (declaim (inline ,has-function-name))
         (defun ,has-function-name (,obj)
-          (not (= (oneof-set-field (,hidden-accessor-name ,obj)) -1)))
+          (not (= (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
 
         (declaim (inline ,clear-function-name))
         (defun ,clear-function-name (,obj)
