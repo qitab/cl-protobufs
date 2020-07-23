@@ -657,7 +657,6 @@ Paramters:
   ONEOF: The oneof-descriptor of the oneof to make accessors for."
   (let* ((public-slot-name (oneof-descriptor-external-name oneof))
          (hidden-slot-name (oneof-descriptor-internal-name oneof))
-         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (hidden-accessor-name (fintern "~A-~A" proto-type hidden-slot-name))
          (case-function-name (proto-slot-function-name proto-type public-slot-name :case))
          (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
