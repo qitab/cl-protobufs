@@ -153,7 +153,7 @@ Parameters:
                                   :print-name print-name
                                   :pretty-print pretty-print)))
       ((typep msg 'enum-descriptor)
-       (when (and value (not (eql value (proto-default field))))
+       (when (not (eql value (proto-default field)))
          (print-enum value msg field stream
                      (and pretty-print indent))))
       ((typep msg 'protobuf-type-alias)
