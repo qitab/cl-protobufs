@@ -666,17 +666,15 @@ Paramters:
       `(
         ;; Since the oneof struct stores an integer to indicate which field is set, it is not
         ;; particularly useful for the user when writing code surrounding oneof types. This
-        ;; creates a function which returns a keyword with the same name as the field which
-        ;; is currently set.
+        ;; creates a function which returns a symbol with the same name as the field which
+        ;; is currently set. If the field is not set, this function returns :unset.
         (declaim (inline ,case-function-name))
         (defun ,case-function-name (,obj)
           (ecase (oneof-set-field (,hidden-accessor-name ,obj))
             ,@(loop for field across (oneof-descriptor-fields oneof)
                     collect
-                    (let ((offset (proto-oneof-offset field))
-                          (keyword (keywordify (proto-external-field-name field))))
-                      `((,offset) ,keyword)))
-            ((nil) :%unset)))
+                    `(,(proto-oneof-offset field) ',(proto-external-field-name field)))
+            ((nil) :unset)))
 
         (declaim (inline ,has-function-name))
         (defun ,has-function-name (,obj)
