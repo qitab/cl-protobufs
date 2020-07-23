@@ -97,8 +97,8 @@ Parameters:
               (print-scalar v type (proto-name field) stream
                             (and pretty-print indent))))
       ((typep (setq desc (or (find-message type)
-                            (find-enum type)
-                            (find-type-alias type)))
+                             (find-enum type)
+                             (find-type-alias type)))
               'message-descriptor)
        (dolist (v values)
          (print-text-format v :indent (+ indent 2)
@@ -140,9 +140,9 @@ Parameters:
        (print-scalar value type (proto-name field) stream
                      (and pretty-print indent)))
       ((typep (setq desc (or (find-message type)
-                            (find-enum type)
-                            (find-type-alias type)
-                            (find-map-descriptor type)))
+                             (find-enum type)
+                             (find-type-alias type)
+                             (find-map-descriptor type)))
               'message-descriptor)
        (print-text-format value :indent (+ indent 2)
                                 :stream stream
