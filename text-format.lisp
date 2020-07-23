@@ -100,14 +100,12 @@ Parameters:
                             (find-enum type)
                             (find-type-alias type)))
               'message-descriptor)
-       (let ((indent (+ indent 2)))
-         (dolist (v values)
-
-           (print-text-format v :indent indent
-                                :stream stream
-                                :name (proto-name field)
-                                :print-name print-name
-                                :pretty-print pretty-print))))
+       (dolist (v values)
+         (print-text-format v :indent (+ indent 2)
+                              :stream stream
+                              :name (proto-name field)
+                              :print-name print-name
+                              :pretty-print pretty-print)))
       ((typep desc 'enum-descriptor)
        (doseq (v values)
               (print-enum v desc field stream
@@ -146,12 +144,11 @@ Parameters:
                             (find-type-alias type)
                             (find-map-descriptor type)))
               'message-descriptor)
-       (let ((indent (+ indent 2)))
-         (print-text-format value :indent indent
-                                  :stream stream
-                                  :name (proto-name field)
-                                  :print-name print-name
-                                  :pretty-print pretty-print)))
+       (print-text-format value :indent (+ indent 2)
+                                :stream stream
+                                :name (proto-name field)
+                                :print-name print-name
+                                :pretty-print pretty-print))
       ((typep desc 'enum-descriptor)
        (when (not (eql value (proto-default field)))
          (print-enum value desc field stream
