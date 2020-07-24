@@ -87,7 +87,7 @@ Parameters:
   PRINT-NAME: Whether or not to print the name of the field.
   PRETTY-PRINT: When true, print newlines and indentation."
   (unless values
-    nil) ; If values is NIL, then there is nothing to do.
+    (return-from print-repeated-field nil) ; If values is NIL, then there is nothing to do.
   (let ((type (proto-class field))
         (desc))
     (cond
@@ -131,7 +131,7 @@ Parameters:
   PRINT-NAME: Whether or not to print the name of the field.
   PRETTY-PRINT: When true, print newlines and indentation."
   (unless value
-    nil) ; If value is nil, there is nothing to do.
+    (return-from print-non-repeated-field nil) ; If value is nil, there is nothing to do.
   (let ((type (proto-class field))
         (desc))
     (cond
