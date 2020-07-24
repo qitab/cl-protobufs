@@ -227,13 +227,13 @@ Parameters:
       (format stream "~%")
       (format stream " "))))
 
-(defun print-enum (val enum field stream indent)
+(defun print-enum (val enum name stream indent)
   "Print enum to stream
 
 Parameters:
   VAL: The enum value.
   ENUM: The enum descriptor.
-  FIELD: The field which contains this value.
+  NAME: The name to print before the value. If NIL, no name will be printed.
   STREAM: The stream to print to.
   INDENT: Either a number or nil.
           - If indent is a number, indent this print
@@ -243,8 +243,9 @@ Parameters:
             do not write a newline."
   (when val
     (if indent
-      (format stream "~&~V,0T~A: " (+ indent 2) (proto-name field))
-      (format stream "~A: " (proto-name field)))
+      (format stream "~&~V,0T" (+ indent 2)))
+    (if name
+        (format stream "~A: " name))
     (let* ((e (find (keywordify val)
                     (enum-descriptor-values enum)
                     :key #'enum-value-descriptor-name))
@@ -254,7 +255,6 @@ Parameters:
       (if indent
         (format stream "~%")
         (format stream " ")))))
-
 
 ;;; Parse objects that were serialized using the text format
 
