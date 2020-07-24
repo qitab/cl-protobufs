@@ -70,6 +70,17 @@ Parameters:
                  :stream stream
                  :print-name print-name
                  :pretty-print pretty-print)))))
+      (dolist (oneof (proto-oneofs message))
+        (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
+               (set-field (oneof-set-field oneof-data)))
+          (when set-field
+            (print-non-repeated-field
+             (oneof-value oneof-data)
+             (aref (oneof-descriptor-fields oneof) set-field)
+             :indent indent
+             :stream stream
+             :print-name print-name
+             :pretty-print pretty-print))))
       (if pretty-print
           (format stream "~&~V,0T}~%" indent)
           (format stream "} "))
