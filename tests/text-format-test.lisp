@@ -48,6 +48,8 @@ Parameters:
   two_level_nesting {
     int_field: 2
   }
+  map_field { key: 1 value: \"one\" }
+  map_field { key: 2 value: \"two\" }
 }
 ")
 
@@ -64,7 +66,9 @@ Parameters:
     (assert-true (equal '("First" "Second")  (cl-protobufs.test-proto:string-fields msg-parse)))
     (assert-true (equal '(:NONE :TWENTY-ONE) (cl-protobufs.test-proto:enum-vals msg-parse)))
     (assert-true (equal 2 (cl-protobufs.test-proto:int-field
-                           (cl-protobufs.test-proto:two-level-nesting msg-parse))))))
+                           (cl-protobufs.test-proto:two-level-nesting msg-parse))))
+    (assert-true (string= (text-format-test.map-field-gethash 1 msg-parse) "one"))
+    (assert-true (string= (text-format-test.map-field-gethash 2 msg-parse) "two"))))
 
 ; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-text-format (text-format-tests)
@@ -79,6 +83,8 @@ Parameters:
                                      :enum-vals (list :none :twenty-one)
                                      :one-level-nesting nested))
          (out-stream (make-string-output-stream)))
+    (setf (text-format-test.map-field-gethash 1 msg) "one")
+    (setf (text-format-test.map-field-gethash 2 msg) "two")
     (print-text-format msg :stream out-stream)
     (let* ((text (get-output-stream-string out-stream))
            (msg-parse (proto:parse-text-format 'cl-protobufs.test-proto:text-format-test
