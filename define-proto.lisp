@@ -492,37 +492,40 @@ Parameters:
          (field-list (make-array (length fields))))
     (loop for field in fields
           for oneof-offset from 0
-          do (destructuring-bind (slot &key type typename name (default nil default-p)
-                                         lazy index documentation &allow-other-keys)
-                 field
-               (assert index)
-               (let ((default (if default-p default $empty-default)))
-                 (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
-                     (clos-type-to-protobuf-type type)
-                   (declare (ignore packed-p enum-values))
-                   (setf (aref field-list oneof-offset)
-                         (make-instance 'field-descriptor
-                                        :name (or name (slot-name->proto slot))
-                                        :type (or typename ptype)
-                                        :lisp-type (when root-lisp-type (qualified-symbol-name
-                                                                         root-lisp-type))
-                                        :set-type type
-                                        :class pclass
-                                        :qualified-name (make-qualified-name
-                                                         *protobuf* (or name
-                                                                        (slot-name->proto slot)))
-                                        :label :optional
-                                        :index index
-                                        ;; Oneof fields don't have a bit in the %%is-set vector, but
-                                        ;; if they don't have an offset, then some code treats them
-                                        ;; as extension fields.
-                                        :field-offset nil
-                                        :internal-field-name internal-name
-                                        :external-field-name slot
-                                        :oneof-offset oneof-offset
-                                        :default default
-                                        :lazy (and lazy t)
-                                        :documentation documentation))))))
+          do
+       (destructuring-bind
+           (slot &key type typename name (default nil default-p)
+                 lazy index documentation &allow-other-keys)
+           field
+         (assert index)
+         (let ((default (if default-p default $empty-default)))
+           (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
+               (clos-type-to-protobuf-type type)
+             (declare (ignore packed-p enum-values))
+             (setf (aref field-list oneof-offset)
+                   (make-instance
+                    'field-descriptor
+                    :name (or name (slot-name->proto slot))
+                    :type (or typename ptype)
+                    :lisp-type (when root-lisp-type (qualified-symbol-name
+                                                     root-lisp-type))
+                    :set-type type
+                    :class pclass
+                    :qualified-name (make-qualified-name
+                                     *protobuf* (or name
+                                                    (slot-name->proto slot)))
+                    :label :optional
+                    :index index
+                    ;; Oneof fields don't have a bit in the %%is-set vector, but
+                    ;; if they don't have an offset, then some code treats them
+                    ;; as extension fields.
+                    :field-offset nil
+                    :internal-field-name internal-name
+                    :external-field-name slot
+                    :oneof-offset oneof-offset
+                    :default default
+                    :lazy (and lazy t)
+                    :documentation documentation))))))
     `(progn
        ,(make-oneof-descriptor
          :internal-name internal-name
