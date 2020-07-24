@@ -86,10 +86,10 @@ Parameters:
   STREAM: The stream to output to.
   PRINT-NAME: Whether or not to print the name of the field.
   PRETTY-PRINT: When true, print newlines and indentation."
+  (unless values
+    (return-from print-repeated-field nil)) ; If values is NIL, then there is nothing to do.
   (let ((type (proto-class field))
         (desc))
-    (unless values
-      (return-from print-repeated-field nil)) ; If values is NIL, then there is nothing to do.
     (cond
       ((scalarp type)
        (doseq (v values)
