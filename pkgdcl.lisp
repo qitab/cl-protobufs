@@ -49,6 +49,7 @@
    #:undefined-input-type
    #:undefined-output-type
    #:undefined-stream-type
+   #:undefined-type
    #:unknown-enum-error
    #:error-type-name
    #:error-field
@@ -68,6 +69,7 @@
    #:define-schema
    #:define-enum
    #:define-map
+   #:define-oneof
    #:define-message
    #:define-extend
    #:define-extension

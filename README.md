@@ -307,6 +307,49 @@ these definitions:
 
 ```
 
+### Maps
+
+This section uses the following protocol buffer message as an example:
+
+```protocol-buffer
+message Dictionary {
+  map<int32,string> map_field = 1;
+}
+```
+This creates an associative map with keys of type `int32` and values of
+type `string`. In general, the key type can be any scalar type except
+`float` and `double`. The value type can be any protobuf type. For a message
+`dict` of type `Dictionary`, the following functions are created to
+access the map:
+
+```lisp
+(dictionary.map-field-gethash 2 dict)
+```
+This returns the value associated with `2` in the `map-field` field in `dict`.
+If there is no value explicitly set, this function returns the default value
+of the value type. In this case, the empty string.
+
+```lisp
+(setf (dictionary.map-field-gethash 1 dict) "one")
+```
+This associates `1` with the value `"one"` in the `map-field` field in `dict`.
+
+```lisp
+(dictionary.map-field-remhash 1 dict)
+```
+This removes any entry with key `1` in the `map-field` field in `dict`.
+
+Like the other fields, these functions are aliased by methods which are slower
+but more concise. Examples of the methods are: `(map-field-gethash 2 dict)`,
+`(setf (map-field-gethash 1 dict) "one")`, and `(map-field-remhash 1 dict)`.
+These have the same functionality as the above 3 functions respectively.
+
+These functions are type checked, and interfacing with the map with these
+functions alone will guarantee that (de)serialization functions as well as the
+`(dictionary.has-map-field dict)` function will work properly. The underlying
+hash table may be accessed directly via `(dictionary.map-field dict)`, but doing
+so may result in undefined behavior.
+
 ### Oneof
 
 TODO

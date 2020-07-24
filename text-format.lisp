@@ -51,51 +51,52 @@ Parameters:
                   (has-extension object (proto-internal-field-name field)))
           (let ((slot   (slot-value field 'internal-field-name))
                 (reader (slot-value field 'reader)))
-            (cond
-              ((eq (proto-label field) :repeated)
-               (print-repeated-field
-                (if slot
-                    (read-slot object slot
-                               (and (not (proto-lazy-p field))
-                                    reader))
-                    (list object))
-                field
-                :indent indent
-                :stream stream
-                :print-name print-name
-                :pretty-print pretty-print))
-              (t
-               (print-non-repeated-field
-                (if slot (read-slot object slot reader) object)
-                field
-                :indent indent
-                :stream stream
-                :print-name print-name
-                :pretty-print pretty-print))))))
+            (if (eq (proto-label field) :repeated)
+                (print-repeated-field
+                 (if slot
+                     (read-slot object slot
+                                (and (not (proto-lazy-p field))
+                                     reader))
+                     (list object))
+                 (proto-class field)
+                 (proto-name field)
+                 :indent indent
+                 :stream stream
+                 :print-name print-name
+                 :pretty-print pretty-print)
+                (print-non-repeated-field
+                 (if slot (read-slot object slot reader) object)
+                 (proto-class field)
+                 (proto-name field)
+                 :indent indent
+                 :stream stream
+                 :print-name print-name
+                 :pretty-print pretty-print)))))
       (if pretty-print
           (format stream "~&~V,0T}~%" indent)
           (format stream "} "))
       nil)))
 
 (defun print-repeated-field
-    (values field &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
+    (values type name &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
   "Print the text format of a single field which is not repeated.
 
 Parameters:
   VALUES: The list or vector of values in the field to print.
-  FIELD: The field-descriptor of the field.
+  TYPE: The protobuf type to print. This is obtained from
+    the PROTO-CLASS slot in the field-descriptor.
+  NAME: The name of the field. This is printed before the value.
   INDENT: If supplied, indent the text by INDENT spaces.
   STREAM: The stream to output to.
   PRINT-NAME: Whether or not to print the name of the field.
   PRETTY-PRINT: When true, print newlines and indentation."
   (unless values
     (return-from print-repeated-field nil)) ; If values is NIL, then there is nothing to do.
-  (let ((type (proto-class field))
-        (desc))
+  (let ((desc))
     (cond
       ((scalarp type)
        (doseq (v values)
-              (print-scalar v type (proto-name field) stream
+              (print-scalar v type name stream
                             (and pretty-print indent))))
       ((typep (setq desc (or (find-message type)
                              (find-enum type)
@@ -104,42 +105,43 @@ Parameters:
        (dolist (v values)
          (print-text-format v :indent (+ indent 2)
                               :stream stream
-                              :name (proto-name field)
+                              :name name
                               :print-name print-name
                               :pretty-print pretty-print)))
       ((typep desc 'enum-descriptor)
        (doseq (v values)
-              (print-enum v desc field stream
+              (print-enum v desc name stream
                           (and pretty-print indent))))
       ((typep desc 'protobuf-type-alias)
        (let ((type (proto-proto-type desc)))
          (doseq (v values)
                 (let ((v (funcall (proto-serializer desc) v)))
-                  (print-scalar v type (proto-name field) stream
+                  (print-scalar v type name stream
                                 (and pretty-print indent))))))
       (t
-       (undefined-field-type "While printing ~S to text format,"
-                             values type field)))))
+       (undefined-type "While printing ~S to text format,"
+                             values type)))))
 
 (defun print-non-repeated-field
-    (value field &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
+    (value type name &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
   "Print the text format of a single field which is not repeated.
 
 Parameters:
   VALUE: The value in the field to print.
-  FIELD: The field-descriptor of the field.
+  TYPE: The protobuf type to print. This is obtained from
+    the PROTO-CLASS slot in the field-descriptor.
+  NAME: The name of the field. This is printed before the value.
   INDENT: If supplied, indent the text by INDENT spaces.
   STREAM: The stream to output to.
   PRINT-NAME: Whether or not to print the name of the field.
   PRETTY-PRINT: When true, print newlines and indentation."
-  (let ((type (proto-class field))
-        (desc))
+  (let ((desc))
     ;; If VALUE is NIL and the type is not boolean, there is nothing to do.
     (unless (or value (eq type :bool))
       (return-from print-non-repeated-field nil))
     (cond
       ((scalarp type)
-       (print-scalar value type (proto-name field) stream
+       (print-scalar value type name stream
                      (and pretty-print indent)))
       ((typep (setq desc (or (find-message type)
                              (find-enum type)
@@ -148,18 +150,17 @@ Parameters:
               'message-descriptor)
        (print-text-format value :indent (+ indent 2)
                                 :stream stream
-                                :name (proto-name field)
+                                :name name
                                 :print-name print-name
                                 :pretty-print pretty-print))
       ((typep desc 'enum-descriptor)
-       (when (not (eql value (proto-default field)))
-         (print-enum value desc field stream
-                     (and pretty-print indent))))
+       (print-enum value desc name stream
+                   (and pretty-print indent)))
       ((typep desc 'protobuf-type-alias)
        (when value
          (let ((value (funcall (proto-serializer desc) value))
                (type  (proto-proto-type desc)))
-           (print-scalar value type (proto-name field) stream
+           (print-scalar value type name stream
                          (and pretty-print indent)))))
       ((typep desc 'map-descriptor)
        (let ((key-type (map-descriptor-key-class desc))
@@ -170,13 +171,13 @@ Parameters:
                       (format stream "~A { " (proto-name field)))
                   (print-scalar k key-type "key" stream nil)
                   (format stream " ")
-                  (print-scalar v val-type "value" stream nil)
+                  (print-non-repeated-field v val-type "value" stream :pretty-print nil)
                   (format stream " }")
                   (when pretty-print
                     (format stream "~%")))))
       (t
-       (undefined-field-type "While printing ~S to text format,"
-                             value type field)))))
+       (undefined-field "While printing ~S to text format,"
+                             value type)))))
 
 (defun print-scalar (val type name stream indent)
   "Print scalar value to stream
@@ -221,13 +222,13 @@ Parameters:
     (if indent
       (format stream "~%"))))
 
-(defun print-enum (val enum field stream indent)
+(defun print-enum (val enum name stream indent)
   "Print enum to stream
 
 Parameters:
   VAL: The enum value.
   ENUM: The enum descriptor.
-  FIELD: The field which contains this value.
+  NAME: The name to print before the value. If NIL, no name will be printed.
   STREAM: The stream to print to.
   INDENT: Either a number or nil.
           - If indent is a number, indent this print
@@ -237,8 +238,9 @@ Parameters:
             do not write a newline."
   (when val
     (if indent
-      (format stream "~&~V,0T~A: " (+ indent 2) (proto-name field))
-      (format stream "~A: " (proto-name field)))
+      (format stream "~&~V,0T" (+ indent 2)))
+    (if name
+        (format stream "~A: " name))
     (let* ((e (find (keywordify val)
                     (enum-descriptor-values enum)
                     :key #'enum-value-descriptor-name))
@@ -248,7 +250,6 @@ Parameters:
       (if indent
         (format stream "~%")
         (format stream " ")))))
-
 
 ;;; Parse objects that were serialized using the text format
 

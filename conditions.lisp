@@ -44,6 +44,14 @@
     :type-name (prin1-to-string type)
     :field field))
 
+;; This is used when the field-descriptor is not accessible.
+(defun undefined-type (format-control object type)
+  (error 'undefined-type
+         :format-control format-control
+         :format-arguments (list object)
+         :type-name (prin1-to-string type)
+         :type-name type))
+
 (define-condition undefined-method-type (undefined-type)
   ((method :type method-descriptor
            :reader error-method

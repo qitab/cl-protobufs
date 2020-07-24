@@ -125,6 +125,12 @@
     :components ((:protobuf-source-file "map-proto")
                  (:file "map-test")))
 
+  (:module "oneof-test"
+   :serial t
+   :pathname ""
+   :components ((:protobuf-source-file "oneof-proto")
+                (:file "oneof-test")))
+
    (:module "import-test"
     :serial t
     :pathname ""
@@ -203,6 +209,7 @@
   (uiop:symbol-call (find-package 'cl-protobufs.test.deserialize-test)       '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.enum-mapping-test)      '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.map-test)               '#:run)
+  (uiop:symbol-call (find-package 'cl-protobufs.test.oneof-test)             '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.import-test)            '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.lazy-structure-test)    '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.lazy-test)              '#:run)

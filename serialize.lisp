@@ -117,8 +117,19 @@
 (defmethod serialize-object (object (msg-desc message-descriptor) buffer)
   (declare (buffer buffer))
   (let ((size 0))
-    (dolist (field (proto-fields msg-desc) size)
-      (iincf size (emit-field object field buffer)))))
+    (dolist (field (proto-fields msg-desc))
+      (iincf size (emit-field object field buffer)))
+    (dolist (oneof (proto-oneofs msg-desc) size)
+      (let* ((fields    (oneof-descriptor-fields oneof))
+             (data      (slot-value object (oneof-descriptor-internal-name oneof)))
+             (set-field (oneof-set-field data))
+             (value     (oneof-value data)))
+        (when set-field
+          (let* ((field (aref fields set-field))
+                 (type  (proto-class field))
+                 (index (proto-index field)))
+            (iincf size
+                   (emit-non-repeated-field value type index buffer))))))))
 
 (defun emit-field (object field buffer)
   "Serialize a single field from an object to buffer
@@ -214,8 +225,23 @@ Parameters:
                        (if custom-serializer
                            (iincf submessage-size
                                   (funcall custom-serializer v buffer))
-                           (dolist (f (proto-fields desc))
-                             (iincf submessage-size (emit-field v f buffer))))
+                           ;; todo(benkuehnert): There's some repeated code that could
+                           ;; be avoided here if we call serialize-object instead.
+                           (progn
+                             (dolist (f (proto-fields desc))
+                               (iincf submessage-size (emit-field v f buffer)))
+                             (dolist (oneof (proto-oneofs desc))
+                               (let* ((fields (oneof-descriptor-fields oneof))
+                                      (data (slot-value v (oneof-descriptor-internal-name
+                                                           oneof)))
+                                      (set-field (oneof-set-field data))
+                                      (value (oneof-value data)))
+                                 (when set-field
+                                   (let* ((field (aref fields set-field))
+                                          (type  (proto-class field))
+                                          (index (proto-index field)))
+                                     (iincf submessage-size
+                                            (emit-non-repeated-field value type index buffer))))))))
                        (iincf size (+ (backpatch submessage-size)
                                       submessage-size)))))))
            size)
@@ -284,8 +310,23 @@ Parameters:
                              (setq submessage-size
                                    (funcall custom-serializer value buffer)))
                             (t
+                             ;; todo(benkuehnert): There's some repeated code that could
+                             ;; be avoided here if we call serialize-object instead.
                              (dolist (f (proto-fields desc))
-                               (iincf submessage-size (emit-field value f buffer)))))
+                               (iincf submessage-size (emit-field value f buffer)))
+                             (dolist (oneof (proto-oneofs desc))
+                               (let* ((fields (oneof-descriptor-fields oneof))
+                                      (data (slot-value value (oneof-descriptor-internal-name
+                                                               oneof)))
+                                      (set-field (oneof-set-field data))
+                                      (value     (oneof-value data)))
+                                 (when set-field
+                                   (let* ((field (aref fields set-field))
+                                          (type  (proto-class field))
+                                          (index (proto-index field)))
+                                     (iincf submessage-size
+                                            (emit-non-repeated-field value type index
+                                                                     buffer))))))))
                       (+ tag-size (backpatch submessage-size) submessage-size))))))
           ((typep desc 'enum-descriptor)
            (serialize-enum value (enum-descriptor-values desc)
@@ -392,18 +433,19 @@ Parameters:
     (deserialize-structure-object
      msg-desc buffer start end end-tag class)))
 
-(defstruct (field (:constructor make-field (index offset bool-index initarg complex-field))
+(defstruct (field (:constructor make-field (index offset bool-index oneof-p initarg complex-field))
                   (:print-object
                    (lambda (self stream)
                      (format stream "#<~D~S>" (field-index self) (field-initarg self)))))
   "Field metadata for a protocol buffer.
 Contains the INDEX of the field as according to protobuf, an internal
-OFFSET, the BOOL-NUMBER (for simple boolean fields), the INITARG, the COMPLEX-FIELD
-datastructure.
+OFFSET, the BOOL-NUMBER (for simple boolean fields), a flag ONEOF-P which indicates if the field
+is part of a oneof, the INITARG, the COMPLEX-FIELD datastructure.
 See field-descriptor for the distinction between index, offset, and bool-number."
   index
   offset
   bool-index
+  oneof-p
   initarg
   complex-field)
 
@@ -425,6 +467,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                (make-field (proto-index field)
                            (proto-field-offset field)
                            (proto-bool-index field)
+                           (and (proto-oneof-offset field) t)
                            (keywordify (proto-internal-field-name field))
                            field)))
         (if (< max (* count 2)) ; direct map
@@ -451,13 +494,17 @@ See field-descriptor for the distinction between index, offset, and bool-number.
             (when (= (field-index field) field-number)
               (return field)))))))
 
-;; Lazily compute and memoize a field map for SCHEMA-MESSAGE
-;; This is not needed unless the generic deserializer is executed.
-(defun message-field-metadata-vector (schema-message)
-  (if (slot-boundp schema-message 'field-vect)
-      (proto-field-vect schema-message)
-      (setf (proto-field-vect schema-message)
-            (make-field-map (proto-fields schema-message)))))
+(defun message-field-metadata-vector (message)
+  "Lazily compute and memoize a field map for message-descriptor
+   MESSAGE. This is not needed unless the generic deserializer is
+   executed."
+  (if (slot-boundp message 'field-vect)
+      (proto-field-vect message)
+      (setf (proto-field-vect message)
+            (make-field-map (append
+                             (proto-fields message)
+                             (loop for oneof in (proto-oneofs message)
+                                   append (coerce (oneof-descriptor-fields oneof) 'list)))))))
 
 ;; The generic deserializer for structure-object collects all fields' values before
 ;; applying the object constructor. This is identical to the the way that the
@@ -494,6 +541,10 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                ;; First return value is the cons cell for the pair,
                ;; second is the list as a whole, which is now headed by this pair.
                (values pair pair)))
+           (insert-at-end (head &aux (rest (cdr head)))
+             (if (not rest)
+                 (insert-after head)
+                 (insert-at-end (cdr rest))))
            (insert-after (tail)
              ;; A picture: list is (#<FIELD A> a-val #<FIELD C> c-val #<FIELD D> d-val ...)
              ;;                                ^--- TAIL points here
@@ -519,14 +570,22 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                           (insert-in (cdr rest))))))))
     (if (not field-list)
         (insert-at-front)
-        (let* ((field (car field-list))
-               (index (field-index field)))
-          (cond ((i> field-number index) ; greater than any field number seen thus far
-                 (insert-at-front))
-                ((i= field-number index) ; a field number which has been seen before
-                 (values field-list field-list))
-                (t                       ; keep on looking
-                 (insert-in (cdr field-list))))))))
+        (let* ((cur-field (find-in-field-map field-number field-map))
+               (top-field (car field-list))
+               (index (field-index top-field)))
+          (if (field-oneof-p cur-field)
+              ;; If a field is part of a oneof, put it at the end of the plist.
+              ;; This is to preserve the behavior that if two fields from the same
+              ;; oneof are recieved on the wire, then only the last one is set. Since
+              ;; this list sorts fields by their index, this information is lost here,
+              ;; so oneofs need to ignore this heuristic.
+              (insert-at-end (cdr field-list))
+              (cond ((i> field-number index) ; greater than any field number seen thus far
+                     (insert-at-front))
+                    ((i= field-number index) ; a field number which has been seen before
+                     (values field-list field-list))
+                    (t                       ; keep on looking
+                     (insert-in (cdr field-list)))))))))
 
 (defun deserialize-structure-object (message buffer index limit end-tag class)
   "Deserialize a message.
@@ -560,23 +619,33 @@ Parameters:
             do
            (let* ((field (car cell))
                   (inner-index (field-offset field))
-                  (bool-index (field-bool-index field)))
-             (rplaca cell (field-initarg field))
-             ;; Get the full metadata from the brief metadata.
-             (let ((field (field-complex-field field)))
-               (when (eq (proto-label field) :repeated)
-                 (let ((data (nreverse (cadr cell))))
-                   (setf (cadr cell)
-                         (if (vector-field-p field) (coerce data 'vector) data)))))
-             (cond ((eq (proto-message-type (field-complex-field field)) :extends)
+                  (bool-index (field-bool-index field))
+                  (initargs (field-initarg field))
+                  ;; Get the full metadata from the brief metadata.
+                  (field (field-complex-field field))
+                  (oneof-offset (proto-oneof-offset field)))
+             (rplaca cell initargs)
+             (when (eq (proto-label field) :repeated)
+               (let ((data (nreverse (cadr cell))))
+                 (setf (cadr cell)
+                       (if (vector-field-p field) (coerce data 'vector) data))))
+             (cond ((eq (proto-message-type field) :extends)
                     ;; If an extension we'll have to set it manually later...
                     (progn
-                      (push `(,(proto-internal-field-name (field-complex-field field)) ,(cadr cell))
+                      (push `(,(proto-internal-field-name field) ,(cadr cell))
                             extension-list)))
                    (bool-index
                     (push (cons bool-index (cadr cell)) bool-map)
                     (when inner-index
                       (push inner-index offset-list)))
+                   ;; Fields contained in a oneof need to be wrapped in
+                   ;; a oneof struct.
+                   (oneof-offset
+                    (push (make-oneof
+                           :value (cadr cell)
+                           :set-field oneof-offset)
+                          initargs-final)
+                    (push (car cell) initargs-final))
                    ;; Otherwise we have to mark is set later.
                    (t
                     (progn
@@ -905,12 +974,19 @@ Parameters:
 
 ;; Note well: keep this in sync with the main 'serialize-object' method above
 (defun generate-serializer-body (message vobj vbuf size)
-  "Generate the body of a 'serialize-object' method for the given message."
-  (when (null (proto-fields message))
+  "Generate the body of a 'serialize-object' method for the given message.
+
+Parameters:
+  MESSAGE: The message-descriptor to generate a serializer for.
+  VOBJ: A gensym'd symbol which will hold the object to be serialized.
+  VBUF: A gensym'd symbol which will hold the buffer to serialize to.
+  SIZE: A gensym'd symbol which will hold the number of bytes serialized."
+  (when (and (null (proto-fields message))
+             (null (proto-oneofs message)))
     (return-from generate-serializer-body nil))
   (nreverse
    (let (serializers)
-     (dolist (field (proto-fields message) serializers)
+     (dolist (field (proto-fields message))
        ;; TODO(shaunm): class is duplicated
        (let* ((class (proto-class field))
               (msg (and class (not (scalarp class))
@@ -926,7 +1002,10 @@ Parameters:
                           (proto-class message) field-name :has)
                         ,vobj)))
          (push (generate-field-serializer msg field boundp reader vbuf size)
-               serializers))))))
+               serializers)))
+     (dolist (oneof (proto-oneofs message) serializers)
+       (push (generate-oneof-serializer message oneof vobj vbuf size)
+             serializers)))))
 
 (defmacro make-serializer (message-name)
   "Create the serializer for a message.
@@ -948,6 +1027,35 @@ Parameters:
           ,@serializers
           ,size)))))
 
+(defun generate-oneof-serializer (message oneof vobj vbuf size)
+  "Creates and returns the code that serializes a oneof.
+
+Parameters:
+  MESSAGE: The message-descriptor for the containing message.
+  ONEOF: The oneof-descriptor to create a serializer for.
+  VOBJ: A symbol which will store the protobuf object to serialize.
+  VBUF: A symbol which will store the buffer to serialize to.
+  SIZE: A symbol which stores the running total of bytes serialized."
+  (let ((fields (oneof-descriptor-fields oneof)))
+    `(let* ((oneof (slot-value ,vobj ',(oneof-descriptor-internal-name oneof)))
+            (set-field  (oneof-set-field oneof))
+            (value      (oneof-value oneof)))
+       (ecase set-field
+         ,@(loop for field across fields
+                 collect
+                 (let ((class (proto-class field))
+                       (index (proto-index field))
+                       (offset (proto-oneof-offset field)))
+                   ;; The BOUNDP argument is T here, since if we get to this point
+                   ;; then the slot must be bound, as SET-FIELD indicates that a
+                   ;; field is set.
+                   `((,offset) ,(or (generate-non-repeated-field-serializer
+                                         class index t 'value vbuf size)
+                                        (undefined-field-type
+                                         "While generating 'serialize-object' for ~S,"
+                                         message class field)))))
+         ((nil) nil)))))
+
 (defun generate-field-deserializer (message field vbuf vidx &key raw-p)
   "Generate a deserializer for a single field.
 
@@ -962,7 +1070,8 @@ Parameters:
         (rslot nil))
     (let* ((class  (proto-class field))
            (index  (proto-index field))
-           (temp (make-symbol (string (proto-internal-field-name field)))))
+           (temp (fintern (string (proto-internal-field-name field))))
+           (oneof-offset (proto-oneof-offset field)))
       (cond ((eq (proto-label field) :repeated)
              (setf rslot (list field temp))
              (multiple-value-bind (deserializer tag list?)
@@ -978,6 +1087,24 @@ Parameters:
                                  nslot rslot)))
                    (undefined-field-type "While generating 'deserialize-object' for ~S,"
                                          message class field))))
+            ;; If this field is contained in a oneof, we need to put the value in the
+            ;; proper slot in the one-of data struct.
+            (oneof-offset
+             (let ((oneof-val (gensym "ONEOF-VAL")))
+               (multiple-value-bind (deserializer tag)
+                   (generate-non-repeated-field-deserializer
+                    class index vbuf vidx oneof-val :raw-p raw-p)
+                 (when deserializer
+                   (setf deserializer
+                         `(progn
+                            (let ((,oneof-val))
+                              ,deserializer
+                              (setf (oneof-value ,temp) ,oneof-val)
+                              (setf (oneof-set-field ,temp) ,oneof-offset))))
+                   (return-from generate-field-deserializer
+                     (values (list tag) (list deserializer) nil nil temp)))
+                 (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                                       message class field))))
             ;; Non-repeated field.
             (t
              (setf nslot temp)
@@ -987,9 +1114,9 @@ Parameters:
                (if deserializer
                    (return-from generate-field-deserializer
                      (values (list tag) (list deserializer)
-                             nslot rslot)))
-               (undefined-field-type "While generating 'deserialize-object' for ~S,"
-                                     message class field))))))
+                             nslot rslot))
+                   (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                                         message class field)))))))
 
   (assert nil))
 
@@ -1126,10 +1253,8 @@ Parameters:
                  (let ((tag1 (make-wire-tag $wire-type-start-group index))
                        (tag2 (make-wire-tag $wire-type-end-group index)))
                    (values
-                    `(multiple-value-bind (obj end)
-                         ,(call-deserializer msg vbuf vidx nil tag2)
-                       (setq ,vidx end
-                             ,dest obj))
+                    `(multiple-value-setq (,dest ,vidx)
+                       ,(call-deserializer msg vbuf vidx nil tag2))
                     tag1))
                  (values
                   `(multiple-value-bind (payload-len payload-start)
@@ -1217,8 +1342,14 @@ Parameters:
   (let ((vbuf (gensym "BUFFER"))
         (vidx (gensym "INDEX"))
         (vlim (gensym "LIMIT"))
-        (vendtag (gensym "ENDTAG")))
-    (when (null (proto-fields message))
+        (vendtag (gensym "ENDTAG"))
+        ;; Add oneof fields to the list of field descriptors, since we need to
+        ;; create a deserializer for each.
+        (fields (append (proto-fields message)
+                        (loop for oneof in (proto-oneofs message)
+                              append (coerce (oneof-descriptor-fields oneof)
+                                             'list)))))
+    (when (null fields)
       (return-from generate-deserializer
         (def-pseudo-method :deserialize name
           `(,vbuf ,vidx ,vlim &optional (,vendtag 0))
@@ -1234,7 +1365,9 @@ Parameters:
                       ;; Nonrepeating slots
                       (nslots collect-nslot)
                       ;; For tracking repeated slots that will need to be reversed
-                      (rslots collect-rslot))
+                      (rslots collect-rslot)
+                      ;; For tracking oneof slots
+                      (oneof-slots collect-oneof-slot))
       (flet ((include-field (field)
                (or (eq include-fields :all)
                    (member (proto-external-field-name field)
@@ -1242,10 +1375,10 @@ Parameters:
              (skip-field (field)
                (member (proto-external-field-name field)
                        skip-fields)))
-        (dolist (field (proto-fields message))
+        (dolist (field fields)
           (when (and (include-field field)
                      (not (skip-field field)))
-            (multiple-value-bind (tags deserializers nslot rslot)
+            (multiple-value-bind (tags deserializers nslot rslot oneof-slot)
                 (generate-field-deserializer message field vbuf vidx :raw-p raw-p)
               (assert tags)
               (assert deserializers)
@@ -1257,10 +1390,13 @@ Parameters:
                        (when nslot
                          (collect-nslot nslot))
                        (when rslot
-                         (collect-rslot rslot)))))))
+                         (collect-rslot rslot))
+                       (when oneof-slot
+                         (collect-oneof-slot oneof-slot)))))))
       (let* ((rslots  (delete-duplicates rslots :key #'first))
              (rfields (mapcar #'first  rslots))
              (rtemps  (mapcar #'second rslots))
+             (oneof-slots (delete-duplicates oneof-slots :test #'string= :key #'symbol-name))
              (lisp-type (or (proto-alias-for message) (proto-class message)))
              (lisp-class (find-class lisp-type nil))
              (constructor (or constructor
@@ -1281,6 +1417,8 @@ Parameters:
                     (type array-index ,vidx ,vlim))
            (let (,@(loop for slot in nslots
                          collect `(,slot ,missing-value))
+                 ,@(loop for oneof-slot in oneof-slots
+                         collect `(,oneof-slot (make-instance 'oneof)))
                  ,@rtemps)
              (loop
                (multiple-value-setq (tag ,vidx)
@@ -1291,6 +1429,10 @@ Parameters:
                     (,@(if constructor (list constructor)
                            #+sbcl`(make-instance ',lisp-type)
                            #-sbcl`(funcall (get-constructor-name ',lisp-type)))
+                     ;; oneofs
+                     ,@(loop for temp in oneof-slots
+                             for mtemp = (slot-value-to-slot-name-symbol temp)
+                             nconc (list (intern (string mtemp) :keyword) temp))
                      ;; nonrepeating slots
                      ,@(loop for temp in nslots
                              for mtemp = (slot-value-to-slot-name-symbol temp)

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <memory>
 #include <set>
+#include <unordered_set>
 
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/io/printer.h>
@@ -135,17 +136,47 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
 
   if (descriptor_->field_count() > 0) {
     printer->Print("\n;; Fields.");
+
+    std::unordered_set<int> seen_fields;
+
+    if (descriptor_->oneof_decl_count() > 0) {
+      for (int i = 0; i < descriptor_->oneof_decl_count(); ++i) {
+        const OneofDescriptor* oneof = descriptor_->oneof_decl(i);
+        printer->Print("\n(proto:define-oneof $name$", "name",
+                       ToLispName(oneof->name()));
+        printer->Indent();
+        for (int j = 0; j < oneof->field_count(); ++j) {
+          const FieldDescriptor* field  = oneof->field(j);
+          seen_fields.insert(field->index());
+          if (field->type() == FieldDescriptor::TYPE_GROUP) {
+            // Strange way of handling group fields.
+            MessageGenerator group(field->message_type());
+            group.GenerateSource(printer,
+                                 ToLispName(field->message_type()->name()),
+                                 field->number(),
+                                 field->label());
+          } else {
+            GenerateField(printer, field);
+          }
+        }
+        printer->Print(")");
+        printer->Outdent();
+      }
+    }
+
     for (int i = 0; i < descriptor_->field_count(); ++i) {
       const FieldDescriptor* field = descriptor_->field(i);
-      if (field->type() == FieldDescriptor::TYPE_GROUP) {
-        // Strange way of handling group fields.
-        MessageGenerator group(field->message_type());
-        group.GenerateSource(printer,
-                             ToLispName(field->message_type()->name()),
-                             field->number(),
-                             field->label());
-      } else {
-        GenerateField(printer, field);
+      if (seen_fields.find(field->index()) == seen_fields.end()) {
+        if (field->type() == FieldDescriptor::TYPE_GROUP) {
+          // Strange way of handling group fields.
+          MessageGenerator group(field->message_type());
+          group.GenerateSource(printer,
+                               ToLispName(field->message_type()->name()),
+                               field->number(),
+                               field->label());
+        } else {
+          GenerateField(printer, field);
+        }
       }
     }
   }
