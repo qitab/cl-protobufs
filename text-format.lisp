@@ -240,10 +240,10 @@ Parameters:
           - If indent is nil, then do not indent and
             do not write a newline."
   (when val
-    (if indent
+    (when indent
       (format stream "~&~V,0T" (+ indent 2)))
-    (if name
-        (format stream "~A: " name))
+    (when name
+      (format stream "~A: " name))
     (let* ((e (find (keywordify val)
                     (enum-descriptor-values enum)
                     :key #'enum-value-descriptor-name))
