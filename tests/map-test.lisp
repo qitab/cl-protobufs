@@ -132,7 +132,7 @@ Parameters:
       (assert-true (proto:proto-equal test3 t3res))
       (assert-true (proto:proto-equal test4 t4res)))))
 
-(deftest text-serialization-test (map-tests)
+(deftest text-format-test (map-tests)
   (let* ((test1 (make-map-proto :strval "test" :intval 1))
          (submsg1 (make-map-message.val-message :strval "one"))
          (submsg2 (make-map-message.val-message :strval "two"))
