@@ -116,8 +116,8 @@ Parameters:
                   (print-scalar v type (proto-name field) stream
                                 (and pretty-print indent))))))
       (t
-       (undefined-field-type "While printing ~S to text format,"
-                             values type field)))))
+       (undefined-type "While printing ~S to text format,"
+                             values type)))))
 
 (defun print-non-repeated-field
     (value field &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
@@ -179,8 +179,8 @@ Parameters:
            (format stream "~&~VT}" (+ indent 2)))))
 
       (t
-       (undefined-field-type "While printing ~S to text format,"
-                             value type field)))))
+       (undefined-field "While printing ~S to text format,"
+                             value type)))))
 
 (defun print-scalar (val type name stream indent)
   "Print scalar value to stream

@@ -49,6 +49,7 @@
    #:undefined-input-type
    #:undefined-output-type
    #:undefined-stream-type
+   #:undefined-type
    #:unknown-enum-error
    #:error-type-name
    #:error-field
