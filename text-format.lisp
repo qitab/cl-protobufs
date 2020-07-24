@@ -118,6 +118,8 @@ Parameters:
                 (let ((v (funcall (proto-serializer desc) v)))
                   (print-scalar v type name stream
                                 (and pretty-print indent))))))
+      ;; This case only happens when the user specifies a custom type and
+      ;; doesn't support it above. 
       (t (undefined-type type "While printing ~S to text format," values)))))
 
 (defun print-non-repeated-field
@@ -178,7 +180,8 @@ Parameters:
                   (format stream "~%")))
            (maphash #'print-entry value)
            (format stream "~&~VT}" (+ indent 2)))))
-
+      ;; This case only happens when the user specifies a custom type and
+      ;; doesn't support it above. 
       (t (undefined-type type "While printing ~S to text format," value)))))
 
 (defun print-scalar (val type name stream indent)
