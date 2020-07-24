@@ -352,6 +352,7 @@ so may result in undefined behavior.
 
 ### Oneof
 This section uses the following protobuf message as an example:
+
 ```protocol-buffer
 message Person {
   optional string name = 1;
@@ -368,11 +369,17 @@ To access fields inside a oneof, just use the standard accessors outlined above.
 ```
 will set the `age` field of a `Person` object `bob` to `5`. Defining a oneof also creates
 two special functions:
-`(person.age-oneof-case bob)`
+
+```lisp
+(person.age-oneof-case bob)
+```
 This will return the lisp symbol corresponding to the field which is currently set. So, if
-we set `age` to `5`, then this will return `age`. If no field is set, this function will
-return `nil`.
-`(person.clear-age-oneof bob)`
+we set `age` to `5`, then this will return the symbol `AGE`. If no field is set, this function
+will return `nil`.
+
+```lisp
+(person.clear-age-oneof bob)
+```
 This will clear all fields inside of the oneof `age-oneof`.
 
 ### Options
