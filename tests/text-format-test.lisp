@@ -65,7 +65,8 @@ Parameters:
     (assert-true (equal '("First" "Second")  (cl-protobufs.test-proto:string-fields msg-parse)))
     (assert-true (equal '(:NONE :TWENTY-ONE) (cl-protobufs.test-proto:enum-vals msg-parse)))
     (assert-true (equal 2 (cl-protobufs.test-proto:int-field
-                           (cl-protobufs.test-proto:two-level-nesting msg-parse))))))
+                           (cl-protobufs.test-proto:two-level-nesting msg-parse))))
+    (assert-true (eql 5 (cl-protobufs.test-proto:oneof-int-field msg-parse)))))
 
 ; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-text-format (text-format-tests)
