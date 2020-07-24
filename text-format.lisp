@@ -167,12 +167,14 @@ Parameters:
              (val-type (map-descriptor-val-class desc)))
          (loop for k being the hash-keys of value using (hash-value v)
                do (if pretty-print
-                      (format stream "~&~V,0T~A { " (+ indent 2) (proto-name field))
-                      (format stream "~A { " (proto-name field)))
+                      (format stream "~&~V,0T~A { " (+ indent 2) name)
+                      (format stream "~A { " name))
                   (print-scalar k key-type "key" stream nil)
-                  (format stream " ")
-                  (print-non-repeated-field v val-type "value" stream :pretty-print nil)
-                  (format stream " }")
+                  (print-non-repeated-field v val-type "value"
+                                            :stream stream
+                                            :print-name t
+                                            :pretty-print nil)
+                  (format stream "}")
                   (when pretty-print
                     (format stream "~%")))))
       (t
@@ -220,7 +222,8 @@ Parameters:
       ((:date :time :datetime :timestamp)
        (format stream "~D" val)))
     (if indent
-      (format stream "~%"))))
+      (format stream "~%")
+      (format stream " "))))
 
 (defun print-enum (val enum name stream indent)
   "Print enum to stream
@@ -360,6 +363,7 @@ return T as a second value."
                         (skip-whitespace stream)
                         (assert (string= "value" (parse-token stream)))
                         (setf val (parse-field val-type :stream stream))
+                        (skip-whitespace stream)
                         (expect-char stream #\})
                         (cons key val))))
                (case (peek-char nil stream nil)
@@ -375,7 +379,7 @@ return T as a second value."
                            (read-char stream)
                            (progn
                              (skip-whitespace stream)
-                             (expect-char #\])
+                             (expect-char stream #\])
                              (return pairs)))))
                  (t
                   (skip-whitespace stream)
