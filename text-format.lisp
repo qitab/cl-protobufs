@@ -150,9 +150,8 @@ Parameters:
                                 :print-name print-name
                                 :pretty-print pretty-print))
       ((typep desc 'enum-descriptor)
-       (when (not (eql value (proto-default field)))
-         (print-enum value desc field stream
-                     (and pretty-print indent))))
+       (print-enum value desc name stream
+                   (and pretty-print indent)))
       ((typep desc 'protobuf-type-alias)
        (when value
          (let ((value (funcall (proto-serializer desc) value))
