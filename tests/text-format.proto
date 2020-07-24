@@ -41,4 +41,8 @@ message TextFormatTest {
   optional NestedMessage1 one_level_nesting = 18;
   repeated TextEnumValues enum_vals = 19;
   optional NestedMessage1.NestedMessage2 two_level_nesting = 20;
+  oneof TestOneof {
+    int32 oneof_int_field = 21;
+    string oneof_string_field = 22;
+  }
 }
