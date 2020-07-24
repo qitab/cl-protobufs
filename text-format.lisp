@@ -118,9 +118,7 @@ Parameters:
                 (let ((v (funcall (proto-serializer desc) v)))
                   (print-scalar v type name stream
                                 (and pretty-print indent))))))
-      (t
-       (undefined-type "While printing ~S to text format,"
-                             values type)))))
+      (t (undefined-type type "While printing ~S to text format," values)))))
 
 (defun print-non-repeated-field
     (value type name &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
@@ -181,9 +179,7 @@ Parameters:
            (maphash #'print-entry value)
            (format stream "~&~VT}" (+ indent 2)))))
 
-      (t
-       (undefined-field "While printing ~S to text format,"
-                             value type)))))
+      (t (undefined-type type "While printing ~S to text format," value)))))
 
 (defun print-scalar (val type name stream indent)
   "Print scalar value to stream
