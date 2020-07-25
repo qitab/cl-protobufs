@@ -48,6 +48,7 @@ Parameters:
   two_level_nesting {
     int_field: 2
   }
+  oneof_int_field: 5
 }
 ")
 
@@ -77,7 +78,8 @@ Parameters:
                                      :string-field "A string"
                                      :string-fields (list "First" "Second")
                                      :enum-vals (list :none :twenty-one)
-                                     :one-level-nesting nested))
+                                     :one-level-nesting nested
+                                     :oneof-int-field 5))
          (out-stream (make-string-output-stream)))
     (print-text-format msg :stream out-stream)
     (let* ((text (get-output-stream-string out-stream))
