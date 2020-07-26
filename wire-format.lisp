@@ -908,7 +908,8 @@ and a buffer which encodes the value to the buffer."
                    Watch out, this function turns off all type
                    checking and array bounds checking." bits)
            (declare #.$optimize-serialization)
-           (let ((val (ldb (byte ,bits 0) val)))
+           (let ((val (ldb (byte ,bits 0) val))
+                 (nbytes-written 0))
              (declare (type (unsigned-byte ,bits) val))
              (let ((index (buffer-index buffer))
                    (buf
@@ -918,13 +919,14 @@ and a buffer which encodes the value to the buffer."
                ;; Seven bits at a time, least significant bits first
                (loop do (let ((bits (,ldb (byte 7 0) val)))
                           (declare (type (unsigned-byte 8) bits))
+                          (incf nbytes-written)
                           (setq val (,ash val -7))
                           (setf (aref buf index)
                                 (ilogior bits (if ,zerop-val 0 128)))
                           (iincf index))
                   until ,zerop-val)
-               (setf (buffer-index buffer) index)))
-           ,bytes)
+               (setf (buffer-index buffer) index))
+             nbytes-written))
          (defun ,encode-fixed (val buffer)
            ,(format nil
                     "Encodes the unsigned ~A-bit integer 'val' as a
