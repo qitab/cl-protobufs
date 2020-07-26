@@ -36,7 +36,7 @@
     #+sbcl
     `(funcall #'(:protobuf ,method-name ,class) ,@args)
     #-sbcl
-    `(let ((method (get ',class ',name)))
+    `(let ((method (get ',class ',method-name)))
        (assert method)
        (funcall (the function method) ,@args))))
 
