@@ -13,6 +13,7 @@
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/io/zero_copy_stream.h>
 #include <google/protobuf/descriptor.h>
+#include "third_party/absl/container/flat_hash_set.h"
 #include "file.h"
 
 namespace google {
@@ -67,8 +68,8 @@ bool LispGenerator::Generate(const FileDescriptor* file,
 
 void AccumulateSortedFiles(
     const FileDescriptor* file,
-    const std::unordered_set<const FileDescriptor*>& all_files,
-    std::unordered_set<const FileDescriptor*>& visited_files,
+    const absl::flat_hash_set<const FileDescriptor*>& all_files,
+    absl::flat_hash_set<const FileDescriptor*>& visited_files,
     std::vector<const FileDescriptor*>& sorted_files) {
   // If we've added this already or we're outside of the files we're processing,
   // we're done.
@@ -116,9 +117,9 @@ bool LispGenerator::GenerateAll(const std::vector<const FileDescriptor*>& files,
     // the files passed to this function are in the order of
     // compiler::CodeGeneratorRequest.files_to_generate, which is the order in which
     // those files were passed to the protoc command-line.
-    std::unordered_set<const FileDescriptor*> all_files(files.begin(),
-                                                        files.end());
-    std::unordered_set<const FileDescriptor*> visited_files;
+    absl::flat_hash_set<const FileDescriptor*> all_files(files.begin(),
+                                                         files.end());
+    absl::flat_hash_set<const FileDescriptor*> visited_files;
     std::vector<const FileDescriptor*> sorted_files;
     for (const FileDescriptor* file : files) {
       AccumulateSortedFiles(file, all_files, visited_files, sorted_files);
