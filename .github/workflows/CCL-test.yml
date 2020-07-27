@@ -16,7 +16,7 @@ jobs:
       - name: Download ccl 
         run: |
           curl -o ccl.tar.gz 'https://github.com/Clozure/ccl/releases/download/v1.11.5/ccl-1.11.5-linuxx86.tar.gz'
-          tar -xf ccl.tar.gz
+          tar -xzf ccl.tar.gz
 
       - name: Download quicklisp
         run: curl -o quicklisp.lisp 'https://beta.quicklisp.org/quicklisp.lisp'
