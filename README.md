@@ -1,5 +1,5 @@
 # cl-protobufs
-![Tests](https://github.com/qitab/cl-protobufs/workflows/Tests/badge.svg?branch=master)
+![SBCL-Tests](https://github.com/qitab/cl-protobufs/workflows/SBCL-Tests/badge.svg?branch=master)
 ![CCL-Tests](https://github.com/qitab/cl-protobufs/workflows/CCL-Tests/badge.svg?branch=master)
 
 

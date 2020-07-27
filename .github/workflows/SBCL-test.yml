@@ -1,6 +1,6 @@
-# @file test.yml
+# @file SBCL-test.yml
 ---
-name: Tests
+name: SBCL-Tests
 
 on:
   push:
@@ -37,11 +37,10 @@ jobs:
         run: git clone --recursive https://github.com/google/protobuf $GITHUB_WORKSPACE/protobuf && cd $GITHUB_WORKSPACE/protobuf && ./autogen.sh && ./configure --prefix=/usr/local && make && sudo make install && sudo ldconfig
 
       - name: Install protoc plug-in
-        run: cd $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc && PROTOC_ROOT=/usr/local make          
+        run: cd $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc && PROTOC_ROOT=/usr/local make
 
       - name: Load and run tests
         run: |
           export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
           sbcl --noinform --non-interactive --eval '(ql:quickload "clunit2")' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
           ! grep -q "not ok" report
-          
