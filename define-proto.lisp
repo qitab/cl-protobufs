@@ -557,7 +557,7 @@ Arguments:
       `(defmethod ,lazy-reader :around ((,obj ,proto-type))
          ,(if (not repeated)
               `(let* ((,field-obj (call-next-method))
-                      (,bytes (proto-%bytes ,field-obj)))
+                      (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
                  (if ,bytes
                      ;; Re-create the field object by deserializing its %bytes field.
                      (setf (slot-value ,obj ',slot-name)
@@ -844,7 +844,7 @@ Arguments:
         (defun ,public-accessor-name (,obj)
           ,(if (not repeated)
                `(let* ((,field-obj (,hidden-accessor-name ,obj))
-                       (,bytes (proto-%bytes ,field-obj)))
+                       (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
                   (if ,bytes
                       (setf (,hidden-accessor-name ,obj)
                             ;; Re-create the field object by deserializing its %bytes
