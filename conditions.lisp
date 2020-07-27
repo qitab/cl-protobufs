@@ -46,6 +46,8 @@
 
 ;; This is used when the field-descriptor is not accessible.
 (defun undefined-type (type format-control &rest format-args)
+  "Signal an undefined type error for TYPE. The error is reported with format string
+FORMAT-CONTROL which takes arguments FORMAT-ARGS."
   (error 'undefined-type
          :format-control format-control
          :format-arguments format-args
