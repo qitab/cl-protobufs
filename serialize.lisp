@@ -65,18 +65,6 @@
 
 ;;; Serialization
 
-;; Allow clients to add their own methods
-;; This is how we address the problem of cycles, e.g. -- if you have an object
-;; that may contain cycles, serialize the cyclic object using a "handle"
-;; TODO(jgodbout): Delete the geenric serialize-object
-;; and remove the type option for the serialize defuns.
-(defgeneric serialize-object (object type buffer)
-  (:documentation
-   "Serialize OBJECT of type TYPE into BUFFER using wire format.
-    TYPE is either a symbol naming a Protobufs message (usually the name of a
-    Lisp class) or the message-descriptor object itself.
-    The returned value is the number of octets written to BUFFER."))
-
 (defun serialize-object-to-stream (stream object &optional (type (type-of object)))
   "Serialize OBJECT of type TYPE onto the STREAM using wire format.
    OBJECT and TYPE are as described in SERIALIZE-OBJECT-TO-BYTES."
@@ -113,8 +101,8 @@
 
 ;; Serialize the object using the given protobuf type
 
-;; The default method uses metadata from the message descriptor.
-(defmethod serialize-object (object (msg-desc message-descriptor) buffer)
+;; The default function uses metadata from the message descriptor.
+(defun serialize-object (object msg-desc buffer)
   (declare (buffer buffer))
   (let ((size 0))
     (dolist (field (proto-fields msg-desc))
