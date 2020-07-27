@@ -93,6 +93,7 @@ Parameters:
     (let* ((slot
              (find '%u (closer-mop:class-slots class) :key 'closer-mop:slot-definition-name))
            (type (closer-mop:slot-definition-type slot)))
+      #+sbcl ;; In non sbcl the int-name may differ
       (assert-true (eq type '(or null uint64)))
       (assert-true (not (typep -10 type)))
       (assert-true (typep 10 type)))))

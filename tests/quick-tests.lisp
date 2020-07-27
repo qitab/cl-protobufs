@@ -380,6 +380,7 @@ Parameters:
 
     (values)))
 
+#+sbcl
 (deftest test-field-maps (quick-tests)
   (test-find-in-field-map)
   (test-get-field-cell *field-map-1*)
