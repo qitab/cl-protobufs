@@ -76,13 +76,15 @@ Parameters:
         (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
                (set-field (oneof-set-field oneof-data)))
           (when set-field
-            (print-non-repeated-field
-             (oneof-value oneof-data)
-             (aref (oneof-descriptor-fields oneof) set-field)
-             :indent indent
-             :stream stream
-             :print-name print-name
-             :pretty-print pretty-print))))
+            (let ((field-desc (aref (oneof-descriptor-fields oneof) set-field)))
+              (print-non-repeated-field
+               (oneof-value oneof-data)
+               (proto-class field-desc)
+               (proto-name field-desc)
+               :indent indent
+               :stream stream
+               :print-name print-name
+               :pretty-print pretty-print)))))
       (if pretty-print
           (format stream "~&~V,0T}~%" indent)
           (format stream "} "))
