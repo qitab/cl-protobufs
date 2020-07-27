@@ -966,18 +966,12 @@ and a buffer which encodes the value to the buffer."
     (declare (type single-float val))
     (let ((bits (single-float-bits val)))
       (declare (type (signed-byte 32) bits))
-      (let ((index (buffer-index buffer))
-            (buf
-             (if (buffer-ensure-space buffer 8)
-                 (octet-buffer-block buffer)
-                 (octet-buffer-scratchpad buffer))))
-        (loop repeat 4 doing
-             (let ((byte (ldb (byte 8 0) bits)))
-               (declare (type (unsigned-byte 8) byte))
-               (setq bits (ash bits -8))
-               (setf (aref buf index) byte)
-               (iincf index)))
-        (setf (buffer-index buffer) index))
+      (buffer-ensure-space buffer 4)
+      (loop repeat 4 doing
+        (let ((byte (ldb (byte 8 0) bits)))
+          (declare (type (unsigned-byte 8) byte))
+          (setq bits (ash bits -8))
+          (fast-octet-out buffer byte)))
       4))
 
   ;; This seems ghastly. Would it make sense for double-float-bits to
@@ -994,24 +988,17 @@ and a buffer which encodes the value to the buffer."
         (double-float-bits val)
       (declare (type (unsigned-byte 32) low)
                (type (signed-byte 32) high))
-      (let ((index (buffer-index buffer))
-            (buf
-             (if (buffer-ensure-space buffer 8)
-                 (octet-buffer-block buffer)
-                 (octet-buffer-scratchpad buffer))))
-        (loop repeat 4 doing
-             (let ((byte (ldb (byte 8 0) low)))
-               (declare (type (unsigned-byte 8) byte))
-               (setf low (ash low -8)
-                     (aref buf index) byte)
-               (iincf index)))
-        (loop repeat 4 doing
-             (let ((byte (ldb (byte 8 0) high)))
-               (declare (type (unsigned-byte 8) byte))
-               (setq high (ash high -8))
-               (setf (aref buf index) byte)
-               (iincf index)))
-        (setf (buffer-index buffer) index))
+      (buffer-ensure-space buffer 8)
+      (loop repeat 4 doing
+        (let ((byte (ldb (byte 8 0) low)))
+          (declare (type (unsigned-byte 8) byte))
+          (setf low (ash low -8))
+          (fast-octet-out buffer byte)))
+      (loop repeat 4 doing
+        (let ((byte (ldb (byte 8 0) high)))
+          (declare (type (unsigned-byte 8) byte))
+          (setf high (ash high -8))
+          (fast-octet-out buffer byte)))
       8)))
 
 (progn
