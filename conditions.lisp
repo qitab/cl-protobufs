@@ -44,6 +44,16 @@
     :type-name (prin1-to-string type)
     :field field))
 
+;; This is used when the field-descriptor is not accessible.
+(defun undefined-type (type format-control &rest format-args)
+  "Signal an undefined type error for TYPE. The error is reported with format string
+FORMAT-CONTROL which takes arguments FORMAT-ARGS."
+  (error 'undefined-type
+         :format-control format-control
+         :format-arguments format-args
+         :type-name (prin1-to-string type)
+         :type-name type))
+
 (define-condition undefined-method-type (undefined-type)
   ((method :type method-descriptor
            :reader error-method
