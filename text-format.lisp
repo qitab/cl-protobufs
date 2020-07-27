@@ -289,8 +289,11 @@ attempt to parse the name of the message and match it against MSG-DESC."
     (let ((name (parse-token stream)))
       (assert (string= name (proto-name msg-desc)) ()
               "The message is not of the expected type ~A" (proto-name msg-desc))))
-  (let ((object (make-instance (or (proto-alias-for msg-desc)
-                                   (proto-class msg-desc))))
+  (let ((object #+sbcl (make-instance (or (proto-alias-for msg-desc)
+                                          (proto-class msg-desc)))
+                #-sbcl (funcall (get-constructor-name
+                                 (or (proto-alias-for msg-desc)
+                                     (proto-class msg-desc)))))
         (rslots ())) ; repeated slot names, tracks which slots need to be nreversed.
     (expect-char stream #\{)
     (loop

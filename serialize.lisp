@@ -1413,49 +1413,50 @@ Parameters:
         (def-pseudo-method :deserialize name
           `(,vbuf ,vidx ,vlim &optional (,vendtag 0) &aux tag)
           `((declare ,$optimize-serialization)
-           (declare ,@(if constructor `((inline ,constructor)))
+            (declare ,@(if constructor `((inline ,constructor)))
                     (type array-index ,vidx ,vlim))
-           (let (,@(loop for slot in nslots
-                         collect `(,slot ,missing-value))
-                 ,@(loop for oneof-slot in oneof-slots
-                         collect `(,oneof-slot (make-instance 'oneof)))
-                 ,@rtemps)
-             (loop
-               (multiple-value-setq (tag ,vidx)
-                   (if (i< ,vidx ,vlim) (decode-uint32 ,vbuf ,vidx) (values 0 ,vidx)))
-               (when (i= tag ,vendtag)
-                 (return-from :deserialize
-                   (values
-                    (,@(if constructor (list constructor)
-                           #+sbcl`(make-instance ',lisp-type)
-                           #-sbcl`(funcall (get-constructor-name ',lisp-type)))
-                     ;; oneofs
-                     ,@(loop for temp in oneof-slots
-                             for mtemp = (slot-value-to-slot-name-symbol temp)
-                             nconc (list (intern (string mtemp) :keyword) temp))
-                     ;; nonrepeating slots
-                     ,@(loop for temp in nslots
-                             for mtemp = (slot-value-to-slot-name-symbol temp)
-                             nconc (list (intern (string mtemp) :keyword) temp))
-                     ;; repeating slots
-                     ,@(loop for field in rfields
-                             for temp in rtemps
-                             for mtemp = (slot-value-to-slot-name-symbol temp)
-                             as slot = (proto-internal-field-name field)
-                             as writer = (proto-writer field)
-                             for conversion = (if (vector-field-p field)
-                                                   `(coerce (nreverse ,temp) 'vector)
-                                                   `(nreverse ,temp))
-                             nconc `(,(intern (string mtemp) :keyword)
-                                     ,(if missing-value
-                                          `(if (null ,temp) ,missing-value
-                                               ,conversion)
-                                          conversion))))
-                    ,vidx)))
-               (case tag
-                 ,@deserializers
-                 (otherwise
-                  (setq ,vidx (skip-element ,vbuf ,vidx tag))))))))))))
+            (block :deserialize-function
+              (let (,@(loop for slot in nslots
+                            collect `(,slot ,missing-value))
+                    ,@(loop for oneof-slot in oneof-slots
+                            collect `(,oneof-slot (make-instance 'oneof)))
+                    ,@rtemps)
+                (loop
+                  (multiple-value-setq (tag ,vidx)
+                    (if (i< ,vidx ,vlim) (decode-uint32 ,vbuf ,vidx) (values 0 ,vidx)))
+                  (when (i= tag ,vendtag)
+                    (return-from :deserialize-function
+                      (values
+                       (,@(if constructor (list constructor)
+                              #+sbcl`(make-instance ',lisp-type)
+                              #-sbcl`(funcall (get-constructor-name ',lisp-type)))
+                        ;; oneofs
+                        ,@(loop for temp in oneof-slots
+                                for mtemp = (slot-value-to-slot-name-symbol temp)
+                                nconc (list (intern (string mtemp) :keyword) temp))
+                        ;; nonrepeating slots
+                        ,@(loop for temp in nslots
+                                for mtemp = (slot-value-to-slot-name-symbol temp)
+                                nconc (list (intern (string mtemp) :keyword) temp))
+                        ;; repeating slots
+                        ,@(loop for field in rfields
+                                for temp in rtemps
+                                for mtemp = (slot-value-to-slot-name-symbol temp)
+                                as slot = (proto-internal-field-name field)
+                                as writer = (proto-writer field)
+                                for conversion = (if (vector-field-p field)
+                                                     `(coerce (nreverse ,temp) 'vector)
+                                                     `(nreverse ,temp))
+                                nconc `(,(intern (string mtemp) :keyword)
+                                        ,(if missing-value
+                                             `(if (null ,temp) ,missing-value
+                                                  ,conversion)
+                                             conversion))))
+                       ,vidx)))
+                  (case tag
+                    ,@deserializers
+                    (otherwise
+                     (setq ,vidx (skip-element ,vbuf ,vidx tag)))))))))))))
 
 (defun make-message-with-bytes (type buffer)
   "Creates an instance of TYPE with BUFFER used as the pre-computed proto

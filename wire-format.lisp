@@ -34,7 +34,6 @@
   (defconstant $wire-type-start-group 3)          ;supposedly deprecated, but no such luck
   (defconstant $wire-type-end-group   4)          ;supposedly deprecated
   (defconstant $wire-type-32bit  5)
-
   )       ;eval-when
 
 
@@ -899,6 +898,8 @@ and a buffer which encodes the value to the buffer."
            (ldb (if fixnump 'ildb 'ldb))
            (ash (if fixnump 'iash 'ash))
            (zerop-val (if fixnump '(i= val 0) '(zerop val))))
+      ;; TODO(jgodbout): At this point with a little effort we can collapse these
+      ;; into one.
       `(progn
          (defun ,encode-uint (val buffer)
            ,(format nil
@@ -909,23 +910,15 @@ and a buffer which encodes the value to the buffer."
                    checking and array bounds checking." bits)
            (declare #.$optimize-serialization)
            (let ((val (ldb (byte ,bits 0) val))
-                 (nbytes-written 0))
+                 (nbytes-written (length32 val)))
              (declare (type (unsigned-byte ,bits) val))
-             (let ((index (buffer-index buffer))
-                   (buf
-                    (if (buffer-ensure-space buffer 8)
-                        (octet-buffer-block buffer)
-                        (octet-buffer-scratchpad buffer))))
-               ;; Seven bits at a time, least significant bits first
-               (loop do (let ((bits (,ldb (byte 7 0) val)))
-                          (declare (type (unsigned-byte 8) bits))
-                          (incf nbytes-written)
-                          (setq val (,ash val -7))
-                          (setf (aref buf index)
-                                (ilogior bits (if ,zerop-val 0 128)))
-                          (iincf index))
-                  until ,zerop-val)
-               (setf (buffer-index buffer) index))
+             (buffer-ensure-space buffer nbytes-written)
+             ;; Seven bits at a time, least significant bits first
+             (loop do (let ((bits (,ldb (byte 7 0) val)))
+                        (declare (type (unsigned-byte 8) bits))
+                        (setq val (,ash val -7))
+                        (fast-octet-out buffer (ilogior bits (if ,zerop-val 0 128))))
+                   until ,zerop-val)
              nbytes-written))
          (defun ,encode-fixed (val buffer)
            ,(format nil
@@ -937,18 +930,12 @@ and a buffer which encodes the value to the buffer."
                    type checking and array bounds checking." bits)
            (declare #.$optimize-serialization)
            (declare (type (unsigned-byte ,bits) val))
-           (let ((index (buffer-index buffer))
-                 (buf
-                  (if (buffer-ensure-space buffer 8)
-                      (octet-buffer-block buffer)
-                      (octet-buffer-scratchpad buffer))))
-             (loop repeat ,bytes doing
-                  (let ((byte (,ldb (byte 8 0) val)))
-                    (declare (type (unsigned-byte 8) byte))
-                    (setq val (,ash val -8))
-                    (setf (aref buf index) byte)
-                    (iincf index)))
-             (setf (buffer-index buffer) index))
+           (buffer-ensure-space buffer ,bytes)
+           (loop repeat ,bytes doing
+             (let ((byte (,ldb (byte 8 0) val)))
+               (declare (type (unsigned-byte 8) byte))
+               (setq val (,ash val -8))
+               (fast-octet-out buffer byte)))
            ,bytes)
          (defun ,encode-sfixed (val buffer)
            ,(format nil
@@ -960,18 +947,12 @@ and a buffer which encodes the value to the buffer."
                     checking and array bounds checking." bits)
            (declare #.$optimize-serialization)
            (declare (type (signed-byte ,bits) val))
-           (let ((index (buffer-index buffer))
-                 (buf
-                  (if (buffer-ensure-space buffer 8)
-                      (octet-buffer-block buffer)
-                      (octet-buffer-scratchpad buffer))))
-             (loop repeat ,bytes doing
-                  (let ((byte (,ldb (byte 8 0) val)))
-                    (declare (type (unsigned-byte 8) byte))
-                    (setq val (,ash val -8))
-                    (setf (aref buf index) byte)
-                    (iincf index)))
-             (setf (buffer-index buffer) index))
+           (buffer-ensure-space buffer ,bytes)
+           (loop repeat ,bytes doing
+             (let ((byte (,ldb (byte 8 0) val)))
+               (declare (type (unsigned-byte 8) byte))
+               (setq val (,ash val -8))
+               (fast-octet-out buffer byte)))
            ,bytes))))
 
   (generate-integer-encoders 32)
