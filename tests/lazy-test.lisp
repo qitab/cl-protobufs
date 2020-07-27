@@ -133,3 +133,9 @@ Parameters:
     ;; Serialize the restored proto again and verify it's the same as the originally serialized
     ;; value.
     (assert-true (equalp bytes (proto:serialize-object-to-bytes restored)))))
+
+;; Checks that the accessors work for empty lazy fields.
+(deftest test-empty-lazy (lazy-tests)
+  (let ((proto (make-container)))
+    (assert-false (container.inner proto))
+    (assert-false (inner proto))))
