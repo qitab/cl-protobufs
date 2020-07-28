@@ -542,44 +542,6 @@ Parameters:
   "Sets the %bytes field of the proto object OBJ with NEW-VALUE."
   (setf (slot-value obj '%bytes) new-value))
 
-(defun make-lazy-reader-form (proto-type field lazy-reader)
-  "Makes the form for a reader of a lazy field.
-
-Arguments:
-  PROTO-TYPE: The Lisp type name of the proto message.
-  FIELD: The field definition of the lazy field.
-  LAZY-READER: The reader name of the lazy field."
-  (let ((slot-name (proto-internal-field-name field))
-        (field-type (proto-class field))
-        (repeated (eq (proto-label field) :repeated))
-        (vectorp (vector-field-p field)))
-    (with-gensyms (obj field-obj bytes)
-      `(defmethod ,lazy-reader :around ((,obj ,proto-type))
-         ,(if (not repeated)
-              `(let* ((,field-obj (call-next-method))
-                      (,bytes (proto-%bytes ,field-obj)))
-                 (if ,bytes
-                     ;; Re-create the field object by deserializing its %bytes field.
-                     (setf (slot-value ,obj ',slot-name)
-                           (%deserialize-object ',field-type ,bytes nil nil))
-                     ,field-obj))
-              `(let ((,field-obj (call-next-method)))
-                 (if (notany #'proto-%bytes ,field-obj)
-                     ,field-obj
-                     ,(with-gensyms (maybe-deserialize-object field-element)
-                        `(flet ((,maybe-deserialize-object (,field-element)
-                                  (let ((,bytes (proto-%bytes ,field-element)))
-                                    (if ,bytes
-                                        ;; Re-create the field object by deserializing its %bytes
-                                        ;; field.
-                                        (%deserialize-object ',field-type ,bytes nil nil)
-                                        ,field-element))))
-                           (setf (slot-value ,obj ',slot-name)
-                                 ,(if vectorp
-                                      `(map 'vector #',maybe-deserialize-object
-                                            (the vector ,field-obj))
-                                      `(mapcar #',maybe-deserialize-object ,field-obj))))))))))))
-
 ;; As a compile time performance improvement we should see
 ;; how big the hash table usually is.
 (defparameter *proto-function-table* (make-hash-table)
@@ -844,7 +806,7 @@ Arguments:
         (defun ,public-accessor-name (,obj)
           ,(if (not repeated)
                `(let* ((,field-obj (,hidden-accessor-name ,obj))
-                       (,bytes (proto-%bytes ,field-obj)))
+                       (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
                   (if ,bytes
                       (setf (,hidden-accessor-name ,obj)
                             ;; Re-create the field object by deserializing its %bytes
@@ -1145,7 +1107,7 @@ Arguments:
                (push oneof-desc (proto-oneofs msg-desc))
                (collect-oneof oneof-desc))))
           (otherwise
-           (multiple-value-bind (field slot idx lazy-reader)
+           (multiple-value-bind (field slot idx)
                (process-field field :conc-name conc-name
                                     :alias-for alias-for
                                     :field-offset field-offset
@@ -1166,9 +1128,7 @@ Arguments:
              (setq index idx)
              (when slot
                (collect-slot slot))
-             (push field (proto-fields msg-desc))
-             (when lazy-reader
-               (collect-form (make-lazy-reader-form type field lazy-reader)))))))
+             (push field (proto-fields msg-desc))))))
       ;; Not required, but this will have the proto-fields serialized
       ;; in the order they were defined.
       (setf (proto-fields msg-desc) (nreverse (proto-fields msg-desc)))
@@ -1612,8 +1572,7 @@ Arguments:
 
 (defun process-field (field &key conc-name alias-for field-offset bool-index bool-values)
   "Process one field descriptor within 'define-message' or 'define-extend'.
-Returns a 'proto-field' object, a CLOS slot form, the field index, and lazy reader
-name (if lazy).
+Returns a 'proto-field' object, a CLOS slot form, and the field index.
 
 Arguments
   FIELD: The description of the field as laid out in the proto schema.
@@ -1703,7 +1662,7 @@ Arguments
                          :documentation documentation)))
             (when (and bool-index default (not (eq default $empty-default)))
               (setf (bit bool-values bool-index) 1))
-            (values field cslot index (and lazy reader))))))))
+            (values field cslot index)))))))
 
 (defparameter *rpc-package* nil
   "The Lisp package that implements RPC.

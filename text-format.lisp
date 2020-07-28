@@ -72,6 +72,19 @@ Parameters:
                  :stream stream
                  :print-name print-name
                  :pretty-print pretty-print)))))
+      (dolist (oneof (proto-oneofs message))
+        (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
+               (set-field (oneof-set-field oneof-data)))
+          (when set-field
+            (let ((field-desc (aref (oneof-descriptor-fields oneof) set-field)))
+              (print-non-repeated-field
+               (oneof-value oneof-data)
+               (proto-class field-desc)
+               (proto-name field-desc)
+               :indent indent
+               :stream stream
+               :print-name print-name
+               :pretty-print pretty-print)))))
       (if pretty-print
           (format stream "~&~V,0T}~%" indent)
           (format stream "} "))
@@ -118,9 +131,9 @@ Parameters:
                 (let ((v (funcall (proto-serializer desc) v)))
                   (print-scalar v type name stream
                                 (and pretty-print indent))))))
-      (t
-       (undefined-type "While printing ~S to text format,"
-                             values type)))))
+      ;; This case only happens when the user specifies a custom type and
+      ;; doesn't support it above.
+      (t (undefined-type type "While printing ~S to text format," values)))))
 
 (defun print-non-repeated-field
     (value type name &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
@@ -177,9 +190,9 @@ Parameters:
                   (format stream "}")
                   (when pretty-print
                     (format stream "~%")))))
-      (t
-       (undefined-field "While printing ~S to text format,"
-                             value type)))))
+      ;; This case only happens when the user specifies a custom type and
+      ;; doesn't support it above.
+      (t (undefined-type type "While printing ~S to text format," value)))))
 
 (defun print-scalar (val type name stream indent)
   "Print scalar value to stream
@@ -240,10 +253,10 @@ Parameters:
           - If indent is nil, then do not indent and
             do not write a newline."
   (when val
-    (if indent
+    (when indent
       (format stream "~&~V,0T" (+ indent 2)))
-    (if name
-        (format stream "~A: " name))
+    (when name
+      (format stream "~A: " name))
     (let* ((e (find (keywordify val)
                     (enum-descriptor-values enum)
                     :key #'enum-value-descriptor-name))
@@ -276,8 +289,11 @@ attempt to parse the name of the message and match it against MSG-DESC."
     (let ((name (parse-token stream)))
       (assert (string= name (proto-name msg-desc)) ()
               "The message is not of the expected type ~A" (proto-name msg-desc))))
-  (let ((object (make-instance (or (proto-alias-for msg-desc)
-                                   (proto-class msg-desc))))
+  (let ((object #+sbcl (make-instance (or (proto-alias-for msg-desc)
+                                          (proto-class msg-desc)))
+                #-sbcl (funcall (get-constructor-name
+                                 (or (proto-alias-for msg-desc)
+                                     (proto-class msg-desc)))))
         (rslots ())) ; repeated slot names, tracks which slots need to be nreversed.
     (expect-char stream #\{)
     (loop
