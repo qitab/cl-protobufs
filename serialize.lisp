@@ -103,6 +103,8 @@
 
 ;; The default function uses metadata from the message descriptor.
 (defun serialize-object (object msg-desc buffer)
+  "Serialize OBJECT with message descriptor MSG-DESC into BUFFER using wire format.
+   The value returned is the number of octets written to BUFFER."
   (declare (buffer buffer))
   (let ((size 0))
     (dolist (field (proto-fields msg-desc))
