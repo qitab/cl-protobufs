@@ -903,12 +903,18 @@ Parameters:
                       (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
                       (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
                (let ((tag (make-wire-tag $wire-type-string index)))
-                 `(let ((,vval ,reader))
+                 `(let* ((,vval ,reader)
+                         (lazy-bytes (and (slot-exists-p ,vval '%bytes))))
                     (when ,vval
                       (iincf ,size (encode-uint32 ,tag ,vbuf))
                       (with-placeholder (,vbuf)
-                        (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
-                          (iincf ,size (i+ len (backpatch len))))))))))
+                        (if lazy-bytes
+                            (let* ((len (length lazy-bytes))
+                                   (buffer-ensure-space ,vbuf len)
+                                   (fast-octets-out ,vbuf bytes))
+                              (iincf ,size (i+ len (backpatch len))))
+                            (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
+                              (iincf ,size (i+ len (backpatch len)))))))))))
           ((typep msg 'enum-descriptor)
            (let ((tag (make-wire-tag $wire-type-varint index)))
              `(when ,boundp
