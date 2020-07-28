@@ -1056,7 +1056,6 @@ Arguments:
                                   :conc-name conc-name
                                   :options   (remove-options options "default" "packed")
                                   :documentation documentation))
-         (index 0)
          (field-offset 0)
          (top-level-form-p (top-level-p *protobuf*))
          (*protobuf* msg-desc)
@@ -1124,8 +1123,6 @@ Arguments:
                      ;; TODO(cgay): this should probably refer to the external field name but I'll
                      ;; wait since I've no idea if that slot is bound at this point.
                      (proto-internal-field-name field) (proto-class msg-desc))
-             ;; todo(benkuehnert: What does this do?
-             (setq index idx)
              (when slot
                (collect-slot slot))
              (push field (proto-fields msg-desc))))))
@@ -1241,8 +1238,7 @@ Arguments:
                         :documentation documentation)))
          (top-level-form-p (top-level-p *protobuf*))
          ;; Only now can we bind *protobuf* to the new extended message
-         (*protobuf* extends)
-         (index 0))
+         (*protobuf* extends))
     (assert message ()
             "There is no message named ~A to extend" name)
     (assert (eq type (proto-class message)) ()
@@ -1326,7 +1322,6 @@ Arguments:
              (assert (index-within-extensions-p idx message) ()
                      "The index ~D is not in range for extending ~S"
                      idx (proto-class message))
-             (setq index idx)
              (when slot
                (let* (;; The slot name which is the %field-name
                       (sname  (field-data-internal-slot-name slot))
@@ -1463,7 +1458,6 @@ Arguments:
                     :options   (remove-options options "default" "packed")
                     :message-type :group                ;this message is a group
                     :documentation documentation))
-         (index 0)
          (field-offset 0)
          (bool-count (count-if #'non-repeated-bool-field fields))
          (bool-index -1)
@@ -1525,7 +1519,6 @@ Arguments:
              (assert (not (find-field message (proto-index field))) ()
                      "The field ~S overlaps with another field in ~S"
                      (proto-internal-field-name field) (proto-class message))
-             (setq index idx)
              (when slot
                (collect-slot slot))
              (appendf (proto-fields message) (list field))))))
