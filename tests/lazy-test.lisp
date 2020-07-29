@@ -32,32 +32,38 @@ Parameters:
     (assert-true (proto-impl::proto-lazy-p inner-field))))
 
 (deftest test-lazy-field-serialize (lazy-tests)
-  (let* ((proto (make-container
-                 :value-before 10
-                 :inner (make-inner :value 42)
-                 :value-after 20))
-         (bytes (proto:serialize-object-to-bytes proto))
-         (restored (proto:deserialize-object-from-bytes 'container bytes)))
-    ;; The original proto doesn't have encoded field.
-    (assert-true (null (proto:encoded-field proto 'inner)))
-    ;; The deserialized proto does have encoded field.
-    (assert-true (proto:encoded-field restored 'inner))
+  (dolist (optimized '(nil t))
+      (when optimized
+        (proto-impl::make-deserializer container)
+        (proto-impl::make-deserializer inner)
+        (proto-impl::make-serializer container)
+        (proto-impl::make-serializer inner))
+    (let* ((proto (make-container
+                   :value-before 10
+                   :inner (make-inner :value 42)
+                   :value-after 20))
+           (bytes (proto:serialize-object-to-bytes proto))
+           (restored (proto:deserialize-object-from-bytes 'container bytes)))
+      ;; The original proto doesn't have encoded field.
+      (assert-true (null (proto:encoded-field proto 'inner)))
+      ;; The deserialized proto does have encoded field.
+      (assert-true (proto:encoded-field restored 'inner))
 
-    ;; If the encoded field is deserialized independently, we get the correct result.
-    (let ((inner (proto:deserialize-object-from-bytes
-                  'inner
-                  (proto:encoded-field restored 'inner))))
-      (assert-true (= 42 (value inner))))
-    ;; If the field is accessed, it's deserialized lazily.
-    (assert-true (= 42 (value (inner restored))))
+      ;; If the encoded field is deserialized independently, we get the correct result.
+      (let ((inner (proto:deserialize-object-from-bytes
+                    'inner
+                    (proto:encoded-field restored 'inner))))
+        (assert-true (= 42 (value inner))))
+      ;; If the field is accessed, it's deserialized lazily.
+      (assert-true (= 42 (value (inner restored))))
 
-    ;; Verify fields around the lazy field are restored correctly.
-    (assert-true (= 10 (value-before restored)))
-    (assert-true (= 20 (value-after restored)))
+      ;; Verify fields around the lazy field are restored correctly.
+      (assert-true (= 10 (value-before restored)))
+      (assert-true (= 20 (value-after restored)))
 
-    ;; Serialize the restored proto again and verify it's the same as the originally serialized
-    ;; value.
-    (assert-true (equalp bytes (proto:serialize-object-to-bytes restored)))))
+      ;; Serialize the restored proto again and verify it's the same as the originally serialized
+      ;; value.
+      (assert-true (equalp bytes (proto:serialize-object-to-bytes restored))))))
 
 (deftest test-recursive-lazy (lazy-tests)
   (let* ((inner (make-inner :value 123))
