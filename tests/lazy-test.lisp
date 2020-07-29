@@ -66,7 +66,8 @@ Parameters:
 
       ;; Serialize the restored proto again and verify it's the same as the originally serialized
       ;; value.
-      (assert-true (equalp bytes (proto:serialize-object-to-bytes restored))))))
+      (let ((restored (proto:deserialize-object-from-bytes 'container bytes)))
+        (assert-true (equalp bytes (proto:serialize-object-to-bytes restored)))))))
 
 (deftest test-lazy-oneof-serialize (lazy-tests)
   (dolist (optimized '(nil t))
@@ -101,7 +102,8 @@ Parameters:
 
       ;; Serialize the restored proto again and verify it's the same as the originally serialized
       ;; value.
-      (assert-true (equalp bytes (proto:serialize-object-to-bytes restored))))))
+      (let ((restored (proto:deserialize-object-from-bytes 'oneof-lazy bytes)))
+        (assert-true (equalp bytes (proto:serialize-object-to-bytes restored)))))))
 
 (deftest test-recursive-lazy (lazy-tests)
   (dolist (optimized '(nil t))
@@ -200,7 +202,8 @@ Parameters:
 
       ;; Serialize the restored proto again and verify it's the same as the originally serialized
       ;; value.
-      (assert-true (equalp bytes (proto:serialize-object-to-bytes restored))))))
+      (let ((restored (proto:deserialize-object-from-bytes 'repeated-lazy bytes)))
+        (assert-true (equalp bytes (proto:serialize-object-to-bytes restored)))))))
 
 ;; Checks that the accessors work for empty lazy fields.
 (deftest test-empty-lazy (lazy-tests)
