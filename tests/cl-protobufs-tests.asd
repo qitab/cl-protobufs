@@ -139,11 +139,6 @@
                  (:protobuf-source-file "import-proto")
                  (:file "import-test")))
 
-   (:module "lazy-structure-test"
-    :serial t
-    :pathname ""
-    :components ((:file "lazy-structure-test")))
-
    (:module "lazy-test"
     :serial t
     :pathname ""
@@ -211,7 +206,6 @@
   (uiop:symbol-call (find-package 'cl-protobufs.test.map-test)               '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.oneof-test)             '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.import-test)            '#:run)
-  (uiop:symbol-call (find-package 'cl-protobufs.test.lazy-structure-test)    '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.lazy-test)              '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.alias-test)             '#:run)
   (uiop:symbol-call (find-package 'cl-protobufs.test.packed-test)            '#:run)
