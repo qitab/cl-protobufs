@@ -107,20 +107,29 @@
    The value returned is the number of octets written to BUFFER."
   (declare (buffer buffer)
            (message-descriptor msg-desc))
-  (let ((size 0))
-    (dolist (field (proto-fields msg-desc))
-      (iincf size (emit-field object field buffer)))
-    (dolist (oneof (proto-oneofs msg-desc) size)
-      (let* ((fields    (oneof-descriptor-fields oneof))
-             (data      (slot-value object (oneof-descriptor-internal-name oneof)))
-             (set-field (oneof-set-field data))
-             (value     (oneof-value data)))
-        (when set-field
-          (let* ((field (aref fields set-field))
-                 (type  (proto-class field))
-                 (index (proto-index field)))
-            (iincf size
-                   (emit-non-repeated-field value type index buffer))))))))
+  (let ((bytes (and (slot-exists-p object '%bytes)
+                    (proto-%bytes object)))
+        (size 0))
+    (cond
+      (bytes
+       (setf size (length bytes))
+       (buffer-ensure-space buffer size)
+       (fast-octets-out buffer bytes)
+       size)
+      (t
+       (dolist (field (proto-fields msg-desc))
+         (iincf size (emit-field object field buffer)))
+       (dolist (oneof (proto-oneofs msg-desc) size)
+         (let* ((fields    (oneof-descriptor-fields oneof))
+                (data      (slot-value object (oneof-descriptor-internal-name oneof)))
+                (set-field (oneof-set-field data))
+                (value     (oneof-value data)))
+           (when set-field
+             (let* ((field (aref fields set-field))
+                    (type  (proto-class field))
+                    (index (proto-index field)))
+               (iincf size
+                      (emit-non-repeated-field value type index buffer))))))))))
 
 (defun emit-field (object field buffer)
   "Serialize a single field from an object to buffer
@@ -269,25 +278,17 @@ Parameters:
                                (i+ size (encode-uint32 tag2 buffer)))
                       (iincf size (emit-field value f buffer)))))
                  (t
-                  (let ((precomputed-bytes (and (slot-exists-p value '%bytes)
-                                                (proto-%bytes value)))
-                        (custom-serializer (custom-serializer type))
+                  (let ((custom-serializer (custom-serializer type))
                         (tag-size
                          (encode-uint32 (make-wire-tag $wire-type-string index)
                                         buffer))
                         (submessage-size 0))
                     (with-placeholder (buffer)
-                      (cond (precomputed-bytes
-                             (let* ((len (length precomputed-bytes)))
-                               (setq submessage-size len)
-                               (buffer-ensure-space buffer len)
-                               (fast-octets-out buffer precomputed-bytes)))
-                            (custom-serializer
-                             (setq submessage-size
-                                   (funcall custom-serializer value buffer)))
-                            (t
-                             (setq submessage-size
-                                   (serialize-object value desc buffer))))
+                      (if custom-serializer
+                          (setq submessage-size
+                                (funcall custom-serializer value buffer))
+                          (setq submessage-size
+                                (serialize-object value desc buffer)))
                       (+ tag-size (backpatch submessage-size) submessage-size))))))
           ((typep desc 'enum-descriptor)
            (serialize-enum value (enum-descriptor-values desc)
