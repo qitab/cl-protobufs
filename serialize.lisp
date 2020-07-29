@@ -111,11 +111,14 @@
                     (proto-%bytes object)))
         (size 0))
     (cond
+      ;; If OBJECT has BYTES bound, then it is a lazy field, and BYTES is
+      ;; the pre-computed serialization of OBJECT, so output that.
       (bytes
        (setf size (length bytes))
        (buffer-ensure-space buffer size)
        (fast-octets-out buffer bytes)
        size)
+      ;; Otherwise, serialize as normal.
       (t
        (dolist (field (proto-fields msg-desc))
          (iincf size (emit-field object field buffer)))
@@ -989,6 +992,8 @@ Parameters:
            (type fixnum ,size))
           (let ((,bytes (and (slot-exists-p ,vobj '%bytes)
                              (proto-%bytes ,vobj))))
+            ;; If BYTES is bound, then VOBJ is a lazy field, and BYTES is the pre-computed
+            ;; serialization of VOBJ. So, just output that.
             (cond
               (,bytes
                (setf ,size (length ,bytes))
@@ -1159,6 +1164,9 @@ Parameters:
                             ;; the secondary return value for anything.
                             (setq ,vidx (+ payload-start payload-len))
                             ,(if lazy-p
+                                 ;; If this field is declared lazy, then don't deserialize.
+                                 ;; Instead, create a new message with %BYTES field set to
+                                 ;; the bytes on the wire.
                                  `(push (make-message-with-bytes
                                          ',class (subseq ,vbuf payload-start ,vidx))
                                         ,dest)
@@ -1239,6 +1247,9 @@ Parameters:
                   `(multiple-value-bind (payload-len payload-start)
                        (decode-uint32 ,vbuf ,vidx)
                      (setq ,vidx (+ payload-start payload-len))
+                     ;; If this field is declared lazy, then don't deserialize.
+                     ;; Instead, create a new message with %BYTES field set to
+                     ;; the bytes on the wire.
                      ,(if lazy-p
                           `(setq ,dest (make-message-with-bytes
                                         ',class (subseq ,vbuf payload-start ,vidx)))
