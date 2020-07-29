@@ -1403,7 +1403,6 @@ Parameters:
                         ,@(loop for field in rfields
                                 for temp in rtemps
                                 for mtemp = (slot-value-to-slot-name-symbol temp)
-                                as slot = (proto-internal-field-name field)
                                 as writer = (proto-writer field)
                                 for conversion = (if (vector-field-p field)
                                                      `(coerce (nreverse ,temp) 'vector)
