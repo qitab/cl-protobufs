@@ -175,24 +175,21 @@ Parameters:
                (type  (proto-proto-type desc)))
            (print-scalar value type name stream
                          (and pretty-print indent)))))
-      ;; todo(benkuehnert): use specified map format
       ((typep desc 'map-descriptor)
-       (let ((key-class (map-descriptor-key-class desc))
-             (val-class (map-descriptor-val-class desc)))
-         (if pretty-print
-             (format stream "~&~VT~A: {~%" (+ 2 indent) name)
-             (format stream "~A: {" name))
-         (flet ((print-entry (k v)
-                  (format stream "~&~VT" (+ 4 indent))
-                  (print-scalar k key-class nil stream nil)
-                  (format stream "-> ")
-                  (if (scalarp val-class)
-                      (print-scalar v val-class nil stream nil)
-                      (print-text-format v :stream stream
-                                           :pretty-print nil))
-                  (format stream "~%")))
-           (maphash #'print-entry value)
-           (format stream "~&~VT}" (+ indent 2)))))
+       (let ((key-type (map-descriptor-key-class desc))
+             (val-type (map-descriptor-val-class desc)))
+         (loop for k being the hash-keys of value using (hash-value v)
+               do (if pretty-print
+                      (format stream "~&~V,0T~A { " (+ indent 2) name)
+                      (format stream "~A { " name))
+                  (print-scalar k key-type "key" stream nil)
+                  (print-non-repeated-field v val-type "value"
+                                            :stream stream
+                                            :print-name t
+                                            :pretty-print nil)
+                  (format stream "}")
+                  (when pretty-print
+                    (format stream "~%")))))
       ;; This case only happens when the user specifies a custom type and
       ;; doesn't support it above.
       (t (undefined-type type "While printing ~S to text format," value)))))
@@ -326,6 +323,10 @@ attempt to parse the name of the message and match it against MSG-DESC."
                  (when slot
                    (pushnew slot rslots)
                    (push val (proto-slot-value object slot))))
+                ((eq (proto-set-type field) :map)
+                 (dolist (pair val)
+                   (setf (gethash (car pair) (proto-slot-value object slot))
+                         (cdr pair))))
                 (t
                  (when slot
                    (setf (proto-slot-value object slot) val))))))))))
@@ -336,7 +337,8 @@ the object parsed. If the parsing fails, the function will
 return T as a second value."
   (let ((desc (or (find-message type)
                  (find-enum type)
-                 (find-type-alias type))))
+                 (find-type-alias type)
+                 (find-map-descriptor type))))
     (cond ((scalarp type)
            (expect-char stream #\:)
            (case type
@@ -366,6 +368,38 @@ return T as a second value."
                ((:string) (parse-string stream))
                ((:bool)   (boolean-true-p (parse-token stream)))
                (otherwise (parse-signed-int stream)))))
+          ((typep desc 'map-descriptor)
+           (let ((key-type (map-descriptor-key-class desc))
+                 (val-type (map-descriptor-val-class desc)))
+             (flet ((parse-map-entry (key-type val-type stream)
+                      (let (key val)
+                        (expect-char stream #\{)
+                        (assert (string= "key" (parse-token stream)))
+                        (setf key (parse-field key-type :stream stream))
+                        (skip-whitespace stream)
+                        (assert (string= "value" (parse-token stream)))
+                        (setf val (parse-field val-type :stream stream))
+                        (skip-whitespace stream)
+                        (expect-char stream #\})
+                        (cons key val))))
+               (case (peek-char nil stream nil)
+                 ((#\:)
+                  (expect-char stream #\:)
+                  (expect-char stream #\[)
+                  (loop
+                    with pairs = ()
+                    do (skip-whitespace stream)
+                       (push (parse-map-entry key-type val-type stream)
+                             pairs)
+                       (if (eql (peek-char nil stream nil) #\,)
+                           (read-char stream)
+                           (progn
+                             (skip-whitespace stream)
+                             (expect-char stream #\])
+                             (return pairs)))))
+                 (t
+                  (skip-whitespace stream)
+                  (list (parse-map-entry key-type val-type stream)))))))
         (t (values nil t)))))
 
 (defun skip-field (stream)
