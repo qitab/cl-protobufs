@@ -1106,7 +1106,7 @@ Arguments:
                (push oneof-desc (proto-oneofs msg-desc))
                (collect-oneof oneof-desc))))
           (otherwise
-           (multiple-value-bind (field slot idx)
+           (multiple-value-bind (field slot)
                (process-field field :conc-name conc-name
                                     :alias-for alias-for
                                     :field-offset field-offset
@@ -1504,7 +1504,7 @@ Arguments:
                (appendf (proto-oneofs message) (list oneof-desc))
                (collect-oneof oneof-desc))))
           (otherwise
-           (multiple-value-bind (field slot idx)
+           (multiple-value-bind (field slot)
                (process-field field :conc-name conc-name
                                     :alias-for alias-for
                                     :field-offset field-offset
