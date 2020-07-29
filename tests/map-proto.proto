@@ -23,10 +23,12 @@ message MapProto {
 }
 
 message MapMessage {
+  optional int32 before = 2;
   message ValMessage {
     optional string strval = 1;
   }
   map<int32,ValMessage> map_field = 1;
+  optional int32 after = 3;
 }
 
 message MapEnum {
@@ -43,4 +45,5 @@ message MapEnum {
 message NestedMap {
   optional string strval = 1;
   optional MapProto subfield = 2;
+  optional int32 after = 3;
 }

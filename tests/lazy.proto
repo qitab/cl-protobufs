@@ -30,6 +30,14 @@ message RequiredLazy {
   required Inner inner = 1 [lazy = true];
 }
 
+message OneofLazy {
+  optional int32 value_before = 1;
+  oneof LazyOneof {
+    Inner inner = 2 [lazy = true];
+  }
+  optional int32 value_after = 3;
+}
+
 message RepeatedLazy {
   repeated Inner inners = 1 [lazy = true];
 }

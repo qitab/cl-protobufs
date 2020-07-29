@@ -680,12 +680,19 @@ Paramters:
                    (oneof-offset (proto-oneof-offset field)))
               ;; If a field isn't currently set inside of the oneof, just return its
               ;; default value.
-              (with-gensyms (obj new-value)
+              (with-gensyms (obj new-value bytes field-obj)
                 `((declaim (inline ,public-accessor-name))
                   (defun ,public-accessor-name (,obj)
                     (if (eq (oneof-set-field (,hidden-accessor-name ,obj))
                             ,oneof-offset)
-                        (oneof-value (,hidden-accessor-name ,obj))
+                        ,(if (proto-lazy-p field)
+                             `(let* ((,field-obj (oneof-value (,hidden-accessor-name ,obj)))
+                                     (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
+                                (if ,bytes
+                                    (setf (oneof-value (,hidden-accessor-name ,obj))
+                                          (%deserialize-object ',(proto-class field)
+                                                               ,bytes nil nil))))
+                             `(oneof-value (,hidden-accessor-name ,obj)))
                         ,default-form))
 
                   (declaim (inline (setf ,public-accessor-name)))
