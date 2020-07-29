@@ -105,7 +105,8 @@
 (defun serialize-object (object msg-desc buffer)
   "Serialize OBJECT with message descriptor MSG-DESC into BUFFER using wire format.
    The value returned is the number of octets written to BUFFER."
-  (declare (buffer buffer))
+  (declare (buffer buffer)
+           (message-descriptor msg-desc))
   (let ((size 0))
     (dolist (field (proto-fields msg-desc))
       (iincf size (emit-field object field buffer)))
