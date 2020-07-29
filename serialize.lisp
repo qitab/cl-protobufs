@@ -1042,13 +1042,14 @@ Parameters:
         (rslot nil))
     (let* ((class  (proto-class field))
            (index  (proto-index field))
+           (lazy-p (proto-lazy-p field))
            (temp (fintern (string (proto-internal-field-name field))))
            (oneof-offset (proto-oneof-offset field)))
       (cond ((eq (proto-label field) :repeated)
              (setf rslot (list field temp))
              (multiple-value-bind (deserializer tag list?)
                  (generate-repeated-field-deserializer
-                  class index vbuf vidx temp :raw-p raw-p)
+                  class index lazy-p vbuf vidx temp :raw-p raw-p)
                (if deserializer
                    (if list?
                        (return-from generate-field-deserializer
@@ -1065,7 +1066,7 @@ Parameters:
              (let ((oneof-val (gensym "ONEOF-VAL")))
                (multiple-value-bind (deserializer tag)
                    (generate-non-repeated-field-deserializer
-                    class index vbuf vidx oneof-val :raw-p raw-p)
+                    class index lazy-p vbuf vidx oneof-val :raw-p raw-p)
                  (when deserializer
                    (setf deserializer
                          `(progn
@@ -1082,7 +1083,7 @@ Parameters:
              (setf nslot temp)
              (multiple-value-bind (deserializer tag)
                  (generate-non-repeated-field-deserializer
-                  class index vbuf vidx temp :raw-p raw-p)
+                  class index lazy-p vbuf vidx temp :raw-p raw-p)
                (if deserializer
                    (return-from generate-field-deserializer
                      (values (list tag) (list deserializer)
@@ -1093,7 +1094,7 @@ Parameters:
   (assert nil))
 
 (defun generate-repeated-field-deserializer
-    (class index vbuf vidx dest &key raw-p)
+    (class index lazy-p vbuf vidx dest &key raw-p)
   "Returns three values: The first is a (list of) s-expressions that deserializes the
 specified object to dest and updates vidx to the new index. The second is (list of)
 tag(s) of this field. The third is true if and only if lists are being returned.
@@ -1101,6 +1102,7 @@ tag(s) of this field. The third is true if and only if lists are being returned.
 Parameters:
   CLASS: The :class field of this field.
   INDEX: The field index of the field.
+  LAZY-P: True if and only if the field is lazy.
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
   DEST: The symbol name for the destination of deserialized data.
@@ -1156,8 +1158,12 @@ Parameters:
                             ;; for the recursive call. And we don't need
                             ;; the secondary return value for anything.
                             (setq ,vidx (+ payload-start payload-len))
-                            (push ,(call-deserializer msg vbuf 'payload-start vidx)
-                                  ,dest))
+                            ,(if lazy-p
+                                 `(push (make-message-with-bytes
+                                         ',class (subseq ,vbuf payload-start ,vidx))
+                                        ,dest)
+                                 `(push ,(call-deserializer msg vbuf 'payload-start vidx)
+                                        ,dest)))
                          (make-wire-tag $wire-type-string index))))
             ((typep msg 'enum-descriptor)
              (let* ((tag (make-wire-tag $wire-type-varint index))
@@ -1193,13 +1199,14 @@ Parameters:
             (t nil)))))
 
 (defun generate-non-repeated-field-deserializer
-    (class index vbuf vidx dest &key raw-p)
+    (class index lazy-p vbuf vidx dest &key raw-p)
   "Returns two values: The first is lisp code that deserializes the specified object
 to dest and updates vidx to the new index. The second is the tag of this field.
 
 Parameters:
   CLASS: The :class field of this field.
   INDEX: The field index of the field.
+  LAZY-P: True if and only if the field is lazy.
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
   DEST: The symbol name for the destination of deserialized data.
@@ -1231,8 +1238,11 @@ Parameters:
                  (values
                   `(multiple-value-bind (payload-len payload-start)
                        (decode-uint32 ,vbuf ,vidx)
-                     (setq ,vidx (+ payload-start payload-len)
-                           ,dest ,(call-deserializer msg vbuf 'payload-start vidx)))
+                     (setq ,vidx (+ payload-start payload-len))
+                     ,(if lazy-p
+                          `(setq ,dest (make-message-with-bytes
+                                        ',class (subseq ,vbuf payload-start ,vidx)))
+                          `(setq ,dest ,(call-deserializer msg vbuf 'payload-start vidx))))
                   (make-wire-tag $wire-type-string index))))
             ((typep msg 'enum-descriptor)
              (values
@@ -1272,7 +1282,7 @@ Parameters:
                            (multiple-value-setq (key-data ,vidx)
                              (deserialize-scalar ,key-class ,vbuf ,vidx))
                            ,(generate-non-repeated-field-deserializer
-                             val-class 2 vbuf vidx 'val-data)))))
+                             val-class 2 nil vbuf vidx 'val-data)))))
                 (make-wire-tag $wire-type-string index))))
             (t nil)))))
 
