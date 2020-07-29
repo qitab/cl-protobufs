@@ -865,18 +865,12 @@ Parameters:
                       (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
                       (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
                (let ((tag (make-wire-tag $wire-type-string index)))
-                 `(let* ((,vval ,reader)
-                         (lazy-bytes (and (slot-exists-p ,vval '%bytes))))
+                 `(let* ((,vval ,reader))
                     (when ,vval
                       (iincf ,size (encode-uint32 ,tag ,vbuf))
                       (with-placeholder (,vbuf)
-                        (if lazy-bytes
-                            (let* ((len (length lazy-bytes))
-                                   (buffer-ensure-space ,vbuf len)
-                                   (fast-octets-out ,vbuf bytes))
-                              (iincf ,size (i+ len (backpatch len))))
-                            (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
-                              (iincf ,size (i+ len (backpatch len)))))))))))
+                        (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
+                          (iincf ,size (i+ len (backpatch len))))))))))
           ((typep msg 'enum-descriptor)
            (let ((tag (make-wire-tag $wire-type-varint index)))
              `(when ,boundp
@@ -984,7 +978,8 @@ Parameters:
 (defun generate-serializer (message)
   (let ((vobj (make-symbol "OBJ"))
         (vbuf (make-symbol "BUF"))
-        (size (make-symbol "SIZE")))
+        (size (make-symbol "SIZE"))
+        (bytes (make-symbol "BYTES")))
     (multiple-value-bind (serializers) (generate-serializer-body message vobj vbuf size)
       (def-pseudo-method :serialize message `(,vobj ,vbuf &aux (,size 0))
         `((declare ,$optimize-serialization)
@@ -992,8 +987,17 @@ Parameters:
           (declare ; maybe allow specification of the type
            #+ignore(type ,(proto-class message) ,vobj)
            (type fixnum ,size))
-          ,@serializers
-          ,size)))))
+          (let ((,bytes (and (slot-exists-p ,vobj '%bytes)
+                             (proto-%bytes ,vobj))))
+            (cond
+              (,bytes
+               (setf ,size (length ,bytes))
+               (buffer-ensure-space ,vbuf ,size)
+               (fast-octets-out ,vbuf ,bytes)
+               ,size)
+              (t
+               ,@serializers
+               ,size))))))))
 
 (defun generate-oneof-serializer (message oneof vobj vbuf size)
   "Creates and returns the code that serializes a oneof.
