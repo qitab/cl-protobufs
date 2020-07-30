@@ -7,34 +7,40 @@
 (defpackage #:protobuf-config
   (:documentation "Configuration information for PROTOBUF.")
   (:use #:common-lisp)
-  (:export *protoc-relative-path*))
+  (:export *protoc-relative-path*
+	   *PROTOC-GEN-LISP-RELATIVE-PATH*))
 
 (in-package #:protobuf-config)
 
 (defvar *protoc-relative-path* nil
   "Supply relative proto file paths to protoc, the protobuf compiler?")
 
+(defvar *protoc-gen-lisp-relative-path*
+  #+(and :linux :x86-64) "bin/protoc-gen-lisp"
+  #-(and :linux :x86-64)nil
+  "Supply relative proto file paths to protoc, the protobuf compiler?")
+
 (defpackage #:protobuf-system
   (:documentation "System definitions for protocol buffer code.")
   (:use #:common-lisp
-        #:asdf
-        #:protobuf-config)
+	#:asdf
+	#:protobuf-config)
   (:export #:protobuf-source-file
-           #:proto-pathname
-           #:search-path))
+	   #:proto-pathname
+	   #:search-path))
 
 (in-package #:protobuf-system)
 
 (defclass protobuf-source-file (cl-source-file)
   ((relative-proto-pathname :initarg :proto-pathname
-                            :initform nil
-                            :reader proto-pathname
-                            :documentation
-                            "Relative pathname that specifies the location of a .proto file.")
+			    :initform nil
+			    :reader proto-pathname
+			    :documentation
+			    "Relative pathname that specifies the location of a .proto file.")
    (search-path :initform ()
-                :initarg :proto-search-path
-                :reader search-path
-                :documentation
+		:initarg :proto-search-path
+		:reader search-path
+		:documentation
 "List containing directories where the protocol buffer compiler should search
 for imported protobuf files.  Non-absolute pathnames are treated as relative to
 the directory containing the DEFSYSTEM form in which they appear."))
@@ -72,11 +78,11 @@ translated into Lisp source code for this PROTO-FILE component."
       (merge-pathnames
        (make-pathname :type "proto")
        (merge-pathnames (pathname (proto-pathname protobuf-source-file))
-                        (component-pathname (component-parent protobuf-source-file))))
+			(component-pathname (component-parent protobuf-source-file))))
       ;; No :PROTO-PATHNAME was specified, so the path of the protobuf
       ;; defaults to that of the Lisp file, but with a ".proto" suffix.
       (let ((lisp-pathname (component-pathname protobuf-source-file)))
-        (merge-pathnames (make-pathname :type "proto") lisp-pathname))))
+	(merge-pathnames (make-pathname :type "proto") lisp-pathname))))
 
 (defmethod input-files ((operation proto-to-lisp) (component protobuf-source-file))
   (list (proto-input component)))
@@ -85,28 +91,28 @@ translated into Lisp source code for this PROTO-FILE component."
   "Arranges for the Lisp output file of a proto-to-lisp OPERATION on a
 PROTOBUF-SOURCE-FILE COMPONENT to be stored where fasl files are located."
   (values (list (component-pathname component))
-          nil))                     ; allow around methods to translate
+	  nil))                     ; allow around methods to translate
 
 (defun resolve-relative-pathname (path parent-path)
   "When PATH doesn't have an absolute directory component, treat it as relative
 to PARENT-PATH."
   (let* ((pathname (pathname path))
-         (directory (pathname-directory pathname)))
+	 (directory (pathname-directory pathname)))
     (if (and (list directory) (eq (car directory) :absolute))
-        pathname
-        (let ((resolved-path (merge-pathnames pathname parent-path)))
-          (make-pathname :directory (pathname-directory resolved-path)
-                         :name nil
-                         :type nil
-                         :defaults resolved-path)))))
+	pathname
+	(let ((resolved-path (merge-pathnames pathname parent-path)))
+	  (make-pathname :directory (pathname-directory resolved-path)
+			 :name nil
+			 :type nil
+			 :defaults resolved-path)))))
 
 (defun resolve-search-path (protobuf-source-file)
   "Resolves the search path of PROTOBUF-SOURCE-FILE."
   (let ((search-path (search-path protobuf-source-file)))
     (let ((parent-path (component-pathname (component-parent protobuf-source-file))))
       (mapcar (lambda (path)
-                (resolve-relative-pathname path parent-path))
-              search-path))))
+		(resolve-relative-pathname path parent-path))
+	      search-path))))
 
 (define-condition protobuf-compile-failed (compile-failed-error)
   ()
@@ -117,34 +123,40 @@ to PARENT-PATH."
 
 (defmethod perform ((operation proto-to-lisp) (component protobuf-source-file))
   (let* ((source-file (first (input-files operation component)))
-         (source-file-argument (if *protoc-relative-path*
-                                   (file-namestring source-file)
-                                   (namestring source-file)))
-         ;; Around methods on output-file may globally redirect output products, so we must call
-         ;; that method instead of executing (component-pathname component).
-         (output-file (first (output-files operation component)))
-         (search-path (cons (directory-namestring source-file) (resolve-search-path component)))
-         (command (format nil "protoc --proto_path=~{~A~^:~} --lisp_out=output-file=~A:~A ~A"
-                          search-path
-                          (file-namestring output-file)
-                          (directory-namestring output-file)
-                          source-file-argument)))
+	 (source-file-argument (if *protoc-relative-path*
+				   (file-namestring source-file)
+				   (namestring source-file)))
+	 (protoc-gen-lisp (when *protoc-gen-lisp-relative-path*
+			    (format nil "--plugin=~a"
+				    (namestring
+				     (asdf:system-relative-pathname
+				      :cl-protobufs *protoc-gen-lisp-relative-path*)))))
+	 ;; Around methods on output-file may globally redirect output products, so we must call
+	 ;; that method instead of executing (component-pathname component).
+	 (output-file (first (output-files operation component)))
+	 (search-path (cons (directory-namestring source-file) (resolve-search-path component)))
+	 (command (format nil "protoc ~@[~a ~]--proto_path=~{~A~^:~} --lisp_out=output-file=~A:~A ~A"
+			  protoc-gen-lisp
+			  search-path
+			  (file-namestring output-file)
+			  (directory-namestring output-file)
+			  source-file-argument)))
     (multiple-value-bind (output error-output status)
-        (uiop:run-program command :output t :error-output :output :ignore-error-status t)
+	(uiop:run-program command :output t :error-output :output :ignore-error-status t)
       (declare (ignore output error-output))
       (unless (zerop status)
-        (error 'protobuf-compile-failed
-               :description (format nil "Failed to compile proto file.  Command: ~S" command)
-               :context-format "~/asdf-action::format-action/"
-               :context-arguments `((,operation . ,component)))))))
+	(error 'protobuf-compile-failed
+	       :description (format nil "Failed to compile proto file.  Command: ~S" command)
+	       :context-format "~/asdf-action::format-action/"
+	       :context-arguments `((,operation . ,component)))))))
 
 (defmethod asdf::component-self-dependencies :around ((op load-op) (c protobuf-source-file))
   "Removes PROTO-TO-LISP operations from self dependencies.  Otherwise, the Lisp
 output files of PROTO-TO-LISP are considered to be input files for LOAD-OP,
 which means ASDF loads both the .lisp file and the .fasl file."
   (remove-if (lambda (x)
-               (eq (car x) 'proto-to-lisp))
-             (call-next-method)))
+	       (eq (car x) 'proto-to-lisp))
+	     (call-next-method)))
 
 (defmethod input-files ((operation compile-op) (c protobuf-source-file))
   (output-files 'proto-to-lisp c))
