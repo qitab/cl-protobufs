@@ -6,158 +6,10 @@
 
 ;;; Author: Robert Brown <robert.brown@gmail.com>
 
-(in-package #:common-lisp-user)
+#.(unless (or #+asdf3.1 (version<= "3.1" (asdf-version)))
+    (error "You need ASDF >= 3.1 to load this system correctly."))
 
-(defpackage #:protobuf-config
-  (:documentation "Configuration information for PROTOBUF.")
-  (:use #:common-lisp)
-  (:export *protoc-relative-path*))
-
-(in-package #:protobuf-config)
-
-(defvar *protoc-relative-path* nil
-  "Supply relative proto file paths to protoc, the protobuf compiler?")
-
-;;;; ASDF package changes
-
-(in-package #:asdf)
-
-(defclass protobuf-source-file (cl-source-file)
-  ((relative-proto-pathname :initarg :proto-pathname
-                            :initform nil
-                            :reader proto-pathname
-                            :documentation
-                            "Relative pathname that specifies the location of a .proto file.")
-   (search-path :initform ()
-                :initarg :proto-search-path
-                :reader search-path
-                :documentation
-"List containing directories where the protocol buffer compiler should search
-for imported protobuf files.  Non-absolute pathnames are treated as relative to
-the directory containing the DEFSYSTEM form in which they appear."))
-  (:documentation "A protocol buffer definition file."))
-
-(export '(protobuf-source-file proto-pathname search-path))
-
-;;;; ASDF system definition
-
-(in-package #:common-lisp-user)
-
-(defpackage #:protobuf-system
-  (:documentation "System definitions for protocol buffer code.")
-  (:use #:common-lisp
-        #:asdf
-        #:protobuf-config))
-
-(in-package #:protobuf-system)
-
-(defclass proto-to-lisp (downward-operation selfward-operation)
-  ((selfward-operation :initform 'prepare-op :allocation :class))
-  (:documentation
-"An ASDF operation that compiles a .proto file containing protocol buffer
-definitions into a Lisp source file."))
-
-(defmethod component-depends-on ((operation compile-op) (component protobuf-source-file))
-  "Compiling a protocol buffer file depends on generating Lisp source code for
-the protobuf, but also on loading package definitions and in-line function
-definitions that the machine-generated protobuf Lisp code uses."
-  `((proto-to-lisp ,(component-name component))
-    ,@(call-next-method)))
-
-(defmethod component-depends-on ((operation load-op) (component protobuf-source-file))
-  "Loading a protocol buffer file depends on generating Lisp source code for the
-protobuf, but also on loading package definitions and in-line function
-definitions that the machine-generated protobuf Lisp code uses."
-  `((proto-to-lisp ,(component-name component))
-    ,@(call-next-method)))
-
-(defun proto-input (protobuf-source-file)
-  "Returns the pathname of the protocol buffer definition file that must be
-translated into Lisp source code for this PROTO-FILE component."
-  (if (proto-pathname protobuf-source-file)
-      ;; Path of the protobuf file was specified with :PROTO-PATHNAME.
-      (merge-pathnames
-       (make-pathname :type "proto")
-       (merge-pathnames (pathname (proto-pathname protobuf-source-file))
-                        (component-pathname (component-parent protobuf-source-file))))
-      ;; No :PROTO-PATHNAME was specified, so the path of the protobuf
-      ;; defaults to that of the Lisp file, but with a ".proto" suffix.
-      (let ((lisp-pathname (component-pathname protobuf-source-file)))
-        (merge-pathnames (make-pathname :type "proto") lisp-pathname))))
-
-(defmethod input-files ((operation proto-to-lisp) (component protobuf-source-file))
-  (list (proto-input component)))
-
-(defmethod output-files ((operation proto-to-lisp) (component protobuf-source-file))
-  "Arranges for the Lisp output file of PROTO-TO-LISP operations to be stored
-where fasl files are located."
-  (values (list (component-pathname component))
-          nil))                     ; allow around methods to translate
-
-(defun resolve-relative-pathname (path parent-path)
-  "When PATH doesn't have an absolute directory component, treat it as relative
-to PARENT-PATH."
-  (let* ((pathname (pathname path))
-         (directory (pathname-directory pathname)))
-    (if (and (list directory) (eq (car directory) :absolute))
-        pathname
-        (let ((resolved-path (merge-pathnames pathname parent-path)))
-          (make-pathname :directory (pathname-directory resolved-path)
-                         :name nil
-                         :type nil
-                         :defaults resolved-path)))))
-
-(defun resolve-search-path (protobuf-source-file)
-  (let ((search-path (search-path protobuf-source-file)))
-    (let ((parent-path (component-pathname (component-parent protobuf-source-file))))
-      (mapcar (lambda (path)
-                (resolve-relative-pathname path parent-path))
-              search-path))))
-
-(define-condition protobuf-compile-failed (compile-failed-error)
-  ()
-  (:documentation "Condition signalled when translating a .proto file into Lisp code fails."))
-
-(defmethod perform :before ((operation proto-to-lisp) (component protobuf-source-file))
-  (map nil #'ensure-directories-exist (output-files operation component)))
-
-(defmethod perform ((operation proto-to-lisp) (component protobuf-source-file))
-  (let* ((source-file (first (input-files operation component)))
-         (source-file-argument (if *protoc-relative-path*
-                                   (file-namestring source-file)
-                                   (namestring source-file)))
-         ;; Around methods on output-file may globally redirect output products, so we must call
-         ;; that method instead of executing (component-pathname component).
-         (output-file (first (output-files operation component)))
-         (search-path (cons (directory-namestring source-file) (resolve-search-path component)))
-         (command (format nil "protoc --proto_path=~{~A~^:~} --lisp_out=output-file=~A:~A ~A"
-                          search-path
-                          (file-namestring output-file)
-                          (directory-namestring output-file)
-                          source-file-argument)))
-    (multiple-value-bind (output error-output status)
-        (uiop:run-program command :output t :error-output :output :ignore-error-status t)
-      (declare (ignore output error-output))
-      (unless (zerop status)
-        (error 'protobuf-compile-failed
-               :description (format nil "Failed to compile proto file.  Command: ~S" command)
-               :context-format "~/asdf-action::format-action/"
-               :context-arguments `((,operation . ,component)))))))
-
-(defmethod asdf::component-self-dependencies :around ((op load-op) (c protobuf-source-file))
-  "Removes PROTO-TO-LISP operations from self dependencies.  Otherwise, the Lisp
-output files of PROTO-TO-LISP are considered to be input files for LOAD-OP,
-which means ASDF loads both the .lisp file and the .fasl file."
-  (remove-if (lambda (x)
-               (eq (car x) 'proto-to-lisp))
-             (call-next-method)))
-
-(defmethod input-files ((operation compile-op) (c protobuf-source-file))
-  (output-files 'proto-to-lisp c))
-
-(in-package "CL-USER")
-
-(asdf:defsystem :cl-protobufs
+(defsystem :cl-protobufs
   :name "CL Protobufs"
   :author "Scott McKay"
   :version "2.0"
@@ -165,13 +17,14 @@ which means ASDF loads both the .lisp file and the .fasl file."
   :maintainer '("Jon Godbout" "Carl Gay")
   :description      "Protobufs for Common Lisp"
   :long-description "Protobufs for Common Lisp"
+  :defsystem-depends-on (:cl-protobufs.asdf)
   :depends-on (:closer-mop
                ;; For SBCL we'll use its builtin UTF8 encoder/decoder.
                #-sbcl :babel
                :alexandria
                :trivial-garbage)
   :serial t
-  :in-order-to ((asdf:test-op (asdf:test-op :cl-protobufs-tests)))
+  :in-order-to ((test-op (test-op :cl-protobufs/tests)))
   :components
   ((:module "packages"
     :serial t
@@ -244,4 +97,211 @@ which means ASDF loads both the .lisp file and the .fasl file."
       :proto-pathname "google/protobuf/wrappers.proto")
      (:file "well-known-types")))))
 
-(pushnew :cl-protobufs *features*)
+(defsystem :cl-protobufs/tests
+  :name "Protobufs Tests"
+  :author "Scott McKay"
+  :version "2.0"
+  :licence "MIT-style"
+  :maintainer '("Jon Godbout" "Carl Gay")
+  :description      "Test code for Protobufs for Common Lisp"
+  :long-description "Test code for Protobufs for Common Lisp"
+  :defsystem-depends-on (:cl-protobufs.asdf)
+  :depends-on (:cl-protobufs :clunit2 :babel)
+  :serial t
+  :pathname "tests/"
+  :components
+  ((:module "packages"
+    :serial t
+    :pathname ""
+    :components ((:file "pkgdcl")))
+   ;; TODO(cgay): do these tests really depend on each other in the ways that
+   ;;   the :depends-on clauses imply? If so, why?
+   ;;
+   ;;   lisp-service-test.lisp not included as the necessary fields in
+   ;;   service-test.proto are not currently exported.
+
+   (:module "wire-level-tests"
+    :serial t
+    :pathname ""
+    :depends-on ("packages")
+    :components ((:file "varint-tests")
+                 (:file "wire-tests")))
+
+   (:module "descriptor-extensions"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "descriptor"
+                  :proto-pathname "../google/protobuf/descriptor")
+                 (:protobuf-source-file "proto2-descriptor-extensions"
+                  :proto-pathname "../proto2-descriptor-extensions"
+                  :depends-on ("descriptor")
+                  :proto-search-path ("../google/protobuf/"))))
+
+   (:module "lisp-alias"
+    :serial t
+    :pathname ""
+    :depends-on ("descriptor-extensions")
+    :components ((:protobuf-source-file "lisp-alias"
+                  :proto-search-path ("../" "../google/protobuf/"))))
+
+   ;; Google's own protocol buffers and protobuf definitions tests
+   (:module "google-tests-proto"
+    :serial t
+    :pathname ""
+    :components
+    ((:protobuf-source-file "unittest_import")
+     (:protobuf-source-file "unittest"
+      :depends-on ("unittest_import"))))
+
+   (:module "object-level-tests"
+    :serial t
+    :pathname ""
+    :depends-on ("wire-level-tests")
+    :components ((:protobuf-source-file "serialization")
+                 (:file "serialization-tests")
+                 (:file "symbol-import-tests")))
+
+   (:module "brown-tests"
+    :serial t
+    :pathname ""
+    :depends-on ("object-level-tests")
+    :components ((:protobuf-source-file "testproto1")
+                 (:protobuf-source-file "testproto2")
+                 (:file "quick-tests")))
+
+   (:module "lisp-reference-tests"
+    :serial t
+    :pathname ""
+    :depends-on ("descriptor-extensions")
+    :components ((:protobuf-source-file "package_test2")
+                 (:protobuf-source-file "package_test1"
+                  :depends-on ("package_test2"))
+                 (:protobuf-source-file "forward_reference"
+                  :proto-search-path ("../" "../google/protobuf/"))
+                 (:file "lisp-reference-tests")))
+
+   (:module "nested-extend-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "extend-base")
+                 (:protobuf-source-file "extend"
+                  :depends-on ("extend-base"))
+                 (:file "extend-test")))
+
+   (:module "case-preservation-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "case-preservation")
+                 (:file "case-preservation-test")))
+
+   (:module "custom-methods-test"
+    :serial t
+    :pathname ""
+    :components ((:file "custom-methods")))
+
+   (:module "deserialize-object-to-bytes-test"
+    :serial t
+    :pathname ""
+    :depends-on ("lisp-alias")
+    :components ((:file "deserialize-object-to-bytes-test")))
+
+   (:module "enum-mapping-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "enum-mapping")
+                 (:file "enum-mapping-test")))
+
+   (:module "map-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "map-proto")
+                 (:file "map-test")))
+
+   (:module "oneof-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "oneof-proto")
+                 (:file "oneof-test")))
+
+   (:module "import-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "import-test-import-1")
+                 (:protobuf-source-file "import-test-import-2")
+                 (:protobuf-source-file "import-proto")
+                 (:file "import-test")))
+
+   (:module "lazy-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "lazy")
+                 (:file "lazy-test")))
+
+   (:module "lisp-alias-test"
+    :serial t
+    :pathname ""
+    :depends-on ("lisp-alias")
+    :components ((:file "lisp-alias-test")))
+
+   (:module "packed-test"
+    :serial t
+    :pathname ""
+    :depends-on ("google-tests-proto")
+    :components ((:file "packed-test")))
+
+   (:module "serialize-object-to-bytes-test"
+    :serial t
+    :pathname ""
+    :depends-on ("object-level-tests")
+    :components ((:file "serialize-object-to-bytes")))
+
+   (:module "text-format-test"
+    :serial t
+    :pathname ""
+    :depends-on ("descriptor-extensions")
+    :components ((:protobuf-source-file "text-format"
+                  :proto-search-path ("../" "../google/protobuf/"))
+                 (:file "text-format-test")))
+
+   (:module "zigzag-test"
+    :serial t
+    :pathname ""
+    :components ((:file "zigzag-test")))
+
+   (:module "well-known-types-test"
+    :serial t
+    :pathname ""
+    :components ((:file "well-known-types-test")))
+
+   (:module "google-tests"
+    :serial t
+    :pathname ""
+    :depends-on ("brown-tests" "google-tests-proto")
+    :components
+    ((:file "full-tests")
+     (:static-file "golden_message.data")
+     (:static-file "golden_packed_message.data"))))
+  :perform (test-op (o c)
+                    (mapc (lambda (p)
+                            (uiop:symbol-call p '#:run))
+                          '(#:cl-protobufs.test.wire-test
+                            #:cl-protobufs.test.case-preservation-test
+                            #:cl-protobufs.test.extend-test
+                            #:cl-protobufs.test.reference-test
+                            #:cl-protobufs.test.serialization-test
+                            #:cl-protobufs.test.symbol-import-test
+                            #:cl-protobufs.test.quick-test
+                            #:cl-protobufs.test.full-test
+                            #:cl-protobufs.test.custom-proto-test
+                            #:cl-protobufs.test.deserialize-test
+                            #:cl-protobufs.test.enum-mapping-test
+                            #:cl-protobufs.test.map-test
+                            #:cl-protobufs.test.oneof-test
+                            #:cl-protobufs.test.import-test
+                            #:cl-protobufs.test.lazy-test
+                            #:cl-protobufs.test.alias-test
+                            #:cl-protobufs.test.packed-test
+                            #:cl-protobufs.test.serialize-test
+                            #:cl-protobufs.test.text-format-test
+                            #:cl-protobufs.test.zigzag-test
+                            #:cl-protobufs.test.well-known-types-test))))
