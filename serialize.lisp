@@ -107,6 +107,7 @@
    The value returned is the number of octets written to BUFFER."
   (declare (buffer buffer)
            (message-descriptor msg-desc))
+  ;; Check for the %BYTES slot, since groups do not have this slot.
   (let ((bytes (and (slot-exists-p object '%bytes)
                     (proto-%bytes object)))
         (size 0))
@@ -990,6 +991,7 @@ Parameters:
           (declare ; maybe allow specification of the type
            #+ignore(type ,(proto-class message) ,vobj)
            (type fixnum ,size))
+          ;; Check for the %BYTES slot, since groups do not have this slot.
           (let ((,bytes (and (slot-exists-p ,vobj '%bytes)
                              (proto-%bytes ,vobj))))
             ;; If BYTES is bound, then VOBJ is a lazy field, and BYTES is the pre-computed
