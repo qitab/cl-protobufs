@@ -67,17 +67,18 @@ find the imported file. It does this by looking for the file relative to the
 values passed to it with the `--proto_path` option (or the `-I` short option).
 
 To see an example of this, you can try generating Lisp code for
-`cl-protobufs/tests/extend-test.proto`.  Still in the same directory, run the
+`cl-protobufs/tests/extend.proto`.  Still in the same directory, run the
 following command:
 
 ```shell
 protoc --plugin=protoc-gen-lisp=/usr/local/bin/protoc-gen-lisp \
-  --lisp_out=output-file=extend-test.lisp:/tmp --proto_path=. \
-  cl-protobufs/tests/extend-test.proto
+  --lisp_out=output-file=extend.lisp:/tmp
+  --proto_path=cl-protobufs/tests \
+  cl-protobufs/tests/extend.proto
 ```
 
-The file `/tmp/extend-test.lisp` should be generated. Note that the .lisp file
-for each imported file also needs to be generated separately.
+The file `/tmp/extend.lisp` should be generated. Note that the `.lisp` file for
+each imported file also needs to be generated separately.
 
 ### ASDF
 
