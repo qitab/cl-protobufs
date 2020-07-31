@@ -869,7 +869,7 @@ Parameters:
                       (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
                       (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
                (let ((tag (make-wire-tag $wire-type-string index)))
-                 `(let* ((,vval ,reader))
+                 `(let ((,vval ,reader))
                     (when ,vval
                       (iincf ,size (encode-uint32 ,tag ,vbuf))
                       (with-placeholder (,vbuf)
