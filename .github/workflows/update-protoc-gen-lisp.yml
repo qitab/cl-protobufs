@@ -29,7 +29,7 @@ jobs:
       run: cd $GITHUB_WORKSPACE/cl-protobufs/protoc && PROTOC_ROOT=/usr/local make && mv protoc-gen-lisp ../bin/ && cd ..
 
     - name: Update commit
-    - uses: EndBug/add-and-commit@v4
+      uses: EndBug/add-and-commit@v4
       with:
           message: "Update protoc-gen-lisp"
           add: "/bin/protoc-gen-lisp"
