@@ -40,7 +40,7 @@
 		:initarg :proto-search-path
 		:reader search-path
 		:documentation
-"List containing directories where the protocol buffer compiler should search
+		"List containing directories where the protocol buffer compiler should search
 for imported protobuf files.  Non-absolute pathnames are treated as relative to
 the directory containing the DEFSYSTEM form in which they appear."))
   (:documentation "A protocol buffer definition file."))
