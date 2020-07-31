@@ -97,10 +97,10 @@ Parameters:
 
 ;; A Protobufs schema, corresponds to one .proto file
 (defclass file-descriptor (descriptor)
-  ((syntax :type (or null string)               ; syntax, passed on but otherwise ignored
+  ((syntax :type keyword               ; proto syntax. Either :proto2 or :proto3.
            :accessor proto-syntax
            :initarg :syntax
-           :initform "proto2")
+           :initform :proto2)
    (package :type (or null string)              ; the Protobufs package
             :accessor proto-package
             :initarg :package

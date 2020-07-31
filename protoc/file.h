@@ -33,6 +33,7 @@ class FileGenerator {
   const FileDescriptor* file_;
   std::string lisp_package_name_;
   std::string schema_name_;
+  std::string syntax_;
 
   std::vector<std::unique_ptr<EnumGenerator>> enums_;
   std::vector<std::unique_ptr<MessageGenerator>> messages_;
