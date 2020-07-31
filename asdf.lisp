@@ -90,7 +90,7 @@ translated into Lisp source code for this PROTO-FILE component."
   "Arranges for the Lisp output file of a proto-to-lisp OPERATION on a
 PROTOBUF-SOURCE-FILE COMPONENT to be stored where fasl files are located."
   (values (list (component-pathname component))
-          nil))			    ; allow around methods to translate
+          nil))                     ; allow around methods to translate
 
 (defun resolve-relative-pathname (path parent-path)
   "When PATH doesn't have an absolute directory component, treat it as relative
