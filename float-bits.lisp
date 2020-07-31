@@ -34,7 +34,7 @@
       (let* ((significand lisp-significand)
              (exponent (+ lisp-exponent 23 127))
              (unsigned-result
-              (if (plusp exponent)                      ;if not obviously denormalized
+              (if (plusp exponent)                      ; if not obviously denormalized
                 (do () (nil)
                   (cond
                     ;; Special termination case for denormalized float number
@@ -99,7 +99,7 @@
       (let* ((significand lisp-significand)
              (exponent (+ lisp-exponent 52 1023))
              (unsigned-result
-              (if (plusp exponent)                      ;if not obviously denormalized
+              (if (plusp exponent)                      ; if not obviously denormalized
                 (do () (nil)
                   (cond
                     ;; Special termination case for denormalized float number
@@ -158,7 +158,7 @@
                     (0 1.0)
                     (1 -1.0)))
             (iexpt (ldb (byte 8 23) bits))
-            (exponent (if (zerop iexpt)                 ;denormalized
+            (exponent (if (zerop iexpt)                 ; denormalized
                         -126
                         (- iexpt 127)))
             (mantissa (* (logior (ldb (byte 23 0) bits)
@@ -196,7 +196,7 @@
                     (0 1.0d0)
                     (1 -1.0d0)))
             (iexpt (ldb (byte 11 52) bits))
-            (exponent (if (zerop iexpt)                 ;denormalized
+            (exponent (if (zerop iexpt)                 ; denormalized
                         -1022
                         (- iexpt 1023)))
             (mantissa (* (logior (ldb (byte 52 0) bits)
