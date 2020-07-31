@@ -320,12 +320,15 @@ return nil."
 an enum of type TYPE. The default type should be the enum
 with the lowest index value in ENUM-VALUES."
   (let ((default-value))
-    (loop with smallest-value = nil
-          for enum in enum-values
-          when (or (not smallest-value)
-                   (< (enum-value-descriptor-value enum) smallest-value))
-            do (setf smallest-value (enum-value-descriptor-value enum)
-                     default-value (enum-value-descriptor-name enum)))
+    ;; proto3 insists that the first constant is the default.
+    (if (eq (proto-syntax *protobuf) :proto3)
+        (setf default-value (enum-value-descriptor-name (car enum-values)))
+        (loop with smallest-value = nil
+              for enum in enum-values
+              when (or (not smallest-value)
+                       (< (enum-value-descriptor-value enum) smallest-value))
+                do (setf smallest-value (enum-value-descriptor-value enum)
+                         default-value (enum-value-descriptor-name enum))))
     `(defmethod enum-default-value ((e (eql ',type)))
        ,default-value)))
 
