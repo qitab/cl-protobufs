@@ -4,6 +4,8 @@ name: Update-Protoc-Gen-Lisp
 
 # Run when updating protoc 
 on:
+  push:
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
