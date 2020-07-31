@@ -46,6 +46,10 @@ Common Lisp.
 
 ## Using `protoc` to Generate Lisp Code
 
+If you are running on x86-64 we have bundled the proto-gen-lisp
+binary with cl-protobufs. You will have to install protoc,
+which can be done with apt-get.
+
 To test your build, try generating Lisp code from the
 `cl-protobufs/tests/case-preservation.proto` file with the following command.
 Note that the command may differ slightly depending on what directory you're in
@@ -89,7 +93,7 @@ Build and run the tests with ASDF:
 
 *   Install ASDF if it isn't part of your Lisp implementation.
 
-    
+
 
 *   Create a link to cl-protobufs so that Quicklisp will use the local version:
 
