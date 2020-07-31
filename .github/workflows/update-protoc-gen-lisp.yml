@@ -26,7 +26,7 @@ jobs:
        path: cl-protobufs
 
     - name: Install protoc plug-in
-      run: cd $GITHUB_WORKSPACE/cl-protobufs/protoc && PROTOC_ROOT=/usr/local make && mv protoc-gen-lisp ../bin/ && cd ..
+      run: cd $GITHUB_WORKSPACE/cl-protobufs/protoc && PROTOC_ROOT=/usr/local make && mv protoc-gen-lisp ../bin/ && cd $GITHUB_WORKSPACE
 
     - name: Update commit
       uses: EndBug/add-and-commit@v4
