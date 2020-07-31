@@ -50,7 +50,7 @@ the directory containing the DEFSYSTEM form in which they appear."))
 (defclass proto-to-lisp (downward-operation selfward-operation)
   ((selfward-operation :initform 'prepare-op :allocation :class))
   (:documentation
-"An ASDF operation that compiles a .proto file containing protocol buffer
+   "An ASDF operation that compiles a .proto file containing protocol buffer
 definitions into a Lisp source file."))
 
 (defmethod component-depends-on ((operation compile-op) (proto-def-file protobuf-source-file))
