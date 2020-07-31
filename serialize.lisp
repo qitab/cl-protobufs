@@ -108,32 +108,20 @@
   (declare (buffer buffer)
            (message-descriptor msg-desc))
   ;; Check for the %BYTES slot, since groups do not have this slot.
-  (let ((bytes (and (slot-exists-p object '%bytes)
-                    (proto-%bytes object)))
-        (size 0))
-    (cond
-      ;; If OBJECT has BYTES bound, then it is a lazy field, and BYTES is
-      ;; the pre-computed serialization of OBJECT, so output that.
-      (bytes
-       (setf size (length bytes))
-       (buffer-ensure-space buffer size)
-       (fast-octets-out buffer bytes)
-       size)
-      ;; Otherwise, serialize as normal.
-      (t
-       (dolist (field (proto-fields msg-desc))
-         (iincf size (emit-field object field buffer)))
-       (dolist (oneof (proto-oneofs msg-desc) size)
-         (let* ((fields    (oneof-descriptor-fields oneof))
-                (data      (slot-value object (oneof-descriptor-internal-name oneof)))
-                (set-field (oneof-set-field data))
-                (value     (oneof-value data)))
-           (when set-field
-             (let* ((field (aref fields set-field))
-                    (type  (proto-class field))
-                    (index (proto-index field)))
-               (iincf size
-                      (emit-non-repeated-field value type index buffer))))))))))
+  (let ((size 0))
+    (dolist (field (proto-fields msg-desc))
+      (iincf size (emit-field object field buffer)))
+    (dolist (oneof (proto-oneofs msg-desc) size)
+      (let* ((fields    (oneof-descriptor-fields oneof))
+             (data      (slot-value object (oneof-descriptor-internal-name oneof)))
+             (set-field (oneof-set-field data))
+             (value     (oneof-value data)))
+        (when set-field
+          (let* ((field (aref fields set-field))
+                 (type  (proto-class field))
+                 (index (proto-index field)))
+            (iincf size
+                   (emit-non-repeated-field value type index buffer))))))))
 
 (defun emit-field (object field buffer)
   "Serialize a single field from an object to buffer
@@ -224,13 +212,22 @@ Parameters:
                    ;; To serialize an embedded message, first say that it's
                    ;; a string, then encode its size, then serialize its fields
                    (iincf size (encode-uint32 tag buffer))
-                   (let ((submessage-size 0))
+                   ;; If OBJECT has BYTES bound, then it is a lazy field, and BYTES is
+                   ;; the pre-computed serialization of OBJECT, so output that.
+                   (let ((precomputed-bytes (and (slot-exists-p v '%bytes)
+                                                 (proto-%bytes v)))
+                         (submessage-size 0))
                      (with-placeholder (buffer)
-                       (if custom-serializer
-                           (iincf submessage-size
-                                  (funcall custom-serializer v buffer))
-                           (iincf submessage-size
-                                  (serialize-object v desc buffer)))
+                       (cond (precomputed-bytes
+                              (setq submessage-size (length precomputed-bytes))
+                              (buffer-ensure-space buffer submessage-size)
+                              (fast-octets-out buffer precomputed-bytes))
+                             (custom-serializer
+                              (setq submessage-size
+                                    (funcall custom-serializer v buffer)))
+                             (t
+                              (setq submessage-size
+                                    (serialize-object v desc buffer))))
                        (iincf size (+ (backpatch submessage-size)
                                       submessage-size)))))))
            size)
@@ -282,17 +279,26 @@ Parameters:
                                (i+ size (encode-uint32 tag2 buffer)))
                       (iincf size (emit-field value f buffer)))))
                  (t
-                  (let ((custom-serializer (custom-serializer type))
+                  ;; If OBJECT has BYTES bound, then it is a lazy field, and BYTES is
+                  ;; the pre-computed serialization of OBJECT, so output that.
+                  (let ((precomputed-bytes (and (slot-exists-p value '%bytes)
+                                                (proto-%bytes value)))
+                        (custom-serializer (custom-serializer type))
                         (tag-size
                          (encode-uint32 (make-wire-tag $wire-type-string index)
                                         buffer))
                         (submessage-size 0))
                     (with-placeholder (buffer)
-                      (if custom-serializer
-                          (setq submessage-size
-                                (funcall custom-serializer value buffer))
-                          (setq submessage-size
-                                (serialize-object value desc buffer)))
+                      (cond (precomputed-bytes
+                             (setq submessage-size (length precomputed-bytes))
+                             (buffer-ensure-space buffer submessage-size)
+                             (fast-octets-out buffer precomputed-bytes))
+                            (custom-serializer
+                             (setq submessage-size
+                                   (funcall custom-serializer value buffer)))
+                            (t
+                             (setq submessage-size
+                                   (serialize-object value desc buffer))))
                       (+ tag-size (backpatch submessage-size) submessage-size))))))
           ((typep desc 'enum-descriptor)
            (serialize-enum value (enum-descriptor-values desc)
