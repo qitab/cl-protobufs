@@ -281,6 +281,11 @@ Parameters:
     (proto:clear m)
     (expect-clear m)))
 
+(deftest test-enum-default (full-tests)
+  (let ((m (cl-protobufs.protobuf-unittest:make-sparse-enum-message)))
+    (assert-true (eq (cl-protobufs.protobuf-unittest:sparse-enum-message.sparse-enum m)
+                     :SPARSE-A))))
+
 (deftest test (full-tests)
   (test-parse-from-file)
   (test-parse-packed-from-file)
