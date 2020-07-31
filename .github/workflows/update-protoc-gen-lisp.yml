@@ -1,0 +1,38 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Update-Protoc-Gen-Lisp
+
+# Run when updating protoc 
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    - name: Download and install protobuf
+      run: git clone --recursive https://github.com/google/protobuf $GITHUB_WORKSPACE/protobuf && cd $GITHUB_WORKSPACE/protobuf && ./autogen.sh && ./configure --prefix=/usr/local && make && sudo make install && sudo ldconfig
+
+    - name: Download repo
+      uses: actions/checkout@v2
+      with:
+       path: cl-protobufs
+
+    - name: Install protoc plug-in
+      run: cd $GITHUB_WORKSPACE/cl-protobufs/protoc && PROTOC_ROOT=/usr/local make && mv protoc-gen-lisp ../bin/ && cd $GITHUB_WORKSPACE
+
+    - name: Update commit
+      uses: EndBug/add-and-commit@v4
+      with:
+          message: "Update protoc-gen-lisp"
+          add: "bin/protoc-gen-lisp"
+          cwd: "cl-protobufs"
+      env:
+          GITHUB_TOKEN: ${{ secrets.COMMIT_TOKEN }}
