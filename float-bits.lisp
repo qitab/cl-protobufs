@@ -196,7 +196,7 @@
                     (0 1.0d0)
                     (1 -1.0d0)))
             (iexpt (ldb (byte 11 52) bits))
-            (exponent (if (zerop iexpt)                 ; denormalized
+            (exponent (if (zerop iexpt)                 ;denormalized
                         -1022
                         (- iexpt 1023)))
             (mantissa (* (logior (ldb (byte 52 0) bits)
