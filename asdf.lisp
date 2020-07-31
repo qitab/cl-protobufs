@@ -90,7 +90,7 @@ translated into Lisp source code for this PROTO-FILE component."
   "Arranges for the Lisp output file of a proto-to-lisp OPERATION on a
 PROTOBUF-SOURCE-FILE COMPONENT to be stored where fasl files are located."
   (values (list (component-pathname component))
-	  nil))                     ; allow around methods to translate
+	  nil))			    ; allow around methods to translate
 
 (defun resolve-relative-pathname (path parent-path)
   "When PATH doesn't have an absolute directory component, treat it as relative
@@ -145,7 +145,7 @@ to PARENT-PATH."
       (declare (ignore output error-output))
       (unless (zerop status)
 	(error 'protobuf-compile-failed
-	       :description (format nil "Failed to compile proto file.  Command: ~S" command)
+	       :description (format nil "Failed to compile proto file.	Command: ~S" command)
 	       :context-format "~/asdf-action::format-action/"
 	       :context-arguments `((,operation . ,component)))))))
 
