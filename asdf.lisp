@@ -145,7 +145,7 @@ to PARENT-PATH."
       (declare (ignore output error-output))
       (unless (zerop status)
         (error 'protobuf-compile-failed
-               :description (format nil "Failed to compile proto file.	Command: ~S" command)
+               :description (format nil "Failed to compile proto file.  Command: ~S" command)
                :context-format "~/asdf-action::format-action/"
                :context-arguments `((,operation . ,component)))))))
 
