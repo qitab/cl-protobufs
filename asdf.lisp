@@ -7,8 +7,7 @@
 (defpackage #:protobuf-config
   (:documentation "Configuration information for PROTOBUF.")
   (:use #:common-lisp)
-  (:export *protoc-relative-path*
-	   *PROTOC-GEN-LISP-RELATIVE-PATH*))
+  (:export *protoc-relative-path*))
 
 (in-package #:protobuf-config)
 
@@ -17,7 +16,7 @@
 
 (defvar *protoc-gen-lisp-relative-path*
   #+(and :linux :x86-64) "bin/protoc-gen-lisp"
-  #-(and :linux :x86-64)nil
+  #-(and :linux :x86-64) nil
   "Supply relative proto file paths to protoc, the protobuf compiler?")
 
 (defpackage #:protobuf-system
