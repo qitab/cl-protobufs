@@ -42,13 +42,11 @@ Parameters:
                 (format stream "~A { " name))
             (format stream "{")))
       (dolist (field (proto-fields message))
-        ;; If a field doesn't have an offset, then it is an extension.
-        ;; Otherwise, we can use the %%IS-SET vector.
-        (when (if (slot-value field 'field-offset)
+        (when (if (eq (slot-value field 'message-type) :extends)
+                  (has-extension object (proto-internal-field-name field))
                   (= (bit (slot-value object '%%is-set)
                           (proto-field-offset field))
-                     1)
-                  (has-extension object (proto-internal-field-name field)))
+                     1))
           (let ((slot   (slot-value field 'internal-field-name))
                 (reader (slot-value field 'reader)))
             (if (eq (proto-label field) :repeated)
