@@ -553,7 +553,7 @@ Parameters:
 ;;;
 ;;; This aims to test updateing a protocol buffer and deserializing
 ;;; on a binary containing the previous version.
-(deftest test-proto-backwards-compatability (serialization-tests)
+(deftest test-proto-backwards-compatibility (serialization-tests)
   (let* ((proto-on-wire (make-proto-on-wire
                          :beginning "char"
                          :always "pika-pal"
