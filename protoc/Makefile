@@ -6,7 +6,7 @@
 
 
 # This Makefile depends on the Google protobuf library.
-# See ../README.md for information on installing that
+# See ../README.md for information on installing that.
 
 
 # Directory into which the Lisp protocol buffer plugin,

@@ -10,4 +10,5 @@
   :licence "MIT"
   :encoding :utf-8
   :components
-  ((:file "asdf")))
+  ((:file "asdf")
+   (:static-file "bin/protoc-gen-lisp")))
