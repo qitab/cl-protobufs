@@ -7,7 +7,8 @@
 (defpackage #:protobuf-config
   (:documentation "Configuration information for PROTOBUF.")
   (:use #:common-lisp)
-  (:export *protoc-relative-path*))
+  (:export *protoc-relative-path*
+           *protoc-gen-lisp-relative-path*))
 
 (in-package #:protobuf-config)
 
