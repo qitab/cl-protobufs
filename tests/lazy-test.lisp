@@ -47,22 +47,34 @@ Parameters:
                    :value-after 20))
            (bytes (proto:serialize-object-to-bytes proto))
            (restored (proto:deserialize-object-from-bytes 'container bytes)))
-      ;; The original proto doesn't have encoded field.
-      (assert-true (null (proto:encoded-field proto 'inner)))
-      ;; The deserialized proto does have encoded field.
-      (assert-true (proto:encoded-field restored 'inner))
 
-      ;; If the encoded field is deserialized independently, we get the correct result.
-      (let ((inner (proto:deserialize-object-from-bytes
-                    'inner
-                    (proto:encoded-field restored 'inner))))
-        (assert-true (= 42 (value inner))))
-      ;; If the field is accessed, it's deserialized lazily.
-      (assert-true (= 42 (value (inner restored))))
+      (let ((restored (proto:deserialize-object-from-bytes 'container bytes)))
+        ;; The original proto doesn't have encoded field.
+        (assert-true (null (proto:encoded-field proto 'inner)))
+        ;; The deserialized proto does have encoded field.
+        (assert-true (proto:encoded-field restored 'inner))
 
-      ;; Verify fields around the lazy field are restored correctly.
-      (assert-true (= 10 (value-before restored)))
-      (assert-true (= 20 (value-after restored)))
+        ;; If the encoded field is deserialized independently, we get the correct result.
+        (let ((inner (proto:deserialize-object-from-bytes
+                      'inner
+                      (proto:encoded-field restored 'inner))))
+          (assert-true (= 42 (value inner))))
+        ;; If the field is accessed, it's deserialized lazily.
+        (assert-true (= 42 (value (inner restored))))
+
+        ;; Verify fields around the lazy field are restored correctly.
+        (assert-true (= 10 (value-before restored)))
+        (assert-true (= 20 (value-after restored))))
+
+      ;; Ensure that editing a lazy field clears the %BYTES slot.
+      (let ((restored (proto:deserialize-object-from-bytes 'container bytes))
+            (inner-slot 'cl-protobufs.third-party.lisp.cl-protobufs.tests::%inner))
+        (setf (value (inner restored)) 43)
+        (assert-false (slot-value (slot-value restored inner-slot) 'proto-impl::%bytes))
+        (let* ((reserialized (proto:serialize-object-to-bytes restored))
+               (rerestored (proto:deserialize-object-from-bytes 'container reserialized)))
+          (assert-true (= (value (inner rerestored)) 43))))
+
 
       ;; Serialize the restored proto again and verify it's the same as the originally serialized
       ;; value.
