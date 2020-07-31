@@ -12,7 +12,7 @@
 
 (in-package #:cl-protobufs.test.alias-test)
 
-(defsuite alias-tests ())
+(defsuite alias-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

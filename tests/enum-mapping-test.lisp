@@ -15,7 +15,7 @@
 
 (in-package #:cl-protobufs.test.enum-mapping-test)
 
-(defsuite enum-mapping-tests ())
+(defsuite enum-mapping-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

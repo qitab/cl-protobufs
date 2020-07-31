@@ -23,7 +23,7 @@
 
 (in-package #:cl-protobufs.test.reference-test)
 
-(defsuite reference-tests ())
+(defsuite reference-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

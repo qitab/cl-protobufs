@@ -13,7 +13,7 @@
 
 (in-package #:cl-protobufs.test.oneof-test)
 
-(defsuite oneof-tests ())
+(defsuite oneof-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

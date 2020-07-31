@@ -15,7 +15,7 @@
 
 (in-package #:cl-protobufs.test.lazy-test)
 
-(defsuite lazy-tests ())
+(defsuite lazy-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

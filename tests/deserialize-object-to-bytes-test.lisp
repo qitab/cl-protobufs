@@ -12,7 +12,7 @@
 
 (in-package #:cl-protobufs.test.deserialize-test)
 
-(defsuite deserialize-tests ())
+(defsuite deserialize-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

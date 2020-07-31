@@ -35,7 +35,7 @@
 
 (in-package #:cl-protobufs.test.zigzag-test)
 
-(defsuite wire-tests ())
+(defsuite wire-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.
