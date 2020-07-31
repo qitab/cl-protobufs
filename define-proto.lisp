@@ -317,7 +317,7 @@ return nil."
 
 (defun make-enum-default (type enum-values)
   "Generate a function to return the default enum value for
-an enum of type TYPE. The default type should be the first
+an enum of type TYPE. The default value should be the first
 enum in ENUM-VALUES."
   `(defmethod enum-default-value ((e (eql ',type)))
      ,(enum-value-descriptor-name (car enum-values))))
