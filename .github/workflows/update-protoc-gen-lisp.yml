@@ -33,5 +33,5 @@ jobs:
       with:
           message: "Update protoc-gen-lisp"
           add: "/bin/protoc-gen-lisp"
-        env:
+      env:
           GITHUB_TOKEN: ${{ secrets.COMMIT_TOKEN }}
