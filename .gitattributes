@@ -1,0 +1,1 @@
+bin/protoc-gen-lisp filter=lfs diff=lfs merge=lfs -text
