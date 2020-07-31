@@ -32,6 +32,6 @@ jobs:
     - uses: EndBug/add-and-commit@v4
       with:
           message: "Update protoc-gen-lisp"
-          add: "*bin/protoc-gen-lisp"
+          add: "bin/protoc-gen-lisp"
         env:
           GITHUB_TOKEN: ${{ secrets.COMMIT_TOKEN }}
