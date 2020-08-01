@@ -317,17 +317,10 @@ return nil."
 
 (defun make-enum-default (type enum-values)
   "Generate a function to return the default enum value for
-an enum of type TYPE. The default type should be the enum
-with the lowest index value in ENUM-VALUES."
-  (let ((default-value))
-    (loop with smallest-value = nil
-          for enum in enum-values
-          when (or (not smallest-value)
-                   (< (enum-value-descriptor-value enum) smallest-value))
-            do (setf smallest-value (enum-value-descriptor-value enum)
-                     default-value (enum-value-descriptor-name enum)))
-    `(defmethod enum-default-value ((e (eql ',type)))
-       ,default-value)))
+an enum of type TYPE. The default value should be the first
+enum in ENUM-VALUES."
+  `(defmethod enum-default-value ((e (eql ',type)))
+     ,(enum-value-descriptor-name (car enum-values))))
 
 (defun make-enum-constant-forms (type enum-values)
   "Generates forms for defining a constant for each enum value in ENUM-VALUES.
