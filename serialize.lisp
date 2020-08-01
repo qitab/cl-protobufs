@@ -107,6 +107,7 @@
    The value returned is the number of octets written to BUFFER."
   (declare (buffer buffer)
            (message-descriptor msg-desc))
+  ;; Check for the %BYTES slot, since groups do not have this slot.
   (let ((size 0))
     (dolist (field (proto-fields msg-desc))
       (iincf size (emit-field object field buffer)))
@@ -211,13 +212,22 @@ Parameters:
                    ;; To serialize an embedded message, first say that it's
                    ;; a string, then encode its size, then serialize its fields
                    (iincf size (encode-uint32 tag buffer))
-                   (let ((submessage-size 0))
+                   ;; If OBJECT has BYTES bound, then it is a lazy field, and BYTES is
+                   ;; the pre-computed serialization of OBJECT, so output that.
+                   (let ((precomputed-bytes (and (slot-exists-p v '%bytes)
+                                                 (proto-%bytes v)))
+                         (submessage-size 0))
                      (with-placeholder (buffer)
-                       (if custom-serializer
-                           (iincf submessage-size
-                                  (funcall custom-serializer v buffer))
-                           (iincf submessage-size
-                                  (serialize-object v desc buffer)))
+                       (cond (precomputed-bytes
+                              (setq submessage-size (length precomputed-bytes))
+                              (buffer-ensure-space buffer submessage-size)
+                              (fast-octets-out buffer precomputed-bytes))
+                             (custom-serializer
+                              (setq submessage-size
+                                    (funcall custom-serializer v buffer)))
+                             (t
+                              (setq submessage-size
+                                    (serialize-object v desc buffer))))
                        (iincf size (+ (backpatch submessage-size)
                                       submessage-size)))))))
            size)
@@ -269,6 +279,8 @@ Parameters:
                                (i+ size (encode-uint32 tag2 buffer)))
                       (iincf size (emit-field value f buffer)))))
                  (t
+                  ;; If OBJECT has BYTES bound, then it is a lazy field, and BYTES is
+                  ;; the pre-computed serialization of OBJECT, so output that.
                   (let ((precomputed-bytes (and (slot-exists-p value '%bytes)
                                                 (proto-%bytes value)))
                         (custom-serializer (custom-serializer type))
@@ -278,10 +290,9 @@ Parameters:
                         (submessage-size 0))
                     (with-placeholder (buffer)
                       (cond (precomputed-bytes
-                             (let* ((len (length precomputed-bytes)))
-                               (setq submessage-size len)
-                               (buffer-ensure-space buffer len)
-                               (fast-octets-out buffer precomputed-bytes)))
+                             (setq submessage-size (length precomputed-bytes))
+                             (buffer-ensure-space buffer submessage-size)
+                             (fast-octets-out buffer precomputed-bytes))
                             (custom-serializer
                              (setq submessage-size
                                    (funcall custom-serializer value buffer)))
@@ -977,7 +988,8 @@ Parameters:
 (defun generate-serializer (message)
   (let ((vobj (make-symbol "OBJ"))
         (vbuf (make-symbol "BUF"))
-        (size (make-symbol "SIZE")))
+        (size (make-symbol "SIZE"))
+        (bytes (make-symbol "BYTES")))
     (multiple-value-bind (serializers) (generate-serializer-body message vobj vbuf size)
       (def-pseudo-method :serialize message `(,vobj ,vbuf &aux (,size 0))
         `((declare ,$optimize-serialization)
@@ -985,8 +997,20 @@ Parameters:
           (declare ; maybe allow specification of the type
            #+ignore(type ,(proto-class message) ,vobj)
            (type fixnum ,size))
-          ,@serializers
-          ,size)))))
+          ;; Check for the %BYTES slot, since groups do not have this slot.
+          (let ((,bytes (and (slot-exists-p ,vobj '%bytes)
+                             (proto-%bytes ,vobj))))
+            ;; If BYTES is bound, then VOBJ is a lazy field, and BYTES is the pre-computed
+            ;; serialization of VOBJ. So, just output that.
+            (cond
+              (,bytes
+               (setf ,size (length ,bytes))
+               (buffer-ensure-space ,vbuf ,size)
+               (fast-octets-out ,vbuf ,bytes)
+               ,size)
+              (t
+               ,@serializers
+               ,size))))))))
 
 (defun generate-oneof-serializer (message oneof vobj vbuf size)
   "Creates and returns the code that serializes a oneof.
@@ -1031,13 +1055,14 @@ Parameters:
         (rslot nil))
     (let* ((class  (proto-class field))
            (index  (proto-index field))
+           (lazy-p (proto-lazy-p field))
            (temp (fintern (string (proto-internal-field-name field))))
            (oneof-offset (proto-oneof-offset field)))
       (cond ((eq (proto-label field) :repeated)
              (setf rslot (list field temp))
              (multiple-value-bind (deserializer tag list?)
                  (generate-repeated-field-deserializer
-                  class index vbuf vidx temp :raw-p raw-p)
+                  class index lazy-p vbuf vidx temp :raw-p raw-p)
                (if deserializer
                    (if list?
                        (return-from generate-field-deserializer
@@ -1054,7 +1079,7 @@ Parameters:
              (let ((oneof-val (gensym "ONEOF-VAL")))
                (multiple-value-bind (deserializer tag)
                    (generate-non-repeated-field-deserializer
-                    class index vbuf vidx oneof-val :raw-p raw-p)
+                    class index lazy-p vbuf vidx oneof-val :raw-p raw-p)
                  (when deserializer
                    (setf deserializer
                          `(progn
@@ -1071,7 +1096,7 @@ Parameters:
              (setf nslot temp)
              (multiple-value-bind (deserializer tag)
                  (generate-non-repeated-field-deserializer
-                  class index vbuf vidx temp :raw-p raw-p)
+                  class index lazy-p vbuf vidx temp :raw-p raw-p)
                (if deserializer
                    (return-from generate-field-deserializer
                      (values (list tag) (list deserializer)
@@ -1082,7 +1107,7 @@ Parameters:
   (assert nil))
 
 (defun generate-repeated-field-deserializer
-    (class index vbuf vidx dest &key raw-p)
+    (class index lazy-p vbuf vidx dest &key raw-p)
   "Returns three values: The first is a (list of) s-expressions that deserializes the
 specified object to dest and updates vidx to the new index. The second is (list of)
 tag(s) of this field. The third is true if and only if lists are being returned.
@@ -1090,6 +1115,7 @@ tag(s) of this field. The third is true if and only if lists are being returned.
 Parameters:
   CLASS: The :class field of this field.
   INDEX: The field index of the field.
+  LAZY-P: True if and only if the field is lazy.
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
   DEST: The symbol name for the destination of deserialized data.
@@ -1145,8 +1171,15 @@ Parameters:
                             ;; for the recursive call. And we don't need
                             ;; the secondary return value for anything.
                             (setq ,vidx (+ payload-start payload-len))
-                            (push ,(call-deserializer msg vbuf 'payload-start vidx)
-                                  ,dest))
+                            ,(if lazy-p
+                                 ;; If this field is declared lazy, then don't deserialize.
+                                 ;; Instead, create a new message with %BYTES field set to
+                                 ;; the bytes on the wire.
+                                 `(push (make-message-with-bytes
+                                         ',class (subseq ,vbuf payload-start ,vidx))
+                                        ,dest)
+                                 `(push ,(call-deserializer msg vbuf 'payload-start vidx)
+                                        ,dest)))
                          (make-wire-tag $wire-type-string index))))
             ((typep msg 'enum-descriptor)
              (let* ((tag (make-wire-tag $wire-type-varint index))
@@ -1182,13 +1215,14 @@ Parameters:
             (t nil)))))
 
 (defun generate-non-repeated-field-deserializer
-    (class index vbuf vidx dest &key raw-p)
+    (class index lazy-p vbuf vidx dest &key raw-p)
   "Returns two values: The first is lisp code that deserializes the specified object
 to dest and updates vidx to the new index. The second is the tag of this field.
 
 Parameters:
   CLASS: The :class field of this field.
   INDEX: The field index of the field.
+  LAZY-P: True if and only if the field is lazy.
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
   DEST: The symbol name for the destination of deserialized data.
@@ -1220,8 +1254,14 @@ Parameters:
                  (values
                   `(multiple-value-bind (payload-len payload-start)
                        (decode-uint32 ,vbuf ,vidx)
-                     (setq ,vidx (+ payload-start payload-len)
-                           ,dest ,(call-deserializer msg vbuf 'payload-start vidx)))
+                     (setq ,vidx (+ payload-start payload-len))
+                     ;; If this field is declared lazy, then don't deserialize.
+                     ;; Instead, create a new message with %BYTES field set to
+                     ;; the bytes on the wire.
+                     ,(if lazy-p
+                          `(setq ,dest (make-message-with-bytes
+                                        ',class (subseq ,vbuf payload-start ,vidx)))
+                          `(setq ,dest ,(call-deserializer msg vbuf 'payload-start vidx))))
                   (make-wire-tag $wire-type-string index))))
             ((typep msg 'enum-descriptor)
              (values
@@ -1261,7 +1301,7 @@ Parameters:
                            (multiple-value-setq (key-data ,vidx)
                              (deserialize-scalar ,key-class ,vbuf ,vidx))
                            ,(generate-non-repeated-field-deserializer
-                             val-class 2 vbuf vidx 'val-data)))))
+                             val-class 2 nil vbuf vidx 'val-data)))))
                 (make-wire-tag $wire-type-string index))))
             (t nil)))))
 
