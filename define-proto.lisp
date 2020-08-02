@@ -187,11 +187,12 @@ the oneof and its nested fields.
 
 (defun validate-imports (file-descriptor imports)
   "Validates that all of the IMPORTS (a list of file names) have
-   already been imported by FILE-DESCRIPTOR."
+   already been loaded. FILE-DESCRIPTOR is the descriptor of the
+   file doing the importing."
   (dolist (import (reverse imports))
     (let* ((imported (proto:find-schema (if (stringp import) (pathname import) import))))
       (unless imported
-        (error "Could not find imported file-descriptor: ~A for: ~S" file-descriptor import)))))
+        (error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
 (defun define-schema (type &key name syntax package import
                            optimize options documentation)
