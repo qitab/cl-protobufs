@@ -54,7 +54,6 @@ The possible top level define macros are:
 - define-message
 - define-extend
 - define-service
-- define-type-alias
 
 Inside of those macros there may also be define-* macros:
 - define-enum
@@ -63,7 +62,6 @@ Inside of those macros there may also be define-* macros:
 - define-extension
 - define-extend
 - define-service
-- define-type-alias
 - define-map
 - define-oneof
 
@@ -148,19 +146,6 @@ The define-service macro creates forms that make the SERVICE-DESCRIPTOR, add it 
 PROTOBUF-SCHEMA meta-object, and create method stubs for the service implementation.
 
 Note: Actually using services require a gRPC plugin.
-
-DEFINE-TYPE-ALIAS:
-
-The define-type-alias macro creates a PROTOBUF-TYPE-ALIAS meta-object
-and a deftype form so we can use a alias a lisp type outside of cl-protobufs
-instead of a protobuf-implementation type.
-
-e.g.:
-(proto:define-type-alias date ()
-      :lisp-type integer
-      :proto-type string
-      :serializer integer-to-date
-      :deserializer date-to-integer)
 
 DEFINE-ONEOF:
 
@@ -1248,8 +1233,7 @@ Arguments:
     (with-collectors ((forms collect-form))
       (dolist (field fields)
         (assert (not (member (car field)
-                             '(define-enum define-message define-extend define-extension
-                               define-type-alias)))
+                             '(define-enum define-message define-extend define-extension)))
                 () "The body of ~S can only contain field and group definitions" 'define-extend)
         (case (car field)
           ((define-group)
@@ -1475,7 +1459,7 @@ Arguments:
                       (oneofs collect-oneof))
       (dolist (field fields)
         (case (car field)
-          ((define-enum define-message define-extend define-type-alias)
+          ((define-enum define-message define-extend)
            (let ((result (macroexpand-1 field env)))
              (assert (eq (car result) 'progn) ()
                      "The macroexpansion for ~S failed" field)
@@ -1802,41 +1786,3 @@ Arguments
                                (declare (values ,output-type))))))))
       (collect-form `(appendf (proto-services *protobuf*) (list ,service)))
       `(progn ,@forms))))
-
-
-;; Lisp-only type aliases
-(defmacro define-type-alias (type (&key name alias-for documentation)
-                             &key lisp-type proto-type serializer deserializer)
-  "Define a Protobufs type alias Lisp 'deftype' named 'type'.
-   'lisp-type' is the name of the Lisp type.
-   'proto-type' is the name of a scalar Protobufs type, e.g., 'int32' or 'string'.
-   'serializer' is a function that takes a Lisp object and generates a Protobufs object.
-   'deserializer' is a function that takes a Protobufs object and generates a Lisp object.
-   If 'alias-for' is given, no Lisp 'deftype' will be defined."
-  (multiple-value-bind (type-str proto)
-      (lisp-type-to-protobuf-type proto-type)
-    (assert (scalarp proto) ()
-            "The alias ~S must resolve to a Protobufs scalar type"
-            type)
-    (let* ((name  (or name (class-name->proto type)))
-           (alias (make-instance 'protobuf-type-alias
-                    :class  type
-                    :name   name
-                    :lisp-type  lisp-type
-                    :proto-type proto
-                    :proto-type-str type-str
-                    :serializer   serializer
-                    :deserializer deserializer
-                    :qualified-name (make-qualified-name *protobuf* name)
-                    :documentation documentation)))
-      (with-collectors ((forms collect-form))
-        (if alias-for
-            ;; If we've got an alias, define a a type that is the subtype of
-            ;; the Lisp enum so that typep and subtypep work
-            (unless (eq type alias-for)
-              (collect-form `(deftype ,type () ',alias-for)))
-            ;; If no alias, define the Lisp enum type now
-            (collect-form `(deftype ,type () ',lisp-type)))
-        (record-protobuf-object type alias :alias)
-        (collect-form `(record-protobuf-object ',type ,alias :alias))
-        `(progn ,@forms)))))

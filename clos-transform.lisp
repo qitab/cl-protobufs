@@ -48,8 +48,6 @@
          (list-of-list-of (list-of-list-of))
          (type-enum (when (symbolp type)
                       (find-enum type)))
-         (type-alias (when (symbolp type)
-                       (find-type-alias type)))
          (expanded-type (type-expand type))
          ;; As of cl/94580268, aliased types each have a (deftype <aliased-type> t) form generated,
          ;; because the actual type is generally not available at the time that we compile the proto
@@ -137,14 +135,10 @@
                    (lisp-type-to-protobuf-type (first tail))
                  (values type class (packed-type-p class)))
                (lisp-type-to-protobuf-type type))))))
-      (type-alias
-       (values (proto-proto-type-str type-alias) type))
       ;; Transforming an atomic type (i.e. a symbol) into something else seems "surprising"
       ;; when that symbol names a message. I'm going to do the least invasive kludge that
       ;; works, which is to see whether TYPE has a custom fast (de)serializer, and if so,
-      ;; preserve TYPE intact. It's possible that type-alias is the right thing to use,
-      ;; but the concept does not exist in "normal" protobuf APIs,
-      ;; and it seems an unnecessary piece of ugliness.
+      ;; preserve TYPE intact.
       ((or (custom-serializer type) (custom-deserializer type))
        (values (string type) type))
       ;; I'm not sure that we should ever check the expanded type.  This case has been the source of

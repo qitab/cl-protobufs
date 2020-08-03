@@ -42,7 +42,6 @@
    #:service-descriptor
    #:enum-descriptor
    #:enum-value-descriptor
-   #:protobuf-type-alias                ; Lisp-only extension
 
    ;; Conditions
    #:undefined-field-type
@@ -75,7 +74,6 @@
    #:define-extension
    #:define-group
    #:define-service
-   #:define-type-alias                  ; Lisp-only extension
 
    ;; Binary format
    #:serialize-object-to-file

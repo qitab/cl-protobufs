@@ -110,8 +110,7 @@ Parameters:
               (print-scalar v type name stream
                             (and pretty-print indent))))
       ((typep (setq desc (or (find-message type)
-                             (find-enum type)
-                             (find-type-alias type)))
+                             (find-enum type)))
               'message-descriptor)
        (dolist (v values)
          (print-text-format v :indent (+ indent 2)
@@ -123,12 +122,6 @@ Parameters:
        (doseq (v values)
               (print-enum v desc name stream
                           (and pretty-print indent))))
-      ((typep desc 'protobuf-type-alias)
-       (let ((type (proto-proto-type desc)))
-         (doseq (v values)
-                (let ((v (funcall (proto-serializer desc) v)))
-                  (print-scalar v type name stream
-                                (and pretty-print indent))))))
       ;; This case only happens when the user specifies a custom type and
       ;; doesn't support it above.
       (t (undefined-type type "While printing ~S to text format," values)))))
@@ -156,7 +149,6 @@ Parameters:
                      (and pretty-print indent)))
       ((typep (setq desc (or (find-message type)
                              (find-enum type)
-                             (find-type-alias type)
                              (find-map-descriptor type)))
               'message-descriptor)
        (print-text-format value :indent (+ indent 2)
@@ -167,12 +159,6 @@ Parameters:
       ((typep desc 'enum-descriptor)
        (print-enum value desc name stream
                    (and pretty-print indent)))
-      ((typep desc 'protobuf-type-alias)
-       (when value
-         (let ((value (funcall (proto-serializer desc) value))
-               (type  (proto-proto-type desc)))
-           (print-scalar value type name stream
-                         (and pretty-print indent)))))
       ((typep desc 'map-descriptor)
        (let ((key-type (map-descriptor-key-class desc))
              (val-type (map-descriptor-val-class desc)))
@@ -334,9 +320,8 @@ attempt to parse the name of the message and match it against MSG-DESC."
 the object parsed. If the parsing fails, the function will
 return T as a second value."
   (let ((desc (or (find-message type)
-                 (find-enum type)
-                 (find-type-alias type)
-                 (find-map-descriptor type))))
+                  (find-enum type)
+                  (find-map-descriptor type))))
     (cond ((scalarp type)
            (expect-char stream #\:)
            (case type
@@ -357,15 +342,6 @@ return T as a second value."
                   (enum (find (keywordify name) (enum-descriptor-values desc)
                               :key #'enum-value-descriptor-name)))
              (and enum (enum-value-descriptor-name enum))))
-          ((typep desc 'protobuf-type-alias)
-           (let ((type (proto-proto-type desc)))
-             (expect-char stream #\:)
-             (case type
-               ((:float) (parse-float stream))
-               ((:double) (parse-double stream))
-               ((:string) (parse-string stream))
-               ((:bool)   (boolean-true-p (parse-token stream)))
-               (otherwise (parse-signed-int stream)))))
           ((typep desc 'map-descriptor)
            (let ((key-type (map-descriptor-key-class desc))
                  (val-type (map-descriptor-val-class desc)))
@@ -385,8 +361,8 @@ return T as a second value."
                   (expect-char stream #\:)
                   (expect-char stream #\[)
                   (loop
-                    with pairs = ()
-                    do (skip-whitespace stream)
+                     with pairs = ()
+                     do (skip-whitespace stream)
                        (push (parse-map-entry key-type val-type stream)
                              pairs)
                        (if (eql (peek-char nil stream nil) #\,)
@@ -398,7 +374,7 @@ return T as a second value."
                  (t
                   (skip-whitespace stream)
                   (list (parse-map-entry key-type val-type stream)))))))
-        (t (values nil t)))))
+          (t (values nil t)))))
 
 (defun skip-field (stream)
   "Skip either a token or a balanced {}-pair."
