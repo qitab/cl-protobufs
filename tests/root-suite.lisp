@@ -4,11 +4,6 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test
-  (:use #:cl)
-  (:export #:root-suite
-           #:run-all))
-
 (in-package #:cl-protobufs.test)
 
 ;;; A suite to contain all other test suites so there's an easy entry point to
