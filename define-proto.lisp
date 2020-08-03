@@ -1620,7 +1620,11 @@ Arguments
         (declare (ignore packed-p enum-values))
         (assert index)
         (multiple-value-bind (label repeated-type) (values-list label)
-          (let* ((default
+          ;; Proto3 optional fields are known as 'singular' fields, and are handled differently.
+          (let* ((label (if (and (eq *syntax* :proto3) (eq label :optional))
+                            :singular
+                            label))
+                 (default
                   (cond ((and (eq label :repeated)
                               (eq repeated-type :vector))
                          $empty-vector)
