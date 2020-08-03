@@ -484,7 +484,7 @@ on the symbol if we are not in SBCL."
               :initform nil)
    (set-type  :accessor proto-set-type          ; The type obtained directly
               :initarg :set-type)               ; from the protobuf schema.
-   (label :type (member :required :optional :repeated)
+   (label :type (member :required :optional :repeated :singular)
           :accessor proto-label
           :initarg :label)
    (index :type (unsigned-byte 29)              ; The index number for this field
