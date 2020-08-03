@@ -55,7 +55,7 @@
 
 (in-package #:cl-protobufs.test.custom-proto-test)
 
-(defsuite custom-proto-tests ())
+(defsuite custom-proto-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

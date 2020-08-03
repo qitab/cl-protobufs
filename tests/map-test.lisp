@@ -13,7 +13,7 @@
 
 (in-package #:cl-protobufs.test.map-test)
 
-(defsuite map-tests ())
+(defsuite map-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

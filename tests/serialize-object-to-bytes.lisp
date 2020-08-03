@@ -15,7 +15,7 @@
 
 (in-package #:cl-protobufs.test.serialize-test)
 
-(defsuite serialize-tests ())
+(defsuite serialize-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

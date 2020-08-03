@@ -21,7 +21,7 @@
 
 (in-package #:cl-protobufs.test.symbol-import-test)
 
-(defsuite symbol-import-tests ())
+(defsuite symbol-import-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

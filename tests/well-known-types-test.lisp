@@ -13,7 +13,7 @@
 
 (in-package #:cl-protobufs.test.well-known-types-test)
 
-(defsuite well-known-types ())
+(defsuite well-known-types (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.
