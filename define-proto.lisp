@@ -578,13 +578,19 @@ Arguments:
         (index (proto-field-offset field))
         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
         (bool-index (proto-bool-index field))
-        (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type)))
+        (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
+        (label (proto-label field)))
 
     (with-gensyms (obj new-value)
       `(
         (declaim (inline (setf ,public-accessor-name)))
         (defun (setf ,public-accessor-name) (,new-value ,obj)
           (setf (bit (,is-set-accessor ,obj) ,index) 1)
+          ;; If a field is singular and ,new-value is the default, then the field should be
+          ;; marked as unset.
+          ,(when (eq label :singular)
+             `(when (equalp ,new-value ,default-form)
+                (setf (bit (,is-set-accessor ,obj) ,index) 0)))
           ,(if bool-index
                `(setf (bit (,bit-field-name ,obj) ,bool-index)
                       (if ,new-value 1 0))
@@ -618,7 +624,12 @@ Arguments:
         ;; field, this is impossible.
         (proto-impl::set-functions-in-hash-table ',proto-type ',public-slot-name)
 
-        (export '(,has-function-name ,clear-function-name ,public-accessor-name))))))
+        ;; has-* functions are not exported for singular fields. They are only for
+        ;; internal usage.
+        ,(when (not (eq label :singular))
+           `(export '(,has-function-name)))
+
+        (export '(,clear-function-name ,public-accessor-name))))))
 
 (defun make-oneof-accessor-forms (proto-type oneof)
   "Make and return forms that define accessor functions for a oneof and its fields.
