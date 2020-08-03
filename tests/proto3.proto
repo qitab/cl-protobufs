@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package proto3_test;
+
+message AllSingular {
+  int32 int32_value = 1;
+  int64 int64_value = 2;
+  uint32 uint32_value = 3;
+  uint64 uint64_value = 4;
+  sint32 sint32_value = 5;
+  sint64 sint64_value = 6;
+  fixed32 fixed32_value = 7;
+  fixed64 fixed64_value = 8;
+  sfixed32 sfixed32_value = 9;
+  sfixed64 sfixed64_value = 10;
+  bool bool_value = 11;
+  string string_value = 12;
+  bytes bytes_value = 13;
+  double double_value = 14;
+  float float_value = 15;
+  TestEnum enum_value = 16;
+  TestMessage msg_value = 17;
+}
+
+enum TestEnum {
+  DEFAULT = 0;
+  OTHER = 1;
+}
+
+message TestMessage {
+  int32 value = 1;
+}
