@@ -648,30 +648,30 @@ Paramters:
          (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear)))
     (with-gensyms (obj)
       `(
+        ;; Since the oneof struct stores an integer to indicate which field is set, it is not
+        ;; particularly useful for the user when writing code surrounding oneof types. This
+        ;; creates a function which returns a symbol with the same name as the field which
+        ;; is currently set. If the field is not set, this function returns nil.
+        (declaim (inline ,case-function-name))
+        (defun ,case-function-name (,obj)
+          (ecase (oneof-set-field (,hidden-accessor-name ,obj))
+            ,@(loop for field across (oneof-descriptor-fields oneof)
+                    collect
+                    `(,(proto-oneof-offset field) ',(proto-external-field-name field)))
+            ((nil) nil)))
+
+        (declaim (inline ,has-function-name))
+        (defun ,has-function-name (,obj)
+          (not (eql (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
+
+        (declaim (inline ,clear-function-name))
+        (defun ,clear-function-name (,obj)
+          (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
+          (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil))
+
         ;; Special oneof forms are only created when ONEOF is not synthetic.
-        ,@(when (not (oneof-descriptor-synthetic-p oneof))
-            `(;; Since the oneof struct stores an integer to indicate which field is set, it is not
-              ;; particularly useful for the user when writing code surrounding oneof types. This
-              ;; creates a function which returns a symbol with the same name as the field which
-              ;; is currently set. If the field is not set, this function returns nil.
-              (declaim (inline ,case-function-name))
-              (defun ,case-function-name (,obj)
-                (ecase (oneof-set-field (,hidden-accessor-name ,obj))
-                  ,@(loop for field across (oneof-descriptor-fields oneof)
-                          collect
-                          `(,(proto-oneof-offset field) ',(proto-external-field-name field)))
-                  ((nil) nil)))
-
-              (declaim (inline ,has-function-name))
-              (defun ,has-function-name (,obj)
-                (not (eql (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
-
-              (declaim (inline ,clear-function-name))
-              (defun ,clear-function-name (,obj)
-                (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
-                (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil))
-
-              (export '(,case-function-name ,has-function-name ,clear-function-name))))
+        ,(unless (oneof-descriptor-synthetic-p oneof)
+           `(export '(,case-function-name ,has-function-name ,clear-function-name)))
 
         ;; Fields inside of a oneof need special accessors, since they need to consult
         ;; with the oneof struct. This creates those special accessors for each field.
