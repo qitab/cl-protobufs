@@ -142,8 +142,13 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
     if (descriptor_->oneof_decl_count() > 0) {
       for (int i = 0; i < descriptor_->oneof_decl_count(); ++i) {
         const OneofDescriptor* oneof = descriptor_->oneof_decl(i);
-        printer->Print("\n(proto:define-oneof $name$", "name",
-                       ToLispName(oneof->name()));
+        // Non-synthetic oneofs come first in the list.
+        if (i < descriptor_->real_oneof_decl_count())
+          printer->Print("\n(proto:define-oneof $name$ ()", "name",
+                         ToLispName(oneof->name()));
+        else
+          printer->Print("\n(proto:define-oneof $name$ (:synthetic-p t)", "name",
+                         ToLispName(oneof->name()));
         printer->Indent();
         for (int j = 0; j < oneof->field_count(); ++j) {
           const FieldDescriptor* field  = oneof->field(j);

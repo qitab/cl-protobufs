@@ -39,6 +39,11 @@ class LispGenerator : public compiler::CodeGenerator {
                    compiler::GeneratorContext* generator_context,
                    std::string* error) const override;
 
+  // cl-protobufs supports proto3 optional fields.
+  uint64_t GetSupportedFeatures() const override {
+    return FEATURE_PROTO3_OPTIONAL;
+  }
+
  private:
   LispGenerator(const LispGenerator&) = delete;
   LispGenerator& operator=(const LispGenerator&) = delete;
