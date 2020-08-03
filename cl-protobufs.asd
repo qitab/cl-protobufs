@@ -120,6 +120,11 @@
    ;;   lisp-service-test.lisp not included as the necessary fields in
    ;;   service-test.proto are not currently exported.
 
+   (:module "root-suite"
+            :serial t
+            :pathname ""
+            :components ((:file "root-suite")))
+
    (:module "wire-level-tests"
     :serial t
     :pathname ""
@@ -276,32 +281,10 @@
    (:module "google-tests"
     :serial t
     :pathname ""
-    :depends-on ("brown-tests" "google-tests-proto")
+    :depends-on ("root-suite" "brown-tests" "google-tests-proto")
     :components
     ((:file "full-tests")
      (:static-file "golden_message.data")
      (:static-file "golden_packed_message.data"))))
   :perform (test-op (o c)
-                    (mapc (lambda (p)
-                            (uiop:symbol-call p '#:run))
-                          '(#:cl-protobufs.test.wire-test
-                            #:cl-protobufs.test.case-preservation-test
-                            #:cl-protobufs.test.extend-test
-                            #:cl-protobufs.test.reference-test
-                            #:cl-protobufs.test.serialization-test
-                            #:cl-protobufs.test.symbol-import-test
-                            #:cl-protobufs.test.quick-test
-                            #:cl-protobufs.test.full-test
-                            #:cl-protobufs.test.custom-proto-test
-                            #:cl-protobufs.test.deserialize-test
-                            #:cl-protobufs.test.enum-mapping-test
-                            #:cl-protobufs.test.map-test
-                            #:cl-protobufs.test.oneof-test
-                            #:cl-protobufs.test.import-test
-                            #:cl-protobufs.test.lazy-test
-                            #:cl-protobufs.test.alias-test
-                            #:cl-protobufs.test.packed-test
-                            #:cl-protobufs.test.serialize-test
-                            #:cl-protobufs.test.text-format-test
-                            #:cl-protobufs.test.zigzag-test
-                            #:cl-protobufs.test.well-known-types-test))))
+                    (uiop:symbol-call '#:cl-protobufs.test '#:run-all)))

@@ -22,7 +22,7 @@
 
 (in-package :cl-protobufs.test.text-format-test)
 
-(defsuite text-format-tests ())
+(defsuite text-format-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

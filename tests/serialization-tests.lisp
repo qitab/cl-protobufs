@@ -60,7 +60,7 @@
 
 (in-package #:cl-protobufs.test.serialization-test)
 
-(defsuite serialization-tests ())
+(defsuite serialization-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.
@@ -553,7 +553,7 @@ Parameters:
 ;;;
 ;;; This aims to test updateing a protocol buffer and deserializing
 ;;; on a binary containing the previous version.
-(deftest test-proto-backwards-compatability (serialization-tests)
+(deftest test-proto-backwards-compatibility (serialization-tests)
   (let* ((proto-on-wire (make-proto-on-wire
                          :beginning "char"
                          :always "pika-pal"

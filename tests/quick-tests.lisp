@@ -12,7 +12,7 @@
 
 (in-package #:cl-protobufs.test.quick-test)
 
-(defsuite quick-tests ())
+(defsuite quick-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

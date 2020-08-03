@@ -13,7 +13,7 @@
 
 (in-package #:cl-protobufs.test.full-test)
 
-(defsuite full-tests ())
+(defsuite full-tests (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.
@@ -280,6 +280,11 @@ Parameters:
     (expect-repeated-fields-modified m)
     (proto:clear m)
     (expect-clear m)))
+
+(deftest test-enum-default (full-tests)
+  (let ((m (cl-protobufs.protobuf-unittest:make-sparse-enum-message)))
+    (assert-true (eq (cl-protobufs.protobuf-unittest:sparse-enum-message.sparse-enum m)
+                     :SPARSE-A))))
 
 (deftest test (full-tests)
   (test-parse-from-file)

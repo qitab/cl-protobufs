@@ -190,11 +190,12 @@ the oneof and its nested fields.
 
 (defun validate-imports (file-descriptor imports)
   "Validates that all of the IMPORTS (a list of file names) have
-   already been imported by FILE-DESCRIPTOR."
+   already been loaded. FILE-DESCRIPTOR is the descriptor of the
+   file doing the importing."
   (dolist (import (reverse imports))
     (let* ((imported (proto:find-schema (if (stringp import) (pathname import) import))))
       (unless imported
-        (error "Could not find imported file-descriptor: ~A for: ~S" file-descriptor import)))))
+        (error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
 (defun define-schema (type &key name syntax package import
                            optimize options documentation)
@@ -321,20 +322,10 @@ return nil."
 
 (defun make-enum-default (type enum-values)
   "Generate a function to return the default enum value for
-an enum of type TYPE. The default type should be the enum
-with the lowest index value in ENUM-VALUES."
-  (let ((default-value))
-    ;; proto3 insists that the first constant is the default.
-    (if (eq *syntax* :proto3)
-        (setf default-value (enum-value-descriptor-name (car enum-values)))
-        (loop with smallest-value = nil
-              for enum in enum-values
-              when (or (not smallest-value)
-                       (< (enum-value-descriptor-value enum) smallest-value))
-                do (setf smallest-value (enum-value-descriptor-value enum)
-                         default-value (enum-value-descriptor-name enum))))
-    `(defmethod enum-default-value ((e (eql ',type)))
-       ,default-value)))
+an enum of type TYPE. The default value should be the first
+enum in ENUM-VALUES."
+  `(defmethod enum-default-value ((e (eql ',type)))
+     ,(enum-value-descriptor-name (car enum-values))))
 
 (defun make-enum-constant-forms (type enum-values)
   "Generates forms for defining a constant for each enum value in ENUM-VALUES.

@@ -15,7 +15,7 @@
 
 (in-package #:cl-protobufs.service-test)
 
-(defsuite service-test ())
+(defsuite service-test (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.

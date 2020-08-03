@@ -11,7 +11,7 @@
 
 (in-package #:cl-protobufs.test.varint-test)
 
-(defsuite varint-test ())
+(defsuite varint-test (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.
