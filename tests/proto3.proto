@@ -30,3 +30,8 @@ enum TestEnum {
 message TestMessage {
   int32 value = 1;
 }
+
+message OptionalTest {
+  optional string string_value = 1;
+  optional bool bool_value = 2;
+}

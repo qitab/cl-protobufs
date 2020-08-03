@@ -87,3 +87,15 @@ Parameters:
       (assert-true (equalp serialized *expected-bytes*))
       (let ((deserialized (deserialize-object-from-bytes 'all-singular serialized)))
         (assert-true (proto-impl::proto-equal deserialized msg))))))
+
+;; Protoc currently specifies that proto3 optional fields should be represented internally
+;; by "synthetic" oneofs. Since oneof features are tested elsewhere, these tests are
+;; redundant. 
+(deftest optional-test (proto3-tests)
+  (let ((msg (make-optional-test)))
+    (assert-false (optional-test.has-bool-value msg))
+    (assert-false (optional-test.has-string-value msg))
+    (setf (string-value msg) "")
+    (setf (bool-value msg) nil)
+    (assert-true (optional-test.has-bool-value msg))
+    (assert-true (optional-test.has-string-value msg))))
