@@ -325,7 +325,7 @@
   (let* ((file-desc (make-instance 'file-descriptor
                                    :class class
                                    :name  name))
-         (*protobuf* file-desc)
+         (*current-file-descriptor* file-desc)
          *protobuf-package*
          *protobuf-rpc-package*
          (*protobuf-conc-name* conc-name))
@@ -551,7 +551,7 @@
                     ;; Maybe force accessors for all slots
                     :conc-name (conc-name-for-type class *protobuf-conc-name*)
                     :source-location (make-source-location stream loc (i+ loc (length name)))))
-         (*protobuf* msg-desc))
+         (*current-message-descriptor* msg-desc))
     (loop
       (let ((token (parse-token stream)))
         (when (null token)
@@ -615,7 +615,7 @@
                          :message-type :extends ; this message is an extension
                          :source-location (make-source-location stream loc (i+ loc (length name)))
                          )))
-         (*protobuf* extended))
+         (*current-message-descriptor* extended))
     (assert message ()
             "There is no message named ~A to extend" name)
     (loop
@@ -804,7 +804,7 @@
          (service (make-instance 'service-descriptor
                     :class (proto->class-name name *protobuf-package*)
                     :name name
-                    :qualified-name (make-qualified-name *protobuf* name)
+                    :qualified-name (make-qualified-name desc name)
                     :parent desc
                     :source-location (make-source-location stream loc (i+ loc (length name)))))
          (index 0))
@@ -860,7 +860,7 @@
          (method (make-instance 'method-descriptor
                    :class stub
                    :name  name
-                   :qualified-name (make-qualified-name *protobuf* name)
+                   :qualified-name (make-qualified-name *current-file-descriptor* name)
                    :parent service
                    :input-name  in
                    :output-name out
