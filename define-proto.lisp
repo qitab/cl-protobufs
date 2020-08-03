@@ -185,6 +185,9 @@ the oneof and its nested fields.
 (defvar *protobuf* nil
   "The current proto-schema, proto-message, or group object we're compiling.")
 
+(defvar *syntax* :proto2
+  "The current proto syntax of the file we're compiling.")
+
 (defun validate-imports (file-descriptor imports)
   "Validates that all of the IMPORTS (a list of file names) have
    already been imported by FILE-DESCRIPTOR."
@@ -235,6 +238,7 @@ the oneof and its nested fields.
                     :documentation documentation)))
     (record-schema schema)
     (setf *protobuf* schema)
+    (setf *syntax* (or syntax :proto2))
     (validate-imports schema imports)))
 
 (defun %make-enum->numeral-table (enum-values)
@@ -321,7 +325,7 @@ an enum of type TYPE. The default type should be the enum
 with the lowest index value in ENUM-VALUES."
   (let ((default-value))
     ;; proto3 insists that the first constant is the default.
-    (if (eq (proto-syntax *protobuf) :proto3)
+    (if (eq *syntax* :proto3)
         (setf default-value (enum-value-descriptor-name (car enum-values)))
         (loop with smallest-value = nil
               for enum in enum-values
