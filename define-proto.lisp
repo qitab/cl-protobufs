@@ -584,24 +584,35 @@ Arguments:
         (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
         (label (proto-label field)))
 
-    (with-gensyms (obj new-value)
+    ;; If index is unbound, then this field does not have a reserved bit in the %%is-set vector.
+    ;; This means that the field is singular, so checking for field presence must be done by
+    ;; checking if the bound value is default.
+    (with-gensyms (obj new-value cur-value)
       `(
         (declaim (inline (setf ,public-accessor-name)))
         (defun (setf ,public-accessor-name) (,new-value ,obj)
-          (setf (bit (,is-set-accessor ,obj) ,index) 1)
-          ;; If a field is singular and ,new-value is the default, then the field should be
-          ;; marked as unset.
-          ,(when (eq label :singular)
-             `(when (equalp ,new-value ,default-form)
-                (setf (bit (,is-set-accessor ,obj) ,index) 0)))
+          ,(when index
+             `(setf (bit (,is-set-accessor ,obj) ,index) 1))
           ,(if bool-index
                `(setf (bit (,bit-field-name ,obj) ,bool-index)
                       (if ,new-value 1 0))
                `(setf (,hidden-accessor-name ,obj) ,new-value)))
 
+
+        ;; For singular fields, the has-* function is repurposed. It now answers the question:
+        ;; "Is this field bound to the default value?". This is done so that the optimized
+        ;; serializer can use the has-* function to check if a singular field should be serialized.
         (declaim (inline ,has-function-name))
         (defun ,has-function-name (,obj)
-          (= (bit (,is-set-accessor ,obj) ,index) 1))
+          ,(if index
+               `(= (bit (,is-set-accessor ,obj) ,index) 1)
+               `(let ((,cur-value ,(if bool-index
+                                       `(plusp (bit (,bit-field-name ,obj) ,bool-index))
+                                       `(,hidden-accessor-name ,obj))))
+                  ,(case (proto-set-type field)
+                     ((proto:byte-vector cl:string) `(not (= (length ,cur-value) 0)))
+                     ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
+                     (t `(not (eq ,cur-value ,default-form)))))))
 
         ;; Clear function
         (declaim (inline ,clear-function-name))
@@ -610,7 +621,8 @@ Arguments:
                `(setf (bit (,bit-field-name ,obj) ,bool-index)
                       ,(if default-form 1 0))
                `(setf (,hidden-accessor-name ,obj) ,default-form))
-          (setf (bit (,is-set-accessor ,obj) ,index) 0))
+          ,(when index
+            `(setf (bit (,is-set-accessor ,obj) ,index) 0)))
 
         ;; Create defmethods to allow for getting/setting compatibly
         ;; with the standard-classes.
@@ -1127,7 +1139,7 @@ Arguments:
                (push oneof-desc (proto-oneofs msg-desc))
                (collect-oneof oneof-desc))))
           (otherwise
-           (multiple-value-bind (field slot)
+           (multiple-value-bind (field slot idx offset-p)
                (process-field field :conc-name conc-name
                                     :alias-for alias-for
                                     :field-offset field-offset
@@ -1135,7 +1147,9 @@ Arguments:
                                     (when (non-repeated-bool-field field)
                                       (incf bool-index))
                                     :bool-values bool-values)
-             (incf field-offset)
+             (declare (ignore idx))
+             (when offset-p
+               (incf field-offset))
              (if (proto-lazy-p field)
                  (collect-lazy-field field)
                  (collect-non-lazy-field field))
@@ -1525,7 +1539,7 @@ Arguments:
                (appendf (proto-oneofs message) (list oneof-desc))
                (collect-oneof oneof-desc))))
           (otherwise
-           (multiple-value-bind (field slot)
+           (multiple-value-bind (field slot idx offset-p)
                (process-field field :conc-name conc-name
                                     :alias-for alias-for
                                     :field-offset field-offset
@@ -1533,7 +1547,9 @@ Arguments:
                                     (when (non-repeated-bool-field field)
                                       (incf bool-index))
                                     :bool-values bool-values)
-             (incf field-offset)
+             (declare (ignore offset-p))
+             (when offset-p
+               (incf field-offset))
              (if (proto-lazy-p field)
                  (collect-lazy-field field)
                  (collect-non-lazy-field field))
@@ -1586,7 +1602,8 @@ Arguments:
 
 (defun process-field (field &key conc-name alias-for field-offset bool-index bool-values)
   "Process one field descriptor within 'define-message' or 'define-extend'.
-Returns a 'proto-field' object, a CLOS slot form, and the field index.
+Returns a 'proto-field' object, a CLOS slot form, the field index, and a boolean which
+indicates if FIELD has an offset.
 
 Arguments
   FIELD: The description of the field as laid out in the proto schema.
@@ -1629,6 +1646,8 @@ Arguments
           (let* ((label (if (and (eq *syntax* :proto3) (eq label :optional))
                             :singular
                             label))
+                 ;; Singular fields do not have offsets, as they don't have has-* functions.
+                 (offset (and (not (eq label :singular)) field-offset))
                  (default
                   (cond ((and (eq label :repeated)
                               (eq repeated-type :vector))
@@ -1668,7 +1687,7 @@ Arguments
                                           *protobuf* (or name (slot-name->proto slot)))
                          :label label
                          :index  index
-                         :field-offset field-offset
+                         :field-offset offset
                          :internal-field-name internal-slot-name
                          :external-field-name slot
                          :reader reader
@@ -1680,7 +1699,7 @@ Arguments
                          :documentation documentation)))
             (when (and bool-index default (not (eq default $empty-default)))
               (setf (bit bool-values bool-index) 1))
-            (values field cslot index)))))))
+            (values field cslot index (and offset t))))))))
 
 (defparameter *rpc-package* nil
   "The Lisp package that implements RPC.
