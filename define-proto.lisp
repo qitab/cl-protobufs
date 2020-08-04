@@ -206,7 +206,7 @@ the oneof and its nested fields.
                     'file-descriptor
                     :class    type
                     :name     name
-                    :syntax   (or syntax :proto2)
+                    :syntax   syntax
                     :package  package
                     :imports  imports
                     :options  (if optimize

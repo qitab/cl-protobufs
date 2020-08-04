@@ -104,8 +104,7 @@ Parameters:
 (defclass file-descriptor (descriptor)
   ((syntax :type (member :proto2 :proto3)       ; proto syntax. Either :proto2 or :proto3.
            :accessor proto-syntax
-           :initarg :syntax
-           :initform :proto2)
+           :initarg :syntax)
    (package :type (or null string)              ; the Protobufs package
             :accessor proto-package
             :initarg :package
