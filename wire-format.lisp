@@ -910,7 +910,9 @@ and a buffer which encodes the value to the buffer."
                    checking and array bounds checking." bits)
            (declare #.$optimize-serialization)
            (let ((val (ldb (byte ,bits 0) val))
-                 (nbytes-written (length32 val)))
+                 (nbytes-written ,(if (= bits 32)
+                                      '(length32 val)
+                                      '(length64 val))))
              (declare (type (unsigned-byte ,bits) val))
              (buffer-ensure-space buffer nbytes-written)
              ;; Seven bits at a time, least significant bits first
