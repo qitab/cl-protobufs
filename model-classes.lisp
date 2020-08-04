@@ -734,6 +734,10 @@ on the symbol if we are not in SBCL."
 (defstruct oneof-descriptor
   "The meta-object for a protobuf oneof"
   ;; A boolean which indicates if the oneof is synthetic.
+  ;; A synthetic oneof is a oneof which is created by protoc in order to
+  ;; create has-* functions for proto3 optional fields. Special accessors
+  ;; (the clear, has, and case functions) are not created for synthetic
+  ;; oneofs.
   (synthetic-p nil :type boolean)
   ;; A vector which stores the oneof's field descriptor.
   (fields nil :type array)
