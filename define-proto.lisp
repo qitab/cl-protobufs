@@ -558,7 +558,7 @@ Arguments:
         (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
         (label (proto-label field)))
 
-    ;; If index is unbound, then this field does not have a reserved bit in the %%is-set vector.
+    ;; If index is nil, then this field does not have a reserved bit in the %%is-set vector.
     ;; This means that the field is singular, so checking for field presence must be done by
     ;; checking if the bound value is default.
     (with-gensyms (obj new-value cur-value)
