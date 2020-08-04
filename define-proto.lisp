@@ -562,7 +562,6 @@ in the found hash-table."
                 (proto-slot-function-name proto-type field-name :get)
                 (proto-slot-function-name proto-type field-name :clear)))))
 
-
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
   "Create the common forms needed for all message fields
 has, is-set, clear, set.
