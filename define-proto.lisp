@@ -586,6 +586,7 @@ Arguments:
                   ,(case (proto-set-type field)
                      ((proto:byte-vector cl:string) `(not (= (length ,cur-value) 0)))
                      ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
+                     ;; Otherwise, the type is integral. EQ suffices to check equality.
                      (t `(not (eq ,cur-value ,default-form)))))))
 
         ;; Clear function
