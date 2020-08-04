@@ -163,14 +163,6 @@ Parameters:
 
 ;; find-* functions for finding different proto meta-objects
 
-(defvar *type-aliases* (make-hash-table :test 'eq)
-  "Maps alias names (symbols) to protobuf-type-alias instances.")
-
-(declaim (inline find-type-alias))
-(defun find-type-alias (alias)
-  "Return the protobuf-type-alias instance named by ALIAS (a symbol)."
-  (gethash alias *type-aliases*))
-
 (defvar *messages* (make-hash-table :test 'eq)
   "Map from the protobuf message name symbol to the message-descriptor instance. If there is an
 'extends' instance this will be the last (largest) defined extended version of the
@@ -204,11 +196,9 @@ or that's named by the class-name of TYPE."
   "Find a message for class.
 Parameters:
   CLASS: Either a symbol naming the class or a class."
-  (let* ((type (if (typep class 'symbol)
-                   class
-                   (class-name class))))
-    (or (find-message type)
-        (find-type-alias type))))
+  (find-message (if (typep class 'symbol)
+                    class
+                    (class-name class))))
 
 (defvar *maps* (make-hash-table :test 'eq)
   "Maps map names (symbols) to map-descriptor instances.")
@@ -428,7 +418,6 @@ on the symbol if we are not in SBCL."
      (when (and (slot-boundp message 'qual-name) (proto-qualified-name message))
        (setf (gethash (proto-qualified-name message) *qualified-messages*)
              (proto-class message))))
-    (:alias (setf (gethash symbol *type-aliases*) message))
     (:map (setf (gethash symbol *maps*) message))))
 
 (defmethod print-object ((msg-desc message-descriptor) stream)
@@ -778,39 +767,12 @@ on the symbol if we are not in SBCL."
            thereis (find index (oneof-descriptor-fields oneof)
                          :key #'proto-index))))
 
-;;; Lisp-only extensions
-
-(defclass protobuf-type-alias (descriptor)
-  ((lisp-type :reader proto-lisp-type   ; a Lisp type specifier
-              :initarg :lisp-type)
-   (proto-type :reader proto-proto-type ; a .proto type specifier
-               :initarg :proto-type)
-   (proto-type-str :reader proto-proto-type-str
-                   :initarg :proto-type-str)
-   (serializer :reader proto-serializer ; Lisp -> bytes conversion function
-               :initarg :serializer)
-   (deserializer :reader proto-deserializer ; bytes -> Lisp conversion function
-                 :initarg :deserializer))
-  (:documentation
-   "Model class to describe a protobuf type alias."))
-
-(defmethod make-load-form ((m protobuf-type-alias) &optional environment)
-  (make-load-form-saving-slots m :environment environment))
-
-(defmethod print-object ((m protobuf-type-alias) stream)
-  (if *print-escape*
-    (print-unreadable-object (m stream :type t :identity t)
-      (format stream "~S (maps ~S to ~S)"
-              (proto-class m)
-              (proto-lisp-type m) (proto-proto-type m)))
-    (format stream "~S" (proto-class m))))
-
 (defgeneric set-method-do-not-deserialize-input (method)
   (:documentation
    "Sets a service METHOD to indicate that its input should not be deserialized prior to calling its
     server function.")
   (:method ((method method-descriptor))
-    (setf (proto-impl::proto-input-type method) nil)))
+    (setf (proto-input-type method) nil)))
 
 (defgeneric make-qualified-name (parent-desc name)
   (:documentation
