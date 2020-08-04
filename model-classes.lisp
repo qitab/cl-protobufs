@@ -25,9 +25,14 @@ Parameters:
 
 ;;; "Thread-local" variables
 
-;; Parsing (and even pretty printing schemas) want to keep track of the current schema
-(defvar *protobuf* nil
-  "Bound to the Protobufs object currently being defined, either a schema or a message.")
+;;; These two variables are defined here, rather than in define-proto.lisp,
+;;; because they're needed by parser.lisp, which doesn't depend on
+;;; define-proto.lisp. Once the parser is deleted they can be moved.
+(defvar *current-file-descriptor* nil
+  "The file-descriptor for the file currently being loaded.")
+
+(defvar *current-message-descriptor* nil
+  "The message-descriptor for the message or group currently being loaded.")
 
 (defvar *protobuf-conc-name* nil
   "Bound to a conc-name to use for all the messages in the schema being defined.
