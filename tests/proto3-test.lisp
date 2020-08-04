@@ -28,27 +28,33 @@ Parameters:
 ;; Test that setting a singular value to the default results in nothing
 ;; being serialized or printed.
 (deftest test-singular-defaults (proto3-tests)
-  (let* ((msg (make-all-singular
-              :int32-value 0
-              :int64-value 0
-              :uint32-value 0
-              :uint64-value 0
-              :sint32-value 0
-              :sint64-value 0
-              :fixed32-value 0
-              :fixed64-value 0
-              :sfixed32-value 0
-              :sfixed64-value  0
-              :bool-value nil
-              :string-value ""
-              :bytes-value (make-byte-vector 0 :adjustable t)
-              :double-value 0.0d0
-              :float-value 0.0
-              :enum-value :default))
-         (serialized (serialize-object-to-bytes msg))
-         (text (with-output-to-string (s) (print-text-format msg :stream s))))
-    (assert-true (string= (format nil "AllSingular {~%}~%") text))
-    (assert-true (equalp serialized #()))))
+  (dolist (optimized '(nil t))
+    (when optimized
+      (proto-impl::make-serializer test-message)
+      (proto-impl::make-serializer all-singular)
+      (proto-impl::make-deserializer test-message)
+      (proto-impl::make-deserializer all-singular))
+    (let* ((msg (make-all-singular
+                 :int32-value 0
+                 :int64-value 0
+                 :uint32-value 0
+                 :uint64-value 0
+                 :sint32-value 0
+                 :sint64-value 0
+                 :fixed32-value 0
+                 :fixed64-value 0
+                 :sfixed32-value 0
+                 :sfixed64-value  0
+                 :bool-value nil
+                 :string-value ""
+                 :bytes-value (make-byte-vector 0 :adjustable t)
+                 :double-value 0.0d0
+                 :float-value 0.0
+                 :enum-value :default))
+           (serialized (serialize-object-to-bytes msg))
+           (text (with-output-to-string (s) (print-text-format msg :stream s))))
+      (assert-true (string= (format nil "AllSingular {~%}~%") text))
+      (assert-true (equalp serialized #())))))
 
 (defvar *expected-bytes*
   #(8 1 16 2 24 13 32 25 40 3 48 39 61 50 0 0 0 65 30 0 0 0 0 0 0 0 77 7 0 0 0 81
@@ -88,9 +94,6 @@ Parameters:
       (let ((deserialized (deserialize-object-from-bytes 'all-singular serialized)))
         (assert-true (proto-impl::proto-equal deserialized msg))))))
 
-;; Protoc currently specifies that proto3 optional fields should be represented internally
-;; by "synthetic" oneofs. Since oneof features are tested elsewhere, these tests are
-;; redundant. 
 (deftest optional-test (proto3-tests)
   (let ((msg (make-optional-test)))
     (assert-false (optional-test.has-bool-value msg))
