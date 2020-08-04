@@ -42,34 +42,47 @@ Parameters:
                 (format stream "~A { " name))
             (format stream "{")))
       (dolist (field (proto-fields message))
-        (when (if (eq (slot-value field 'message-type) :extends)
-                  (has-extension object (proto-internal-field-name field))
-                  (= (bit (slot-value object '%%is-set)
-                          (proto-field-offset field))
-                     1))
-          (let ((slot   (slot-value field 'internal-field-name))
-                (reader (slot-value field 'reader)))
-            (if (eq (proto-label field) :repeated)
-                (print-repeated-field
-                 (if slot
-                     (read-slot object slot
-                                (and (not (proto-lazy-p field))
-                                     reader))
-                     (list object))
-                 (proto-class field)
-                 (proto-name field)
-                 :indent indent
-                 :stream stream
-                 :print-name print-name
-                 :pretty-print pretty-print)
-                (print-non-repeated-field
-                 (if slot (read-slot object slot reader) object)
-                 (proto-class field)
-                 (proto-name field)
-                 :indent indent
-                 :stream stream
-                 :print-name print-name
-                 :pretty-print pretty-print)))))
+        (unless
+            (or (and (eq (slot-value field 'message-type) :extends)
+                     (not (has-extension object (proto-internal-field-name field))))
+                (and (proto-field-offset field)
+                     (= (bit (slot-value object '%%is-set)
+                             (proto-field-offset field))
+                        0)))
+          (let* ((slot   (slot-value field 'internal-field-name))
+                 (reader (slot-value field 'reader))
+                 (value (read-slot object slot (and (not (proto-lazy-p field)) reader))))
+            ;; For singular fields, only print if VALUE is not default.
+            (unless
+                (and (eq (proto-label field) :singular)
+                     (case (proto-set-type field)
+                       ((proto:byte-vector cl:string) (= (length value) 0))
+                       ((cl:double-float cl:float) (= value (get-default-form
+                                                             (proto-set-type field)
+                                                             (proto-default field))))
+                       (t (eq value (get-default-form (proto-set-type field)
+                                                      (proto-default field))))))
+              (if (eq (proto-label field) :repeated)
+                  (print-repeated-field
+                   (if slot
+                       (read-slot object slot
+                                  (and (not (proto-lazy-p field))
+                                       reader))
+                       (list object))
+                   (proto-class field)
+                   (proto-name field)
+                   :indent indent
+                   :stream stream
+                   :print-name print-name
+                   :pretty-print pretty-print)
+                  (print-non-repeated-field
+                   (if slot (read-slot object slot reader) object)
+                   (proto-class field)
+                   (proto-name field)
+                   :indent indent
+                   :stream stream
+                   :print-name print-name
+                   :pretty-print pretty-print))))))
       (dolist (oneof (proto-oneofs message))
         (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
                (set-field (oneof-set-field oneof-data)))
