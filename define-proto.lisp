@@ -1546,7 +1546,7 @@ Arguments:
                                     (when (non-repeated-bool-field field)
                                       (incf bool-index))
                                     :bool-values bool-values)
-             (declare (ignore offset-p))
+             (declare (ignore idx))
              (when offset-p
                (incf field-offset))
              (if (proto-lazy-p field)
