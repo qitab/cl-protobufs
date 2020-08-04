@@ -616,7 +616,7 @@ Arguments:
 
         ;; has-* functions are not exported for singular fields. They are only for
         ;; internal usage.
-        ,(when (not (eq label :singular))
+        ,(unless (eq label :singular)
            `(export '(,has-function-name)))
 
         (export '(,clear-function-name ,public-accessor-name))))))
