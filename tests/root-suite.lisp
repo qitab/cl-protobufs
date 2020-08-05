@@ -12,4 +12,4 @@
 
 (defun run-all ()
   "Run all tests."
-  (clunit:run-suite 'root-suite))
+  (print (clunit:run-suite 'root-suite)))

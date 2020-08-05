@@ -32,17 +32,17 @@
                      (simple-condition-format-control condition)
                      (simple-condition-format-arguments condition)
                      ;; I don't know the message but I do know the
-                     ;; fields qualified name.
+                     ;; field's qualified name.
                      (proto-qualified-name (error-field condition))
                      (error-type-name condition)))))
 
 ;; The serializers use this a lot, so wrap it up
 (defun undefined-field-type (format-control object type field)
   (error 'undefined-field-type
-    :format-control format-control
-    :format-arguments (list object)
-    :type-name (prin1-to-string type)
-    :field field))
+         :format-control format-control
+         :format-arguments (list object)
+         :type-name (prin1-to-string type)
+         :field field))
 
 ;; This is used when the field-descriptor is not accessible.
 (defun undefined-type (type format-control &rest format-args)
