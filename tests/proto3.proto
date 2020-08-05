@@ -42,3 +42,20 @@ message MixedTest {
   optional int32 second_opt = 3;
   bool second_sing = 4;
 }
+
+message Address {
+  string street = 1;
+  int64 s_number = 2;
+}
+
+message Person {
+  int64 id = 1;
+  string name = 2;
+  Address home = 3;
+  Person spouse = 4;
+  bool odd_p = 5;
+}
+
+message Population {
+  repeated Person people = 1;
+}
