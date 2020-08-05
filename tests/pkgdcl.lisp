@@ -9,4 +9,5 @@
 (defpackage #:cl-protobufs.test
   (:use #:cl)
   (:export #:root-suite
-           #:run-all))
+           #:run-all
+           #:run-suite))

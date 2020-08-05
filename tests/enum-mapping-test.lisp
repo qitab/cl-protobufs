@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.enum-mapping-test
+(defpackage #:cl-protobufs.test.enum-mapping
   (:use #:cl
         #:clunit
         #:cl-protobufs.third-party.lisp.cl-protobufs.tests)
@@ -13,20 +13,15 @@
                 #:enum->numeral)
   (:export :run))
 
-(in-package #:cl-protobufs.test.enum-mapping-test)
+(in-package #:cl-protobufs.test.enum-mapping)
 
-(defsuite enum-mapping-tests (cl-protobufs.test:root-suite))
+(defsuite enum-mapping-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'enum-mapping-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'enum-mapping-suite))
 
-(deftest test-enum-mapping (enum-mapping-tests)
+(deftest test-enum-mapping (enum-mapping-suite)
   ;;
   ;; Test the enum defined in a message.
   ;;
@@ -80,7 +75,7 @@ Parameters:
   (assert-true (= 10 (outer-enum->numeral :some-unknown-keyword 10)))
   (assert-true (eq :bah (numeral->outer-enum 1234 :bah))))
 
-(deftest test-enum-mapping-generics (enum-mapping-tests)
+(deftest test-enum-mapping-generics (enum-mapping-suite)
   ;;
   ;; Test the enum defined in a message.
   ;;
@@ -142,7 +137,7 @@ Parameters:
 (proto:define-schema 'my-schema :package 'proto-test :syntax :proto2)
 (proto:define-enum alias-enum (:alias-for orig-type))
 
-(deftest test-enum-values (enum-mapping-tests)
+(deftest test-enum-values (enum-mapping-suite)
   (assert-true (equal '(:foo :bar :baz :foo-bar :zaphod)
                       (proto:enum-values 'my-message.my-enum)))
   (assert-true (equal '(:foo :bar :baz :zaphod)
@@ -152,7 +147,7 @@ Parameters:
   (assert-true (equal '(:eins :zwei :drei)
                       (proto:enum-values 'alias-enum))))
 
-(deftest test-enum-forward-declaration (enum-mapping-tests)
+(deftest test-enum-forward-declaration (enum-mapping-suite)
   (let ((msg (make-my-other-message :other-enum :baz))
         (msg-2 (make-my-other-message)))
     (assert-true (eq (my-other-message.other-enum msg) :baz))

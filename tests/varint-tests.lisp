@@ -4,27 +4,22 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.varint-test
+(defpackage #:cl-protobufs.test.varint
   (:use #:cl
         #:clunit)
   (:export :run))
 
-(in-package #:cl-protobufs.test.varint-test)
+(in-package #:cl-protobufs.test.varint)
 
-(defsuite varint-test (cl-protobufs.test:root-suite))
+(defsuite varint-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'varint-test :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'varint-suite))
 
 ;;; Varint unit tests
 
-(deftest length32-test (varint-test)
+(deftest length32-test (varint-suite)
   (assert-true (= (proto-impl::length32 0) 1))
   (assert-true (= (proto-impl::length32 1) 1))
   (assert-true (= (proto-impl::length32 127) 1))
@@ -33,7 +28,7 @@ Parameters:
   (assert-true (= (proto-impl::length32 16384) 3))
   (assert-true (= (proto-impl::length32 (ash 1 31)) 5)))
 
-(deftest length64-test (varint-test)
+(deftest length64-test (varint-suite)
   (assert-true (= (proto-impl::length64 0) 1))
   (assert-true (= (proto-impl::length64 1) 1))
   (assert-true (= (proto-impl::length64 127) 1))
@@ -45,7 +40,7 @@ Parameters:
   (assert-true (= (proto-impl::length64 (ash 1 63)) 10)))
 
 
-(deftest uint32-test (varint-test)
+(deftest uint32-test (varint-suite)
   (let* ((val #xE499867)
          (encoding #(#xE7 #xB0 #xA6 #x72))
          (len (length encoding))
@@ -58,7 +53,7 @@ Parameters:
         (assert-true (= nidx len))
         (assert-true (= nval val))))))
 
-(deftest uint64-test (varint-test)
+(deftest uint64-test (varint-suite)
   (let* ((val #xE4998679470D98D)
          (encoding #(#x8D #xB3 #xC3 #xA3 #xF9 #x8C #xE6 #xA4 #x0E))
          (len (length encoding))
@@ -75,7 +70,7 @@ Parameters:
 (defvar $max-bytes-32  5)
 (defvar $max-bytes-64 10)
 
-(deftest powers-varint-test (varint-test)
+(deftest powers-varint-test (varint-suite)
   (let ((buffer (proto-impl::make-octet-buffer (* 128 $max-bytes-64)))
         (index 0)
         length)
@@ -115,7 +110,7 @@ Parameters:
                    proto-impl::$wire-type-varint)))
     (assert-true (= index length))))
 
-(deftest random-varint-test (varint-test)
+(deftest random-varint-test (varint-suite)
   ;; Encode 1000 random numbers as both 32-bit and 64-bit varints
   (let* ((count 1000)
          (buf32 (proto-impl::make-octet-buffer (* count $max-bytes-32)))

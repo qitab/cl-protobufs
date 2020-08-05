@@ -4,34 +4,20 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.text-format-test
+(defpackage #:cl-protobufs.test.text-format
   (:use #:cl
         #:clunit
         #:cl-protobufs.test-proto
         #:cl-protobufs)
-  (:import-from #:proto-impl
-                #:proto-name
-                #:proto-fields
-                #:proto-services
-                #:proto-methods
-                #:proto-input-type
-                #:proto-output-type
-                #:proto-extended-fields
-                #:proto-class)
   (:export :run))
 
-(in-package :cl-protobufs.test.text-format-test)
+(in-package :cl-protobufs.test.text-format)
 
-(defsuite text-format-tests (cl-protobufs.test:root-suite))
+(defsuite text-format-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'text-format-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run the text-format-suite."
+  (cl-protobufs.test:run-suite 'text-format-suite))
 
 (defparameter *text-format-msg*
 "TextFormatTest {
@@ -54,7 +40,7 @@ Parameters:
 }
 ")
 
-(deftest test-parse-text-format (text-format-tests)
+(deftest test-parse-text-format (text-format-suite)
   (let ((msg-parse (proto:parse-text-format
                     'cl-protobufs.test-proto:text-format-test
                     :stream (make-string-input-stream *text-format-msg*))))
@@ -73,7 +59,7 @@ Parameters:
     (assert-true (eql 5 (cl-protobufs.test-proto:oneof-int-field msg-parse)))))
 
 ; tests a round trip of proto message -> text -> proto.
-(deftest test-roundtrip-text-format (text-format-tests)
+(deftest test-roundtrip-text-format (text-format-suite)
   (let* ((nested (make-text-format-test.nested-message1 :int-field 2))
          (msg (make-text-format-test :int-field 100
                                      :sint-field -1
@@ -94,14 +80,14 @@ Parameters:
                                                :stream (make-string-input-stream text))))
       (assert-true (proto:proto-equal msg-parse msg)))))
 
-(deftest test-parse-text-format-nested-symbol-names (text-format-tests)
+(deftest test-parse-text-format-nested-symbol-names (text-format-suite)
   (assert-true (find-message-for-class 'cl-protobufs.test-proto:text-format-test))
-  ;; TODO(dlroxe) should expected nested name, not top-level name
+  ;; TODO(dlroxe) should expect nested name, not top-level name
   (assert-true (find-message-for-class 'text-format-test.nested-message1))
-  ; (assert-true (find-message-for-class 'cl-protobufs.test-proto:text-format-test.nested-message1))
+  ;; (assert-true (find-message-for-class 'cl-protobufs.test-proto:text-format-test.nested-message1))
 
   ;; TODO(dlroxe) should assert-true nested name, not top-level name
   (assert-true (find-message-for-class 'text-format-test.nested-message1.nested-message2))
-  ; (assert-true (find-message-for-class
-  ;          'cl-protobufs.test-proto:text-format-test.nested-message1.nested-message2))
-T)
+  ;; (assert-true (find-message-for-class
+  ;;               'cl-protobufs.test-proto:text-format-test.nested-message1.nested-message2))
+  T)

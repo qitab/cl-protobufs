@@ -6,27 +6,22 @@
 
 ;; Tests that extensions may work properly.
 
-(defpackage #:cl-protobufs.test.extend-test
+(defpackage #:cl-protobufs.test.extend
   (:use #:cl
         #:clunit
         #:cl-protobufs
         #:cl-protobufs.extend-test)
   (:export :run))
 
-(in-package #:cl-protobufs.test.extend-test)
+(in-package #:cl-protobufs.test.extend)
 
-(defsuite extend-tests (cl-protobufs.test:root-suite))
+(defsuite extend-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'extend-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'extend-suite))
 
-(deftest test-local-bar (extend-tests)
+(deftest test-local-bar (extend-suite)
   (let ((a (make-foo)))
     (setf (foo-227 a) (make-bar))
     (assert-true (get-extension a 'foo-227))
@@ -38,7 +33,7 @@ Parameters:
     (assert-true (get-extension a 'foo-227))
     (assert-true (has-extension a 'foo-227))))
 
-(deftest test-base-bar (extend-tests)
+(deftest test-base-bar (extend-suite)
   (let ((a (make-foo)))
     (setf (foo-228 a) (cl-protobufs.extend-base::make-bar))
     (assert-true (get-extension a 'foo-228))
@@ -50,7 +45,7 @@ Parameters:
     (assert-true (get-extension a 'foo-228))
     (assert-true (has-extension a 'foo-228))))
 
-(deftest test-base-foo-local-bar (extend-tests)
+(deftest test-base-foo-local-bar (extend-suite)
   (let ((a (cl-protobufs.extend-base::make-foo)))
     (setf (foo-127 a) (make-bar))
     (assert-true (get-extension a 'foo-127))
@@ -62,7 +57,7 @@ Parameters:
     (assert-true (get-extension a 'foo-127))
     (assert-true (has-extension a 'foo-127))))
 
-(deftest test-base-foo-base-bar (extend-tests)
+(deftest test-base-foo-base-bar (extend-suite)
   (let ((a (cl-protobufs.extend-base::make-foo)))
     (setf (foo-128 a) (cl-protobufs.extend-base::make-bar))
     (assert-true (get-extension a 'foo-128))
@@ -74,7 +69,7 @@ Parameters:
     (assert-true (get-extension a 'foo-128))
     (assert-true (has-extension a 'foo-128))))
 
-(deftest test-nonlocal-base-local-extension-local-object (extend-tests)
+(deftest test-nonlocal-base-local-extension-local-object (extend-suite)
   (let ((a (cl-protobufs.extend-base::make-baz)))
     (setf (ext a) (make-quux))
     (assert-true (get-extension a 'ext))

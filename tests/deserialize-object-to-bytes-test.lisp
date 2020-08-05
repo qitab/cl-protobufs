@@ -4,26 +4,21 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.deserialize-test
+(defpackage #:cl-protobufs.test.deserialize
   (:use #:cl
         #:clunit
         #:cl-protobufs)
   (:export :run))
 
-(in-package #:cl-protobufs.test.deserialize-test)
+(in-package #:cl-protobufs.test.deserialize)
 
-(defsuite deserialize-tests (cl-protobufs.test:root-suite))
+(defsuite deserialize-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'deserialize-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'deserialize-suite))
 
-(deftest test-make-message-with-bytes (deserialize-tests)
+(deftest test-make-message-with-bytes (deserialize-suite)
   (let* ((msg (cl-protobufs.test-proto:make-message :i 100))
          (msg-bytes (proto:serialize-object-to-bytes msg)))
     ;; make a new msg using msg's proto serialization bytes
@@ -41,7 +36,7 @@ Parameters:
               (cl-protobufs.test-proto:make-message :i 1000)))
         (assert-true (not (equalp msg-bytes new-msg-bytes)))))))
 
-(deftest bytes-in-embedded-obj (deserialize-tests)
+(deftest bytes-in-embedded-obj (deserialize-suite)
   (let* ((msg
           (cl-protobufs.test-proto:make-message :i 100))
          (msg-bytes (proto:serialize-object-to-bytes msg))
