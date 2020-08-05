@@ -4,16 +4,16 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.proto3-test
+(defpackage #:cl-protobufs.test.proto3
   (:use #:cl
         #:clunit
         #:cl-protobufs.proto3-test
         #:cl-protobufs)
   (:export :run))
 
-(in-package #:cl-protobufs.test.proto3-test)
+(in-package #:cl-protobufs.test.proto3)
 
-(defsuite proto3-tests (cl-protobufs.test:root-suite))
+(defsuite proto3-suite (cl-protobufs.test:root-suite))
 
 (defun run (&optional interactive-p)
   "Run all tests in the test suite.
@@ -27,7 +27,7 @@ Parameters:
 
 ;; Test that setting a singular value to the default results in nothing
 ;; being serialized or printed.
-(deftest test-singular-defaults (proto3-tests)
+(deftest test-singular-defaults (proto3-suite)
   (dolist (optimized '(nil t))
     (when optimized
       (proto-impl::make-serializer test-message)
@@ -62,7 +62,7 @@ Parameters:
     110 103 106 3 3 5 7 113 154 153 153 153 153 153 5 64 125 102 102 70 64 128 1
     1 138 1 2 8 2))
 
-(deftest singular-serialization (proto3-tests)
+(deftest singular-serialization (proto3-suite)
   (dolist (optimized '(nil t))
     (when optimized
       (proto-impl::make-serializer test-message)
@@ -94,7 +94,7 @@ Parameters:
       (let ((deserialized (deserialize-object-from-bytes 'all-singular serialized)))
         (assert-true (proto-impl::proto-equal deserialized msg))))))
 
-(deftest optional-test (proto3-tests)
+(deftest optional-test (proto3-suite)
   (let ((msg (make-optional-test)))
     (assert-false (optional-test.has-bool-value msg))
     (assert-false (optional-test.has-string-value msg))
@@ -102,3 +102,15 @@ Parameters:
     (setf (bool-value msg) nil)
     (assert-true (optional-test.has-bool-value msg))
     (assert-true (optional-test.has-string-value msg))))
+
+(deftest mixed-test (proto3-suite)
+  (let ((msg (make-mixed-test)))
+    (assert-false (mixed-test.has-first-opt msg))
+    (assert-false (mixed-test.has-second-opt msg))
+    (setf (first-opt msg) t)
+    (setf (second-opt msg) 5)
+    (assert-true (mixed-test.has-first-opt msg))
+    (assert-true (mixed-test.has-second-opt msg))
+    (proto:clear msg)
+    (assert-false (mixed-test.has-first-opt msg))
+    (assert-false (mixed-test.has-second-opt msg))))
