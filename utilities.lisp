@@ -421,9 +421,11 @@ Arguments:
 
 ;; "class-name" -> "ClassName", ("ClassName")
 ;; "outer-class.inner-class" -> "InnerClass", ("OuterClass" "InnerClass")
-(defun class-name->proto (lisp-class-name)
-  "Returns the protobuf message or enum name associated with LISP-CLASS-NAME."
-  (let* ((full-path (split-string (string lisp-class-name) :separators '(#\.)))
+;;; TODO(cgay): this would be more appropriately named lisp-name->proto-name.
+(defun class-name->proto (lisp-type-name)
+  "Returns the protobuf message or enum name (a string) associated with
+   LISP-TYPE-NAME (a symbol or string)."
+  (let* ((full-path (split-string (string lisp-type-name) :separators '(#\.)))
          (name-part (first (last full-path))))
     (remove-if-not #'alphanumericp (camel-case name-part *proto-name-separators*))))
 
