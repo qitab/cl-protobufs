@@ -4,29 +4,26 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.full-test
+(defpackage #:cl-protobufs.test.full
   (:use #:cl
         #:clunit
         #:cl-protobufs
         #:alexandria)
   (:export :run))
 
-(in-package #:cl-protobufs.test.full-test)
+(in-package #:cl-protobufs.test.full)
 
-(defsuite full-tests (cl-protobufs.test:root-suite))
+;;; Why this is called "full tests" is lost to the mysts of time...
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'full-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defsuite full-suite (cl-protobufs.test:root-suite))
+
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'full-suite))
 
 (define-constant +pwd+ #.(make-pathname
-                      :directory (pathname-directory
-                                  (or *compile-file-truename* *load-truename*)))
+                          :directory (pathname-directory
+                                      (or *compile-file-truename* *load-truename*)))
                  :test #'equal)
 
 (define-constant +golden-file-name+
@@ -281,12 +278,12 @@ Parameters:
     (proto:clear m)
     (expect-clear m)))
 
-(deftest test-enum-default (full-tests)
+(deftest test-enum-default (full-suite)
   (let ((m (cl-protobufs.protobuf-unittest:make-sparse-enum-message)))
     (assert-true (eq (cl-protobufs.protobuf-unittest:sparse-enum-message.sparse-enum m)
                      :SPARSE-A))))
 
-(deftest test (full-tests)
+(deftest test (full-suite)
   (test-parse-from-file)
   (test-parse-packed-from-file)
   (test-parse-helpers)

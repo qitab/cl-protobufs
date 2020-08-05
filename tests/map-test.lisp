@@ -4,32 +4,27 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.map-test
+(defpackage #:cl-protobufs.test.map
   (:use #:cl
         #:clunit
         #:cl-protobufs.map-test
         #:cl-protobufs)
   (:export :run))
 
-(in-package #:cl-protobufs.test.map-test)
+(in-package #:cl-protobufs.test.map)
 
-(defsuite map-tests (cl-protobufs.test:root-suite))
+(defsuite map-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'map-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'map-suite))
 
 ; todo(benkuehnert):
 ; - Test maps with aliased types as the value.
 ; - Test map type text format
 
 ;; Tests that accessor functions are working: setf, gethash, remhash, has.
-(deftest accessor-check (map-tests)
+(deftest accessor-check (map-suite)
   (let ((m (make-map-proto)))
     (assert-true (not (map-proto.has-map-field m)))
     (setf (map-proto.map-field-gethash 1 m) "string")
@@ -47,7 +42,7 @@ Parameters:
     (assert-false (has-field m 'map-field))))
 
 ;; The same as accessor-check above, except this uses the defmethods.
-(deftest method-check (map-tests)
+(deftest method-check (map-suite)
   (let ((m (make-map-proto)))
     (assert-true (not (has-field m 'map-field)))
     (setf (map-field-gethash 1 m) "string")
@@ -60,7 +55,7 @@ Parameters:
     (assert-false (has-field m 'map-field))))
 
 ;; Verify that the map returns the correct default value when unset.
-(deftest default-check (map-tests)
+(deftest default-check (map-suite)
   (let ((test (make-map-all)))
     (assert-equal (map-all.intmap-gethash 0 test) 0)
     (assert-equal (map-all.stringmap-gethash 0 test) "")
@@ -69,7 +64,7 @@ Parameters:
 
 
 ;; Verify that generic (de)serialization works.
-(deftest serialization-test (map-tests)
+(deftest serialization-test (map-suite)
   (let* ((test1 (make-map-proto :strval "test" :intval 1))
          (submsg1 (make-map-message.val-message :strval "one"))
          (submsg2 (make-map-message.val-message :strval "two"))
@@ -96,7 +91,7 @@ Parameters:
       (assert-true (proto:proto-equal test4 t4res)))))
 
 ;; Verify that optimized (de)serialization works.
-(deftest optimized-serialization-test (map-tests)
+(deftest optimized-serialization-test (map-suite)
   (proto-impl:make-serializer map-proto)
   (proto-impl:make-serializer map-message.val-message)
   (proto-impl:make-serializer map-message)
@@ -132,7 +127,7 @@ Parameters:
       (assert-true (proto:proto-equal test3 t3res))
       (assert-true (proto:proto-equal test4 t4res)))))
 
-(deftest text-format-test (map-tests)
+(deftest text-format-test (map-suite)
   (let* ((test1 (make-map-proto :strval "test" :intval 1))
          (submsg1 (make-map-message.val-message :strval "one"))
          (submsg2 (make-map-message.val-message :strval "two"))

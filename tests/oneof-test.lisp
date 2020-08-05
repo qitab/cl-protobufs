@@ -4,28 +4,23 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.oneof-test
+(defpackage #:cl-protobufs.test.oneof
   (:use #:cl
         #:clunit
         #:cl-protobufs.oneof-test
         #:cl-protobufs)
   (:export :run))
 
-(in-package #:cl-protobufs.test.oneof-test)
+(in-package #:cl-protobufs.test.oneof)
 
-(defsuite oneof-tests (cl-protobufs.test:root-suite))
+(defsuite oneof-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'oneof-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'oneof-suite))
 
 ;; Test that normal accessors for fields in a oneof work.
-(deftest accessor-check (oneof-tests)
+(deftest accessor-check (oneof-suite)
   (let ((msg (make-oneof-proto)))
     (assert-false (oneof-proto.has-intval msg))
     (assert-false (oneof-proto.has-strval msg))
@@ -38,7 +33,7 @@ Parameters:
     (assert-false (oneof-proto.has-strval msg))))
 
 ;; Test that special oneof forms work.
-(deftest oneof-accessor-check (oneof-tests)
+(deftest oneof-accessor-check (oneof-suite)
   (let ((msg (make-oneof-proto)))
     (assert-true (eq (oneof-proto.my-oneof-case msg) nil))
     (assert-false (oneof-proto.has-intval msg))
@@ -60,7 +55,7 @@ Parameters:
 
 ;; Oneof types support fields being specified in the constructor.
 ;; this test verfies that.
-(deftest constructor-check (oneof-tests)
+(deftest constructor-check (oneof-suite)
   (let ((msg (make-oneof-proto :outside 1 :intval 1)))
     ;; Only the LAST specified field in a oneof is set.
     (assert-true (eq (oneof-proto.my-oneof-case msg) 'intval))
@@ -71,13 +66,13 @@ Parameters:
 ;; Boolean values are handled differently on oneof fields, since
 ;; each boolean is stored in a single slot rather than one large
 ;; vector. This test verifies that this works.
-(deftest boolean-type-check (oneof-tests)
+(deftest boolean-type-check (oneof-suite)
   (let ((msg (make-oneof-proto)))
     (assert-false (oneof-proto.has-boolval msg))
     (setf (oneof-proto.boolval msg) t)
     (assert-true (oneof-proto.boolval msg))))
 
-(deftest serialization-test (oneof-tests)
+(deftest serialization-test (oneof-suite)
   (loop :for optimized :in '(nil t)
         :do
            (when optimized
@@ -106,7 +101,7 @@ Parameters:
 
 ;; Protobuf specifies that if multiple members of a oneof appear on the wire,
 ;; then only the last one on the wire is saved.
-(deftest multiple-oneof-test (oneof-tests)
+(deftest multiple-oneof-test (oneof-suite)
   (let ((bytes1 (make-array 6 :initial-contents '(26 2 104 105 16 4)
                               :element-type '(unsigned-byte 8)))
         (bytes2 (make-array 6 :initial-contents '(16 4 26 2 104 105)
@@ -132,7 +127,7 @@ Parameters:
                 (assert-true (string= (oneof-proto.strval msg2) "hi"))
                 (assert-false (oneof-proto.has-intval msg2))))))
 
-(deftest text-format-test (oneof-tests)
+(deftest text-format-test (oneof-suite)
   (let* ((test1 (make-oneof-proto :outside 1 :strval "red" :after 2))
          (test2 (make-nested-oneof :outside 2 :nested test1))
          (intlist (make-oneof-test.int-list :ints (list 1 2 3 4 5)))

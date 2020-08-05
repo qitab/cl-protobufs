@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.wire-test
+(defpackage #:cl-protobufs.test.wire-format
   (:use #:cl
         #:clunit
         #:cl-protobufs)
@@ -35,22 +35,17 @@
                 #:zig-zag-encode64)
   (:export :run))
 
-(in-package #:cl-protobufs.test.wire-test)
+(in-package #:cl-protobufs.test.wire-format)
 
-(defsuite wire-tests (cl-protobufs.test:root-suite))
+(defsuite wire-format-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'wire-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run the text-format-suite."
+  (cl-protobufs.test:run-suite 'wire-format-suite))
 
 ;;; Wire format unit tests
 
-(deftest zig-zag-test (wire-tests)
+(deftest zig-zag-test (wire-format-suite)
   (flet ((verify (encoder pairs)
            (loop for (input output) in pairs
                  do (assert-true (= (funcall encoder input) output)))))
@@ -91,7 +86,7 @@ Parameters:
     (dolist (n '(0 1 -1 14927 -3612 856912304801416 -75123905439571256))
       (round-trip64 n))))
 
-(deftest encode-length-tests (wire-tests)
+(deftest encode-length-tests (wire-format-suite)
   (flet ((verify (encoder pairs)
            (loop for (input output) in pairs
                  do (assert-true (= (funcall encoder input) output)))))
@@ -137,7 +132,7 @@ Paramaters:
                ;; Did we get the right index increment?
                (assert-true (= (length assert-trueed) index)))))
 
-(deftest encode/decode-ints-tests (wire-tests)
+(deftest encode/decode-ints-tests (wire-format-suite)
   (verify-encode-decode #'encode-uint32
                         #'decode-uint32
                         '((#x0 (#x00))
@@ -295,7 +290,7 @@ Paramaters:
 ;;---  prim-size, packed-size, enum-size
 ;;---  encode/decode-single/double
 
-(deftest test-encode-double (wire-tests)
+(deftest test-encode-double (wire-format-suite)
   (verify-encode-decode #'proto-impl::encode-double
                         #'proto-impl::decode-double
                         '((0.0d0 #(0 0 0 0 0 0 0 0))

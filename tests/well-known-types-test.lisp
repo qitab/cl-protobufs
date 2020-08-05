@@ -4,27 +4,22 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.well-known-types-test
+(defpackage #:cl-protobufs.test.well-known-types
   (:use #:cl
         #:clunit
         #:cl-protobufs.well-known-types
         #:cl-protobufs.test-proto)
   (:export :run))
 
-(in-package #:cl-protobufs.test.well-known-types-test)
+(in-package #:cl-protobufs.test.well-known-types)
 
-(defsuite well-known-types (cl-protobufs.test:root-suite))
+(defsuite well-known-types-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'well-known-types :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run the text-format-suite."
+  (cl-protobufs.test:run-suite 'well-known-types-suite))
 
-(deftest test-any (well-known-types)
+(deftest test-any (well-known-types-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol :zero "red" :one "fish"
                                 :two 6))
          (any (pack-any p :base-url "http://fish.com"))

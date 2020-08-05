@@ -4,25 +4,19 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.alias-test
+(defpackage #:cl-protobufs.test.alias
   (:use #:cl
         #:clunit
         #:cl-protobufs)
   (:export :run))
 
-(in-package #:cl-protobufs.test.alias-test)
+(in-package #:cl-protobufs.test.alias)
 
-(defsuite alias-tests (cl-protobufs.test:root-suite))
+(defsuite alias-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'alias-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))
-    result))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'alias-suite))
 
 (defstruct aliased-struct i)
 
@@ -35,7 +29,7 @@ Parameters:
   (assert-true (equal (coerce list 'list) (coerce array 'list))))
 
 
-(deftest serialize-regular (alias-tests)
+(deftest serialize-regular (alias-suite)
   (let ((obj (cl-protobufs.test-proto::make-message :i 99)))
     (expect-bytes (list +TAG-I+ 99)
                   (serialize-object-to-bytes obj 'cl-protobufs.test-proto:message))))
@@ -58,14 +52,14 @@ Parameters:
       (lambda (val buf)
         (internal-serialize-message val buf)))
 
-(deftest serialize-aliased (alias-tests)
+(deftest serialize-aliased (alias-suite)
   (let ((struct (make-aliased-struct :i 99)))
     (expect-bytes (list +TAG-I+ 99)
                   (serialize-object-to-bytes struct 'cl-protobufs.test-proto::aliased-message))))
 
 ;;  Serialization of OuterMessage
 
-(deftest serialize-empty-outer (alias-tests)
+(deftest serialize-empty-outer (alias-suite)
   (let ((outer (cl-protobufs.test-proto::make-outer-message)))
     (expect-bytes nil (proto-impl::serialize-object-to-bytes outer))))
 
@@ -75,19 +69,19 @@ Parameters:
 (defconstant +TAG-ALIASED+ (proto-impl::make-tag :string 2)
   "The tag that should be used for field OuterMessage.Aliased")
 
-(deftest serialize-outer-containing-regular (alias-tests)
+(deftest serialize-outer-containing-regular (alias-suite)
   (let ((outer (cl-protobufs.test-proto::make-outer-message
                 :message (cl-protobufs.test-proto::make-message :i 99))))
     (expect-bytes (list +TAG-MESSAGE+ 2 +TAG-I+ 99) (serialize-object-to-bytes outer))))
 
-(deftest serialize-outer-containing-aliased (alias-tests)
+(deftest serialize-outer-containing-aliased (alias-suite)
   (let ((outer (cl-protobufs.test-proto::make-outer-message
                 :aliased (make-aliased-struct :i 99))))
     (expect-bytes (list +TAG-ALIASED+ 2 +TAG-I+ 99) (serialize-object-to-bytes outer))))
 
 ;; cl-protobufs message metadata
 
-(deftest find-message-for-alias (alias-tests)
+(deftest find-message-for-alias (alias-suite)
   (assert-true (find-message-for-class 'cl-protobufs.alias-test::aliased-struct))
   (assert-true (eq (find-message-for-class 'cl-protobufs.alias-test::aliased-message)
               (find-message-for-class 'aliased-struct))))

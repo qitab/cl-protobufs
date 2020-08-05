@@ -4,26 +4,21 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.import-test
+(defpackage #:cl-protobufs.test.import
   (:use #:cl
         #:clunit
         #:cl-protobufs)
   (:export :run))
 
-(in-package #:cl-protobufs.test.import-test)
+(in-package #:cl-protobufs.test.import)
 
-(defsuite import-tests (cl-protobufs.test:root-suite))
+(defsuite import-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'import-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'import-suite))
 
-(deftest test-all-imports-are-included (import-tests)
+(deftest test-all-imports-are-included (import-suite)
   (let* ((schema (proto:find-schema 'cl-protobufs.third-party.lisp.cl-protobufs.tests:import-proto))
          (imports (proto-impl::proto-imports schema)))
     (assert-true (= (length imports) 2))
@@ -32,6 +27,6 @@ Parameters:
     (assert-true (string= (second imports)
                           "import-test-import-2.proto"))))
 
-(deftest test-make-structure (import-tests)
+(deftest test-make-structure (import-suite)
   (assert-true (cl-protobufs.third-party.lisp.cl-protobufs.tests:make-import1))
   (assert-true (cl-protobufs.third-party.lisp.cl-protobufs.tests:make-import2)))

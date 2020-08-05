@@ -6,31 +6,26 @@
 
 ;; Check that packed fields are encoded into a packed vector.
 
-(defpackage #:cl-protobufs.test.packed-test
+(defpackage #:cl-protobufs.test.packed
   (:use #:cl
         #:clunit
         #:cl-protobufs.protobuf-unittest) ; from unittest.proto
   (:export :run))
 
-(in-package #:cl-protobufs.test.packed-test)
+(in-package #:cl-protobufs.test.packed)
 
-(defsuite packed-tests (cl-protobufs.test:root-suite))
+(defsuite packed-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'packed-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'packed-suite))
 
-(deftest packed-tag-test (packed-tests)
+(deftest packed-tag-test (packed-suite)
   (assert-true (= #b1010 (proto-impl::packed-tag 1)))
   (assert-true (= #b10010 (proto-impl::packed-tag 2)))
   (assert-true (= #b11010 (proto-impl::packed-tag 3))))
 
-(deftest packed-encoding-test (packed-tests)
+(deftest packed-encoding-test (packed-suite)
   (let ((m1 (make-test-packed-types)))
     (push 10 (packed-int32 m1))
     (push 20 (packed-int32 m1))
@@ -49,7 +44,7 @@ Parameters:
       (assert-true (equalp '(30 20 10) (packed-int32 m2)))
       (assert-true (equalp '(30 20 10) (unpacked-int32 unpacked))))))
 
-(deftest unpacked-encoding-test (packed-tests)
+(deftest unpacked-encoding-test (packed-suite)
   (let ((m1 (make-test-unpacked-types)))
     (push 10 (unpacked-int32 m1))
     (push 20 (unpacked-int32 m1))
@@ -67,7 +62,7 @@ Parameters:
       (assert-true (equalp '(30 20 10) (unpacked-int32 m2)))
       (assert-true (equalp '(30 20 10) (packed-int32 packed))))))
 
-(deftest packed-enum-encoding-test (packed-tests)
+(deftest packed-enum-encoding-test (packed-suite)
   (let ((m1 (make-test-packed-types)))
     (push :foreign-foo (packed-enum m1))
     (push :foreign-bar (packed-enum m1))
@@ -85,7 +80,7 @@ Parameters:
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (packed-enum m2)))
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (unpacked-enum unpacked))))))
 
-(deftest unpacked-enum-encoding-test (packed-tests)
+(deftest unpacked-enum-encoding-test (packed-suite)
   (let ((m1 (make-test-unpacked-types)))
     (push :foreign-foo (unpacked-enum m1))
     (push :foreign-bar (unpacked-enum m1))
@@ -103,7 +98,7 @@ Parameters:
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (unpacked-enum m2)))
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo) (packed-enum packed))))))
 
-(deftest inner-packed-fast-function-test (packed-tests)
+(deftest inner-packed-fast-function-test (packed-suite)
   (dolist (class '(test-packed-inner test-packed-outer))
     ;; Generate fast serializers for the interesting messages
     (eval (proto-impl::generate-serializer (proto-impl::find-message-for-class class))))
@@ -122,7 +117,7 @@ Parameters:
       (assert-true (equalp #(10 6 210 5 3 30 20 10) bytes))
       (assert-true (equalp '(30 20 10) (packed-int32 (packed outer2)))))))
 
-(deftest inner-packed-enum-fast-function-test (packed-tests)
+(deftest inner-packed-enum-fast-function-test (packed-suite)
   (dolist (class '(test-packed-inner test-packed-outer))
     ;; Generate fast serializers for the interesting messages
     (eval (proto-impl::generate-serializer (proto-impl::find-message-for-class class)))
@@ -143,7 +138,7 @@ Parameters:
       (assert-true (equalp '(:foreign-baz :foreign-bar :foreign-foo)
                            (packed-enum (packed outer2)))))))
 
-(deftest deserialize-unpacked-packed (packed-tests)
+(deftest deserialize-unpacked-packed (packed-suite)
   "If a field is declared as packed, but it was serialized unpacked, we should still be able to
 deserialize it.
 

@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.reference-test
+(defpackage #:cl-protobufs.test.reference
   (:use #:cl
         #:clunit
         #:cl-protobufs
@@ -21,24 +21,19 @@
                 #:proto-internal-field-name)
   (:export :run))
 
-(in-package #:cl-protobufs.test.reference-test)
+(in-package #:cl-protobufs.test.reference)
 
-(defsuite reference-tests (cl-protobufs.test:root-suite))
+(defsuite reference-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'reference-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'reference-suite))
 
 (defun find-message-with-string (message name)
   (proto-impl::find-message (intern (nstring-upcase (proto-impl::uncamel-case name))
                                     (symbol-package (proto-impl::proto-class message)))))
 
-(deftest cross-package-reference-test (reference-tests)
+(deftest cross-package-reference-test (reference-suite)
   (flet ((find-by-name (name proto-object)
            (find-message-with-string proto-object name))
          (find-by-name-in-list (name proto-objects)
@@ -126,7 +121,7 @@ Parameters:
       (assert-true (equal 456
                      (baa (boo new2)))))))
 
-(deftest forward-reference-test (reference-tests)
+(deftest forward-reference-test (reference-suite)
   (flet ((find-by-name (name proto-objects)
            (find name proto-objects :key #'proto-name :test #'string=)))
     (let* ((schema (find-schema 'cl-protobufs.protobuf-forward-reference-unittest:forward_reference))

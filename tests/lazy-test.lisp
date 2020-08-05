@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.lazy-test
+(defpackage #:cl-protobufs.test.lazy
   (:use #:cl
         #:clunit
         #:cl-protobufs.third-party.lisp.cl-protobufs.tests)
@@ -13,28 +13,22 @@
                 #:oneof-value)
   (:export :run))
 
-(in-package #:cl-protobufs.test.lazy-test)
+(in-package #:cl-protobufs.test.lazy)
 
-(defsuite lazy-tests (cl-protobufs.test:root-suite))
+(defsuite lazy-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'lazy-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'lazy-suite))
 
-(deftest test-lazy-field-schema (lazy-tests)
+(deftest test-lazy-field-schema (lazy-suite)
   (let* ((container-message (proto:find-message 'container))
          (container-fields (proto-impl::proto-fields container-message))
-         (inner-field (find 'inner
-                            container-fields
+         (inner-field (find 'inner container-fields
                             :key #'proto-impl::proto-external-field-name)))
     (assert-true (proto-impl::proto-lazy-p inner-field))))
 
-(deftest test-lazy-field-serialize (lazy-tests)
+(deftest test-lazy-field-serialize (lazy-suite)
   (dolist (optimized '(nil t))
       (when optimized
         (proto-impl::make-deserializer container)
@@ -81,7 +75,7 @@ Parameters:
       (let ((restored (proto:deserialize-object-from-bytes 'container bytes)))
         (assert-true (equalp bytes (proto:serialize-object-to-bytes restored)))))))
 
-(deftest test-lazy-oneof-serialize (lazy-tests)
+(deftest test-lazy-oneof-serialize (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
       (proto-impl::make-deserializer oneof-lazy)
@@ -117,7 +111,7 @@ Parameters:
       (let ((restored (proto:deserialize-object-from-bytes 'oneof-lazy bytes)))
         (assert-true (equalp bytes (proto:serialize-object-to-bytes restored)))))))
 
-(deftest test-recursive-lazy (lazy-tests)
+(deftest test-recursive-lazy (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
       (proto-impl::make-deserializer recursively-lazy)
@@ -136,7 +130,7 @@ Parameters:
       ;; Calling accessors in chain for lazy fields works.
       (assert-true (= 123 (value (inner (rec-lazy restored-cntnr))))))))
 
-(deftest test-write-lazy-fields (lazy-tests)
+(deftest test-write-lazy-fields (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
       (proto-impl::make-deserializer container)
@@ -169,7 +163,7 @@ Parameters:
           (assert-true (proto:encoded-field updated-restored 'inner))
           (assert-true (= 5678 (value (inner updated-restored)))))))))
 
-(deftest test-required-lazy (lazy-tests)
+(deftest test-required-lazy (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
       (proto-impl::make-serializer inner)
@@ -182,7 +176,7 @@ Parameters:
            (restored (proto:deserialize-object-from-bytes 'required-lazy bytes)))
       (assert-true (= 42 (value (inner restored)))))))
 
-(deftest test-repeated-lazy (lazy-tests)
+(deftest test-repeated-lazy (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
       (proto-impl::make-serializer inner)
@@ -218,7 +212,7 @@ Parameters:
         (assert-true (equalp bytes (proto:serialize-object-to-bytes restored)))))))
 
 ;; Checks that the accessors work for empty lazy fields.
-(deftest test-empty-lazy (lazy-tests)
+(deftest test-empty-lazy (lazy-suite)
   (let ((proto (make-container)))
     (assert-false (container.inner proto))
     (assert-false (inner proto))))
