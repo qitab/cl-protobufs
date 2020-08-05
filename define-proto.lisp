@@ -206,7 +206,9 @@ the oneof and its nested fields.
                     'file-descriptor
                     :class    type
                     :name     name
-                    :syntax   syntax
+                    ;; CCL requires syntax to be OR'd  with :proto2 or :proto3
+                    ;; in case syntax is NIL.
+                    :syntax   (or syntax :proto2 :proto3)
                     :package  package
                     :imports  imports
                     :options  (if optimize
