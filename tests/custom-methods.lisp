@@ -23,7 +23,7 @@
 ;; whose wire format was a repeated uint32, while still using the introspection-based
 ;; code for containing messages.
 
-(defpackage #:cl-protobufs.test.custom-proto-test
+(defpackage #:cl-protobufs.test.custom-proto
   (:use #:cl
         #:clunit
         #:cl-protobufs)
@@ -53,22 +53,17 @@
            #:example-parent.code)
   (:export :run))
 
-(in-package #:cl-protobufs.test.custom-proto-test)
+(in-package #:cl-protobufs.test.custom-proto)
 
-(defsuite custom-proto-tests (cl-protobufs.test:root-suite))
+(defsuite custom-proto-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'custom-proto-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'custom-proto-suite))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (define-schema 'testschema
-    :package 'cl-protobufs.test.custom-proto-test)
+    :package 'cl-protobufs.test.custom-proto)
   (define-message example-parent (:conc-name "")
     (code :index 1 :type protobufs:int64 :label (:required))
     (name :index 3 :type string :label (:required))
@@ -163,26 +158,24 @@ Parameters:
          buffer index limit endtag)))
 
 (defparameter *sending-test*
-  (cl-protobufs.test.custom-proto-test::make-example-parent
+  (make-example-parent
    :code 47
    :name "fruitbat"
-   :submessage (cl-protobufs.test.custom-proto-test::make-submessage
-                :code "feeps"
-                :othercode "B"
-                :fancything "do-not-send-me"))
+   :submessage (make-submessage :code "feeps"
+                                :othercode "B"
+                                :fancything "do-not-send-me"))
   "Protobuf message used to test custom sending.")
 
 (defparameter *expect*
-  (cl-protobufs.test.custom-proto-test::make-example-parent
+  (make-example-parent
    :code 47
    :name "fruitbat"
-   :submessage (cl-protobufs.test.custom-proto-test::make-submessage
-                :code "feeps"
-                :othercode "B"
-                :fancything "Reconstructed[feeps,B]"))
+   :submessage (make-submessage :code "feeps"
+                                :othercode "B"
+                                :fancything "Reconstructed[feeps,B]"))
   "Protobuf message used to test outcome of custom sending.")
 
-(deftest test-custom-method (custom-proto-tests)
+(deftest test-custom-method (custom-proto-suite)
   (let ((octets (serialize-object-to-bytes *sending-test*)))
     ;; assert that the outer method's generic serializer called the custom inner serializer
     (assert (plusp *callcount-serialize*))

@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.service-test
+(defpackage #:cl-protobufs.test.services
   (:use #:cl
         #:clunit
         #:cl-protobufs.protobuf-package-unittest1
@@ -13,29 +13,24 @@
         #:cl-protobufs.service-test-pb-rpc)
   (:export :run))
 
-(in-package #:cl-protobufs.service-test)
+(in-package #:cl-protobufs.test.services)
 
-(defsuite service-test (cl-protobufs.test:root-suite))
+(defsuite services-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'service-test :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'services-suite))
 
-(deftest test-service-name-is-exported (service-test)
+(deftest test-service-name-is-exported (services-suite)
   (assert-true 'cl-protobufs.protobuf-package-unittest1:service-with-cross-package-input-output))
 
-(deftest test-rpc-method-names-are-exported (service-test)
+(deftest test-rpc-method-names-are-exported (services-suite)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:bloop-impl)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:call-bloop)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:beep-impl)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:call-beep))
 
-(deftest test-camel-spitting-request (service-test)
+(deftest test-camel-spitting-request (services-suite)
   (let* ((service
           (proto:find-service
            'cl-protobufs.protobuf-package-unittest1:package_test1
@@ -49,7 +44,7 @@ Parameters:
     (assert-true (string= "protobuf_package_unittest1.Record2fLookupRequest" input))
     (assert-true (string= "protobuf_package_unittest1.Record2fLookupResponse" output))))
 
-(deftest test-method-options (service-test)
+(deftest test-method-options (services-suite)
   (let* ((service (proto:find-service 'cl-protobufs.service-test-pb:service-test
                                       'cl-protobufs.service-test-pb:foo-service))
          (method (proto-impl::find-method service 'cl-protobufs.service-test-pb::bar-method)))

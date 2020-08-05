@@ -6,7 +6,7 @@
 
 ;; todo(jgodbout): Remove the remaining define-schema: automobile
 
-(defpackage #:cl-protobufs.test.serialization-test
+(defpackage #:cl-protobufs.test.serialization
   (:use #:cl
         #:clunit
         #:cl-protobufs
@@ -58,18 +58,13 @@
            #:automobile-%%bool-values)
   (:export :run))
 
-(in-package #:cl-protobufs.test.serialization-test)
+(in-package #:cl-protobufs.test.serialization)
 
-(defsuite serialization-tests (cl-protobufs.test:root-suite))
+(defsuite serialization-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'serialization-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'serialization-suite))
 
 (defvar *tser5-bytes* #(8 1 16 2 16 3 16 5 16 7 26 3 116 119
                         111 26 5 116 104 114 101 101 26 4 102
@@ -85,7 +80,7 @@ Parameters:
                         27 10 2 103 49 16 1 16 1 16 2 16 3 28
                         27 10 2 103 50 28 34 3 116 119 111))
 
-(deftest basic-serialization (serialization-tests)
+(deftest basic-serialization (serialization-suite)
   (loop :for optimized :in '(nil t)
         :do
      (when optimized
@@ -180,7 +175,7 @@ Parameters:
                          (second (subgroups (deserialize-object 'basic-test7 tser7)))
                          strval intvals))))))
 
-(deftest text-serialization (serialization-tests)
+(deftest text-serialization (serialization-suite)
   (let* ((test1  (make-basic-test1 :intval 150))
          (test1b (make-basic-test1 :intval -150))
          (test2  (make-basic-test2 :strval "testing"))
@@ -296,7 +291,7 @@ Parameters:
                                    (parse-text-format 'basic-test6 :stream s))))
                         strval))))))
 
-(deftest serialization-integrity (serialization-tests)
+(deftest serialization-integrity (serialization-suite)
   (flet ((do-test (message)
            (let* ((type (type-of message))
                   (buf (serialize-object-to-bytes message type))
@@ -319,7 +314,7 @@ Parameters:
       (do-test (make-outer :simple simple-1))
       (do-test (make-outer :simple simple-2)))))
 
-(deftest empty-message-serialization (serialization-tests)
+(deftest empty-message-serialization (serialization-suite)
   (let ((speed0 (make-speed-empty))
         (speed1 (make-speed-optional))
         (speed2 (make-speed-repeated))
@@ -368,7 +363,7 @@ Parameters:
     "George W. Bush" "Barack Obama")
   "A list of presidents from George Washington until Barack Obama")
 
-(deftest optimize-performance-test (serialization-tests)
+(deftest optimize-performance-test (serialization-suite)
   (let ((population (make-population))
         (count 0))
     (loop repeat 5000 do
@@ -398,7 +393,7 @@ Parameters:
            (result (time (deserialize-object-from-bytes (type-of population) buffer))))
       (assert-true (proto:proto-equal population result :exact t)))))
 
-(deftest performance-test (serialization-tests)
+(deftest performance-test (serialization-suite)
   (let ((population (make-population))
         (count 0))
     (loop repeat 5000 do
@@ -468,13 +463,13 @@ Parameters:
 ;;; The define-service macro expands to code in a package named <current-package>-rpc.
 ;;; Normally the package would be created in the generated code but we do it manually
 ;;; here because we call define-service directly.
-(defpackage #:cl-protobufs.test.serialization-test-rpc (:use))
+(defpackage #:cl-protobufs.test.serialization-rpc (:use))
 
 (define-service buy-car ()
   (buy-car (buy-car-request => buy-car-response)
            :options (:deadline 1.0)))
 
-(deftest extension-serialization (serialization-tests)
+(deftest extension-serialization (serialization-suite)
   (let* ((color1 (make-auto-color :r-value 100 :g-value 0 :b-value 100))
          (car1   (make-automobile :model "Audi" :color color1))
          (rqst1  (make-buy-car-request :auto car1))
@@ -503,7 +498,7 @@ Parameters:
       (assert-true (not (search "paint_type:" str1 :test #'char=)))
       (assert-true (search "paint_type:" str2 :test #'char=)))))
 
-(deftest group-serialization (serialization-tests)
+(deftest group-serialization (serialization-suite)
   (let* ((meta1  (make-color-wheel1.metadata1 :revision "1.0"))
          (wheel1 (make-color-wheel1 :name "Colors" :metadata meta1))
          (color1 (make-color1 :r-value 100 :g-value 0 :b-value 100))
@@ -553,7 +548,7 @@ Parameters:
 ;;;
 ;;; This aims to test updateing a protocol buffer and deserializing
 ;;; on a binary containing the previous version.
-(deftest test-proto-backwards-compatibility (serialization-tests)
+(deftest test-proto-backwards-compatibility (serialization-suite)
   (let* ((proto-on-wire (make-proto-on-wire
                          :beginning "char"
                          :always "pika-pal"

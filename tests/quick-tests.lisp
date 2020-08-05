@@ -4,26 +4,21 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.quick-test
+(defpackage #:cl-protobufs.test.quick
   (:use #:cl
         #:clunit
         #:cl-protobufs)
   (:export :run))
 
-(in-package #:cl-protobufs.test.quick-test)
+(in-package #:cl-protobufs.test.quick)
 
-(defsuite quick-tests (cl-protobufs.test:root-suite))
+(defsuite quick-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'quick-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'quick-suite))
 
-(deftest default-and-clear (quick-tests)
+(deftest default-and-clear (quick-suite)
   ;; Assert-True that required strings are made unbound by 'clear'
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:zero)))
@@ -54,7 +49,7 @@ Parameters:
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:opt-string p) "opt"))))
 
 
-(deftest bool-has-works (quick-tests)
+(deftest bool-has-works (quick-suite)
   "Assert-True that 'has' works for bools."
   ;; TODO(cgay): why do we call internals here rather than (make-test1-proto)?
   (let* ((p (cl-protobufs.protobuf-unittest:make-test1-proto)))
@@ -74,7 +69,7 @@ Parameters:
                            :u-bool t)
                           'cl-protobufs.protobuf-unittest:u-bool)))
 
-(deftest generic-slot-functions-work (quick-tests)
+(deftest generic-slot-functions-work (quick-suite)
   "Assert-True that 'has' 'set' and 'slot-value' works."
   (let* ((p (cl-protobufs.protobuf-unittest:make-test1-proto)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:u-bool)))
@@ -85,7 +80,7 @@ Parameters:
     (assert-true (has-field p 'cl-protobufs.protobuf-unittest:u-bool))
     (assert-true (not (proto-slot-value p 'cl-protobufs.protobuf-unittest:u-bool)))))
 
-(deftest print-bool (quick-tests)
+(deftest print-bool (quick-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test1-proto))
          (text (with-output-to-string (s) (print-text-format p :stream s)))
          (text2 (progn
@@ -100,7 +95,7 @@ Parameters:
     (assert-true (search "u_bool: true" text2))
     (assert-true (search "u_bool: false" text3))))
 
-(deftest test-has-speed (quick-tests)
+(deftest test-has-speed (quick-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test1-proto)))
     (setf (cl-protobufs.protobuf-unittest:u-bool p) t)
     (time
@@ -110,7 +105,7 @@ Parameters:
   (assert-true t))
 
 
-(deftest test-proto-slot-function-name (quick-tests)
+(deftest test-proto-slot-function-name (quick-suite)
   (assert-true (eq (proto-impl::proto-slot-function-name 'a 'b :clear)
               'a.clear-b))
   (assert-true (eq (proto-impl::proto-slot-function-name 'a 'b :has)
@@ -118,7 +113,7 @@ Parameters:
   (assert-true (eq (proto-impl::proto-slot-function-name 'a 'b :get)
               'a.b)))
 
-(deftest test-object-initialized (quick-tests)
+(deftest test-object-initialized (quick-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol)))
     (assert-true (not (proto-impl::object-initialized-p
                   p (find-message 'cl-protobufs.protobuf-unittest:test-protocol))))
@@ -160,7 +155,7 @@ Parameters:
       (assert-true (not (proto-impl::object-initialized-p
                     p (find-message 'cl-protobufs.protobuf-unittest:test-protocol)))))))
 
-(deftest test-proto-equivalent-p (quick-tests)
+(deftest test-proto-equivalent-p (quick-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol))
          (q (cl-protobufs.protobuf-unittest:make-test-protocol))
          (z (cl-protobufs.protobuf-unittest:make-time-protocol)))
@@ -222,7 +217,7 @@ Parameters:
     (assert-true (proto-impl::proto-equal p q))
     (assert-true (proto-impl::proto-equal p q :exact t))))
 
-(deftest test-make-qualified-name (quick-tests)
+(deftest test-make-qualified-name (quick-suite)
   (assert-true
       (string= (proto-impl::make-qualified-name
                 (find-message 'cl-protobufs.protobuf-unittest:test-protocol)
@@ -318,70 +313,65 @@ Parameters:
 
 ;; now exercise that map in a bunch of calls to GET-FIELD-CELL
 (defun test-get-field-cell (map)
-  (multiple-value-bind (cell plist) (proto-impl::get-field-cell 6 '() map)
-    ;; after the preceding bind, CELL = (#<6:DELTA NIL) and PLIST = (#<6:DELTA> NIL)
-    (print plist)
-    (print cell)
-    (rplaca (cdr cell) 'data6) ; change the cell's data
-    ;; Assert something about the contents after we write the data in
-    (assert (string= (write-to-string plist) "(#<6:DELTA> CL-PROTOBUFS.TEST.QUICK-TEST::DATA6)"))
+  (flet ((to-string (x)
+           (let ((*package* (find-package :cl-user)))
+             (write-to-string x :right-margin 1000))))
+    (multiple-value-bind (cell plist)
+        (proto-impl::get-field-cell 6 '() map)
+      ;; after the preceding bind, CELL = (#<6:DELTA NIL) and PLIST = (#<6:DELTA> NIL)
+      (rplaca (cdr cell) 'data6)        ; change the cell's data
+      ;; Assert something about the contents after we write the data in
+      (assert-true (string= (to-string plist) "(#<6:DELTA> CL-PROTOBUFS.TEST.QUICK::DATA6)"))
 
-    ;; Insert in the front
-    (multiple-value-setq (cell plist) (proto-impl::get-field-cell 10 plist map))
-    ;; after the preceding setq,
-    ;;  PLIST = (#<10:GOLF> NIL #<6:DELTA> data6)
-    ;;  CELL = (#<10:GOLF> NIL . ...)
-    (print plist)
-    (print cell)
-    (rplaca (cdr cell) 'data10)
-    (assert
-     (string= (write-to-string plist)
-              "(#<10:GOLF> CL-PROTOBUFS.TEST.QUICK-TEST::DATA10 #<6:DELTA>
- CL-PROTOBUFS.TEST.QUICK-TEST::DATA6)"))
+      ;; Insert in the front
+      (multiple-value-setq (cell plist) (proto-impl::get-field-cell 10 plist map))
+      ;; after the preceding setq,
+      ;;  PLIST = (#<10:GOLF> NIL #<6:DELTA> data6)
+      ;;  CELL = (#<10:GOLF> NIL . ...)
+      (rplaca (cdr cell) 'data10)
+      (assert-true
+          (string= (to-string plist)
+                   (format nil "(#<10:GOLF> CL-PROTOBUFS.TEST.QUICK::DATA10 #<6:DELTA> ~
+                                CL-PROTOBUFS.TEST.QUICK::DATA6)")))
 
-    ;; Insert in the middle
-    (multiple-value-setq (cell plist) (proto-impl::get-field-cell 7 plist map))
-    ;; after the preceding setq,
-    ;;  PLIST = (#<10:GOLF> data10 #<7:ECHO> NIL #<6:DELTA> data6)
-    ;;  CELL = (#<7:ECHO> NIL . ...)
-    (print plist)
-    (print cell)
-    (rplaca (cdr cell) 'data7)
-    (assert (string= (write-to-string plist)
-                   "(#<10:GOLF> CL-PROTOBUFS.TEST.QUICK-TEST::DATA10 #<7:ECHO>
- CL-PROTOBUFS.TEST.QUICK-TEST::DATA7 #<6:DELTA>
- CL-PROTOBUFS.TEST.QUICK-TEST::DATA6)"))
+      ;; Insert in the middle
+      (multiple-value-setq (cell plist) (proto-impl::get-field-cell 7 plist map))
+      ;; after the preceding setq,
+      ;;  PLIST = (#<10:GOLF> data10 #<7:ECHO> NIL #<6:DELTA> data6)
+      ;;  CELL = (#<7:ECHO> NIL . ...)
+      (rplaca (cdr cell) 'data7)
+      (assert-true
+          (string= (to-string plist)
+                   (format nil "(#<10:GOLF> CL-PROTOBUFS.TEST.QUICK::DATA10 #<7:ECHO> ~
+                                 CL-PROTOBUFS.TEST.QUICK::DATA7 #<6:DELTA> ~
+                                 CL-PROTOBUFS.TEST.QUICK::DATA6)")))
 
-    ;; Insert at the end
-    (multiple-value-setq (cell plist) (proto-impl::get-field-cell 3 plist map))
-    ;; after the precding setq,
-    ;;  PLIST = (#<10:GOLF> data10 #<7:ECHO> data7 #<6:DELTA> data6 #<3:BRAVO> NIL)
-    ;;  CELL = (#<3:BRAVO> NIL)
-    (print plist)
-    (print cell)
-    (rplaca (cdr cell) 'data3)
-    (assert (string= (write-to-string plist)
-                     "(#<10:GOLF> CL-PROTOBUFS.TEST.QUICK-TEST::DATA10 #<7:ECHO>
- CL-PROTOBUFS.TEST.QUICK-TEST::DATA7 #<6:DELTA>
- CL-PROTOBUFS.TEST.QUICK-TEST::DATA6 #<3:BRAVO>
- CL-PROTOBUFS.TEST.QUICK-TEST::DATA3)"))
+      ;; Insert at the end
+      (multiple-value-setq (cell plist) (proto-impl::get-field-cell 3 plist map))
+      ;; after the precding setq,
+      ;;  PLIST = (#<10:GOLF> data10 #<7:ECHO> data7 #<6:DELTA> data6 #<3:BRAVO> NIL)
+      ;;  CELL = (#<3:BRAVO> NIL)
+      (rplaca (cdr cell) 'data3)
+      (assert-true
+          (string= (to-string plist)
+                   (format nil "(#<10:GOLF> CL-PROTOBUFS.TEST.QUICK::DATA10 ~
+                                 #<7:ECHO> CL-PROTOBUFS.TEST.QUICK::DATA7 ~
+                                 #<6:DELTA> CL-PROTOBUFS.TEST.QUICK::DATA6 ~
+                                 #<3:BRAVO> CL-PROTOBUFS.TEST.QUICK::DATA3)")))
 
-    ;; Now suppose that field 7 appears in the message again but is not specified
-    ;; as a repeatable field. The deserializer code will just do another rplaca on the cell.
-    (multiple-value-setq (cell plist) (proto-impl::get-field-cell 7 plist map))
-    (print plist)
-    (print cell)
-    (rplaca (cdr cell) 'data7new)
-    (assert (string= (write-to-string plist)
-                   "(#<10:GOLF> CL-PROTOBUFS.TEST.QUICK-TEST::DATA10 #<7:ECHO>
- CL-PROTOBUFS.TEST.QUICK-TEST::DATA7NEW #<6:DELTA>
- CL-PROTOBUFS.TEST.QUICK-TEST::DATA6 #<3:BRAVO>
- CL-PROTOBUFS.TEST.QUICK-TEST::DATA3)"))
-
-    (values)))
+      ;; Now suppose that field 7 appears in the message again but is not specified
+      ;; as a repeatable field. The deserializer code will just do another rplaca on the cell.
+      (multiple-value-setq (cell plist) (proto-impl::get-field-cell 7 plist map))
+      (rplaca (cdr cell) 'data7new)
+      (assert-true
+          (string= (to-string plist)
+                   (format nil "(#<10:GOLF> CL-PROTOBUFS.TEST.QUICK::DATA10 ~
+                                 #<7:ECHO> CL-PROTOBUFS.TEST.QUICK::DATA7NEW ~
+                                 #<6:DELTA> CL-PROTOBUFS.TEST.QUICK::DATA6 ~
+                                 #<3:BRAVO> CL-PROTOBUFS.TEST.QUICK::DATA3)"))))))
 
 #+sbcl
-(deftest test-field-maps (quick-tests)
+(deftest test-field-maps (quick-suite)
   (test-find-in-field-map)
   (test-get-field-cell *field-map-1*)
   (test-get-field-cell *field-map-2*)

@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.symbol-import-test
+(defpackage #:cl-protobufs.test.symbol-import
   (:use #:cl
         #:clunit)
   ;; These are here because they are exported from the symbol-importer
@@ -19,18 +19,13 @@
            #:symbol-importer-message.has-imported-type-field)
   (:export :run))
 
-(in-package #:cl-protobufs.test.symbol-import-test)
+(in-package #:cl-protobufs.test.symbol-import)
 
-(defsuite symbol-import-tests (cl-protobufs.test:root-suite))
+(defsuite symbol-import-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-p: Open debugger on assert failure."
-  (let ((result (run-suite 'symbol-import-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'symbol-import-suite))
 
 ;;; Make sure we can import a schema by symbol name in a pure-lisp
 ;;; protobuf defintion.
@@ -49,5 +44,5 @@ Parameters:
 
 ;;; We need an actual test to make this test pass. If we can make an instance of the message it must
 ;;; have compiled successfully.
-(deftest symbol-import-test (symbol-import-tests)
+(deftest symbol-import-test (symbol-import-suite)
   (assert-true (make-symbol-importer-message)))

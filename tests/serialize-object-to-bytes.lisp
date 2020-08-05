@@ -6,27 +6,22 @@
 
 ;; Test serialize object to bytes for different labels
 
-(defpackage #:cl-protobufs.test.serialize-test
+(defpackage #:cl-protobufs.test.serialize
   (:use #:cl
         #:clunit
         #:cl-protobufs
         #:cl-protobufs.serialization-test)
   (:export :run))
 
-(in-package #:cl-protobufs.test.serialize-test)
+(in-package #:cl-protobufs.test.serialize)
 
-(defsuite serialize-tests (cl-protobufs.test:root-suite))
+(defsuite serialize-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'serialize-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'serialize-suite))
 
-(deftest test-optional-serialization (serialize-tests)
+(deftest test-optional-serialization (serialize-suite)
   (let* ((msg (make-optional-message))
          (msg-bytes (serialize-object-to-bytes msg 'optional-message)))
     (assert-true (equalp msg-bytes #()))
@@ -48,7 +43,7 @@ Parameters:
     (assert-true (equalp msg-bytes #(8 2)))))
 
 
-(deftest test-required-serialization (serialize-tests)
+(deftest test-required-serialization (serialize-suite)
   (let* ((msg (make-required-message))
          (msg-bytes))
 
@@ -70,7 +65,7 @@ Parameters:
     (assert-true (equalp msg-bytes #(8 2)))))
 
 
-(deftest test-repeated-serialization (serialize-tests)
+(deftest test-repeated-serialization (serialize-suite)
   (let* ((msg (make-repeated-message))
          (msg-bytes (serialize-object-to-bytes msg 'repeated-message)))
 
@@ -83,7 +78,7 @@ Parameters:
     (assert-true (equalp msg-bytes #()))))
 
 
-(deftest test-float-serialization (serialize-tests)
+(deftest test-float-serialization (serialize-suite)
   (let* ((msg (make-message-with-floats)))
     (setf (message-with-floats.test-float msg) 5.0
           (message-with-floats.test-double msg) 6.0d0)
