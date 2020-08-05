@@ -266,10 +266,11 @@ known as "singular" fields. For singular fields, the state of being unset
 and the state of being set to the default value for the type are indistinguishable.
 So, `has-*` functions, such as `(event.has-day msg)` are not defined.
 
-The `has-*` functions for repeated fields are defined, and work as normal in proto3.
+The `has-*` functions for repeated fields are defined. They return true if and
+only if the field has been manually set and has not been cleared since.
 
 This library supports optional fields in proto3 messages. These fields have
-the same semantics as proto2 optional fields (namely, they have `has-*` functions).
+the same semantics and generated code as proto2 optional fields.
 
 ### Enums
 
@@ -394,7 +395,7 @@ message Person {
   }
 }
 ```
-To access fields inside a oneof, just use the standard accessors outlined above. These fields
+To access fields inside a oneof, use the standard accessors outlined above. These fields
 have the semantics of proto2 optional fields, so `has-*` functions are created. For example:
 
 ```lisp
