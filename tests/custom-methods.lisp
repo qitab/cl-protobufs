@@ -68,6 +68,7 @@ Parameters:
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (define-schema 'testschema
+    :syntax :proto2
     :package 'cl-protobufs.test.custom-proto-test)
   (define-message example-parent (:conc-name "")
     (code :index 1 :type protobufs:int64 :label (:required))
