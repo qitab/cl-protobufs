@@ -323,7 +323,11 @@ return T as a second value."
              ((:float) (parse-float stream))
              ((:double) (parse-double stream))
              ((:string) (parse-string stream))
-             ((:bool)   (boolean-true-p (parse-token stream)))
+             ((:bool)   (let ((token (parse-token stream)))
+                          (cond ((string= token "true") t)
+                                ((string= token "false") nil)
+                                ;; signal an error
+                                (t (values nil t)))))
              (otherwise (parse-signed-int stream))))
           ((typep desc 'message-descriptor)
            (when (eql (peek-char nil stream nil) #\:)
