@@ -209,38 +209,3 @@ https://developers.google.com/protocol-buffers/docs/proto#scalar "
   (not (null (member type '(:int32 :int64 :uint32 :uint64 :sint32 :sint64
                             :fixed32 :fixed64 :sfixed32 :sfixed64
                             :bool :float :double)))))
-
-(defun protobuf-default-to-clos-init (default type)
-  "Given a Protobufs type and default, return a CLOS initform value.
-   Don't call this if the default is empty, because that will confuse 'nil' with 'unbound'."
-  (cond ((ignore-errors (typep default type))
-         default)
-        ((symbolp default)
-         (cond ((eq type :bool)
-                (boolean-true-p default))
-               ;; If we've got a symbol, it must be to initialize an enum type
-               ;; whose values are represented by keywords in Lisp
-               (t (kintern (symbol-name default)))))
-        ((stringp default)
-         (cond ((eq type :bool)
-                (boolean-true-p default))
-               ((member type '(:int32 :uint32 :int64 :uint64 :sint32 :sint64
-                               :fixed32 :sfixed32 :fixed64 :sfixed64))
-                (let ((default (read-from-string default)))
-                  (and (integerp default) default)))
-               ((member type '(:float :double))
-                (let ((default (read-from-string default)))
-                  (and (floatp default) default)))
-               (t default)))))
-
-(defun boolean-true-p (x)
-  "Returns t or nil given a value that might be a boolean."
-  (etypecase x
-    ((member t nil) x)
-    (integer   (not (eql x 0)))
-    (character (char-equal x #\t))
-    (string    (or (string-equal x "true")
-                   (string-equal x "yes")
-                   (string-equal x "t")
-                   (string-equal x "1")))
-    (symbol    (string-equal (string x) "true"))))

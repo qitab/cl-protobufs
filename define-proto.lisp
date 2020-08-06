@@ -1613,8 +1613,7 @@ Arguments
                                           ;; Use unbound for booleans only
                                           (not (eq pclass :bool)))
                                   nil)
-                                 (default-p
-                                  `,(protobuf-default-to-clos-init default type))))))
+                                 (default-p `,default)))))
                  (field (make-instance
                          'field-descriptor
                          :name  (or name (slot-name->proto slot))
