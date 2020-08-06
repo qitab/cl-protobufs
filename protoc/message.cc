@@ -147,8 +147,8 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
           printer->Print("\n(proto:define-oneof $name$ ()", "name",
                          ToLispName(oneof->name()));
         else
-          printer->Print("\n(proto:define-oneof $name$ (:synthetic-p t)", "name",
-                         ToLispName(oneof->name()));
+          printer->Print("\n(proto:define-oneof $name$ (:synthetic-p t)",
+                         "name", ToLispName(oneof->name()));
         printer->Indent();
         for (int j = 0; j < oneof->field_count(); ++j) {
           const FieldDescriptor* field  = oneof->field(j);
