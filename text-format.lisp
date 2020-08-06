@@ -326,8 +326,9 @@ return T as a second value."
              ((:bool)   (let ((token (parse-token stream)))
                           (cond ((string= token "true") t)
                                 ((string= token "false") nil)
-                                ;; Parsing failed, return T as
-                                ;; a second value to signal an error.
+                                ;; Parsing failed, so return T as
+                                ;; a second value to indicate a
+                                ;; failure.
                                 (t (values nil t)))))
              (otherwise (parse-signed-int stream))))
           ((typep desc 'message-descriptor)
@@ -374,6 +375,7 @@ return T as a second value."
                  (t
                   (skip-whitespace stream)
                   (list (parse-map-entry key-type val-type stream)))))))
+          ;; Parsing failed, return t as a second vlaue to indicate failure.
           (t (values nil t)))))
 
 (defun skip-field (stream)
