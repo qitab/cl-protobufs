@@ -15,14 +15,9 @@
 
 (defsuite proto3-suite (cl-protobufs.test:root-suite))
 
-(defun run (&optional interactive-p)
-  "Run all tests in the test suite.
-Parameters:
-  INTERACTIVE-P: Open debugger on assert failure."
-  (let ((result (run-suite 'proto3-tests :use-debugger interactive-p)))
-    (print result)
-    (assert (= (slot-value result 'clunit::failed) 0))
-    (assert (= (slot-value result 'clunit::errors) 0))))
+(defun run ()
+  "Run all tests in the test suite."
+  (cl-protobufs.test:run-suite 'proto3-suite))
 
 
 ;; Test that setting a singular value to the default results in nothing
