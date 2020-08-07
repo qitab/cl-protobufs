@@ -966,7 +966,7 @@ Arguments:
                        slots)
                (mapcar (lambda (oneof)
                          (let ((name (oneof-descriptor-internal-name oneof)))
-                           `(,name (make-instance 'oneof) :type oneof)))
+                           `(,name (make-oneof) :type oneof)))
                        oneofs))))
          ;; Define public accessors for fields.
          ,@(mapcan (lambda (field public-slot-name)

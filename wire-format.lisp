@@ -486,8 +486,8 @@ and a buffer which encodes the value to the buffer."
          (declare #.$optimize-serialization)
          (multiple-value-bind (val new-index)
              (decode-varint buffer index)
-           ,@(when fixnump
-               `((setf val (ildb (byte ,bits 0) val))))
+           ,(when (= bits 32)
+              `(setf val (ildb (byte ,bits 0) val)))
            (values val new-index)))
        (declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
                                  (values (signed-byte ,bits) array-index))
