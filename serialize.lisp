@@ -137,32 +137,35 @@ Parameters:
            (if reader
                (funcall reader object)
                (slot-value object slot))))
-    (unless
-        (if (eq (slot-value field 'message-type) :extends)
-            (has-extension object (slot-value field 'internal-field-name))
-            (= (bit (slot-value object '%%is-set)
+    (when
+        (or (and (eq (slot-value field 'message-type) :extends)
+                 (not (has-extension object (slot-value field 'internal-field-name))))
+            (and (slot-value field 'field-offset)
+                 (= (bit (slot-value object '%%is-set)
                     (slot-value field 'field-offset))
-               1))
+                    0)))
       (return-from emit-field 0))
-    (let ((type   (slot-value field 'class))
-          (slot   (slot-value field 'internal-field-name))
-          (reader (slot-value field 'reader))
-          (index (proto-index field)))
+    (let* ((type   (slot-value field 'class))
+           (slot   (slot-value field 'internal-field-name))
+           (reader (slot-value field 'reader))
+           (index (proto-index field))
+           ;; If the field is lazy, use slot-value, since calling the reader will
+           ;; unnecessarily deserialize the message.
+           (value (read-slot object slot (and (not (proto-lazy-p field)) reader))))
+      ;; For singular fields, only emit if VALUE is not default.
+      (when
+          (and (eq (proto-label field) :singular)
+               (case (proto-set-type field)
+                 ((proto:byte-vector cl:string) (= (length value) 0))
+                 ((cl:double-float cl:float) (= value (get-default-form (proto-set-type field)
+                                                                        (proto-default field))))
+                 (t (eq value (get-default-form (proto-set-type field) (proto-default field))))))
+        (return-from emit-field 0))
       (if (eq (proto-label field) :repeated)
-          (or (emit-repeated-field
-               (if slot (read-slot object slot
-                                   ;; For lazy fields, don't use reader
-                                   ;; because that will deserialize
-                                   ;; unnecessarily.
-                                   (and (not (proto-lazy-p field))
-                                        reader))
-                   (list object))
-               type (proto-packed field) index buffer)
+          (or (emit-repeated-field value type (proto-packed field) index buffer)
               (undefined-field-type "While serializing ~S,"
                                     object type field))
-          (or (emit-non-repeated-field
-               (if slot (read-slot object slot reader) object)
-               type index buffer)
+          (or (emit-non-repeated-field value type index buffer)
               (undefined-field-type "While serializing ~S,"
                                     object type field))))))
 

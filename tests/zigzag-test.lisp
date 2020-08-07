@@ -46,6 +46,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (proto:define-schema 'zigzag-test
+    :syntax :proto2
     :package 'proto-test)
 
   (proto:define-message msg ()

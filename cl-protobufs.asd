@@ -228,6 +228,12 @@
     :components ((:protobuf-source-file "oneof-proto")
                  (:file "oneof-test")))
 
+   (:module "proto3-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "proto3")
+                 (:file "proto3-test")))
+
    (:module "import-test"
     :serial t
     :pathname ""

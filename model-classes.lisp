@@ -102,10 +102,9 @@ Parameters:
 
 ;; A Protobufs schema, corresponds to one .proto file
 (defclass file-descriptor (descriptor)
-  ((syntax :type (or null string)               ; syntax, passed on but otherwise ignored
+  ((syntax :type (member :proto2 :proto3)       ; proto syntax. Either :proto2 or :proto3.
            :accessor proto-syntax
-           :initarg :syntax
-           :initform "proto2")
+           :initarg :syntax)
    (package :type (or null string)              ; the Protobufs package
             :accessor proto-package
             :initarg :package
@@ -478,7 +477,7 @@ on the symbol if we are not in SBCL."
               :initform nil)
    (set-type  :accessor proto-set-type          ; The type obtained directly
               :initarg :set-type)               ; from the protobuf schema.
-   (label :type (member :required :optional :repeated)
+   (label :type (member :required :optional :repeated :singular)
           :accessor proto-label
           :initarg :label)
    (index :type (unsigned-byte 29)              ; The index number for this field
@@ -733,6 +732,12 @@ on the symbol if we are not in SBCL."
 
 (defstruct oneof-descriptor
   "The meta-object for a protobuf oneof"
+  ;; A boolean which indicates if the oneof is synthetic.
+  ;; A synthetic oneof is a oneof which is created by protoc in order to
+  ;; create has-* functions for proto3 optional fields. Special accessors
+  ;; (the clear, has, and case functions) are not created for synthetic
+  ;; oneofs.
+  (synthetic-p nil :type boolean)
   ;; A vector which stores the oneof's field descriptor.
   (fields nil :type array)
   ;; The external name, but with '%' prepended.
