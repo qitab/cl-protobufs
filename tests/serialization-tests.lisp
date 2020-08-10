@@ -4,58 +4,11 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-;; todo(jgodbout): Remove the remaining define-schema: automobile
-
 (defpackage #:cl-protobufs.test.serialization
   (:use #:cl
         #:clunit
         #:cl-protobufs
         #:cl-protobufs.serialization-test)
-  ;; These are here because they are exported from the automobile
-  ;; schema below and not having them causes a build error.
-  (:export #:+used+
-           #:+new+
-           #:+metallic+
-           #:+normal+
-           #:auto-color.has-b-value
-           #:buy-car-request.auto
-           #:make-automobile
-           #:make-buy-car-response
-           #:buy-car-response-%%is-set
-           #:automobile-%%is-set
-           #:auto-color.has-name
-           #:automobile.clear-model
-           #:buy-car-request.clear-auto
-           #:buy-car-response.clear-price
-           #:buy-car-response.price
-           #:buy-car-response.has-price
-           #:automobile.has-status
-           #:automobile.clear-status
-           #:automobile.color
-           #:buy-car-request.has-auto
-           #:automobile.status
-           #:auto-color.has-r-value
-           #:automobile.clear-color
-           #:automobile.has-color
-           #:auto-color.g-value
-           #:auto-color.clear-g-value
-           #:auto-color.b-value
-           #:auto-color.clear-b-value
-           #:automobile.has-model
-           #:buy-car-request-%%is-set
-           #:auto-color.clear-r-value
-           #:make-buy-car-request
-           #:auto-color.name
-           #:automobile.model
-           #:auto-color.clear-name
-           #:auto-color-%%is-set
-           #:auto-color.r-value
-           #:auto-color.has-g-value
-           #:make-auto-color
-           #:buy-car-request-%%bool-values
-           #:buy-car-response-%%bool-values
-           #:auto-color-%%bool-values
-           #:automobile-%%bool-values)
   (:export :run))
 
 (in-package #:cl-protobufs.test.serialization)
@@ -349,41 +302,10 @@
 ;; a method twice in one file using the *exact* *same* qualifiers and specializers.
 ;; The introspection-based (de)serialize functions don't have this issue
 ;; because nothing happens with regard to (de)serialization until just-in-time.
-;;
-(define-schema 'automobile
-  :package 'proto_test
-  ;; Does this really do anything?
-  :optimize :space)
-(define-enum auto-status ()
-  (new :index 1)
-  (used :index 2))
-(define-enum paint-type ()
-  (normal :index 1)
-  (metallic :index 2))
-(define-message auto-color
-    (:conc-name "")
-  (name    :index 1 :type string :label (:optional)      :json-name "name")
-  (r-value :index 2 :type proto:int32 :label (:required) :json-name "rValue")
-  (g-value :index 3 :type proto:int32 :label (:required) :json-name "gValue")
-  (b-value :index 4 :type proto:int32 :label (:required) :json-name "bValue")
-  (define-extension 1000 max))
-(define-extend auto-color
-    (:conc-name "")
-  (paint-type :index 1000 :type (or paint-type null) :label (:optional) :json-name "paintType"))
-(define-message automobile
-    (:conc-name "")
-  (model  :index 1 :type string :label (:required) :json-name "model")
-  (color  :index 2 :type (or null auto-color) :label (:required) :json-name "color")
-  (status :index 3 :type (or null auto-status) :label (:required) :default :new
-          :json-name "status"))
-(define-message buy-car-request ()
-  (auto :index 1 :type (or null automobile) :label (:required) :json-name "auto"))
-(define-message buy-car-response ()
-  (price :index 1 :type proto:uint32 :label (:optional) :json-name "price"))
-
 ;;; The define-service macro expands to code in a package named <current-package>-rpc.
 ;;; Normally the package would be created in the generated code but we do it manually
 ;;; here because we call define-service directly.
+
 (defpackage #:cl-protobufs.test.serialization-rpc (:use))
 
 (define-service buy-car ()
