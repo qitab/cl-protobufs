@@ -87,26 +87,73 @@ const std::string FieldLispType(const FieldDescriptor* field) {
         break;
     }
   }
+  return type;
+}
 
-  if (field->type() == FieldDescriptor::TYPE_MESSAGE &&
-      !field->is_repeated() &&
-      !field->containing_type()->options().map_entry())
-    return StrCat("(cl:or cl:null ", type, ")");
-  if (field->is_required() || field->is_optional()) return type;
-  if (field->is_repeated()) {
-    if (field->options().HasExtension(lisp_container)) {
-      switch (field->options().GetExtension(lisp_container)) {
-        case LIST:
-          return StrCat("(proto:list-of ", type, ")");
-        case VECTOR:
-          return StrCat("(proto:vector-of ", type, ")");
-      }
-    } else {
-      return StrCat("(proto:list-of ", type, ")");
-    }
+const std::string FieldLispClass(const FieldDescriptor* field) {
+  std::string proto_class;
+
+  switch (field->type()) {
+    case FieldDescriptor::TYPE_DOUBLE:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_FLOAT:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_INT64:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_UINT32:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_UINT64:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_INT32:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_FIXED64:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_FIXED32:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_BOOL:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_STRING:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_SFIXED32:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_SFIXED64:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_SINT32:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_SINT64:
+      proto_class = ":scalar";
+      break;
+   case FieldDescriptor::TYPE_BYTES:
+      proto_class = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_MESSAGE:
+      proto_class = ":message";
+      break;
+    case FieldDescriptor::TYPE_GROUP:
+      proto_class = ":group";
+      break;
+    case FieldDescriptor::TYPE_ENUM:
+      proto_class = ":enum";
+      break;
+    default:
+      GOOGLE_LOG(FATAL) << "Unsupported FileDescriptorType: "
+                        << field->DebugString();
+      break;
   }
-  GOOGLE_LOG(FATAL) << "Error determining field type: " << field->DebugString();
-  return ":error";
+  return proto_class;
 }
 
 // Return the "arity" of the field, i.e. whether it's required, optional, or
@@ -215,26 +262,28 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   if (field->is_map()) {
     vars["key-type"] = FieldLispType(field->message_type()->field(0));
     vars["val-type"] = FieldLispType(field->message_type()->field(1));
+    vars["val-class"] = FieldLispClass(field->message_type()->field(1));
     printer->Print(vars,
                     "\n(proto:define-map $name$\n"
                     "   :key-type $key-type$\n"
                     "   :val-type $val-type$\n"
+                    "   :val-class $val-class$\n"
                     "   :index $tag$)");
   } else {
     vars["type"] = FieldLispType(field);
+    vars["class"] = FieldLispClass(field);
     vars["label"] = FieldLispLabel(field);
-    vars["typename"] = FieldTypeName(field);
     vars["packed"] = field->options().packed() ? " :packed cl:t" : "";
     vars["lazy"] = field->options().lazy() ? " :lazy cl:t" : "";
     vars["default"] = field->has_default_value()
         ? StrCat(" :default ", FieldLispDefault(field))
         : "";
     printer->Print(vars,
-                   "\n($name$ "
+                   "\n($name$"
                    " :index $tag$ "
                    " :type $type$"
+                   " :class $class$"
                    " :label $label$"
-                   " :typename \"$typename$\""
                    "$default$"
                    "$packed$"
                    "$lazy$)");
