@@ -309,12 +309,10 @@ Parameters:
 
 (defstruct map-descriptor
   "The meta-object for a protobuf map"
-  (class     nil :type symbol)
   (name      nil :type string)
-  (key-class nil :type symbol) ;; the :class of the key
-  (val-class nil :type symbol) ;; the :class of the value
-  (key-type nil :type symbol)  ;; the lisp type of the key
-  (val-type nil :type symbol)) ;; the lisp type of the value
+  (key-type  nil :type symbol)                                  ; the lisp type of the key
+  (val-type  nil :type symbol)                                  ; the lisp type of the value
+  (val-class nil :type (member :scalar :message :group :enum))) ; the class of the value
 
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
@@ -460,24 +458,15 @@ on the symbol if we are not in SBCL."
   (:documentation
    "Clears the value of the extended slot SLOT from OBJECT."))
 
-
-(defconstant $empty-default 'empty-default
-  "The marker used in 'proto-default' used to indicate that there is no default value.")
-(defconstant $empty-list    'empty-list)
-(defconstant $empty-vector  'empty-vector)
-
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
 (defclass field-descriptor (descriptor)
-  ((type :type string                           ; The name of the Protobuf type for the field
+  ((class :type (member :message :group :enum :map :scalar)
+          :accessor proto-class
+          :initarg :class)
+  (type :type symbol                           ; The lisp type of the field
          :accessor proto-type
          :initarg :type)
-   (lisp-type :type (or null string)            ; Override the name of the Lisp type for the field
-              :accessor proto-lisp-type
-              :initarg :lisp-type
-              :initform nil)
-   (set-type  :accessor proto-set-type          ; The type obtained directly
-              :initarg :set-type)               ; from the protobuf schema.
    (label :type (member :required :optional :repeated)
           :accessor proto-label
           :initarg :label)
@@ -514,9 +503,13 @@ on the symbol if we are not in SBCL."
            :accessor proto-writer               ; it's a list, it's something like '(setf title)'
            :initarg :writer
            :initform nil)
-   (default :accessor proto-default             ; Default value (untyped), pulled out of the options
-            :initarg :default
-            :initform $empty-default)
+   (initform :accessor proto-initform           ; Default initform
+             :initarg :initform
+             :initform nil)
+   (container :accessor proto-container         ; If the field is repeated, this specifies the
+              :type (member nil :list :vector)  ; container type. If not, this field is nil.
+              :initarg :container
+              :initform nil)
    (packed :type boolean                        ; Packed, pulled out of the options
            :accessor proto-packed
            :initarg :packed
@@ -563,30 +556,6 @@ on the symbol if we are not in SBCL."
 
 (defmethod (setf proto-slot) (slot (field field-descriptor))
   (setf (proto-value field) slot))
-
-(defgeneric empty-default-p (field)
-  (:documentation
-   "Returns true iff the default for the field is empty, ie, was not supplied.")
-  (:method ((field field-descriptor))
-    (let ((default (proto-default field)))
-      (or (eq default $empty-default)
-          (eq default $empty-list)
-          (eq default $empty-vector)
-          ;; Special handling for imported CLOS classes
-          (and (not (eq (proto-label field) :optional))
-               (or (null default) (equalp default #())))))))
-
-(defgeneric vector-field-p (field)
-  (:documentation
-   "Returns true if the storage for a 'repeated' field is a vector,
-    returns false if the storage is a list.")
-  (:method ((field field-descriptor))
-    ;; NB: the FieldOption (lisp_container) attempts to generalize whether a repeated field is a
-    ;; list or a vector, but for now the only indication that a field-descriptor wants to be a
-    ;; vector is what its default is.
-    (let ((default (proto-default field)))
-      (or (eq default $empty-vector)
-          (and (vectorp default) (not (stringp default)))))))
 
 (defclass extension-descriptor (abstract-descriptor)
   ;; The start of the extension range.
