@@ -26,31 +26,8 @@
 (defpackage #:cl-protobufs.test.custom-proto
   (:use #:cl
         #:clunit
-        #:cl-protobufs)
-  ;; These are here because they are exported from the testschema
-  ;; schema below and not having them causes a build error.
-  (:export #:example-parent.clear-code
-           #:example-parent-%%is-set
-           #:example-parent.has-name
-           #:submessage.code
-           #:submessage.has-fancything
-           #:submessage.clear-fancything
-           #:make-example-parent
-           #:submessage.clear-code
-           #:submessage-%%is-set
-           #:example-parent.submessage
-           #:submessage.othercode
-           #:submessage.clear-othercode
-           #:submessage.fancything
-           #:example-parent.clear-submessage
-           #:example-parent.has-code
-           #:example-parent.has-submessage
-           #:example-parent.clear-name
-           #:submessage.has-code
-           #:make-submessage
-           #:example-parent.name
-           #:submessage.has-othercode
-           #:example-parent.code)
+        #:cl-protobufs
+        #:cl-protobufs.custom-proto)
   (:export :run))
 
 (in-package #:cl-protobufs.test.custom-proto)
@@ -61,23 +38,11 @@
   "Run all tests in the test suite."
   (cl-protobufs.test:run-suite 'custom-proto-suite))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (define-schema 'testschema
-    :package 'cl-protobufs.test.custom-proto)
-  (define-message example-parent (:conc-name "")
-    (code :index 1 :type protobufs:int64 :label (:required))
-    (name :index 3 :type string :label (:required))
-    (submessage :index 4 :type (or null submessage) :label (:required)))
-  (define-message submessage (:conc-name "")
-    (code :index 1 :type string :label (:required))
-    (fancything :index 2 :type string :label (:required))
-    (othercode :index 3 :type string :label (:required))))
-
 ;; Helper to ensure the deserializer reconstructs this slot
 (defmethod initialize-instance :after ((self submessage) &rest initargs)
   (declare (ignore initargs))
-  (unless (slot-boundp self '%fancything)
-    (setf (slot-value self '%fancything) "-unset-")))
+  (unless (slot-boundp self 'cl-protobufs.custom-proto::%fancything)
+    (setf (slot-value self 'cl-protobufs.custom-proto::%fancything) "-unset-")))
 
 (defvar *callcount-serialize* 0
   "The number of times we've called the customer serialize function.")
@@ -92,15 +57,15 @@
            (type fixnum size))
   ;; as a double-check that this was called.
   (incf *callcount-serialize*)
-  (let ((val (slot-value obj '%code)))
+  (let ((val (slot-value obj 'cl-protobufs.custom-proto::%code)))
     (when val
         (proto-impl::iincf
-         size (proto-impl::serialize-scalar val :string 10 buf))))
+         size (proto-impl::serialize-scalar val 'cl:string 10 buf))))
   ;; skip the FANCYTHING slot
-  (let ((val (slot-value obj '%othercode)))
+  (let ((val (slot-value obj 'cl-protobufs.custom-proto::%othercode)))
     (when val
       (proto-impl::iincf
-       size (proto-impl::serialize-scalar val :string 26 buf))))
+       size (proto-impl::serialize-scalar val 'cl:string 26 buf))))
   size)
 
 #+sbcl
@@ -138,9 +103,9 @@
       (case proto-impl::tag
         ((10) (multiple-value-setq (code index)
                 (proto-impl::deserialize-scalar
-                 :string buffer index)))
+                 'cl:string buffer index)))
         ((26) (multiple-value-setq (othercode index)
-                (proto-impl::deserialize-scalar :string buffer index)))
+                (proto-impl::deserialize-scalar 'cl:string buffer index)))
         (otherwise (setq index (proto-impl::skip-element
                                 buffer index proto-impl::tag)))))))
 
