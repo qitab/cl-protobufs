@@ -466,23 +466,19 @@ Parameters:
           for oneof-offset from 0
           do
        (destructuring-bind
-           (slot &key type typename name (default nil default-p)
+           (slot &key type class name (default nil default-p)
                  lazy index documentation &allow-other-keys)
            field
          (assert index)
-         (let ((default (if default-p default $empty-default)))
-           (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
-               (clos-type-to-protobuf-type type)
+         (let* ((default (when default-p default))
+                (initform (get-default-form type class :optional default)))
              (declare (ignore packed-p enum-values))
              (setf (aref field-list oneof-offset)
                    (make-instance
                     'field-descriptor
                     :name (or name (slot-name->proto slot))
-                    :type (or typename ptype)
-                    :lisp-type (when root-lisp-type (qualified-symbol-name
-                                                     root-lisp-type))
-                    :set-type type
-                    :class pclass
+                    :type type
+                    :class class
                     :qualified-name (make-qualified-name
                                      *current-message-descriptor*
                                      (or name (slot-name->proto slot)))
@@ -495,9 +491,9 @@ Parameters:
                     :internal-field-name internal-name
                     :external-field-name slot
                     :oneof-offset oneof-offset
-                    :default default
+                    :initform `,initform
                     :lazy (and lazy t)
-                    :documentation documentation))))))
+                    :documentation documentation)))))
     `(progn
        ,(make-oneof-descriptor
          :internal-name internal-name
@@ -547,8 +543,7 @@ Arguments:
         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
         (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
-        (default-form (get-default-form (proto-set-type field)
-                                        (proto-default field)))
+        (default-form (proto-initform field))
         (index (proto-field-offset field))
         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
         (bool-index (proto-bool-index field))
@@ -646,9 +641,8 @@ Paramters:
                                           proto-type public-slot-name :has))
                    (clear-function-name  (proto-slot-function-name
                                           proto-type public-slot-name :clear))
-                   (default-form (get-default-form (proto-set-type field)
-                                                   (proto-default field)))
-                   (field-type (proto-set-type field))
+                   (default-form (proto-initform field))
+                   (field-type (proto-type field))
                    (oneof-offset (proto-oneof-offset field)))
               ;; If a field isn't currently set inside of the oneof, just return its
               ;; default value.
@@ -662,7 +656,7 @@ Paramters:
                                      (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
                                 (if ,bytes
                                     (setf (oneof-value (,hidden-accessor-name ,obj))
-                                          (%deserialize-object ',(proto-class field)
+                                          (%deserialize-object ',(proto-type field)
                                                                ,bytes nil nil))))
                              `(oneof-value (,hidden-accessor-name ,obj)))
                         ,default-form))
@@ -779,7 +773,7 @@ Arguments:
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix)."
   (let* ((slot-name (proto-internal-field-name field))
          (repeated (eq (proto-label field) :repeated))
-         (vectorp (vector-field-p field))
+         (vectorp (eq (proto-container field) :vector))
          (public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
          (hidden-accessor-name (fintern "~A-~A" proto-type slot-name)))
     (with-gensyms (obj field-obj bytes)
@@ -794,7 +788,7 @@ Arguments:
                       (setf (,hidden-accessor-name ,obj)
                             ;; Re-create the field object by deserializing its %bytes
                             ;; field.
-                            (%deserialize-object ',(proto-class field) ,bytes nil nil))
+                            (%deserialize-object ',(proto-type field) ,bytes nil nil))
                       ,field-obj))
                `(let ((,field-obj (,hidden-accessor-name ,obj)))
                   (if (notany #'proto-%bytes ,field-obj)
@@ -805,7 +799,7 @@ Arguments:
                                      (if ,bytes
                                          ;; Re-create the field object by deserializing
                                          ;; its %bytes field.
-                                         (%deserialize-object ',(proto-class field) ,bytes nil nil)
+                                         (%deserialize-object ',(proto-type field) ,bytes nil nil)
                                          ,field-element))))
                             (setf (,hidden-accessor-name ,obj)
                                   ,(if vectorp
@@ -872,30 +866,25 @@ Arguments:
   ;; One of the "Home grown types..."
   (setf (gethash 'cl:keyword default-form)
         :default-keyword)
-  (defun get-default-form (type default)
-    "Get the default value for TYPE and the proto set DEFAULT"
+  (defun get-default-form (type class repeated default)
+    "Get the default value for a field that has type TYPE, class CLASS,
+and a pre-set default DEFAULT. REPEATED can be either :vector or :list."
     (let ((possible-default (gethash type default-form)))
       (cond
-        ((not (member default
-                      (list $empty-vector $empty-list $empty-default nil)))
-         default)
-        ((or possible-default
-             (eq type 'cl:boolean))
-         possible-default)
-        ((and (listp type)
-              (eq (first type) 'cl-protobufs:vector-of))
+        ((equal repeated :vector)
          '(make-array 0 :adjustable t))
-        ((and (listp type)
-              (eq (first type) 'cl-protobufs:list-of))
+        ((equal repeated :list)
          nil)
-        ((and (listp type)
-              (eq (first type) 'cl:or)
-              (eq (second type) 'cl:null))
-         nil)
-        ((eq type :map)
+        (default
+         default)
+        ((eq class :scalar)
+         (gethash type default-form))
+        ((eq class :map)
          '(make-hash-table))
-        ((enum-default-value `,type) (enum-default-value `,type))
-        (t `(enum-default-value ',type))))))
+        ((eq class :enum)
+         `(enum-default-value ',type))
+        ((member class '(:group :message))
+         nil)))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
   "Makes the definition forms for the define-group and define-message macros.
@@ -935,7 +924,7 @@ Arguments:
                               (type (field-data-type slot))
                               (initform (field-data-initform slot)))
                           (unless (eq type 'boolean)
-                            `(,name ,(get-default-form type initform) :type ,type))))
+                            `(,name ,initform :type ,type))))
                        slots)
                (mapcar (lambda (oneof)
                          (let ((name (oneof-descriptor-internal-name oneof)))
@@ -971,7 +960,7 @@ Arguments:
            (let ((,obj (,hidden-constructor-name)))
              ,@(mapcan
                 (lambda (field)
-                  (let* ((type (proto-set-type field))
+                  (let* ((type (proto-type field))
                          (public-slot-name (proto-external-field-name field))
                          (set-check (if (eq type 'cl:boolean)
                                         `(eq ,public-slot-name :%unset)
@@ -1417,20 +1406,20 @@ Arguments:
                            :external-slot-name slot
                            :type
                            (case label
-                             (:required `(or ,type null))
-                             (:optional `(or ,type null))
-                             (:repeated `(list-of ,type)))
+                             (:required (list 'cl:or 'cl:null `,type))
+                             (:optional (list 'cl:or 'cl:null `,type))
+                             (:repeated (list 'proto:list-of `,type)))
                            :initform nil
                            :accessor reader
                            :initarg (kintern (symbol-name slot)))))
          (mfield  (make-instance 'field-descriptor
                     :name  (slot-name->proto slot)
-                    :type  name
-                    :class type
+                    :type  type
+                    :class :group
                     :qualified-name (make-qualified-name *current-message-descriptor*
                                                          (slot-name->proto slot))
-                    :set-type type
                     :label label
+                    :container (when (eq label :repeated) :list)
                     :index index
                     :internal-field-name internal-slot-name
                     :external-field-name slot
@@ -1537,8 +1526,8 @@ Arguments:
         ;; the Lisp class that typep and subtypep work
         (unless (or (eq type alias-for) (find-class type nil))
           (collect-type-form `(deftype ,type () ',alias-for)))
-          (collect-type-form
-           (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs)))
+        (collect-type-form
+         (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs)))
       (collect-form `(record-protobuf-object ',type ,message :message))
       ;; Group can never be a top level element.
       `(progn
@@ -1577,72 +1566,56 @@ Arguments
   ;; Label is a member of (:repeated :vector), (:repeated :list),
   ;;   (:optional), (:required).
   ;; Documentation is any documentation that has been set for the slot.
-  (destructuring-bind (slot &key type typename name (default nil default-p) packed lazy
-                            index label documentation &allow-other-keys)
+  (destructuring-bind (slot &key type class name (default nil default-p) packed lazy
+                              index label documentation &allow-other-keys)
       field
     (let* (;; Public accessors and setters for slots should be defined later.
            (internal-slot-name (fintern "%~A" slot))
            (reader (and conc-name
                         (fintern "~A~A" conc-name slot))))
-      (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
-          ;; The protobuf returned by clos-type-to-protobuf-type may be incorrect due to
-          ;; camel-case shenanigans.  Prefer typename, if available.
-          (clos-type-to-protobuf-type type)
-        (declare (ignore packed-p enum-values))
-        (assert index)
-        (multiple-value-bind (label repeated-type) (values-list label)
-          (let* ((default
-                  (cond ((and (eq label :repeated)
-                              (eq repeated-type :vector))
-                         $empty-vector)
-                        ((eq label :repeated)
-                         $empty-list)
-                        (default-p default)
-                        (t $empty-default)))
-                 (cslot (unless alias-for
-                          (make-field-data
-                           :internal-slot-name internal-slot-name
-                           :external-slot-name slot
-                           :type `,type
-                           :accessor reader
-                           :initarg (kintern (symbol-name slot))
-                           :initform
-                           (cond ((eq label :repeated)
-                                     ;; Repeated fields get a container for their elements
-                                     (if (eq repeated-type :vector)
-                                         `(make-array 5 :fill-pointer 0 :adjustable t)
-                                         nil))
-                                 ((and (not default-p)
-                                          (eq label :optional)
-                                          ;; Use unbound for booleans only
-                                          (not (eq pclass :bool)))
-                                  nil)
-                                 (default-p
-                                  `,(protobuf-default-to-clos-init default type))))))
-                 (field (make-instance
-                         'field-descriptor
-                         :name  (or name (slot-name->proto slot))
-                         :type  (or typename ptype)
-                         :lisp-type (when root-lisp-type (qualified-symbol-name root-lisp-type))
-                         :set-type type
-                         :class pclass
-                         :qualified-name (make-qualified-name *current-message-descriptor*
-                                                              (or name (slot-name->proto slot)))
-                         :label label
-                         :index  index
-                         :field-offset field-offset
-                         :internal-field-name internal-slot-name
-                         :external-field-name slot
-                         :reader reader
-                         :default default
-                         ;; Pack the field only if requested and it actually makes sense
-                         :packed  (and (eq label :repeated) packed t)
-                         :lazy (and lazy t)
-                         :bool-index bool-index
-                         :documentation documentation)))
-            (when (and bool-index default (not (eq default $empty-default)))
-              (setf (bit bool-values bool-index) 1))
-            (values field cslot index)))))))
+      (assert index)
+      (multiple-value-bind (label repeated-type) (values-list label)
+        (let* ((default (when default-p default))
+               (initform (get-default-form type class repeated-type default))
+               (cslot (unless alias-for
+                        (make-field-data
+                         :internal-slot-name internal-slot-name
+                         :external-slot-name slot
+                         :type
+                         (cond ((and (eq label :repeated) (eq repeated-type :vector))
+                                (list 'proto:vector-of `,type))
+                               ((and (eq label :repeated) (eq repeated-type :list))
+                                (list 'proto:list-of `,type))
+                               ((member class '(:message :group))
+                                (list 'cl:or 'cl:null `,type))
+                               (t `,type))
+                         :accessor reader
+                         :initarg (kintern (symbol-name slot))
+                         :initform `,initform
+                         )))
+               (field (make-instance
+                       'field-descriptor
+                       :name  (or name (slot-name->proto slot))
+                       :type  type
+                       :class class
+                       :qualified-name (make-qualified-name *current-message-descriptor*
+                                                            (or name (slot-name->proto slot)))
+                       :label label
+                       :index  index
+                       :field-offset field-offset
+                       :internal-field-name internal-slot-name
+                       :external-field-name slot
+                       :reader reader
+                       :initform `,initform
+                       :container repeated-type
+                       ;; Pack the field only if requested and it actually makes sense
+                       :packed  (and (eq label :repeated) packed t)
+                       :lazy (and lazy t)
+                       :bool-index bool-index
+                       :documentation documentation)))
+          (when (and bool-index default default-p)
+            (setf (bit bool-values bool-index) 1))
+          (values field cslot index))))))
 
 (defparameter *rpc-package* nil
   "The Lisp package that implements RPC.
