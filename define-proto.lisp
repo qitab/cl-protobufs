@@ -892,9 +892,10 @@ Arguments:
         (coerce 0 'proto:sint32))
   (setf (gethash 'proto:sint64 default-form)
         (coerce 0 'proto:sint64))
-  ;; One of the "Home grown types..."
+  ;; "Home grown types..."
   (setf (gethash 'cl:keyword default-form)
         :default-keyword)
+  (setf (gethash 'cl:symbol default-form) nil)
   (defun get-default-form (type class repeated default)
     "Get the default value for a field that has type TYPE, class CLASS,
 and a pre-set default DEFAULT. REPEATED can be either :vector or :list."
@@ -906,13 +907,18 @@ and a pre-set default DEFAULT. REPEATED can be either :vector or :list."
       (default
        default)
       ((eq class :scalar)
-       (gethash type default-form))
+       (multiple-value-bind (default bound-p)
+           (gethash type default-form)
+         (if bound-p
+             default
+             (error "Unknown default for scalar type ~A" type))))
       ((eq class :map)
        '(make-hash-table))
       ((eq class :enum)
        `(enum-default-value ',type))
       ((member class '(:group :message))
-       nil))))
+       nil)
+      (t (error "Unknown class ~A for type ~A." class type)))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
   "Makes the definition forms for the define-group and define-message macros.
