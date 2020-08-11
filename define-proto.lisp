@@ -1010,7 +1010,8 @@ Arguments:
 (defun non-repeated-bool-field (field)
   "Determine if a field given by a FIELD is a non-repeated boolean."
   (and (member 'cl:boolean field)
-       (not (member :repeated field))))
+       (not (member '(:repeated :list) field :test #'equal))
+       (not (member '(:repeated :vector) field :test #'equal))))
 
 (defmacro define-message (type (&key name conc-name alias-for options
                                 documentation)
