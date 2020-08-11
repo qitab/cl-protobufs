@@ -476,28 +476,27 @@ Parameters:
          (assert index)
          (let* ((default (when default-p default))
                 (initform (get-default-form type class :optional default)))
-             (declare (ignore packed-p enum-values))
-             (setf (aref field-list oneof-offset)
-                   (make-instance
-                    'field-descriptor
-                    :name (or name (slot-name->proto slot))
-                    :type type
-                    :class class
-                    :qualified-name (make-qualified-name
-                                     *current-message-descriptor*
-                                     (or name (slot-name->proto slot)))
-                    :label :optional
-                    :index index
-                    ;; Oneof fields don't have a bit in the %%is-set vector, but
-                    ;; if they don't have an offset, then some code treats them
-                    ;; as extension fields.
-                    :field-offset nil
-                    :internal-field-name internal-name
-                    :external-field-name slot
-                    :oneof-offset oneof-offset
-                    :initform `,initform
-                    :lazy (and lazy t)
-                    :documentation documentation)))))
+           (setf (aref field-list oneof-offset)
+                 (make-instance
+                  'field-descriptor
+                  :name (or name (slot-name->proto slot))
+                  :type type
+                  :class class
+                  :qualified-name (make-qualified-name
+                                   *current-message-descriptor*
+                                   (or name (slot-name->proto slot)))
+                  :label :optional
+                  :index index
+                  ;; Oneof fields don't have a bit in the %%is-set vector, but
+                  ;; if they don't have an offset, then some code treats them
+                  ;; as extension fields.
+                  :field-offset nil
+                  :internal-field-name internal-name
+                  :external-field-name slot
+                  :oneof-offset oneof-offset
+                  :initform `,initform
+                  :lazy (and lazy t)
+                  :documentation documentation)))))
     `(progn
        ,(make-oneof-descriptor
          :internal-name internal-name
@@ -899,22 +898,21 @@ Arguments:
   (defun get-default-form (type class repeated default)
     "Get the default value for a field that has type TYPE, class CLASS,
 and a pre-set default DEFAULT. REPEATED can be either :vector or :list."
-    (let ((possible-default (gethash type default-form)))
-      (cond
-        ((equal repeated :vector)
-         '(make-array 0 :adjustable t))
-        ((equal repeated :list)
-         nil)
-        (default
-         default)
-        ((eq class :scalar)
-         (gethash type default-form))
-        ((eq class :map)
-         '(make-hash-table))
-        ((eq class :enum)
-         `(enum-default-value ',type))
-        ((member class '(:group :message))
-         nil)))))
+    (cond
+      ((equal repeated :vector)
+       '(make-array 0 :adjustable t))
+      ((equal repeated :list)
+       nil)
+      (default
+       default)
+      ((eq class :scalar)
+       (gethash type default-form))
+      ((eq class :map)
+       '(make-hash-table))
+      ((eq class :enum)
+       `(enum-default-value ',type))
+      ((member class '(:group :message))
+       nil))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
   "Makes the definition forms for the define-group and define-message macros.
