@@ -40,7 +40,6 @@
       ;; (format t "~A~%" bytes) ; =>
       ;; #(210 5 3 30 20 10)
       (assert-true (= 6 (length bytes)))
-      (print bytes)
       (assert-true (equalp '(30 20 10) (packed-int32 m2)))
       (assert-true (equalp '(30 20 10) (unpacked-int32 unpacked))))))
 

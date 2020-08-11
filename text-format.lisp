@@ -10,11 +10,11 @@
 ;;; The exported symbols are parse-text-format and print-text-format.
 
 (defun print-text-format (object &key
-                                 (indent 0)
-                                 (stream *standard-output*)
-                                 name
-                                 (print-name t)
-                                 (pretty-print t))
+                                   (indent 0)
+                                   (stream *standard-output*)
+                                   name
+                                   (print-name t)
+                                   (pretty-print t))
   "Prints a protocol buffer message to a stream.
 Parameters:
   OBJECT: The protocol buffer message to print.
@@ -30,68 +30,54 @@ Parameters:
          (message (find-message-for-class type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
-    (macrolet ((read-slot (object slot reader)
-                 `(if ,reader
-                      (funcall ,reader ,object)
-                      (slot-value ,object ,slot))))
-      (let ((name (or name (proto-name message))))
-        (if print-name
-            (if pretty-print
-                (format stream "~&~V,0T~A {~%" indent name)
-                (format stream "~A { " name))
-            (format stream "{")))
-      (dolist (field (proto-fields message))
-        (unless
-            (or (and (eq (slot-value field 'message-type) :extends)
-                     (not (has-extension object (proto-internal-field-name field))))
-                (and (proto-field-offset field)
-                     (= (bit (slot-value object '%%is-set)
-                             (proto-field-offset field))
-                        0)))
-          (let* ((slot   (slot-value field 'internal-field-name))
-                 (reader (slot-value field 'reader))
-                 (value (read-slot object slot (and (not (proto-lazy-p field)) reader))))
-            ;; For singular fields, only print if VALUE is not default.
-            (unless
-                (and (eq (proto-label field) :singular)
-                     (case (proto-set-type field)
-                       ((proto:byte-vector cl:string) (= (length value) 0))
-                       ((cl:double-float cl:float) (= value (get-default-form
-                                                             (proto-set-type field)
-                                                             (proto-default field))))
-                       (t (eq value (get-default-form (proto-set-type field)
-                                                      (proto-default field))))))
-              (if (eq (proto-label field) :repeated)
-                  (print-repeated-field value
+    (let ((name (or name (proto-name message))))
+      (if print-name
+          (if pretty-print
+              (format stream "~&~V,0T~A {~%" indent name)
+              (format stream "~A { " name))
+          (format stream "{")))
+    (dolist (field (proto-fields message))
+      (when (if (eq (slot-value field 'message-type) :extends)
+                (has-extension object (slot-value field 'internal-field-name))
+                (has-field object (slot-value field 'external-field-name)))
+        (let* ((value
+                 (cond ((eq (slot-value field 'message-type) :extends)
+                        (get-extension object (slot-value field 'external-field-name)))
+                       ((proto-lazy-p field)
+                        (slot-value object (slot-value field 'internal-field-name)))
+                       (t (proto-slot-value object (slot-value field 'external-field-name))))))
+          ;; For singular fields, only print if VALUE is not default.
+          (if (eq (proto-label field) :repeated)
+              (print-repeated-field value
+                                    (proto-class field)
+                                    (proto-name field)
+                                    :indent indent
+                                    :stream stream
+                                    :print-name print-name
+                                    :pretty-print pretty-print)
+              (print-non-repeated-field value
                                         (proto-class field)
                                         (proto-name field)
                                         :indent indent
                                         :stream stream
                                         :print-name print-name
-                                        :pretty-print pretty-print)
-                  (print-non-repeated-field value
-                                            (proto-class field)
-                                            (proto-name field)
-                                            :indent indent
-                                            :stream stream
-                                            :print-name print-name
-                                            :pretty-print pretty-print))))))
-      (dolist (oneof (proto-oneofs message))
-        (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
-               (set-field (oneof-set-field oneof-data)))
-          (when set-field
-            (let ((field-desc (aref (oneof-descriptor-fields oneof) set-field)))
-              (print-non-repeated-field (oneof-value oneof-data)
-                                        (proto-class field-desc)
-                                        (proto-name field-desc)
-                                        :indent indent
-                                        :stream stream
-                                        :print-name print-name
                                         :pretty-print pretty-print)))))
-      (if pretty-print
-          (format stream "~&~V,0T}~%" indent)
-          (format stream "} "))
-      nil)))
+    (dolist (oneof (proto-oneofs message))
+      (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
+             (set-field (oneof-set-field oneof-data)))
+        (when set-field
+          (let ((field-desc (aref (oneof-descriptor-fields oneof) set-field)))
+            (print-non-repeated-field (oneof-value oneof-data)
+                                      (proto-class field-desc)
+                                      (proto-name field-desc)
+                                      :indent indent
+                                      :stream stream
+                                      :print-name print-name
+                                      :pretty-print pretty-print)))))
+    (if pretty-print
+        (format stream "~&~V,0T}~%" indent)
+        (format stream "} "))
+    nil))
 
 (defun print-repeated-field
     (values type name &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
