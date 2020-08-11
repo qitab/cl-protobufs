@@ -262,8 +262,8 @@ Parameters:
         desc)
     (declare (fixnum size))
     (case class
-      ((:scalar) (serialize-scalar value type (make-tag type index)
-                                   buffer))
+      ((:scalar)
+       (serialize-scalar value type (make-tag type index) buffer))
       ((:group)
        (setq desc (find-message type))
        (unless value
