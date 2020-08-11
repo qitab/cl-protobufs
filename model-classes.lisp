@@ -460,11 +460,13 @@ on the symbol if we are not in SBCL."
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
 (defclass field-descriptor (descriptor)
-  ((class :type (member :message :group :enum :map :scalar)
+  ;; The protobuf type of the field. This slot is nullable to allow CCL compilation.
+  ((class :type (member :message :group :enum :map :scalar nil)
           :accessor proto-class
           :initarg :class)
-   ;; The base lisp type of the field (no list-of or vector-of wrapper).
-   (type :type symbol
+   ;; The base lisp type of the field (no list-of or vector-of wrapper). This slot
+   ;; is nullable to allow CCL compilation.
+   (type :type (or null symbol)
          :accessor proto-type
          :initarg :type)
    (label :type (member :required :optional :repeated :singular)
