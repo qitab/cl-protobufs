@@ -50,7 +50,7 @@ Parameters:
                         0)))
           (let* ((slot   (slot-value field 'internal-field-name))
                  (reader (slot-value field 'reader))
-                 (value (read-slot object slot (and (not (proto-lazy-p field)) reader))))
+                 (value (read-slot object slot reader)))
             ;; For singular fields, only print if VALUE is not default.
             (unless
                 (and (eq (proto-label field) :singular)
