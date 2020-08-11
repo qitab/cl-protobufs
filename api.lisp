@@ -12,23 +12,23 @@
   "Check if OBJECT with proto-message MESSAGE is initialized.
 The definition of initialized is all required-fields are set."
   (loop for field in (proto-fields message)
+        for proto-class = (proto-class field)
         when (eq (proto-label field) :required)
           do (when (= (bit (slot-value object '%%is-set)
                            (proto-field-offset field))
                       0)
                (return-from object-initialized-p nil))
-        when (= (bit (slot-value object '%%is-set)
-                     (proto-field-offset field))
-                1)
+        when (and (member proto-class '(:message :group))
+                  (= (bit (slot-value object '%%is-set)
+                          (proto-field-offset field))
+                     1))
           do (let ((lisp-type (proto-type field))
-                   (proto-class (proto-class field))
                    (field-value (slot-value object (proto-internal-field-name field))))
-               (when (member proto-class '(:message :group))
-                 (doseq (msg (if (eq (proto-label field) :repeated)
-                                 field-value
-                                 (list field-value)))
-                   (unless (object-initialized-p msg (find-message lisp-type))
-                     (return-from object-initialized-p nil))))))
+               (doseq (msg (if (eq (proto-label field) :repeated)
+                               field-value
+                               (list field-value)))
+                      (unless (object-initialized-p msg (find-message lisp-type))
+                        (return-from object-initialized-p nil)))))
   t)
 
 ;;; A Python-like, Protobufs2-compatible API
