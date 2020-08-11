@@ -174,11 +174,10 @@ the oneof and its nested fields.
   "Validates that all of the IMPORTS (a list of file names) have
    already been loaded. FILE-DESCRIPTOR is the descriptor of the
    file doing the importing."
-  ;; (dolist (import (reverse imports))
-  ;;   (let* ((imported (proto:find-schema (if (stringp import) (pathname import) import))))
-  ;;     (unless imported
-  ;;       (error "Could not find file ~S imported by ~S" import file-descriptor))))
-  )
+  (dolist (import (reverse imports))
+    (let* ((imported (proto:find-schema (if (stringp import) (pathname import) import))))
+      (unless imported
+        (error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
 (defun define-schema (type &key name syntax package import
                            optimize options documentation)
