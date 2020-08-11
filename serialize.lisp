@@ -143,15 +143,6 @@ Parameters:
                        ((proto-lazy-p field)
                         (slot-value object (slot-value field 'internal-field-name)))
                        (t (proto-slot-value object (slot-value field 'external-field-name))))))
-    ;; For singular fields, only emit if VALUE is not default.
-    (when
-        (and (eq (proto-label field) :singular)
-             (case (proto-set-type field)
-               ((proto:byte-vector cl:string) (= (length value) 0))
-               ((cl:double-float cl:float) (= value (get-default-form (proto-set-type field)
-                                                                      (proto-default field))))
-               (t (eq value (get-default-form (proto-set-type field) (proto-default field))))))
-      (return-from emit-field 0))
     (if (eq (proto-label field) :repeated)
         (or (emit-repeated-field value type (proto-packed field) index buffer)
             (undefined-field-type "While serializing ~S,"
