@@ -405,13 +405,14 @@ Parameters:
         (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
-(defmacro define-map (type-name &key key-type val-type index)
+(defmacro define-map (type-name &key key-type val-type val-class index)
 "Define a lisp type given the data for a protobuf map type.
 
 Parameters:
   TYPE-NAME: Map type name.
   KEY-TYPE: The lisp type of the map's keys.
   VAL-TYPE: The lisp type of the map's values.
+  VAL-CLASS: The class of the map value type.
   INDEX: Index of this map type in the field."
   (check-type index integer)
   (let* ((slot      type-name)
@@ -430,22 +431,20 @@ Parameters:
                   :accessor reader))
          (mfield (make-instance 'field-descriptor
                   :name (slot-name->proto slot)
-                  :type "map"
-                  :class class
+                  :type class
+                  :class :map
                   :qualified-name qual-name
-                  :set-type :map
                   :label :optional
                   :index index
                   :internal-field-name internal-slot-name
                   :external-field-name slot
+                  :initform '(make-hash-table)
                   :reader reader))
          (map-desc (make-map-descriptor
-                    :class class
                     :name name
-                    :key-class (lisp-type-to-protobuf-class key-type)
-                    :val-class (lisp-type-to-protobuf-class val-type)
                     :key-type key-type
-                    :val-type val-type)))
+                    :val-type val-type
+                    :val-class val-class)))
     (record-protobuf-object class map-desc :map)
     `(progn
        define-map ;; the type of this model
@@ -713,9 +712,12 @@ Arguments:
          (method-accessor-name (fintern "~A-gethash" public-slot-name))
          (method-remove-name (fintern "~A-remhash" public-slot-name))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
-         (key-type (map-descriptor-key-type (find-map-descriptor (proto-class field))))
-         (val-type (map-descriptor-val-type (find-map-descriptor (proto-class field))))
-         (val-default-form (get-default-form val-type $empty-default))
+         (desc (find-map-descriptor (proto-type field)))
+         (key-type (map-descriptor-key-type desc))
+         (val-type (map-descriptor-val-type desc))
+         (val-class (map-descriptor-val-class desc))
+         (val-default-form (get-default-form val-type val-class nil nil)
+                           )
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
     (with-gensyms (obj new-val new-key)
@@ -729,8 +731,9 @@ Arguments:
 
         ;; If the map's value type is a message, then the default value returned
         ;; should be nil. However, we do not want to allow the user to insert nil
-        ;; into the map, so this binding only applies to the clear and get functions.
-        ,@(let ((val-type (if (find-message val-type)
+        ;; into the map, so
+        ;; this binding only applies to the clear and get functions.
+        ,@(let ((val-type (if (member val-class '(:message :group))
                               (list 'or 'null val-type)
                               val-type)))
             `((declaim (inline ,public-accessor-name))
@@ -834,7 +837,7 @@ Arguments:
            proto-type public-slot-name slot-name field)
 
         ;; Make special map forms.
-        ,@(when (typep (find-map-descriptor (proto-class field)) 'map-descriptor)
+        ,@(when (eq (proto-class field) :map)
             (make-map-accessor-forms
              proto-type public-slot-name slot-name field))))))
 
