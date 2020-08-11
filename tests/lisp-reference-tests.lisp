@@ -17,6 +17,7 @@
                 #:proto-input-type
                 #:proto-output-type
                 #:proto-extended-fields
+                #:proto-type
                 #:proto-class
                 #:proto-internal-field-name)
   (:export :run))
@@ -29,42 +30,45 @@
   "Run all tests in the test suite."
   (cl-protobufs.test:run-suite 'reference-suite))
 
-(defun find-message-with-string (message name)
+(defun find-message-with-string (class name)
   (proto-impl::find-message (intern (nstring-upcase (proto-impl::uncamel-case name))
-                                    (symbol-package (proto-impl::proto-class message)))))
+                                    (symbol-package class))))
 
 (deftest cross-package-reference-test (reference-suite)
-  (flet ((find-by-name (name proto-object)
-           (find-message-with-string proto-object name))
+  (flet ((find-by-name (name class)
+           (find-message-with-string class name))
          (find-by-name-in-list (name proto-objects)
            (find name proto-objects :key #'proto-name :test #'string=)))
     (let* ((schema (find-schema 'package_test1))
            (message-with-cross-package-reference
-            (find-by-name "MessageWithCrossPackageReference" schema))
+            (find-by-name "MessageWithCrossPackageReference" (proto-class schema)))
            (baz (find-by-name-in-list "baz" (proto-fields message-with-cross-package-reference)))
            (bonk (find-by-name-in-list "bonk" (proto-fields message-with-cross-package-reference)))
            (bam (find-by-name-in-list "bam" (proto-fields message-with-cross-package-reference)))
            (bing (find-by-name-in-list "bing" (proto-fields message-with-cross-package-reference)))
            (message-with-cross-package-extension
-            (find-by-name "MessageWithCrossPackageExtension" schema))
+            (find-by-name "MessageWithCrossPackageExtension" (proto-class schema)))
            (boo (find-by-name-in-list "boo" (proto-fields message-with-cross-package-extension)))
            (service-with-cross-package-input-output
             (find-by-name-in-list "ServiceWithCrossPackageInputOutput" (proto-services schema)))
-           (bloop (find-by-name-in-list "Bloop" (proto-methods service-with-cross-package-input-output)))
-           (beep (find-by-name-in-list "Beep" (proto-methods service-with-cross-package-input-output)))
+           (bloop (find-by-name-in-list "Bloop"
+                                        (proto-methods service-with-cross-package-input-output)))
+           (beep (find-by-name-in-list "Beep"
+                                       (proto-methods service-with-cross-package-input-output)))
            (message-in-other-package-extend
-            (find-by-name "MessageInOtherPackage" bing))
-           (baa (find-by-name-in-list "baa" (proto-extended-fields message-in-other-package-extend))))
+            (find-by-name "MessageInOtherPackage" (proto-type bing)))
+           (baa (find-by-name-in-list "baa"
+                                      (proto-extended-fields message-in-other-package-extend))))
       (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-in-other-package
-                     (proto-class baz)))
+                     (proto-type baz)))
       (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:enum-in-other-package
-                     (proto-class bonk)))
+                     (proto-type bonk)))
       (assert-true (equal 'message-defined-in-both-packages
-                     (proto-class bam)))
+                     (proto-type bam)))
       (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-defined-in-both-packages
-                     (proto-class bing)))
+                     (proto-type bing)))
       (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-in-other-package
-                     (proto-class boo)))
+                     (proto-type boo)))
       (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-in-other-package
                      (proto-input-type bloop)))
       (assert-true (equal 'message-with-cross-package-reference
@@ -124,9 +128,10 @@
 (deftest forward-reference-test (reference-suite)
   (flet ((find-by-name (name proto-objects)
            (find name proto-objects :key #'proto-name :test #'string=)))
-    (let* ((schema (find-schema 'cl-protobufs.protobuf-forward-reference-unittest:forward_reference))
+    (let* ((schema (find-schema
+                    'cl-protobufs.protobuf-forward-reference-unittest:forward_reference))
            (message-with-forward-reference
-            (find-message-with-string schema "MessageWithForwardReference"))
+            (find-message-with-string (proto-class schema) "MessageWithForwardReference"))
            (foo (find-by-name "foo" (proto-fields message-with-forward-reference)))
            ;; (bar (find-by-name "bar" (proto-fields message-with-forward-reference)))
            (service-with-forward-reference
@@ -134,7 +139,8 @@
            (bloop (find-by-name "Bloop" (proto-methods service-with-forward-reference)))
            (beep (find-by-name "Beep" (proto-methods service-with-forward-reference))))
       (assert-true
-       (equal 'cl-protobufs.protobuf-forward-reference-unittest::msg-w-overridden-lisp-class (proto-class foo)))
+          (equal 'cl-protobufs.protobuf-forward-reference-unittest::msg-w-overridden-lisp-class
+                 (proto-type foo)))
       ;; Note this broken because 'lisp_name' cannot be used for enums.
       ;; (assert-true (equal 'cl-protobufs.protobuf-forward-reference-unittest::
       ;;                 ENUM-W-OVERRIDDEN-LISP-CLASS (proto-class bar)))
