@@ -386,6 +386,11 @@ Arguments:
   "Check whether TYPE should be zigzag encoded on the wire."
   (member type '(sint32 sint64)))
 
+(defun packed-type-p (type)
+  "Returns true if TYPE can be packed."
+  (member type '(int32 int64 uint32 uint64 sint32 sint64 fixed32
+                 fixed64 sfixed32 sfixed64 boolean float double-float)))
+
 (defun type-expand (type)
   "Convert TYPE into an equivalent type, removing all references to derived types."
   #+(or abcl xcl) (system::expand-deftype type)
