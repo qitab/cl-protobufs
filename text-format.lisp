@@ -324,7 +324,9 @@ attempt to parse the name of the message and match it against MSG-DESC."
   "Parse data of type TYPE and class CLASS from STREAM. This
 function returns the object parsed. If the parsing fails,
 the function will return T as a second value."
-  (let ((desc))
+  ;; placeholder descriptor. This may be bound to a descriptor for a
+  ;; message, group, map, or enum.
+  (let ((descriptor))
     (case class
       ((:scalar)
        (expect-char stream #\:)
@@ -341,24 +343,24 @@ the function will return T as a second value."
                            (t (values nil t)))))
          (otherwise (parse-signed-int stream))))
       ((:group :message)
-       (setq desc (find-message type))
+       (setq descriptor (find-message type))
        (when (eql (peek-char nil stream nil) #\:)
          (read-char stream))
-       (parse-text-format desc
+       (parse-text-format descriptor
                           :stream stream
                           :parse-name nil))
       ((:enum)
-       (setq desc (find-enum type))
+       (setq descriptor (find-enum type))
        (expect-char stream #\:)
        (let* ((name (parse-token stream))
-              (enum (find (keywordify name) (enum-descriptor-values desc)
+              (enum (find (keywordify name) (enum-descriptor-values descriptor)
                           :key #'enum-value-descriptor-name)))
          (and enum (enum-value-descriptor-name enum))))
       ((:map)
-       (setq desc (find-map-descriptor type))
-       (let ((key-type (map-descriptor-key-type desc))
-             (val-type (map-descriptor-val-type desc))
-             (val-class (map-descriptor-val-class desc)))
+       (setq descriptor (find-map-descriptor type))
+       (let ((key-type (map-descriptor-key-type descriptor))
+             (val-type (map-descriptor-val-type descriptor))
+             (val-class (map-descriptor-val-class descriptor)))
          (flet ((parse-map-entry (key-type val-type stream)
                   (let (key val)
                     (expect-char stream #\{)
