@@ -131,43 +131,34 @@ Parameters:
   FIELD: The field-descriptor describing which field of OBJECT to serialize.
   BUFFER: The buffer to serialize to."
   (declare (type field-descriptor field))
-  (flet ((read-slot (object slot reader)
-           ;; Don't do a boundp check, we assume the object is fully populated.
-           ;; Unpopulated slots should be "nullable" and will contain nil when empty.
-           (if reader
-               (funcall reader object)
-               (slot-value object slot))))
+  (unless
+      (if (eq (slot-value field 'message-type) :extends)
+          (has-extension object (slot-value field 'internal-field-name))
+          (has-field object (slot-value field 'external-field-name)))
+    (return-from emit-field 0))
+  (let* ((type   (slot-value field 'class))
+         (index  (proto-index field))
+         (value  (cond ((eq (slot-value field 'message-type) :extends)
+                        (get-extension object (slot-value field 'external-field-name)))
+                       ((proto-lazy-p field)
+                        (slot-value object (slot-value field 'internal-field-name)))
+                       (t (proto-slot-value object (slot-value field 'external-field-name))))))
+    ;; For singular fields, only emit if VALUE is not default.
     (when
-        (or (and (eq (slot-value field 'message-type) :extends)
-                 (not (has-extension object (slot-value field 'internal-field-name))))
-            (and (slot-value field 'field-offset)
-                 (= (bit (slot-value object '%%is-set)
-                    (slot-value field 'field-offset))
-                    0)))
+        (and (eq (proto-label field) :singular)
+             (case (proto-set-type field)
+               ((proto:byte-vector cl:string) (= (length value) 0))
+               ((cl:double-float cl:float) (= value (get-default-form (proto-set-type field)
+                                                                      (proto-default field))))
+               (t (eq value (get-default-form (proto-set-type field) (proto-default field))))))
       (return-from emit-field 0))
-    (let* ((type   (slot-value field 'class))
-           (slot   (slot-value field 'internal-field-name))
-           (reader (slot-value field 'reader))
-           (index (proto-index field))
-           ;; If the field is lazy, use slot-value, since calling the reader will
-           ;; unnecessarily deserialize the message.
-           (value (read-slot object slot (and (not (proto-lazy-p field)) reader))))
-      ;; For singular fields, only emit if VALUE is not default.
-      (when
-          (and (eq (proto-label field) :singular)
-               (case (proto-set-type field)
-                 ((proto:byte-vector cl:string) (= (length value) 0))
-                 ((cl:double-float cl:float) (= value (get-default-form (proto-set-type field)
-                                                                        (proto-default field))))
-                 (t (eq value (get-default-form (proto-set-type field) (proto-default field))))))
-        (return-from emit-field 0))
-      (if (eq (proto-label field) :repeated)
-          (or (emit-repeated-field value type (proto-packed field) index buffer)
-              (undefined-field-type "While serializing ~S,"
-                                    object type field))
-          (or (emit-non-repeated-field value type index buffer)
-              (undefined-field-type "While serializing ~S,"
-                                    object type field))))))
+    (if (eq (proto-label field) :repeated)
+        (or (emit-repeated-field value type (proto-packed field) index buffer)
+            (undefined-field-type "While serializing ~S,"
+                                  object type field))
+        (or (emit-non-repeated-field value type index buffer)
+            (undefined-field-type "While serializing ~S,"
+                                  object type field)))))
 
 (defun emit-repeated-field (value type packed-p index buffer)
   "Serialize a repeated field.
