@@ -464,7 +464,8 @@ on the symbol if we are not in SBCL."
   ((class :type (member :message :group :enum :map :scalar)
           :accessor proto-class
           :initarg :class)
-  (type :type symbol                           ; The lisp type of the field
+   ;; The base lisp type of the field (no list-of or vector-of wrapper).
+   (type :type symbol
          :accessor proto-type
          :initarg :type)
    (label :type (member :required :optional :repeated)
