@@ -45,6 +45,18 @@ FileGenerator::FileGenerator(const FileDescriptor* file) :
     services_[i] = std::make_unique<ServiceGenerator>(file->service(i));
   }
 
+  switch (file_->syntax()) {
+    case FileDescriptor::Syntax::SYNTAX_PROTO2:
+      syntax_ = ":proto2";
+      break;
+    case FileDescriptor::Syntax::SYNTAX_PROTO3:
+      syntax_ = ":proto3";
+      break;
+    case FileDescriptor::Syntax::SYNTAX_UNKNOWN:
+      GOOGLE_LOG(FATAL) << "Unknown syntax for file: " << file->DebugString();
+      break;
+  }
+
   // Derive schema name.
   const size_t slash = schema_name_.find_last_of("\\/");
   if (std::string::npos != slash) {
@@ -104,6 +116,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   // Schema options.
   printer->Indent();
   const char* sep = "";
+  printer->Print(":syntax $syntax$\n", "syntax", syntax_);
   if (!file_->package().empty()) {
     printer->Print(sep); sep = "\n ";
     printer->Print(":package \"$pck$\"", "pck", file_->package());

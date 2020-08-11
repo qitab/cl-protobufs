@@ -134,7 +134,7 @@
   (assert-true (eq :bah (numeral->enum 'outer-enum 1234 :bah))))
 
 (deftype orig-type () '(member :eins :zwei :drei))
-(proto:define-schema 'my-schema :package 'proto-test)
+(proto:define-schema 'my-schema :package 'proto-test :syntax :proto2)
 (proto:define-enum alias-enum (:alias-for orig-type))
 
 (deftest test-enum-values (enum-mapping-suite)

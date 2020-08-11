@@ -41,35 +41,40 @@ Parameters:
                 (format stream "~A { " name))
             (format stream "{")))
       (dolist (field (proto-fields message))
-        (when (if (eq (slot-value field 'message-type) :extends)
-                  (has-extension object (proto-internal-field-name field))
-                  (= (bit (slot-value object '%%is-set)
-                          (proto-field-offset field))
-                     1))
-          (let ((slot (slot-value field 'internal-field-name))
-                (reader (slot-value field 'reader)))
-            (if (eq (proto-label field) :repeated)
-                (let ((field-value (if slot
-                                       (read-slot object slot
-                                                  (and (not (proto-lazy-p field))
-                                                       reader))
-                                       (list object))))
-                  (print-repeated-field field-value
+        (unless
+            (or (and (eq (slot-value field 'message-type) :extends)
+                     (not (has-extension object (proto-internal-field-name field))))
+                (and (proto-field-offset field)
+                     (= (bit (slot-value object '%%is-set)
+                             (proto-field-offset field))
+                        0)))
+          (let* ((slot   (slot-value field 'internal-field-name))
+                 (reader (slot-value field 'reader))
+                 (value  (read-slot object slot (and (not (proto-lazy-p field)) reader))))
+            ;; For singular fields, only print if VALUE is not default.
+            (unless
+                (and (eq (proto-label field) :singular)
+                     (case (proto-type field)
+                       ((proto:byte-vector cl:string) (= (length value) 0))
+                       ((cl:double-float cl:float) (= value 0))
+                       (t (eq value (eval (proto-initform field))))))
+              (if (eq (proto-label field) :repeated)
+                  (print-repeated-field value
                                         (proto-type field)
                                         (proto-class field)
                                         (proto-name field)
                                         :indent indent
                                         :stream stream
                                         :print-name print-name
-                                        :pretty-print pretty-print))
-                (print-non-repeated-field (if slot (read-slot object slot reader) object)
-                                          (proto-type field)
-                                          (proto-class field)
-                                          (proto-name field)
-                                          :indent indent
-                                          :stream stream
-                                          :print-name print-name
-                                          :pretty-print pretty-print)))))
+                                        :pretty-print pretty-print)
+                  (print-non-repeated-field value
+                                            (proto-type field)
+                                            (proto-class field)
+                                            (proto-name field)
+                                            :indent indent
+                                            :stream stream
+                                            :print-name print-name
+                                            :pretty-print pretty-print))))))
       (dolist (oneof (proto-oneofs message))
         (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
                (set-field (oneof-set-field oneof-data)))
@@ -327,7 +332,13 @@ the function will return T as a second value."
          ((float) (parse-float stream))
          ((double-float) (parse-double stream))
          ((string) (parse-string stream))
-         ((bool)   (boolean-true-p (parse-token stream)))
+         ((bool)   (let ((token (parse-token stream)))
+                     (cond ((string= token "true") t)
+                           ((string= token "false") nil)
+                           ;; Parsing failed, so return T as
+                           ;; a second value to indicate a
+                           ;; failure.
+                           (t (values nil t)))))
          (otherwise (parse-signed-int stream))))
       ((:group :message)
        (setq desc (find-message type))

@@ -178,11 +178,13 @@ to import the package with a local nickname. Example:
 You may have multiple `.proto` files use the same package if desired. The
 package exports the symbols described in the sections below.
 
-### Messages (and Groups)
+### Messages and Groups (proto2)
 
 This section uses the following protocol buffer messages as an example:
 
 ```protocol-buffer
+syntax = "proto2";
+
 package abc;
 
 message DateRange {
@@ -213,7 +215,7 @@ protobuf type    |  default value
 numerics         |  zero of the appropriate type
 strings          |  the empty string
 messages         |  `nil`
-enums            |  the minimum enum value (possibly negative)
+enums            |  the first value listed in the .proto file
 booleans         |  `nil`
 repeated fields  |  the empty list
 
@@ -233,7 +235,7 @@ value.
 ```
 
 Check whether a field has been set. Returns `t` if the `min-date` field has been
-set to a non-default value, otherwise `nil`.
+set, otherwise `nil`.
 
 ```lisp
 (date-range.clear-min-date range)
@@ -242,6 +244,34 @@ set to a non-default value, otherwise `nil`.
 Clear the value of a field. After the above call `(date-range.has-min-date
 range)` returns `nil` and `(date-range.min-date range)` returns the default
 value.
+
+### Messages (proto3)
+
+This section uses the following protocol buffer message as an example:
+
+```protocol-buffer
+syntax = "proto3";
+
+message Event {
+  int32 day = 1;
+  int32 month = 2;
+  int32 year = 3;
+  repeated string invitees = 4;
+}
+```
+
+The generated code for proto3 messages is similar to proto2 messages. The only
+difference is the introduction of fields with no specified label, which are
+known as "singular" fields. For singular fields, the state of being unset and
+the state of being set to the default value for the type are indistinguishable.
+So, `has-*` functions, such as `(event.has-day msg)` are not defined.
+
+The `has-*` functions for repeated fields are defined. They return true if and
+only if the field has been manually set and has not been cleared since.
+
+This library supports optional fields in proto3 messages. These fields have the
+same semantics and generated code as proto2 optional fields.
+
 
 ### Enums
 
@@ -361,12 +391,15 @@ This section uses the following protobuf message as an example:
 message Person {
   optional string name = 1;
   oneof AgeOneof {
-    optional int32 age = 2;
-    optional string birthdate = 3;
+    int32 age = 2;
+    string birthdate = 3;
   }
 }
 ```
-To access fields inside a oneof, just use the standard accessors outlined above. For example:
+
+To access fields inside a oneof, use the standard accessors outlined
+above. These fields have the semantics of proto2 optional fields, so `has-*`
+functions are created. For example:
 
 ```lisp
 (setf (person.age bob) 5)
@@ -380,6 +413,11 @@ two special functions:
 This will return the lisp symbol corresponding to the field which is currently set. So, if
 we set `age` to `5`, then this will return the symbol `AGE`. If no field is set, this function
 will return `nil`.
+
+```lisp
+(person.has-age bob)
+```
+returns true.
 
 ```lisp
 (person.clear-age-oneof bob)

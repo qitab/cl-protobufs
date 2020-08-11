@@ -138,33 +138,35 @@ Parameters:
            (if reader
                (funcall reader object)
                (slot-value object slot))))
-    (unless
-        (if (eq (slot-value field 'message-type) :extends)
-            (has-extension object (slot-value field 'internal-field-name))
-            (= (bit (slot-value object '%%is-set)
+    (when
+        (or (and (eq (slot-value field 'message-type) :extends)
+                 (not (has-extension object (slot-value field 'internal-field-name))))
+            (and (slot-value field 'field-offset)
+                 (= (bit (slot-value object '%%is-set)
                     (slot-value field 'field-offset))
-               1))
+                    0)))
       (return-from emit-field 0))
-    (let ((type   (slot-value field 'type))
-          (class  (slot-value field 'class))
-          (slot   (slot-value field 'internal-field-name))
-          (reader (slot-value field 'reader))
-          (index (proto-index field)))
+    (let* ((type   (slot-value field 'type))
+           (class  (slot-value field 'class))
+           (slot   (slot-value field 'internal-field-name))
+           (reader (slot-value field 'reader))
+           (index (proto-index field))
+           ;; If the field is lazy, use slot-value, since calling the reader will
+           ;; unnecessarily deserialize the message.
+           (value (read-slot object slot (and (not (proto-lazy-p field)) reader))))
+      ;; For singular fields, only emit if VALUE is not default.
+      (when
+          (and (eq (proto-label field) :singular)
+               (case type
+                 ((proto:byte-vector cl:string) (= (length value) 0))
+                 ((cl:double-float cl:float) (= value 0))
+                 (t (eq value (eval (proto-initform field))))))
+        (return-from emit-field 0))
       (if (eq (proto-label field) :repeated)
-          (or (emit-repeated-field
-               (if slot (read-slot object slot
-                                   ;; For lazy fields, don't use reader
-                                   ;; because that will deserialize
-                                   ;; unnecessarily.
-                                   (and (not (proto-lazy-p field))
-                                        reader))
-                   (list object))
-               type class (proto-packed field) index buffer)
+          (or (emit-repeated-field value type class (proto-packed field) index buffer)
               (undefined-field-type "While serializing ~S,"
                                     object type field))
-          (or (emit-non-repeated-field
-               (if slot (read-slot object slot reader) object)
-               type class index buffer)
+          (or (emit-non-repeated-field value type class index buffer)
               (undefined-field-type "While serializing ~S,"
                                     object type field))))))
 
@@ -419,43 +421,41 @@ See field-descriptor for the distinction between index, offset, and bool-number.
 ;; Consecutive numbers starting at other than 1 could in theory be
 ;; direct-mapped by subtracting the "origin" but such usage is uncommon,
 ;; and the performance of the hash-based lookup as a fallback is adequate.
+(defun make-field-map (fields)
+  (let ((count 0) (max 0))
+    (dolist (field fields)
+      (incf count)
+      (setf max (max (proto-index field) max)))
+    (flet ((wrap (field)
+             (make-field (proto-index field)
+                         (proto-field-offset field)
+                         (proto-bool-index field)
+                         (and (proto-oneof-offset field) t)
+                         (keywordify (proto-internal-field-name field))
+                         field)))
+      (if (< max (* count 2)) ; direct map
+          (let ((map (make-array (1+ max) :initial-element nil)))
+            (setf (svref map 0) t)
+            (dolist (field fields map)
+              (setf (svref map (proto-index field)) (wrap field))))
+          ;; hash-based map. a "cheap" computation of a good table modulus,
+          ;; barring a prime-number test, is an odd number achieving 50% load.
+          (let* ((map (make-array (ash count 1) :initial-element nil))
+                 (modulus (1- (length map))))
+            (dolist (field fields map)
+              (let ((bin (1+ (mod (proto-index field) modulus))))
+                (push (wrap field) (svref map bin)))))))))
 
-(macrolet ((field-map-direct-p (field-map) `(svref ,field-map 0)))
-  (defun make-field-map (fields)
-    (let ((count 0) (max 0))
-      (dolist (field fields)
-        (incf count)
-        (setf max (max (proto-index field) max)))
-      (flet ((wrap (field)
-               (make-field (proto-index field)
-                           (proto-field-offset field)
-                           (proto-bool-index field)
-                           (and (proto-oneof-offset field) t)
-                           (keywordify (proto-internal-field-name field))
-                           field)))
-        (if (< max (* count 2)) ; direct map
-            (let ((map (make-array (1+ max) :initial-element nil)))
-              (setf (field-map-direct-p map) t)
-              (dolist (field fields map)
-                (setf (svref map (proto-index field)) (wrap field))))
-            ;; hash-based map. a "cheap" computation of a good table modulus,
-            ;; barring a prime-number test, is an odd number achieving 50% load.
-            (let* ((map (make-array (ash count 1) :initial-element nil))
-                   (modulus (1- (length map))))
-              (dolist (field fields map)
-                (let ((bin (1+ (mod (proto-index field) modulus))))
-                  (push (wrap field) (svref map bin)))))))))
-
-  ;; Given a field-number and a field-map, return the FIELD metadata or NIL.
-  (declaim (inline find-in-field-map))
-  (defun find-in-field-map (field-number field-map)
-    (if (field-map-direct-p field-map)
-        (unless (>= field-number (length field-map))
-          (svref field-map field-number))
-        (let ((modulus (1- (length field-map))))
-          (dolist (field (svref field-map (1+ (mod field-number modulus))))
-            (when (= (field-index field) field-number)
-              (return field)))))))
+;; Given a field-number and a field-map, return the FIELD metadata or NIL.
+(declaim (inline find-in-field-map))
+(defun find-in-field-map (field-number field-map)
+  (if (svref field-map 0)
+      (unless (>= field-number (length field-map))
+        (svref field-map field-number))
+      (let ((modulus (1- (length field-map))))
+        (dolist (field (svref field-map (1+ (mod field-number modulus))))
+          (when (= (field-index field) field-number)
+            (return field))))))
 
 (defun message-field-metadata-vector (message)
   "Lazily compute and memoize a field map for message-descriptor
@@ -485,7 +485,6 @@ See field-descriptor for the distinction between index, offset, and bool-number.
 ;; FIELD-MAP is a vector that translates FIELD-NUMBER to a FIELD object.
 ;; Return NIL and the original list if FIELD-NUMBER is unknown, though this could
 ;; easily return a cell in which to collect raw octets for missing schema fields.
-
 (defun get-field-cell (field-number field-list field-map)
   (declare (optimize (speed 3) (safety 0)))
   ;; FIELD-LIST is maintained as a property list so that it may be passed
@@ -536,7 +535,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
         (let* ((cur-field (find-in-field-map field-number field-map))
                (top-field (car field-list))
                (index (field-index top-field)))
-          (if (field-oneof-p cur-field)
+          (if (and cur-field (field-oneof-p cur-field))
               ;; If a field is part of a oneof, put it at the end of the plist.
               ;; This is to preserve the behavior that if two fields from the same
               ;; oneof are recieved on the wire, then only the last one is set. Since
@@ -1389,7 +1388,7 @@ Parameters:
               (let (,@(loop for slot in nslots
                             collect `(,slot ,missing-value))
                     ,@(loop for oneof-slot in oneof-slots
-                            collect `(,oneof-slot (make-instance 'oneof)))
+                            collect `(,oneof-slot (make-oneof)))
                     ,@rtemps)
                 (loop
                   (multiple-value-setq (tag ,vidx)
@@ -1412,7 +1411,6 @@ Parameters:
                         ,@(loop for field in rfields
                                 for temp in rtemps
                                 for mtemp = (slot-value-to-slot-name-symbol temp)
-                                as writer = (proto-writer field)
                                 for conversion = (if (eq (proto-container field) :vector)
                                                      `(coerce (nreverse ,temp) 'vector)
                                                      `(nreverse ,temp))
