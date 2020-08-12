@@ -131,25 +131,26 @@ Parameters:
   FIELD: The field-descriptor describing which field of OBJECT to serialize.
   BUFFER: The buffer to serialize to."
   (declare (type field-descriptor field))
-  (unless
-      (if (eq (slot-value field 'message-type) :extends)
-          (has-extension object (slot-value field 'internal-field-name))
-          (has-field object (slot-value field 'external-field-name)))
-    (return-from emit-field 0))
-  (let* ((type   (slot-value field 'class))
-         (index  (proto-index field))
-         (value  (cond ((eq (slot-value field 'message-type) :extends)
-                        (get-extension object (slot-value field 'external-field-name)))
-                       ((proto-lazy-p field)
-                        (slot-value object (slot-value field 'internal-field-name)))
-                       (t (proto-slot-value object (slot-value field 'external-field-name))))))
-    (if (eq (proto-label field) :repeated)
-        (or (emit-repeated-field value type (proto-packed field) index buffer)
-            (undefined-field-type "While serializing ~S,"
-                                  object type field))
-        (or (emit-non-repeated-field value type index buffer)
-            (undefined-field-type "While serializing ~S,"
-                                  object type field)))))
+  (let ((message-type (slot-value field 'message-type)))
+    (unless
+        (if (eq message-type :extends)
+            (has-extension object (slot-value field 'internal-field-name))
+            (has-field object (slot-value field 'external-field-name)))
+      (return-from emit-field 0))
+    (let* ((type   (slot-value field 'class))
+           (index  (proto-index field))
+           (value  (cond ((eq message-type :extends)
+                          (get-extension object (slot-value field 'external-field-name)))
+                         ((proto-lazy-p field)
+                          (slot-value object (slot-value field 'internal-field-name)))
+                         (t (proto-slot-value object (slot-value field 'external-field-name))))))
+      (if (eq (proto-label field) :repeated)
+          (or (emit-repeated-field value type (proto-packed field) index buffer)
+              (undefined-field-type "While serializing ~S,"
+                                    object type field))
+          (or (emit-non-repeated-field value type index buffer)
+              (undefined-field-type "While serializing ~S,"
+                                    object type field))))))
 
 (defun emit-repeated-field (value type packed-p index buffer)
   "Serialize a repeated field.

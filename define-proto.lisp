@@ -520,21 +520,23 @@ Parameters:
   "Sets the %bytes field of the proto object OBJ with NEW-VALUE."
   (setf (slot-value obj '%bytes) new-value))
 
-(defstruct field-values
+(defstruct field-accessors
   "Structure containing the get, set, and has functions
 for a proto-message field."
   (get nil :type symbol)
   (set nil :type list)
   (has nil :type symbol))
 
-(defun set-field-value-functions (proto-type field-name)
-  "Set the get, set, and has functions for a field onto
-the symbol plist inside of a field-values struct."
-  (setf (get field-name proto-type)
-        (make-field-values
-         :get (proto-slot-function-name proto-type field-name :get)
-         :set `(setf ,(proto-slot-function-name proto-type field-name :get))
-         :has (proto-slot-function-name proto-type field-name :has))))
+(defun set-field-value-functions (message-name field-symbol)
+  "Set the get, set, and has functions for a proto field on a fields symbol p-list.
+Parameters:
+  MESSAGE-NAME: The name of the protobuf message containing the field.
+  FIELD-SYMBOL: The symbol for the field."
+  (setf (get field-symbol message-name)
+        (make-field-accessors
+         :get (proto-slot-function-name message-name field-symbol :get)
+         :set `(setf ,(proto-slot-function-name message-name field-symbol :get))
+         :has (proto-slot-function-name message-name field-symbol :has))))
 
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
   "Create the common forms needed for all message fields

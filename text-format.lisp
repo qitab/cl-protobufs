@@ -43,8 +43,6 @@ Parameters:
         (let* ((value
                  (cond ((eq (slot-value field 'message-type) :extends)
                         (get-extension object (slot-value field 'external-field-name)))
-                       ((proto-lazy-p field)
-                        (slot-value object (slot-value field 'internal-field-name)))
                        (t (proto-slot-value object (slot-value field 'external-field-name))))))
           ;; For singular fields, only print if VALUE is not default.
           (if (eq (proto-label field) :repeated)

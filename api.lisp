@@ -143,9 +143,8 @@ only if the same fields have been explicitly set."
 (declaim (inline has-field))
 (defun has-field (object field)
   "Check if OBJECT has FIELD set."
-  (funcall
-   (field-values-has (get field (type-of object)))
-   object))
+  (funcall (field-accessors-has (get field (type-of object)))
+           object))
 
 (declaim (inline proto-slot-value))
 (defun proto-slot-value (object slot)
@@ -153,9 +152,8 @@ only if the same fields have been explicitly set."
 Parameters:
   OBJECT: The protobuf object.
   SLOT: The slot in object to retrieve the value from."
-  (funcall
-   (field-values-get (get slot (type-of object)))
-   object))
+  (funcall (field-accessors-get (get slot (type-of object)))
+           object))
 
 (declaim (inline (setf proto-slot-value)))
 (defun (setf proto-slot-value) (value object slot)
@@ -164,10 +162,9 @@ Parameters:
   VALUE: The new value for the field.
   OBJECT: The protobuf object.
   SLOT: The slot in object to retrieve the value from."
-  (funcall
-   (fdefinition (field-values-set (get slot (type-of object))))
-   value
-   object))
+  (funcall (fdefinition (field-accessors-set (get slot (type-of object))))
+           value
+           object))
 
 (defgeneric encoded-field (object slot)
   (:documentation
