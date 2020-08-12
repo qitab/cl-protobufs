@@ -292,6 +292,8 @@
     ((:file "full-tests")
      (:static-file "golden_message.data")
      (:static-file "golden_packed_message.data")))
+
+   #-abcl
    (:module "timing-tests"
     :serial t
     :pathname ""
