@@ -407,14 +407,14 @@ Parameters:
         (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
-(defmacro define-map (type-name &key key-type val-type val-class index)
+(defmacro define-map (type-name &key key-type val-type val-kind index)
 "Define a lisp type given the data for a protobuf map type.
 
 Parameters:
   TYPE-NAME: Map type name.
   KEY-TYPE: The lisp type of the map's keys.
   VAL-TYPE: The lisp type of the map's values.
-  VAL-CLASS: The class of the map value type.
+  VAL-KIND: The protobuf kind of the map value type.
   INDEX: Index of this map type in the field."
   (check-type index integer)
   (let* ((slot      type-name)
@@ -434,7 +434,7 @@ Parameters:
          (mfield (make-instance 'field-descriptor
                   :name (slot-name->proto slot)
                   :type class
-                  :class :map
+                  :kind :map
                   :qualified-name qual-name
                   :label :optional
                   :index index
@@ -446,7 +446,7 @@ Parameters:
                     :name name
                     :key-type key-type
                     :val-type val-type
-                    :val-class val-class)))
+                    :val-kind val-kind)))
     (record-protobuf-object class map-desc :map)
     `(progn
        define-map ;; the type of this model
@@ -470,18 +470,18 @@ Parameters:
           for oneof-offset from 0
           do
        (destructuring-bind
-           (slot &key type class name (default nil default-p)
+           (slot &key type kind name (default nil default-p)
                  lazy index documentation &allow-other-keys)
            field
          (assert index)
          (let* ((default (when default-p default))
-                (initform (get-default-form type class :optional default)))
+                (initform (get-default-form type kind :optional default)))
            (setf (aref field-list oneof-offset)
                  (make-instance
                   'field-descriptor
                   :name (or name (slot-name->proto slot))
                   :type type
-                  :class class
+                  :kind kind
                   :qualified-name (make-qualified-name
                                    *current-message-descriptor*
                                    (or name (slot-name->proto slot)))
@@ -738,8 +738,8 @@ Arguments:
          (desc (find-map-descriptor (proto-type field)))
          (key-type (map-descriptor-key-type desc))
          (val-type (map-descriptor-val-type desc))
-         (val-class (map-descriptor-val-class desc))
-         (val-default-form (get-default-form val-type val-class nil nil)
+         (val-kind (map-descriptor-val-kind desc))
+         (val-default-form (get-default-form val-type val-kind nil nil)
                            )
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
@@ -756,7 +756,7 @@ Arguments:
         ;; should be nil. However, we do not want to allow the user to insert nil
         ;; into the map, so
         ;; this binding only applies to the clear and get functions.
-        ,@(let ((val-type (if (member val-class '(:message :group))
+        ,@(let ((val-type (if (member val-kind '(:message :group))
                               (list 'or 'null val-type)
                               val-type)))
             `((declaim (inline ,public-accessor-name))
@@ -860,7 +860,7 @@ Arguments:
            proto-type public-slot-name slot-name field)
 
         ;; Make special map forms.
-        ,@(when (eq (proto-class field) :map)
+        ,@(when (eq (proto-kind field) :map)
             (make-map-accessor-forms
              proto-type public-slot-name slot-name field))))))
 
@@ -896,8 +896,8 @@ Arguments:
   (setf (gethash 'cl:keyword default-form)
         :default-keyword)
   (setf (gethash 'cl:symbol default-form) nil)
-  (defun get-default-form (type class repeated default)
-    "Get the default value for a field that has type TYPE, class CLASS,
+  (defun get-default-form (type kind repeated default)
+    "Get the default value for a field that has type TYPE, keyword KIND,
 and a pre-set default DEFAULT. REPEATED can be either :vector or :list."
     (cond
       ((equal repeated :vector)
@@ -906,19 +906,19 @@ and a pre-set default DEFAULT. REPEATED can be either :vector or :list."
        nil)
       (default
        default)
-      ((eq class :scalar)
+      ((eq kind :scalar)
        (multiple-value-bind (default bound-p)
            (gethash type default-form)
          (if bound-p
              default
              (error "Unknown default for scalar type ~A" type))))
-      ((eq class :map)
+      ((eq kind :map)
        '(make-hash-table))
-      ((eq class :enum)
+      ((eq kind :enum)
        `(enum-default-value ',type))
-      ((member class '(:group :message))
+      ((member kind '(:group :message))
        nil)
-      (t (error "Unknown class ~A for type ~A." class type)))))
+      (t (error "Unknown kind ~A for type ~A." kind type)))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
   "Makes the definition forms for the define-group and define-message macros.
@@ -1451,7 +1451,7 @@ Arguments:
          (mfield  (make-instance 'field-descriptor
                     :name  (slot-name->proto slot)
                     :type  type
-                    :class :group
+                    :kind :group
                     :qualified-name (make-qualified-name *current-message-descriptor*
                                                          (slot-name->proto slot))
                     :label label
@@ -1605,7 +1605,7 @@ Arguments
   ;; Label is a member of (:repeated :vector), (:repeated :list),
   ;;   (:optional), (:required).
   ;; Documentation is any documentation that has been set for the slot.
-  (destructuring-bind (slot &key type class name (default nil default-p) packed lazy
+  (destructuring-bind (slot &key type kind name (default nil default-p) packed lazy
                               index label documentation &allow-other-keys)
       field
     (let* (;; Public accessors and setters for slots should be defined later.
@@ -1622,7 +1622,7 @@ Arguments
                ;; Singular fields do not have offsets, as they don't have has-* functions.
                (offset (and (not (eq label :singular)) field-offset))
                (default (when default-p default))
-               (initform (get-default-form type class repeated-type default))
+               (initform (get-default-form type kind repeated-type default))
                (cslot (unless alias-for
                         (make-field-data
                          :internal-slot-name internal-slot-name
@@ -1632,7 +1632,7 @@ Arguments
                                 (list 'proto:vector-of `,type))
                                ((and (eq label :repeated) (eq repeated-type :list))
                                 (list 'proto:list-of `,type))
-                               ((member class '(:message :group))
+                               ((member kind '(:message :group))
                                 (list 'cl:or 'cl:null `,type))
                                (t `,type))
                          :accessor reader
@@ -1643,7 +1643,7 @@ Arguments
                        'field-descriptor
                        :name  (or name (slot-name->proto slot))
                        :type  type
-                       :class class
+                       :kind kind
                        :qualified-name (make-qualified-name *current-message-descriptor*
                                                             (or name (slot-name->proto slot)))
                        :label label

@@ -61,7 +61,7 @@ Parameters:
               (if (eq (proto-label field) :repeated)
                   (print-repeated-field value
                                         (proto-type field)
-                                        (proto-class field)
+                                        (proto-kind field)
                                         (proto-name field)
                                         :indent indent
                                         :stream stream
@@ -69,7 +69,7 @@ Parameters:
                                         :pretty-print pretty-print)
                   (print-non-repeated-field value
                                             (proto-type field)
-                                            (proto-class field)
+                                            (proto-kind field)
                                             (proto-name field)
                                             :indent indent
                                             :stream stream
@@ -82,7 +82,7 @@ Parameters:
             (let ((field-desc (aref (oneof-descriptor-fields oneof) set-field)))
               (print-non-repeated-field (oneof-value oneof-data)
                                         (proto-type field-desc)
-                                        (proto-class field-desc)
+                                        (proto-kind field-desc)
                                         (proto-name field-desc)
                                         :indent indent
                                         :stream stream
@@ -94,14 +94,14 @@ Parameters:
       nil)))
 
 (defun print-repeated-field
-    (values type class name &key (indent 0) (stream *standard-output*)
+    (values type kind name &key (indent 0) (stream *standard-output*)
                               (print-name t) (pretty-print t))
   "Print the text format of a single field which is not repeated.
 Parameters:
   VALUES: The list or vector of values in the field to print.
   TYPE: The protobuf type to print. This is obtained from
     the PROTO-TYPE slot in the field-descriptor.
-  CLASS: The class of the type to print.
+  KIND: The :kind slot of the field to print.
   NAME: The name of the field. This is printed before the value.
   INDENT: If supplied, indent the text by INDENT spaces.
   STREAM: The stream to output to.
@@ -109,7 +109,7 @@ Parameters:
   PRETTY-PRINT: When true, print newlines and indentation."
   (unless values
     (return-from print-repeated-field nil)) ; If values is NIL, then there is nothing to do.
-  (case class
+  (case kind
     ((:scalar)
      (doseq (v values)
             (print-scalar v type name stream
@@ -130,14 +130,14 @@ Parameters:
     (t (undefined-type type "While printing ~S to text format," values))))
 
 (defun print-non-repeated-field
-    (value type class name &key (indent 0) (stream *standard-output*)
+    (value type kind name &key (indent 0) (stream *standard-output*)
                              (print-name t) (pretty-print t))
   "Print the text format of a single field which is not repeated.
 Parameters:
   VALUE: The value in the field to print.
   TYPE: The protobuf type to print. This is obtained from
     the PROTO-TYPE
-  CLASS: The class of the type to print.
+  KIND: The :kind slot of the field to print.
   NAME: The name of the field. This is printed before the value.
   INDENT: If supplied, indent the text by INDENT spaces.
   STREAM: The stream to output to.
@@ -146,7 +146,7 @@ Parameters:
   ;; If VALUE is NIL and the type is not boolean, there is nothing to do.
   (unless (or value (eq type 'cl:boolean))
     (return-from print-non-repeated-field nil))
-  (case class
+  (case kind
     ((:scalar)
      (print-scalar value type name stream
                    (and pretty-print indent)))
@@ -163,13 +163,13 @@ Parameters:
      (let* ((map-desc (find-map-descriptor type))
             (key-type (map-descriptor-key-type map-desc))
             (val-type (map-descriptor-val-type map-desc))
-            (val-class (map-descriptor-val-class map-desc)))
+            (val-kind (map-descriptor-val-kind map-desc)))
        (loop for k being the hash-keys of value using (hash-value v)
              do (if pretty-print
                     (format stream "~&~V,0T~A { " (+ indent 2) name)
                     (format stream "~A { " name))
                 (print-scalar k key-type "key" stream nil)
-                (print-non-repeated-field v val-type val-class "value"
+                (print-non-repeated-field v val-type val-kind "value"
                                           :stream stream
                                           :print-name t
                                           :pretty-print nil)
@@ -294,12 +294,12 @@ attempt to parse the name of the message and match it against MSG-DESC."
       (let* ((name  (parse-token stream))
              (field (and name (find-field msg-desc name)))
              (type  (and field (proto-type field)))
-             (class (and field (proto-class field)))
+             (kind  (and field (proto-kind field)))
              (slot  (and field (proto-external-field-name field))))
         (if (null field)
             (skip-field stream)
             (multiple-value-bind (val error-p)
-                (parse-field type class :stream stream)
+                (parse-field type kind :stream stream)
               (cond
                 (error-p
                  (undefined-field-type "While parsing ~S from text format,"
@@ -310,7 +310,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
                  (when slot
                    (pushnew slot rslots)
                    (push val (proto-slot-value object slot))))
-                ((eq class :map)
+                ((eq kind :map)
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
                          (cdr pair))))
@@ -318,11 +318,11 @@ attempt to parse the name of the message and match it against MSG-DESC."
                  (when slot
                    (setf (proto-slot-value object slot) val))))))))))
 
-(defun parse-field (type class &key (stream *standard-input*))
-  "Parse data of type TYPE and class CLASS from STREAM. This
+(defun parse-field (type kind &key (stream *standard-input*))
+  "Parse data of type TYPE and keyword KIND from STREAM. This
 function returns the object parsed. If the parsing fails,
 the function will return T as a second value."
-  (case class
+  (case kind
     ((:scalar)
      (expect-char stream #\:)
      (case type
@@ -355,7 +355,7 @@ the function will return T as a second value."
      (let* ((map-desc (find-map-descriptor type))
             (key-type (map-descriptor-key-type map-desc))
             (val-type (map-descriptor-val-type map-desc))
-            (val-class (map-descriptor-val-class map-desc)))
+            (val-kind (map-descriptor-val-kind map-desc)))
        (flet ((parse-map-entry (key-type val-type stream)
                 (let (key val)
                   (expect-char stream #\{)
@@ -363,7 +363,7 @@ the function will return T as a second value."
                   (setf key (parse-field key-type :scalar :stream stream))
                   (skip-whitespace stream)
                   (assert (string= "value" (parse-token stream)))
-                  (setf val (parse-field val-type val-class :stream stream))
+                  (setf val (parse-field val-type val-kind :stream stream))
                   (skip-whitespace stream)
                   (expect-char stream #\})
                   (cons key val))))

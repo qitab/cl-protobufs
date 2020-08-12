@@ -90,7 +90,7 @@ const std::string FieldLispType(const FieldDescriptor* field) {
   return type;
 }
 
-const std::string FieldLispClass(const FieldDescriptor* field) {
+const std::string FieldLispKind(const FieldDescriptor* field) {
   std::string proto_class;
 
   switch (field->type()) {
@@ -262,16 +262,16 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   if (field->is_map()) {
     vars["key-type"] = FieldLispType(field->message_type()->field(0));
     vars["val-type"] = FieldLispType(field->message_type()->field(1));
-    vars["val-class"] = FieldLispClass(field->message_type()->field(1));
+    vars["val-kind"] = FieldLispKind(field->message_type()->field(1));
     printer->Print(vars,
                     "\n(proto:define-map $name$\n"
                     "   :key-type $key-type$\n"
                     "   :val-type $val-type$\n"
-                    "   :val-class $val-class$\n"
+                    "   :val-kind $val-kind$\n"
                     "   :index $tag$)");
   } else {
     vars["type"] = FieldLispType(field);
-    vars["class"] = FieldLispClass(field);
+    vars["kind"] = FieldLispKind(field);
     vars["label"] = FieldLispLabel(field);
     vars["packed"] = field->options().packed() ? " :packed cl:t" : "";
     vars["lazy"] = field->options().lazy() ? " :lazy cl:t" : "";
@@ -280,9 +280,9 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
         : "";
     printer->Print(vars,
                    "\n($name$"
-                   " :index $tag$ "
+                   " :index $tag$"
                    " :type $type$"
-                   " :class $class$"
+                   " :kind $kind$"
                    " :label $label$"
                    "$default$"
                    "$packed$"

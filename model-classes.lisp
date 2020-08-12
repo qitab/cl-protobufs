@@ -308,10 +308,10 @@ Parameters:
 
 (defstruct map-descriptor
   "The meta-object for a protobuf map"
-  (name      nil :type string)
-  (key-type  nil :type symbol)                                  ; the lisp type of the key
-  (val-type  nil :type symbol)                                  ; the lisp type of the value
-  (val-class nil :type (member :scalar :message :group :enum))) ; the class of the value
+  (name     nil :type string)
+  (key-type nil :type symbol)                                  ; the lisp type of the key
+  (val-type nil :type symbol)                                  ; the lisp type of the value
+  (val-kind nil :type (member :scalar :message :group :enum))) ; the protobuf kind of the value
 
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
@@ -461,9 +461,9 @@ on the symbol if we are not in SBCL."
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
 (defclass field-descriptor (descriptor)
   ;; The protobuf type of the field. This slot is nullable to allow CCL compilation.
-  ((class :type (member :message :group :enum :map :scalar nil)
-          :accessor proto-class
-          :initarg :class)
+  ((kind :type (member :message :group :enum :map :scalar nil)
+         :accessor proto-kind
+         :initarg :kind)
    ;; The base lisp type of the field (no list-of or vector-of wrapper). This slot
    ;; is nullable to allow CCL compilation.
    (type :type (or null symbol)

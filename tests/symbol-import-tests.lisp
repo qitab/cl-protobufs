@@ -42,7 +42,7 @@
   :syntax :proto2
   :import 'symbol-imported-schema)
 (proto:define-message symbol-importer-message ()
-  (imported-type-field :index 1 :type symbol-imported-message :class :message :label (:optional)))
+  (imported-type-field :index 1 :type symbol-imported-message :kind :message :label (:optional)))
 
 ;;; We need an actual test to make this test pass. If we can make an instance of the message it must
 ;;; have compiled successfully.
