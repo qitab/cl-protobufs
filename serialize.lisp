@@ -888,7 +888,7 @@ Parameters:
                                                             ,(make-tag key-type 1)
                                                             ,vbuf))
                            ,(generate-non-repeated-field-serializer
-                             val-type val-class 2 'v 'v vbuf 'map-len)
+                             val-type val-class 2 t 'v vbuf 'map-len)
                            (i+ ret-len (i+ map-len (backpatch map-len)))))))
                 (iincf ,size (loop for k being the hash-keys of ,vval using (hash-value v)
                                    sum (serialize-pair k v))))))))
@@ -939,8 +939,7 @@ Parameters:
   (nreverse
    (let (serializers)
      (dolist (field (proto-fields message))
-       (let* ((type (proto-type field))
-              (field-name (proto-external-field-name field))
+       (let* ((field-name (proto-external-field-name field))
               (reader (when field-name
                         `(,(proto-slot-function-name
                             (proto-class message) field-name :get)
