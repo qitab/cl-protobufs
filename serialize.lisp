@@ -183,8 +183,7 @@ Parameters:
   BUFFER: The buffer to write to."
   (declare (fixnum index)
            (buffer buffer))
-  (let ((size 0)
-        desc)
+  (let ((size 0))
     (declare (fixnum size))
     (cond ((and packed-p (packed-type-p type))
            ;; Handle scalar types. proto-packed-p of enum types returns nil,
@@ -196,20 +195,20 @@ Parameters:
                (iincf size (serialize-scalar v type tag buffer)))
              size))
           ((eq class :group)
-           (setq desc (find-message type))
-           (doseq (v value)
-             ;; To serialize a group, we encode a start tag,
-             ;; serialize the fields, then encode an end tag
-             (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                   (tag2 (make-wire-tag $wire-type-end-group   index)))
-               (iincf size (encode-uint32 tag1 buffer))
-               (dolist (f (proto-fields desc))
-                 (iincf size (emit-field v f buffer)))
-               (iincf size (encode-uint32 tag2 buffer))))
-           size)
+           (let ((msg-desc (find-message type)))
+             (doseq (v value)
+               ;; To serialize a group, we encode a start tag,
+               ;; serialize the fields, then encode an end tag
+               (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                     (tag2 (make-wire-tag $wire-type-end-group   index)))
+                 (iincf size (encode-uint32 tag1 buffer))
+                 (dolist (f (proto-fields msg-desc))
+                   (iincf size (emit-field v f buffer)))
+                 (iincf size (encode-uint32 tag2 buffer))))
+             size))
           ((eq class :message)
-           (setq desc (find-message type))
-           (let ((tag (make-wire-tag $wire-type-string index))
+           (let ((msg-desc (find-message type))
+                 (tag (make-wire-tag $wire-type-string index))
                  (custom-serializer (custom-serializer type)))
              (doseq (v value)
                ;; To serialize an embedded message, first say that it's
@@ -230,20 +229,20 @@ Parameters:
                                 (funcall custom-serializer v buffer)))
                          (t
                           (setq submessage-size
-                                (serialize-object v desc buffer))))
+                                (serialize-object v msg-desc buffer))))
                    (iincf size (+ (backpatch submessage-size)
                                   submessage-size))))))
            size)
           ((eq class :enum)
-           (setq desc (find-enum type))
-           (if packed-p
-               (serialize-packed-enum
-                value
-                (enum-descriptor-values desc) index buffer)
-               (let ((tag (make-wire-tag $wire-type-varint index)))
-                 (doseq (v value size)
-                   (iincf size
-                          (serialize-enum v (enum-descriptor-values desc) tag buffer))))))
+           (let ((enum-desc (find-enum type)))
+             (if packed-p
+                 (serialize-packed-enum
+                  value
+                  (enum-descriptor-values enum-desc) index buffer)
+                 (let ((tag (make-wire-tag $wire-type-varint index)))
+                   (doseq (v value size)
+                     (iincf size
+                            (serialize-enum v (enum-descriptor-values enum-desc) tag buffer)))))))
           (t nil))))
 
 (defun emit-non-repeated-field (value type class index buffer)
@@ -258,27 +257,26 @@ Parameters:
   BUFFER: The buffer to write to."
   (declare (fixnum index)
            (buffer buffer))
-  (let ((size 0)
-        desc)
+  (let ((size 0))
     (declare (fixnum size))
     (case class
       ((:scalar)
        (serialize-scalar value type (make-tag type index) buffer))
       ((:group)
-       (setq desc (find-message type))
-       (unless value
-         (return-from emit-non-repeated-field 0))
-       (let ((tag1 (make-wire-tag $wire-type-start-group index))
-             (tag2 (make-wire-tag $wire-type-end-group   index)))
-         (iincf size (encode-uint32 tag1 buffer))
-         (dolist (f (proto-fields desc)
-                    (i+ size (encode-uint32 tag2 buffer)))
-           (iincf size (emit-field value f buffer)))))
+       (let ((msg-desc (find-message type)))
+         (unless value
+           (return-from emit-non-repeated-field 0))
+         (let ((tag1 (make-wire-tag $wire-type-start-group index))
+               (tag2 (make-wire-tag $wire-type-end-group   index)))
+           (iincf size (encode-uint32 tag1 buffer))
+           (dolist (f (proto-fields msg-desc)
+                      (i+ size (encode-uint32 tag2 buffer)))
+             (iincf size (emit-field value f buffer))))))
       ((:message)
-       (setq desc (find-message type))
        (unless value
          (return-from emit-non-repeated-field 0))
-       (let ((precomputed-bytes (and (slot-exists-p value '%bytes)
+       (let ((msg-desc          (find-message type))
+             (precomputed-bytes (and (slot-exists-p value '%bytes)
                                      (proto-%bytes value)))
              (custom-serializer (custom-serializer type))
              (tag-size
@@ -295,19 +293,19 @@ Parameters:
                         (funcall custom-serializer value buffer)))
                  (t
                   (setq submessage-size
-                        (serialize-object value desc buffer))))
+                        (serialize-object value msg-desc buffer))))
            (+ tag-size (backpatch submessage-size) submessage-size))))
       ((:enum)
-       (setq desc (find-enum type))
-       (serialize-enum value (enum-descriptor-values desc)
-                       (make-wire-tag $wire-type-varint index)
-                       buffer))
+       (let ((enum-desc (find-enum type)))
+         (serialize-enum value (enum-descriptor-values enum-desc)
+                         (make-wire-tag $wire-type-varint index)
+                         buffer)))
       ((:map)
-       (setq desc (find-map-descriptor type))
-       (let* ((tag (make-wire-tag $wire-type-string index))
-              (key-type (map-descriptor-key-type desc))
-              (val-type (map-descriptor-val-type desc))
-              (val-class (map-descriptor-val-class desc)))
+       (let* ((map-desc (find-map-descriptor type))
+              (tag (make-wire-tag $wire-type-string index))
+              (key-type (map-descriptor-key-type map-desc))
+              (val-type (map-descriptor-val-type map-desc))
+              (val-class (map-descriptor-val-class map-desc)))
          (flet ((serialize-pair (k v)
                   (let ((ret-len (encode-uint32 tag buffer))
                         (map-len 0))
@@ -705,38 +703,37 @@ Parameters:
   LAZY-P: True if and only if the field is lazy
   CELL: [For repeated fields only]: The current list (or vector) of
         deserialized objects to add to."
-  (let ((desc))
-    (cond
-      ((eq class :scalar)
-       (cond ((and (packed-type-p type)
-                   (length-encoded-tag-p tag))
-              (multiple-value-bind (data new-index)
-                  (deserialize-packed type buffer index)
-                ;; Multiple occurrences of packed fields must append.
-                ;; All repeating fields will be reversed before calling
-                ;; the structure constructor, so reverse here to counteract.
-                (values (nreconc data (car cell)) new-index)))
-             (t
-              (multiple-value-bind (data new-index)
-                  (deserialize-scalar type buffer index)
-                (values (if repeated-p (cons data (car cell)) data)
-                        new-index)))))
-      ((eq class :enum)
-       (setf desc (find-enum type))
+  (cond
+    ((eq class :scalar)
+     (cond ((and (packed-type-p type)
+                 (length-encoded-tag-p tag))
+            (multiple-value-bind (data new-index)
+                (deserialize-packed type buffer index)
+              ;; Multiple occurrences of packed fields must append.
+              ;; All repeating fields will be reversed before calling
+              ;; the structure constructor, so reverse here to counteract.
+              (values (nreconc data (car cell)) new-index)))
+           (t
+            (multiple-value-bind (data new-index)
+                (deserialize-scalar type buffer index)
+              (values (if repeated-p (cons data (car cell)) data)
+                      new-index)))))
+    ((eq class :enum)
+     (let ((enum-desc (find-enum type)))
        (cond ((length-encoded-tag-p tag)
               (multiple-value-bind (data new-index)
-                  (deserialize-packed-enum (enum-descriptor-values desc)
+                  (deserialize-packed-enum (enum-descriptor-values enum-desc)
                                            buffer index)
                 (values (nreconc data (car cell)) new-index)))
              (t
               (multiple-value-bind (data new-index)
-                  (deserialize-enum (enum-descriptor-values desc)
+                  (deserialize-enum (enum-descriptor-values enum-desc)
                                     buffer index)
                 (values (if repeated-p (cons data (car cell)) data)
-                        new-index)))))
-      ((or (eq class :group) (eq class :message))
-       (setf desc (find-message type))
-       (assert desc)
+                        new-index))))))
+    ((or (eq class :group) (eq class :message))
+     (let ((msg-desc (find-message type)))
+       (assert msg-desc)
        (let* ((deserializer (custom-deserializer type))
               (group-p (i= (logand tag 7) $wire-type-start-group))
               (end-tag (if group-p
@@ -750,7 +747,7 @@ Parameters:
                                  nil end-tag))
                        (t
                         (%deserialize-object
-                         desc buffer index nil end-tag)))
+                         msg-desc buffer index nil end-tag)))
                (values (if repeated-p (cons obj (car cell)) obj)
                        end))
              (multiple-value-bind (embedded-msg-len start)
@@ -766,7 +763,7 @@ Parameters:
                                         start end end-tag))
                               (t
                                (%deserialize-object
-                                desc buffer
+                                msg-desc buffer
                                 start end end-tag)))))
                  (values (if repeated-p (cons obj (car cell)) obj)
                          end)))))))))
@@ -787,8 +784,7 @@ Parameters:
   VECTOR-P: If true, the field is serialized as a vector. Otherwise, it is a list.
   PACKED-P: True if and only if the field is packed."
   (let ((vval (gensym "VAL"))
-        (iterator (if vector-p 'dovector 'dolist))
-        (desc))
+        (iterator (if vector-p 'dovector 'dolist)))
     (cond ((and packed-p (packed-type-p type))
            `(iincf ,size (serialize-packed ,reader ,type ,index ,vbuf ,vector-p)))
           ((eq class :scalar)
@@ -797,37 +793,37 @@ Parameters:
                 (,iterator (,vval ,reader)
                            (iincf ,size (serialize-scalar ,vval ,type ,tag ,vbuf))))))
           ((eq class :group)
-           (setq desc (find-message type))
-           ;; The end tag for a group is the field index shifted and
-           ;; and-ed with a constant.
-           (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                 (tag2 (make-wire-tag $wire-type-end-group   index)))
-             `(when ,boundp
-                (,iterator (,vval ,reader)
-                           (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-                           (iincf ,size ,(call-pseudo-method :serialize desc vval vbuf))
-                           (iincf ,size (encode-uint32 ,tag2 ,vbuf))))))
+           (let ((msg-desc (find-message type)))
+             ;; The end tag for a group is the field index shifted and
+             ;; and-ed with a constant.
+             (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                   (tag2 (make-wire-tag $wire-type-end-group   index)))
+               `(when ,boundp
+                  (,iterator (,vval ,reader)
+                             (iincf ,size (encode-uint32 ,tag1 ,vbuf))
+                             (iincf ,size ,(call-pseudo-method :serialize msg-desc vval vbuf))
+                             (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))))
           ((eq class :message)
-           (setq desc (find-message type))
-           (let ((tag (make-wire-tag $wire-type-string index)))
+           (let ((msg-desc (find-message type))
+                 (tag (make-wire-tag $wire-type-string index)))
              `(when ,boundp
                 (,iterator (,vval ,reader)
                            (iincf ,size (encode-uint32 ,tag ,vbuf))
                            (with-placeholder (,vbuf)
                              (let ((len ,(call-pseudo-method
-                                          :serialize desc vval vbuf)))
+                                          :serialize msg-desc vval vbuf)))
                                (iincf ,size (i+ len (backpatch len)))))))))
           ((eq class :enum)
-           (setq desc (find-enum type))
-           (let ((tag (make-wire-tag $wire-type-varint index)))
+           (let ((enum-desc (find-enum type))
+                 (tag (make-wire-tag $wire-type-varint index)))
              (if packed-p
                  `(iincf ,size
-                         (serialize-packed-enum ,reader '(,@(enum-descriptor-values desc))
+                         (serialize-packed-enum ,reader '(,@(enum-descriptor-values enum-desc))
                                                 ,index ,vbuf))
                  `(when ,boundp
                     (,iterator (,vval ,reader)
                                (iincf ,size (serialize-enum
-                                             ,vval '(,@(enum-descriptor-values desc))
+                                             ,vval '(,@(enum-descriptor-values enum-desc))
                                              ,tag ,vbuf)))))))
           (t nil))))
 
@@ -843,8 +839,7 @@ Parameters:
   READER: symbol-name for the function which returns the value bound in the field.
   VBUF: The symbol-name of the buffer to write to
   SIZE: The symbol-name of the variable which keeps track of the length serialized."
-  (let ((vval (gensym "VAL"))
-        (desc))
+  (let ((vval (gensym "VAL")))
     (case class
       ((:scalar)
        (let ((tag (make-tag type index)))
@@ -852,37 +847,37 @@ Parameters:
             (let ((,vval ,reader))
               (iincf ,size (serialize-scalar ,vval ,type ,tag ,vbuf))))))
       ((:group)
-       (setq desc (find-message type))
-       (let ((tag1 (make-wire-tag $wire-type-start-group index))
+       (let ((msg-desc (find-message type))
+             (tag1 (make-wire-tag $wire-type-start-group index))
              (tag2 (make-wire-tag $wire-type-end-group   index)))
          `(let ((,vval ,reader))
             (when ,vval
               (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-              (iincf ,size ,(call-pseudo-method :serialize desc vval vbuf))
+              (iincf ,size ,(call-pseudo-method :serialize msg-desc vval vbuf))
               (iincf ,size (encode-uint32 ,tag2 ,vbuf))))))
       ((:message)
-       (setq desc (find-message type))
-       (let ((tag (make-wire-tag $wire-type-string index)))
+       (let ((msg-desc (find-message type))
+             (tag (make-wire-tag $wire-type-string index)))
          `(let ((,vval ,reader))
             (when ,vval
               (iincf ,size (encode-uint32 ,tag ,vbuf))
               (with-placeholder (,vbuf)
-                (let ((len ,(call-pseudo-method :serialize desc vval vbuf)))
+                (let ((len ,(call-pseudo-method :serialize msg-desc vval vbuf)))
                   (iincf ,size (i+ len (backpatch len)))))))))
       ((:enum)
-       (setq desc (find-enum type))
-       (let ((tag (make-wire-tag $wire-type-varint index)))
+       (let ((enum-desc (find-enum type))
+             (tag (make-wire-tag $wire-type-varint index)))
          `(when ,boundp
             (let ((,vval ,reader))
               (iincf ,size (serialize-enum
-                            ,vval '(,@(enum-descriptor-values desc))
+                            ,vval '(,@(enum-descriptor-values enum-desc))
                             ,tag ,vbuf))))))
       ((:map)
-       (setq desc (find-map-descriptor type))
-       (let* ((tag      (make-wire-tag $wire-type-string index))
-              (key-type (map-descriptor-key-type desc))
-              (val-type (map-descriptor-val-type desc))
-              (val-class (map-descriptor-val-class desc)))
+       (let* ((map-desc (find-map-descriptor type))
+              (tag      (make-wire-tag $wire-type-string index))
+              (key-type (map-descriptor-key-type map-desc))
+              (val-type (map-descriptor-val-type map-desc))
+              (val-class (map-descriptor-val-class map-desc)))
          `(when ,boundp
             (let ((,vval ,reader))
               (flet ((serialize-pair (k v)
@@ -1104,47 +1099,46 @@ Parameters:
   DEST: The symbol name for the destination of deserialized data.
   RAW-P: If true, return a list of the arguments passed to any recursive
          deserialization call instead of calling the function."
-  (let ((desc))
-    (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
-             (if raw-p
-                 `(list ,vbuf ,start ,end ,end-tag)
-                 (call-pseudo-method :deserialize msg vbuf start end end-tag))))
-      (cond ((eq class :scalar)
-             (let* ((tag (make-tag type index))
-                    (packed-tag (when (packed-type-p type)
-                                  (packed-tag index)))
-                    (non-packed-form `(multiple-value-bind (val next-index)
-                                          (deserialize-scalar ,type ,vbuf ,vidx)
-                                        (setq ,vidx next-index)
-                                        (push val ,dest)))
-                    (packed-form `(multiple-value-bind (x idx)
-                                      (deserialize-packed ,type ,vbuf ,vidx)
-                                    (setq ,vidx idx)
-                                    ;; The reason for nreversing here is that a field that
-                                    ;; is repeated+packed may be transmitted as several
-                                    ;; runs of packed values interleaved with other fields,
-                                    ;; and it might even be possible to send an occurrence
-                                    ;; of the field as non-packed, but I'm not sure.
-                                    ;; The final NREVERSE is going to put everything right.
-                                    ;; Not efficient, but probably not a huge loss.
-                                    (setq ,dest (nreconc x ,dest)))))
-               (if packed-tag
-                   (values
-                    (list non-packed-form packed-form)
-                    (list tag packed-tag)
-                    t)
-                   (values non-packed-form tag))))
-            ((eq class :group)
-             (setq desc (find-message type))
-             (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                   (tag2 (make-wire-tag $wire-type-end-group index)))
-               (values `(multiple-value-bind (obj end)
-                            ,(call-deserializer desc vbuf vidx nil tag2)
-                          (setq ,vidx end)
-                          (push obj ,dest))
-                       tag1)))
-            ((eq class :message)
-             (setq desc (find-message type))
+  (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
+           (if raw-p
+               `(list ,vbuf ,start ,end ,end-tag)
+               (call-pseudo-method :deserialize msg vbuf start end end-tag))))
+    (cond ((eq class :scalar)
+           (let* ((tag (make-tag type index))
+                  (packed-tag (when (packed-type-p type)
+                                (packed-tag index)))
+                  (non-packed-form `(multiple-value-bind (val next-index)
+                                        (deserialize-scalar ,type ,vbuf ,vidx)
+                                      (setq ,vidx next-index)
+                                      (push val ,dest)))
+                  (packed-form `(multiple-value-bind (x idx)
+                                    (deserialize-packed ,type ,vbuf ,vidx)
+                                  (setq ,vidx idx)
+                                  ;; The reason for nreversing here is that a field that
+                                  ;; is repeated+packed may be transmitted as several
+                                  ;; runs of packed values interleaved with other fields,
+                                  ;; and it might even be possible to send an occurrence
+                                  ;; of the field as non-packed, but I'm not sure.
+                                  ;; The final NREVERSE is going to put everything right.
+                                  ;; Not efficient, but probably not a huge loss.
+                                  (setq ,dest (nreconc x ,dest)))))
+             (if packed-tag
+                 (values
+                  (list non-packed-form packed-form)
+                  (list tag packed-tag)
+                  t)
+                 (values non-packed-form tag))))
+          ((eq class :group)
+           (let ((msg-desc (find-message type))
+                 (tag1 (make-wire-tag $wire-type-start-group index))
+                 (tag2 (make-wire-tag $wire-type-end-group index)))
+             (values `(multiple-value-bind (obj end)
+                          ,(call-deserializer msg-desc vbuf vidx nil tag2)
+                        (setq ,vidx end)
+                        (push obj ,dest))
+                     tag1)))
+          ((eq class :message)
+           (let ((msg-desc (find-message type)))
              (values `(multiple-value-bind (payload-len payload-start)
                           (decode-uint32 ,vbuf ,vidx)
                         ;; This index points *after* the sub-message,
@@ -1159,35 +1153,35 @@ Parameters:
                              `(push (make-message-with-bytes
                                      ',type (subseq ,vbuf payload-start ,vidx))
                                     ,dest)
-                             `(push ,(call-deserializer desc vbuf 'payload-start vidx)
+                             `(push ,(call-deserializer msg-desc vbuf 'payload-start vidx)
                                     ,dest)))
-                     (make-wire-tag $wire-type-string index)))
-            ((eq class :enum)
-             (setq desc (find-enum type))
-             (let* ((tag (make-wire-tag $wire-type-varint index))
-                    (packed-tag (packed-tag index))
-                    (non-packed-form `(multiple-value-bind (x idx)
-                                          (deserialize-enum
-                                           '(,@(enum-descriptor-values desc)) ,vbuf ,vidx)
-                                        (setq ,vidx idx)
-                                        (push x ,dest)))
-                    (packed-form `(multiple-value-bind (x idx)
-                                      (deserialize-packed-enum
-                                       '(,@(enum-descriptor-values desc))
-                                       ,vbuf ,vidx)
-                                    (setq ,vidx idx)
-                                    ;; The reason for nreversing here is that a field that
-                                    ;; is repeated+packed may be transmitted as several
-                                    ;; runs of packed values interleaved with other fields,
-                                    ;; and it might even be possible to send an occurrence
-                                    ;; of the field as non-packed, but I'm not sure.
-                                    ;; The final NREVERSE is going to put everything right.
-                                    ;; Not efficient, but probably not a huge loss.
-                                    (setq ,dest (nreconc x ,dest)))))
-               (values (list non-packed-form packed-form)
-                       (list tag packed-tag)
-                       t)))
-            (t nil)))))
+                     (make-wire-tag $wire-type-string index))))
+          ((eq class :enum)
+           (let* ((enum-desc (find-enum type))
+                  (tag (make-wire-tag $wire-type-varint index))
+                  (packed-tag (packed-tag index))
+                  (non-packed-form `(multiple-value-bind (x idx)
+                                        (deserialize-enum
+                                         '(,@(enum-descriptor-values enum-desc)) ,vbuf ,vidx)
+                                      (setq ,vidx idx)
+                                      (push x ,dest)))
+                  (packed-form `(multiple-value-bind (x idx)
+                                    (deserialize-packed-enum
+                                     '(,@(enum-descriptor-values enum-desc))
+                                     ,vbuf ,vidx)
+                                  (setq ,vidx idx)
+                                  ;; The reason for nreversing here is that a field that
+                                  ;; is repeated+packed may be transmitted as several
+                                  ;; runs of packed values interleaved with other fields,
+                                  ;; and it might even be possible to send an occurrence
+                                  ;; of the field as non-packed, but I'm not sure.
+                                  ;; The final NREVERSE is going to put everything right.
+                                  ;; Not efficient, but probably not a huge loss.
+                                  (setq ,dest (nreconc x ,dest)))))
+             (values (list non-packed-form packed-form)
+                     (list tag packed-tag)
+                     t)))
+          (t nil))))
 
 (defun generate-non-repeated-field-deserializer
     (type class index lazy-p vbuf vidx dest &key raw-p)
@@ -1204,26 +1198,25 @@ Parameters:
   DEST: The symbol name for the destination of deserialized data.
   RAW-P: If true, return a list of the arguments passed to any recursive
          deserialization call instead of calling the function."
-  (let ((desc))
-    (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
-             (if raw-p
-                 `(list ,vbuf ,start ,end ,end-tag)
-                 (call-pseudo-method :deserialize msg vbuf start end end-tag))))
-      (cond ((eq class :scalar)
+  (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
+           (if raw-p
+               `(list ,vbuf ,start ,end ,end-tag)
+               (call-pseudo-method :deserialize msg vbuf start end end-tag))))
+    (cond ((eq class :scalar)
+           (values
+            `(multiple-value-setq (,dest ,vidx)
+               (deserialize-scalar ,type ,vbuf ,vidx))
+            (make-tag type index)))
+          ((eq class :group)
+           (let ((msg-desc (find-message type))
+                 (tag1 (make-wire-tag $wire-type-start-group index))
+                 (tag2 (make-wire-tag $wire-type-end-group index)))
              (values
               `(multiple-value-setq (,dest ,vidx)
-                 (deserialize-scalar ,type ,vbuf ,vidx))
-              (make-tag type index)))
-            ((eq class :group)
-             (setq desc (find-message type))
-             (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                   (tag2 (make-wire-tag $wire-type-end-group index)))
-               (values
-                `(multiple-value-setq (,dest ,vidx)
-                   ,(call-deserializer desc vbuf vidx nil tag2))
-                tag1)))
-            ((eq class :message)
-             (setq desc (find-message type))
+                 ,(call-deserializer msg-desc vbuf vidx nil tag2))
+              tag1)))
+          ((eq class :message)
+           (let ((msg-desc (find-message type)))
              (values
               `(multiple-value-bind (payload-len payload-start)
                    (decode-uint32 ,vbuf ,vidx)
@@ -1234,44 +1227,44 @@ Parameters:
                  ,(if lazy-p
                       `(setq ,dest (make-message-with-bytes
                                     ',type (subseq ,vbuf payload-start ,vidx)))
-                      `(setq ,dest ,(call-deserializer desc vbuf 'payload-start vidx))))
-              (make-wire-tag $wire-type-string index)))
-            ((eq class :enum)
-             (setq desc (find-enum type))
+                      `(setq ,dest ,(call-deserializer msg-desc vbuf 'payload-start vidx))))
+              (make-wire-tag $wire-type-string index))))
+          ((eq class :enum)
+           (let ((enum-desc (find-enum type)))
              (values
               `(multiple-value-setq (,dest ,vidx)
-                 (deserialize-enum '(,@(enum-descriptor-values desc)) ,vbuf ,vidx))
-              (make-wire-tag $wire-type-varint index)))
-            ((eq class :map)
-             (setq desc (find-map-descriptor type))
-             (let* ((key-type (map-descriptor-key-type desc))
-                    (val-type (map-descriptor-val-type desc))
-                    (val-class (map-descriptor-val-class desc)))
-               (values
-                `(progn
-                   ;; if ,dest points to the "unset" placeholder, make a new hash-table
-                   (unless (typep ,dest 'hash-table)
-                     (setq ,dest (make-hash-table)))
-                   ;; todo (benkuehnert): val-data should be the default value of
-                   ;; ,key-type instead of nil.
-                   (let ((val-data nil)
-                         map-tag map-len key-data start)
-                     (multiple-value-setq (map-len ,vidx)
+                 (deserialize-enum '(,@(enum-descriptor-values enum-desc)) ,vbuf ,vidx))
+              (make-wire-tag $wire-type-varint index))))
+          ((eq class :map)
+           (let* ((map-desc (find-map-descriptor type))
+                  (key-type (map-descriptor-key-type map-desc))
+                  (val-type (map-descriptor-val-type map-desc))
+                  (val-class (map-descriptor-val-class map-desc)))
+             (values
+              `(progn
+                 ;; if ,dest points to the "unset" placeholder, make a new hash-table
+                 (unless (typep ,dest 'hash-table)
+                   (setq ,dest (make-hash-table)))
+                 ;; todo (benkuehnert): val-data should be the default value of
+                 ;; ,key-type instead of nil.
+                 (let ((val-data nil)
+                       map-tag map-len key-data start)
+                   (multiple-value-setq (map-len ,vidx)
+                     (decode-uint32 ,vbuf ,vidx))
+                   (setq start ,vidx)
+                   (loop
+                     (when (= ,vidx (+ map-len start))
+                       (setf (gethash key-data ,dest) val-data)
+                       (return))
+                     (multiple-value-setq (map-tag ,vidx)
                        (decode-uint32 ,vbuf ,vidx))
-                     (setq start ,vidx)
-                     (loop
-                       (when (= ,vidx (+ map-len start))
-                         (setf (gethash key-data ,dest) val-data)
-                         (return))
-                       (multiple-value-setq (map-tag ,vidx)
-                         (decode-uint32 ,vbuf ,vidx))
-                       (if (= 1 (ilogand (iash map-tag -3) #x1FFFFFFF))
-                           (multiple-value-setq (key-data ,vidx)
-                             (deserialize-scalar ,key-type ,vbuf ,vidx))
-                           ,(generate-non-repeated-field-deserializer
-                             val-type val-class 2 nil vbuf vidx 'val-data)))))
-                (make-wire-tag $wire-type-string index))))
-            (t nil)))))
+                     (if (= 1 (ilogand (iash map-tag -3) #x1FFFFFFF))
+                         (multiple-value-setq (key-data ,vidx)
+                           (deserialize-scalar ,key-type ,vbuf ,vidx))
+                         ,(generate-non-repeated-field-deserializer
+                           val-type val-class 2 nil vbuf vidx 'val-data)))))
+              (make-wire-tag $wire-type-string index))))
+          (t nil))))
 
 (defun slot-value-to-slot-name-symbol (slot-value)
   "Given the SLOT-VALUE of a proto field return the
