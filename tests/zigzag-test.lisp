@@ -23,9 +23,9 @@
 (defun expect-bytes (list array)
   (assert-true (equal (coerce list 'list) (coerce array 'list))))
 
-(defconstant +TAG-S+ (proto-impl::make-tag 'proto:int32 1))
-(defconstant +TAG-U+ (proto-impl::make-tag 'proto:int32 2))
-(defconstant +TAG-I+ (proto-impl::make-tag 'proto:int32 3))
+(defconstant +field-s-tag+ (proto-impl::make-tag 'proto:int32 1))
+(defconstant +field-u-tag+ (proto-impl::make-tag 'proto:int32 2))
+(defconstant +field-i-tag+ (proto-impl::make-tag 'proto:int32 3))
 
 
 (define-constant +equal-loop-list+ '(cl-protobufs.zigzag-test::%s
@@ -46,7 +46,7 @@
 (deftest unsigned-positive (zigzag-suite)
   ;; Small encoding for positive numbers
   (let ((msg (make-msg :u 10)))
-    (expect-bytes (list +TAG-U+ 10) (proto:serialize-object-to-bytes msg))
+    (expect-bytes (list +field-u-tag+ 10) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
 ;; There is no applicable method for the generic function
@@ -69,25 +69,25 @@
 (deftest signed-positive (zigzag-suite)
   ;; Small encoding for positive numbers
   (let ((msg (make-msg :s 10)))
-    (expect-bytes (list +TAG-S+ (ash 10 1)) (proto:serialize-object-to-bytes msg))
+    (expect-bytes (list +field-s-tag+ (ash 10 1)) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
 (deftest signed-negative (zigzag-suite)
   (let ((msg (make-msg :s -10)))
     ;; Small encoding for negative numbers
-    (expect-bytes (list +TAG-S+ (1- (ash 10 1)))
+    (expect-bytes (list +field-s-tag+ (1- (ash 10 1)))
                   (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
 (deftest unspecified-positive (zigzag-suite)
   ;; Small encoding for positive numbers
   (let ((msg (make-msg :i 10)))
-    (expect-bytes (list +TAG-I+ 10) (proto:serialize-object-to-bytes msg))
+    (expect-bytes (list +field-i-tag+ 10) (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
 
 (deftest unspecified-negative (zigzag-suite)
   (let ((msg (make-msg :i -10)))
     ;; Large encoding for negative numbers
-    (expect-bytes (list +TAG-I+ 246 255 255 255 255 255 255 255 255 1)
+    (expect-bytes (list +field-i-tag+ 246 255 255 255 255 255 255 255 255 1)
                   (proto:serialize-object-to-bytes msg))
     (expect-same msg)))
