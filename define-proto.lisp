@@ -527,16 +527,16 @@ for a proto-message field."
   (set nil :type list)
   (has nil :type symbol))
 
-(defun set-field-value-functions (message-name field-symbol)
+(defun set-field-accessor-functions (message-name field-name)
   "Set the get, set, and has functions for a proto field on a fields symbol p-list.
 Parameters:
-  MESSAGE-NAME: The name of the protobuf message containing the field.
-  FIELD-SYMBOL: The symbol for the field."
-  (setf (get field-symbol message-name)
+  MESSAGE-NAME: The symbol name of the protobuf message containing the field.
+  FIELD-NAME: The symbol name for the field."
+  (setf (get field-name message-name)
         (make-field-accessors
-         :get (proto-slot-function-name message-name field-symbol :get)
-         :set `(setf ,(proto-slot-function-name message-name field-symbol :get))
-         :has (proto-slot-function-name message-name field-symbol :has))))
+         :get (proto-slot-function-name message-name field-name :get)
+         :set `(setf ,(proto-slot-function-name message-name field-name :get))
+         :has (proto-slot-function-name message-name field-name :has))))
 
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
   "Create the common forms needed for all message fields
@@ -608,7 +608,7 @@ Arguments:
         (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
           (setf (,public-accessor-name ,obj) ,new-value))
 
-        (proto-impl::set-field-value-functions ',proto-type ',public-slot-name)
+        (proto-impl::set-field-accessor-functions ',proto-type ',public-slot-name)
 
         ;; has-* functions are not exported for singular fields. They are only for
         ;; internal usage.
@@ -716,7 +716,7 @@ Paramters:
                   (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
                     (setf (,public-accessor-name ,obj) ,new-value))
 
-                  (proto-impl::set-field-value-functions ',proto-type ',public-slot-name)
+                  (proto-impl::set-field-accessor-functions ',proto-type ',public-slot-name)
 
                   (export '(,has-function-name ,clear-function-name
                             ,public-accessor-name))))))))))
