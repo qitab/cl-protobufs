@@ -140,14 +140,17 @@ only if the same fields have been explicitly set."
   (:documentation
    "Initialize all of the fields of 'object' to their default values."))
 
+(declaim (inline has-field))
 (defun has-field (object field)
   "Check if OBJECT has FIELD set."
-  (let* ((proto-table
-          (gethash (type-of object)
-                   *proto-function-table*))
-         (has-function
-          (first (gethash field proto-table))))
-    (funcall has-function object)))
+  (funcall (field-accessors-has (get field (type-of object)))
+           object))
+
+(declaim (inline clear-field))
+(defun clear-field (object field)
+  "Check if OBJECT has FIELD set."
+  (funcall (field-accessors-clear (get field (type-of object)))
+           object))
 
 (declaim (inline proto-slot-value))
 (defun proto-slot-value (object slot)
@@ -155,12 +158,8 @@ only if the same fields have been explicitly set."
 Parameters:
   OBJECT: The protobuf object.
   SLOT: The slot in object to retrieve the value from."
-  (let* ((proto-table
-          (gethash (type-of object)
-                   *proto-function-table*))
-         (get-function
-          (second (gethash slot proto-table))))
-    (funcall get-function object)))
+  (funcall (field-accessors-get (get slot (type-of object)))
+           object))
 
 (declaim (inline (setf proto-slot-value)))
 (defun (setf proto-slot-value) (value object slot)
@@ -169,9 +168,9 @@ Parameters:
   VALUE: The new value for the field.
   OBJECT: The protobuf object.
   SLOT: The slot in object to retrieve the value from."
-  (let* ((fname `(setf ,slot))
-         (setter (fdefinition fname)))
-    (funcall setter value object)))
+  (funcall (fdefinition (field-accessors-set (get slot (type-of object))))
+           value
+           object))
 
 (defgeneric encoded-field (object slot)
   (:documentation
