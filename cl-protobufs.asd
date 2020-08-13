@@ -293,6 +293,7 @@
      (:static-file "golden_message.data")
      (:static-file "golden_packed_message.data")))
 
+   ;; ABCL is slow, these tests take to long.
    #-abcl
    (:module "timing-tests"
     :serial t

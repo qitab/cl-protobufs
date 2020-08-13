@@ -16,13 +16,13 @@
 
 (in-package #:cl-protobufs.test.timing-tests)
 
-(defsuite timing-tests (cl-protobufs.test:root-suite))
+(defsuite timing-suite (cl-protobufs.test:root-suite))
 
 (defun run ()
   "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'timing-tests))
+  (cl-protobufs.test:run-suite 'timing-suite))
 
-(deftest basic-function-times (timing-tests)
+(deftest basic-function-times (timing-suite)
   (print "Optional Field Test")
   (benchmark:with-timing (1000)
     (let ((optional-message (serial-proto:make-optional-message)))
@@ -100,7 +100,7 @@
   (proto-impl::make-deserializer proto3-proto:person)
   (proto-impl::make-deserializer proto3-proto:address))
 
-(deftest proto3-serialization-times (timing-tests)
+(deftest proto3-serialization-times (timing-suite)
   (let ((population (proto3-proto:make-population))
         (count 0))
     (loop for name in *presidents* do
@@ -157,7 +157,7 @@
   (proto-impl::make-deserializer serial-proto:person)
   (proto-impl::make-deserializer serial-proto:address))
 
-(deftest proto2-serialization-times (timing-tests)
+(deftest proto2-serialization-times (timing-suite)
   (let ((population (serial-proto:make-population))
         (count 0))
     (loop for name in *presidents* do
