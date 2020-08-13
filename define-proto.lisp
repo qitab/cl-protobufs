@@ -525,7 +525,8 @@ Parameters:
 for a proto-message field."
   (get nil :type symbol)
   (set nil :type list)
-  (has nil :type symbol))
+  (has nil :type symbol)
+  (clear nil :type symbol))
 
 (defun set-field-accessor-functions (message-name field-name)
   "Set the get, set, and has functions for a proto field on a fields symbol p-list.
@@ -536,7 +537,8 @@ Parameters:
         (make-field-accessors
          :get (proto-slot-function-name message-name field-name :get)
          :set `(setf ,(proto-slot-function-name message-name field-name :get))
-         :has (proto-slot-function-name message-name field-name :has))))
+         :has (proto-slot-function-name message-name field-name :has)
+         :clear (proto-slot-function-name message-name field-name :clear))))
 
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
   "Create the common forms needed for all message fields

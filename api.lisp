@@ -146,6 +146,12 @@ only if the same fields have been explicitly set."
   (funcall (field-accessors-has (get field (type-of object)))
            object))
 
+(declaim (inline clear-field))
+(defun clear-field (object field)
+  "Check if OBJECT has FIELD set."
+  (funcall (field-accessors-clear (get field (type-of object)))
+           object))
+
 (declaim (inline proto-slot-value))
 (defun proto-slot-value (object slot)
   "Get the value of a field in a protobuf object.
