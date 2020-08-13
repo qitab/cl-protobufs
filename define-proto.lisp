@@ -440,7 +440,6 @@ Parameters:
                   :index index
                   :internal-field-name internal-slot-name
                   :external-field-name slot
-                  :initform '(make-hash-table)
                   :reader reader))
          (map-desc (make-map-descriptor
                     :name name
@@ -474,8 +473,7 @@ Parameters:
                  lazy index documentation &allow-other-keys)
            field
          (assert index)
-         (let* ((default (when default-p default))
-                (initform (get-default-form type kind :optional default)))
+         (let* ((default (if default-p default $empty-default)))
            (setf (aref field-list oneof-offset)
                  (make-instance
                   'field-descriptor
@@ -485,6 +483,7 @@ Parameters:
                   :qualified-name (make-qualified-name
                                    *current-message-descriptor*
                                    (or name (slot-name->proto slot)))
+                  :default default
                   :label :optional
                   :index index
                   ;; Oneof fields don't have a bit in the %%is-set vector, but
@@ -494,7 +493,6 @@ Parameters:
                   :internal-field-name internal-name
                   :external-field-name slot
                   :oneof-offset oneof-offset
-                  :initform `,initform
                   :lazy (and lazy t)
                   :documentation documentation)))))
     `(progn
@@ -547,7 +545,8 @@ Arguments:
         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
         (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
-        (default-form (proto-initform field))
+        (default-form (get-default-form (proto-type field) (proto-kind field)
+                                        (proto-container field) (proto-default field)))
         (index (proto-field-offset field))
         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
         (bool-index (proto-bool-index field))
@@ -666,7 +665,8 @@ Paramters:
                                           proto-type public-slot-name :has))
                    (clear-function-name  (proto-slot-function-name
                                           proto-type public-slot-name :clear))
-                   (default-form (proto-initform field))
+                   (default-form (get-default-form (proto-type field) (proto-kind field)
+                                                   nil (proto-default field)))
                    (field-type (proto-type field))
                    (oneof-offset (proto-oneof-offset field)))
               ;; If a field isn't currently set inside of the oneof, just return its
@@ -735,8 +735,7 @@ Arguments:
          (key-type (map-descriptor-key-type desc))
          (val-type (map-descriptor-val-type desc))
          (val-kind (map-descriptor-val-kind desc))
-         (val-default-form (get-default-form val-type val-kind nil nil)
-                           )
+         (val-default-form (get-default-form val-type val-kind nil $empty-default))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
     (with-gensyms (obj new-val new-key)
@@ -900,7 +899,7 @@ and a pre-set default DEFAULT. REPEATED can be either :vector or :list."
        '(make-array 0 :adjustable t))
       ((equal repeated :list)
        nil)
-      (default
+      ((not (eql default $empty-default))
        default)
       ((eq kind :scalar)
        (multiple-value-bind (default bound-p)
@@ -1617,8 +1616,7 @@ Arguments
                           label))
                ;; Singular fields do not have offsets, as they don't have has-* functions.
                (offset (and (not (eq label :singular)) field-offset))
-               (default (when default-p default))
-               (initform (get-default-form type kind repeated-type default))
+               (default (if default-p default $empty-default))
                (cslot (unless alias-for
                         (make-field-data
                          :internal-slot-name internal-slot-name
@@ -1633,7 +1631,7 @@ Arguments
                                (t `,type))
                          :accessor reader
                          :initarg (kintern (symbol-name slot))
-                         :initform `,initform
+                         :initform (get-default-form type kind repeated-type default)
                          )))
                (field (make-instance
                        'field-descriptor
@@ -1648,7 +1646,7 @@ Arguments
                        :internal-field-name internal-slot-name
                        :external-field-name slot
                        :reader reader
-                       :initform `,initform
+                       :default default
                        :container repeated-type
                        ;; Pack the field only if requested and it actually makes sense
                        :packed  (and (eq label :repeated) packed t)

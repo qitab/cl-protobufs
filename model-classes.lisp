@@ -457,6 +457,9 @@ on the symbol if we are not in SBCL."
   (:documentation
    "Clears the value of the extended slot SLOT from OBJECT."))
 
+(defconstant $empty-default 'empty-default
+  "The marker used in 'proto-default' used to indicate that there is no default value.")
+
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
 (defclass field-descriptor (descriptor)
@@ -505,9 +508,9 @@ on the symbol if we are not in SBCL."
            :accessor proto-writer               ; it's a list, it's something like '(setf title)'
            :initarg :writer
            :initform nil)
-   (initform :accessor proto-initform           ; Default initform
-             :initarg :initform
-             :initform nil)
+   (default :accessor proto-default             ; Default value (untyped), pulled out of the options
+            :initarg :default
+            :initform $empty-default)
    (container :accessor proto-container         ; If the field is repeated, this specifies the
               :type (member nil :list :vector)  ; container type. If not, this field is nil.
               :initarg :container
