@@ -80,8 +80,8 @@
 
 (defun clear-serialization-functions (proto-name)
   #-sbcl
-  (setf (get (get ',proto-name :serialize)) nil
-        (get (get ',proto-name :deserialize)) nil)
+  (setf (get `,proto-name :serialize) nil
+        (get `,proto-name :deserialize) nil)
   #+sbcl (fmakunbound (list :protobuf :serialize proto-name))
   #+sbcl (fmakunbound (list :protobuf :deserialize proto-name)))
 
