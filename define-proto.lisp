@@ -514,24 +514,25 @@ Parameters:
   "Sets the %bytes field of the proto object OBJ with NEW-VALUE."
   (setf (slot-value obj '%bytes) new-value))
 
-;; As a compile time performance improvement we should see
-;; how big the hash table usually is.
-(defparameter *proto-function-table* (make-hash-table)
-  "Hash table mapping proto-type to a hash-table whose keys are
-field names and values are the field function.")
+(defstruct field-accessors
+  "Structure containing the get, set, and has functions
+for a proto-message field."
+  (get nil :type symbol)
+  (set nil :type list)
+  (has nil :type symbol)
+  (clear nil :type symbol))
 
-(defun set-functions-in-hash-table (proto-type field-name)
-  "Add a hash-table to *proto-function-table* for PROTO-TYPE if it does
-not already exist, then add the field functions to the map from FIELD-NAME
-in the found hash-table."
-  (multiple-value-bind (value present)
-      (gethash proto-type *proto-function-table* (make-hash-table))
-    (when (not present)
-      (setf (gethash proto-type *proto-function-table*) value))
-    (setf (gethash field-name value)
-          (list (proto-slot-function-name proto-type field-name :has)
-                (proto-slot-function-name proto-type field-name :get)
-                (proto-slot-function-name proto-type field-name :clear)))))
+(defun set-field-accessor-functions (message-name field-name)
+  "Set the get, set, and has functions for a proto field on a fields symbol p-list.
+Parameters:
+  MESSAGE-NAME: The symbol name of the protobuf message containing the field.
+  FIELD-NAME: The symbol name for the field."
+  (setf (get field-name message-name)
+        (make-field-accessors
+         :get (proto-slot-function-name message-name field-name :get)
+         :set `(setf ,(proto-slot-function-name message-name field-name :get))
+         :has (proto-slot-function-name message-name field-name :has)
+         :clear (proto-slot-function-name message-name field-name :clear))))
 
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
   "Create the common forms needed for all message fields
@@ -602,12 +603,7 @@ Arguments:
         (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
           (setf (,public-accessor-name ,obj) ,new-value))
 
-        ;; This must be done outside of proto generation
-        ;; since we reset the hash-table after every  protobuf macro-expansion.
-        ;; Also, for proto-type public-slot-name to have a collison
-        ;; we would need two protos in the same package with the same
-        ;; field, this is impossible.
-        (proto-impl::set-functions-in-hash-table ',proto-type ',public-slot-name)
+        (proto-impl::set-field-accessor-functions ',proto-type ',public-slot-name)
 
         ;; has-* functions are not exported for singular fields. They are only for
         ;; internal usage.
@@ -714,7 +710,7 @@ Paramters:
                   (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
                     (setf (,public-accessor-name ,obj) ,new-value))
 
-                  (proto-impl::set-functions-in-hash-table ',proto-type ',public-slot-name)
+                  (proto-impl::set-field-accessor-functions ',proto-type ',public-slot-name)
 
                   (export '(,has-function-name ,clear-function-name
                             ,public-accessor-name))))))))))
