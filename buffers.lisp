@@ -16,9 +16,11 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter $optimize-buffering '(optimize (speed 3) (safety 0))))
 
-(deftype array-index ()
-  #+sbcl 'sb-int:index
-  #-sbcl `(integer 0 ,(1- array-total-size-limit)))
+(defconstant +max-array-index+ (- array-total-size-limit 1)
+  "Maximum array index. Yup.")
+
+(deftype array-index () `(integer 0 ,+max-array-index+))
+
 
 ;; A BUFFER is a linked list of blocks (vectors) of unsigned-byte.
 ;; It can more-or-less be thought of as a string-output-stream that accepts

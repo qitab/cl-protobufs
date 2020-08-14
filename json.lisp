@@ -36,11 +36,11 @@ Parameters:
           (let* ((name (if camel-case-p
                            (proto-json-name field)
                            (proto-name field)))
-                 (type (proto-class field))
+                 (type (proto-type field))
                  (value
-                   (if (eq (slot-value field 'message-type) :extends)
-                       (get-extension object (slot-value field 'external-field-name))
-                       (proto-slot-value object (slot-value field 'external-field-name)))))
+                  (if (eq (slot-value field 'message-type) :extends)
+                      (get-extension object (slot-value field 'external-field-name))
+                      (proto-slot-value object (slot-value field 'external-field-name)))))
             (if field-printed
                 (format stream ",")
                 (setf field-printed t))
@@ -48,7 +48,7 @@ Parameters:
                 (format stream "~&~V,0T\"~A\": " (+ indent 2) name)
                 (format stream "\"~A\":" name))
             (if (not (eq (proto-label field) :repeated))
-                (print-field-to-json value type (and indent (+ indent 2))
+                (print-field-to-json (proto-kind field) value type (and indent (+ indent 2))
                                      stream camel-case-p numeric-enums-p)
                 (let (repeated-printed)
                   (format stream "[")
@@ -57,7 +57,7 @@ Parameters:
                         (format stream ",")
                         (setf repeated-printed t))
                     (when indent (format stream "~&~V,0T" (+ indent 4)))
-                    (print-field-to-json v type (and indent (+ indent 4))
+                    (print-field-to-json (proto-kind field) v type (and indent (+ indent 4))
                                          stream camel-case-p numeric-enums-p))
                   (if indent
                       (format stream "~&~V,0T]" (+ indent 2))
@@ -67,7 +67,7 @@ Parameters:
                (set-field (oneof-set-field oneof-data)))
           (when set-field
             (let* ((field-desc (aref (oneof-descriptor-fields oneof) set-field))
-                   (type (proto-class field-desc))
+                   (type (proto-type field-desc))
                    (value (oneof-value oneof-data))
                    (name (if camel-case-p
                              (proto-json-name field-desc)
@@ -78,18 +78,19 @@ Parameters:
               (if indent
                   (format stream "~&~V,0T\"~A\": " (+ indent 2) name)
                   (format stream "\"~A\":" name))
-              (print-field-to-json value type (and indent (+ indent 2))
+              (print-field-to-json (proto-kind field-desc) value type (and indent (+ indent 2))
                                    stream camel-case-p numeric-enums-p))))))
     (if indent
         (format stream "~&~V,0T}" indent)
         (format stream "}"))))
 
-(defun print-field-to-json (value type indent stream camel-case-p numeric-enums-p)
+(defun print-field-to-json (kind value type indent stream camel-case-p numeric-enums-p)
   "Print a field to JSON format.
 
 Parameters:
+  KIND: The proto-kind keyword, :scalar, :message, :map, etc.
   VALUE: The value held by the field
-  TYPE: The proto-class slot of the field.
+  TYPE: The proto-type slot of the field.
   INDENT: If non-nil, the amount to indent when pretty-printing.
   STREAM: The stream to print to.
   CAMEL-CASE-P: Passed recursively to PRINT-JSON.
@@ -98,7 +99,7 @@ Parameters:
                         (find-enum type)
                         (find-map-descriptor type))))
     (cond
-      ((scalarp type)
+      ((eq kind :scalar)
        (print-scalar-to-json value type stream))
       ((typep descriptor 'message-descriptor)
        (print-json value
@@ -115,19 +116,20 @@ Parameters:
 (defun print-scalar-to-json (value type stream)
   "Print scalar VALUE of type TYPE to STREAM."
   (ecase type
-    ((:int32 :fixed32 :uint32 :sfixed32 :sint32)
+    ((proto:int32 proto:fixed32 proto:uint32 proto:sfixed32 proto:sint32)
      (format stream "~D" value))
-    ((:int64 :fixed64 :uint64 :sfixed64 :sint64)
+    ((proto:int64 proto:fixed64 proto:uint64 proto:sfixed64 proto:sint64)
      (format stream "\"~D\"" value))
-    ((:float :double)
+    ((float double-float)
      (format stream "~F" value))
-    ((:string)
+    ((string)
      (format stream "\"~A\"" value))
-    ((:bool)
+    ((boolean)
      (format stream "~A" (if value "true" "false")))
-    ((:bytes)
+    ((byte-vector)
      (format stream "\"~A\"" (cl-base64:usb8-array-to-base64-string value)))
-    ((:symbol :keyword)
+    ;; home grown types
+    ((symbol keyword)
      (let ((val (if (keywordp value)
                     (string value)
                     (format nil "~A:~A" (package-name (symbol-package value))
@@ -160,7 +162,9 @@ Parameters:
              (if indent
                  (format stream "~&~V,0T\"~A\": " (+ indent 2) (write-to-string k))
                  (format stream "\"~A\":"  (write-to-string k)))
-             (print-field-to-json v (map-descriptor-val-class map-descriptor)
+             (print-field-to-json (map-descriptor-val-kind map-descriptor)
+                                  v
+                                  (map-descriptor-val-type map-descriptor)
                                   (and indent (+ indent 4)) stream camel-case-p numeric-enums-p)))
     (if indent
         (format stream "~&~V,0T}" indent)
@@ -194,9 +198,7 @@ Parameters:
       (let* ((name  (parse-string stream))
              (field (or (find-field msg-desc name)
                         (find-field-by-json-name msg-desc name)))
-             (type  (and field (if (eq (proto-class field) 'boolean)
-                                   :bool
-                                   (proto-class field))))
+             (type  (and field (proto-type field)))
              (slot  (and field (proto-external-field-name field))))
         (expect-char stream #\:)
         (if (null field)
@@ -204,14 +206,14 @@ Parameters:
             (let (val error-p)
               (if (not (eq (proto-label field) :repeated))
                   (multiple-value-setq (val error-p)
-                    (parse-value-from-json type :stream stream))
+                    (parse-value-from-json field type :stream stream))
                   (case (peek-char nil stream nil)
                     ;; Repeated field is in list format
                     ((#\[)
                      (expect-char stream #\[)
                      (loop
                        (multiple-value-bind (data err)
-                           (parse-value-from-json type :stream stream)
+                           (parse-value-from-json field type :stream stream)
                          (if err
                              (setf error-p t)
                              (push data val)))
@@ -229,7 +231,7 @@ Parameters:
                  (undefined-field-type "While parsing ~S from JSON format,"
                                        msg-desc type field)
                  (return-from parse-json))
-                ((eq (proto-set-type field) :map)
+                ((eq (proto-kind field) :map)
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
                          (cdr pair))))
@@ -247,24 +249,29 @@ Parameters:
                   (nreverse (proto-slot-value object slot))))
           (return-from parse-json object))))))
 
-(defun parse-value-from-json (type &key (stream *standard-input*))
-  "Parse a single JSON value of type TYPE from STREAM."
+(defun parse-value-from-json (field type &key (stream *standard-input*))
+  "Parse a single JSON value of type TYPE from STREAM. FIELD is either
+   nil (meaning parse a scalar) or a field-descriptor."
   (let ((desc (or (find-message type)
                   (find-enum type)
                   (find-map-descriptor type))))
-    (cond ((scalarp type)
+    (cond ((or (null field)
+               (eq (proto-kind field) :scalar))
            (case type
-             ((:float) (parse-float stream))
-             ((:double) (parse-double stream))
-             ((:string) (parse-string stream))
-             ((:bool)
+             (float
+              (parse-float stream))
+             (double-float
+              (parse-double stream))
+             (string
+              (parse-string stream))
+             (boolean
               (let ((token (parse-token stream)))
                 (cond ((string= token "true") t)
                       ((string= token "false") nil)
-                      ;; Parsing failed, return T as a second
-                      ;; value to indicate a failure.
+                      ;; Parsing failed, return T as a second value to indicate
+                      ;; a failure.
                       (t (values nil t)))))
-             ((:bytes)
+             (byte-vector
               (cl-base64:base64-string-to-usb8-array (parse-string stream)))
              (otherwise
               (if (eql (peek-char nil stream nil) #\")
@@ -291,16 +298,16 @@ Parameters:
           ;; In the case of maps, return a list of key-value pairs.
           ((typep desc 'map-descriptor)
            (expect-char stream #\{)
-           (let ((key-type (map-descriptor-key-class desc))
-                 (val-type (map-descriptor-val-class desc)))
+           (let ((key-type (map-descriptor-key-type desc))
+                 (val-type (map-descriptor-val-type desc)))
              (loop with pairs = ()
                    for pair = (cons nil nil)
-                   do (if (eql key-type :string)
+                   do (if (eql key-type 'string)
                           (setf (car pair) (parse-string stream))
                           (setf (car pair) (parse-integer
                                             (parse-string stream))))
                       (expect-char stream #\:)
-                      (setf (cdr pair) (parse-value-from-json val-type :stream stream))
+                      (setf (cdr pair) (parse-value-from-json nil val-type :stream stream))
                       (push pair pairs)
                       (if (eql (peek-char nil stream nil) #\,)
                           (expect-char stream #\,)

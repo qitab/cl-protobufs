@@ -12,23 +12,23 @@
   "Check if OBJECT with proto-message MESSAGE is initialized.
 The definition of initialized is all required-fields are set."
   (loop for field in (proto-fields message)
+        for proto-kind = (proto-kind field)
         when (eq (proto-label field) :required)
           do (when (= (bit (slot-value object '%%is-set)
                            (proto-field-offset field))
                       0)
                (return-from object-initialized-p nil))
-        when (= (bit (slot-value object '%%is-set)
-                     (proto-field-offset field))
-                1)
-          do (let ((lisp-type (proto-class field))
+        when (and (member proto-kind '(:message :group))
+                  (= (bit (slot-value object '%%is-set)
+                          (proto-field-offset field))
+                     1))
+          do (let ((lisp-type (proto-type field))
                    (field-value (slot-value object (proto-internal-field-name field))))
-               (when (and (not (keywordp lisp-type))
-                          (find-message lisp-type))
-                 (doseq (msg (if (eq (proto-label field) :repeated)
-                                 field-value
-                                 (list field-value)))
-                   (unless (object-initialized-p msg (find-message lisp-type))
-                     (return-from object-initialized-p nil))))))
+               (doseq (msg (if (eq (proto-label field) :repeated)
+                               field-value
+                               (list field-value)))
+                      (unless (object-initialized-p msg (find-message lisp-type))
+                        (return-from object-initialized-p nil)))))
   t)
 
 ;;; A Python-like, Protobufs2-compatible API
@@ -87,17 +87,18 @@ only if the same fields have been explicitly set."
             = (oneof-set-field slot-value-1)
           for set-field-2
             = (oneof-set-field slot-value-2)
-          for lisp-type
-            = (when set-field-1 (proto-class
-                                 (aref (oneof-descriptor-fields oneof)
-                                      set-field-1)))
+          for field-desc
+            = (when set-field-1 (aref (oneof-descriptor-fields oneof)
+                                      set-field-1))
+          for lisp-type = (when set-field-1 (proto-type field-desc))
+          for proto-kind = (when set-field-1 (proto-kind field-desc))
           unless (and set-field-1 set-field-2)
             do (when (or set-field-1 set-field-2)
                  (return-from proto-equal nil))
           unless (equal (oneof-set-field slot-value-1)
                         (oneof-set-field slot-value-2))
             do (return-from proto-equal nil)
-          when (or (scalarp lisp-type) (find-enum lisp-type))
+          when (member proto-kind '(:scalar :enum))
             do (unless (scalar-field-equal (oneof-value slot-value-1)
                                            (oneof-value slot-value-2))
                  (return-from proto-equal nil))
@@ -108,15 +109,16 @@ only if the same fields have been explicitly set."
                  (return-from proto-equal nil)))
 
     (loop for field in (proto-fields message)
-          for lisp-type = (proto-class field)
+          for lisp-type = (proto-type field)
+          for proto-kind = (proto-kind field)
           for slot-value-1
-            = (unless (eq lisp-type :bool)
+            = (unless (eq lisp-type 'cl:boolean)
                 (slot-value message-1 (proto-internal-field-name field)))
           for slot-value-2
             = (when slot-value-1
                 (slot-value message-2 (proto-internal-field-name field)))
-          when (and (not (eq lisp-type :bool))
-                    (or (scalarp lisp-type) (find-enum lisp-type)))
+          when (and (not (eq lisp-type 'cl:boolean))
+                    (member proto-kind '(:scalar :enum)))
             do (unless (scalar-field-equal slot-value-1 slot-value-2)
                  (return-from proto-equal nil))
           unless (and slot-value-1 slot-value-2)
@@ -125,7 +127,7 @@ only if the same fields have been explicitly set."
           when (and slot-value-1 (eq (proto-label field) :repeated))
             do (unless (= (length slot-value-1) (length slot-value-2))
                  (return-from proto-equal nil))
-          when (and slot-value-1 (find-message lisp-type))
+          when (and slot-value-1 (member proto-kind '(:message :group)))
             do (loop for x in
                            (if (eq (proto-label field) :repeated)
                                slot-value-1

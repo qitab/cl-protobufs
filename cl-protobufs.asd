@@ -52,8 +52,7 @@
     :pathname ""
     :depends-on ("models")
     :components
-    ((:file "define-proto")
-     (:file "clos-transform")))
+    ((:file "define-proto")))
    (:module "serialization"
     :serial t
     :pathname ""
@@ -204,7 +203,8 @@
    (:module "custom-methods-test"
     :serial t
     :pathname ""
-    :components ((:file "custom-methods")))
+    :components ((:protobuf-source-file "custom-proto")
+                 (:file "custom-methods")))
 
    (:module "deserialize-object-to-bytes-test"
     :serial t
@@ -285,7 +285,8 @@
    (:module "zigzag-test"
     :serial t
     :pathname ""
-    :components ((:file "zigzag-test")))
+    :components ((:protobuf-source-file "zigzag-proto")
+                 (:file "zigzag-test")))
 
    (:module "well-known-types-test"
     :serial t

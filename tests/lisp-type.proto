@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+// Can't name this package lisp_type because it conflicts with a name
+// in the imported file.
+package lisp_type_pb;
+
+import "proto2-descriptor-extensions.proto"; // descriptor extension
+
+message NoteData {
+  string key = 3 [(lisp_type) = "cl:keyword"];
+  string sym = 8 [(lisp_type) = "cl:symbol"];
+}

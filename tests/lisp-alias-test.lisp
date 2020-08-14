@@ -20,7 +20,7 @@
 
 (defstruct aliased-struct i)
 
-(defconstant +TAG-I+ (proto-impl::make-tag :int32 1)
+(defconstant +TAG-I+ (proto-impl::make-tag 'proto:int32 1)
   "The tag that should be used for Message.I and AliasedMessage.I")
 
 ;; Serialization of cl-protobufs-generated class (as opposed to using a lisp_alias FieldOption)
@@ -41,7 +41,7 @@
    BUF: The buffer to serialize to.
    SIZE: Auxiliar variable to increment."
   (let ((i (aliased-struct-i val)))
-    (incf size (proto-impl::serialize-scalar i :int32  +TAG-I+ buf)))
+    (incf size (proto-impl::serialize-scalar i 'proto:int32  +TAG-I+ buf)))
   size)
 #+sbcl
 (defun (:protobuf :serialize cl-protobufs.test-proto::aliased-message)
@@ -63,10 +63,10 @@
   (let ((outer (cl-protobufs.test-proto::make-outer-message)))
     (expect-bytes nil (proto-impl::serialize-object-to-bytes outer))))
 
-(defconstant +TAG-MESSAGE+ (proto-impl::make-tag :string 1)
+(defconstant +TAG-MESSAGE+ (proto-impl::make-tag 'cl:string 1)
   "The tag that should be used for field OuterMessage.Message")
 
-(defconstant +TAG-ALIASED+ (proto-impl::make-tag :string 2)
+(defconstant +TAG-ALIASED+ (proto-impl::make-tag 'cl:string 2)
   "The tag that should be used for field OuterMessage.Aliased")
 
 (deftest serialize-outer-containing-regular (alias-suite)
