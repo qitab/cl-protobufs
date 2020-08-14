@@ -136,7 +136,7 @@ const std::string FieldLispKind(const FieldDescriptor* field) {
     case FieldDescriptor::TYPE_SINT64:
       proto_class = ":scalar";
       break;
-   case FieldDescriptor::TYPE_BYTES:
+    case FieldDescriptor::TYPE_BYTES:
       proto_class = ":scalar";
       break;
     case FieldDescriptor::TYPE_MESSAGE:
