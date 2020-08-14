@@ -70,7 +70,13 @@
     ;; Verify that this works after clearing the hash table, too.
     (map-enum.clear-map-field msg)
     (setf (map-enum.map-field-gethash "two" msg) :two)
-    (assert-true (eq (map-enum.map-field-gethash "two" msg) :two))))
+    (assert-true (eq (map-enum.map-field-gethash "two" msg) :two))
+    (map-enum.clear-map-field msg)
+    (setf (map-enum.map-field-gethash "Two" msg) :two)
+    (setf (map-enum.map-field-gethash "two" msg) :one)
+    ;; Verify that the map is case-sensitive.
+    (assert-true (eq (map-enum.map-field-gethash "Two" msg) :two))
+    (assert-true (eq (map-enum.map-field-gethash "two" msg) :one))))
 
 ;; Verify that generic (de)serialization works.
 (deftest serialization-test (map-suite)

@@ -596,15 +596,16 @@ Arguments:
 
         ;; Clear function
         ;; Map type clear functions are created in make-map-accessor-forms.
-        ,(unless (eq (proto-set-type field) :map)
-           `(declaim (inline ,clear-function-name))
-           `(defun ,clear-function-name (,obj)
-              ,(when index
-                 `(setf (bit (,is-set-accessor ,obj) ,index) 0))
-              ,(if bool-index
-                   `(setf (bit (,bit-field-name ,obj) ,bool-index)
-                          ,(if default-form 1 0))
-                   `(setf (,hidden-accessor-name ,obj) ,default-form))))
+        ;; todo(benkuehnert): rewrite map types/definers so that this isn't necessary
+        ,@(unless (eq (proto-set-type field) :map)
+            `((declaim (inline ,clear-function-name))
+              (defun ,clear-function-name (,obj)
+                ,(when index
+                   `(setf (bit (,is-set-accessor ,obj) ,index) 0))
+                ,(if bool-index
+                     `(setf (bit (,bit-field-name ,obj) ,bool-index)
+                            ,(if default-form 1 0))
+                     `(setf (,hidden-accessor-name ,obj) ,default-form)))))
 
         ;; Create defmethods to allow for getting/setting compatibly
         ;; with the standard-classes.
