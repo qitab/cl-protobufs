@@ -1288,8 +1288,9 @@ Arguments:
                                                      :weakness :key :test #'eq)))
                                        ,@(and reader `((defmethod ,reader ((object ,type))
                                                          (gethash object ,stable ,default))))
-                                       ,@(and writer `((defmethod ,writer ((object ,type) value)
-                                                         (declare (type ,stype value))
+                                       ,@(and writer `((defmethod ,writer ((object ,type) ,stype)
+                                                         (#+sbcl declare #-sbcl declaim
+                                                          (type ,stype value))
                                                          (setf (gethash object ,stable) value))))
                                        ;; For Python compatibility
                                        (defmethod get-extension ((object ,type)
@@ -1357,7 +1358,8 @@ Arguments:
                        ,@(and reader `((defmethod ,reader ((object ,type))
                                          (gethash object ,stable ,default))))
                        ,@(and writer `((defmethod ,writer ((object ,type) value)
-                                         (declare (type ,stype value))
+                                         (#+sbcl declare #-sbcl declaim
+                                           (type ,stype value))
                                          (setf (gethash object ,stable) value))))
                        (defmethod get-extension ((object ,type) (slot (eql ',fname)))
                          (values (gethash object ,stable ,default)))
