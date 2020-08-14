@@ -115,13 +115,15 @@ only if the same fields have been explicitly set."
           for slot-value-2
             = (when slot-value-1
                 (slot-value message-2 (proto-internal-field-name field)))
-
           when (and (not (eq lisp-type :bool))
                     (or (scalarp lisp-type) (find-enum lisp-type)))
             do (unless (scalar-field-equal slot-value-1 slot-value-2)
                  (return-from proto-equal nil))
           unless (and slot-value-1 slot-value-2)
             do (when (or slot-value-1 slot-value-2)
+                 (return-from proto-equal nil))
+          when (and slot-value-1 (eq (proto-label field) :repeated))
+            do (unless (= (length slot-value-1) (length slot-value-2))
                  (return-from proto-equal nil))
           when (and slot-value-1 (find-message lisp-type))
             do (loop for x in
