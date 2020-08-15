@@ -549,16 +549,29 @@
 ;;; This aims to test updateing a protocol buffer and deserializing
 ;;; on a binary containing the previous version.
 (deftest test-proto-backwards-compatibility (serialization-suite)
-  (let* ((proto-on-wire (make-proto-on-wire
-                         :beginning "char"
-                         :always "pika-pal"
-                         :end (list "mander")))
-         (proto-on-wire-octet-bytes (serialize-object-to-bytes proto-on-wire))
-         (my-deserialized-proto
-          (deserialize-object 'proto-different-than-wire
-                              proto-on-wire-octet-bytes))
-         (proto-different-than-wire (make-proto-different-than-wire
-                                     :beginning "char"
-                                     :always "pika-pal")))
-    (assert-true my-deserialized-proto)
-    (assert-true (proto-equal my-deserialized-proto proto-different-than-wire))))
+  (loop :for optimized :in '(nil t) :do
+    (when optimized
+      (dolist (class '(proto-on-wire proto-different-than-wire))
+        (let ((message (proto:find-message-for-class class)))
+          (handler-bind ((style-warning #'muffle-warning))
+            (eval (proto-impl::generate-deserializer message))
+            (eval (proto-impl::generate-serializer message))))))
+
+    (let* ((proto-on-wire (make-proto-on-wire
+                           :beginning "char"
+                           :always "pika-pal"
+                           :end (list "mander")))
+           (proto-on-wire-octet-bytes (serialize-object-to-bytes proto-on-wire))
+           (my-deserialized-proto
+             (deserialize-object 'proto-different-than-wire
+                                 proto-on-wire-octet-bytes))
+           (proto-different-than-wire (make-proto-different-than-wire
+                                       :beginning "char"
+                                       :always "pika-pal")))
+      (assert-true my-deserialized-proto)
+      (assert-true (proto-equal my-deserialized-proto proto-different-than-wire))
+      (let* ((reserializaed-proto-octets (serialize-object-to-bytes my-deserialized-proto))
+             (should-be-original-proto
+               (deserialize-object 'proto-on-wire
+                                   reserializaed-proto-octets)))
+        (assert-true (proto-equal should-be-original-proto proto-on-wire))))))

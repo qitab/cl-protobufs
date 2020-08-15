@@ -121,7 +121,20 @@
                  (type  (proto-class field))
                  (index (proto-index field)))
             (iincf size
-                   (emit-non-repeated-field value type index buffer))))))))
+                   (emit-non-repeated-field value type index buffer))))))
+
+    (incf size (emit-skipped-bytes object buffer))))
+
+
+(defun emit-skipped-bytes (object buffer)
+  (declare (buffer buffer)
+           (base-message object))
+  (let ((skipped-byte-length (length (base-message-%%skipped-bytes object))))
+    (if (zerop skipped-byte-length)
+        0
+        (progn
+          (buffer-ensure-space buffer skipped-byte-length)
+          (fast-octets-out buffer (base-message-%%skipped-bytes object))))))
 
 (defun emit-field (object field buffer)
   "Serialize a single field from an object to buffer
@@ -543,6 +556,7 @@ Parameters:
         ;; This quickly translates a field number to its PROTO-FIELD object
         ;; without using linear scan.
         (field-map (message-field-metadata-vector message))
+        (skipped-bytes (make-byte-vector 0 :adjustable t))
         offset-list extension-list bool-map
         initargs initargs-final tag)
     (loop
@@ -603,7 +617,11 @@ Parameters:
                #-sbcl
                (let ((class-name (class-name class)))
                  (apply (get-constructor-name class-name) initargs-final))))
-          ;; Finally set the extensions and the is-set field.
+
+          ;; Most fields in a proto are set above.
+          ;; Special care must be given for extensions,
+          ;; booleans, and bytes we can't deserialize
+          ;; but may be useful later.
           (loop for extension in extension-list do
             (set-extension new-struct (first extension) (second extension)))
           (when bool-map
@@ -613,13 +631,23 @@ Parameters:
           (loop with is-set = (slot-value new-struct '%%is-set)
                 for offset in offset-list do
                   (setf (bit is-set offset) 1))
+          (unless (zerop (length skipped-bytes))
+            (setf (base-message-%%skipped-bytes new-struct) skipped-bytes))
+
           (return-from deserialize-structure-object
             (values new-struct index))))
+
       (multiple-value-bind (cell updated-list)
           (get-field-cell (ilogand (iash tag -3) #x1FFFFFFF) initargs field-map)
         (setq initargs updated-list)
         (if (not cell) ; skip this field
-            (setq index (skip-element buffer index tag))
+            (let ((new-index (skip-element buffer index tag)))
+              (setf skipped-bytes
+                    (concatenate 'byte-vector
+                                 skipped-bytes
+                                 (subseq buffer (i- index 4)
+                                         new-index)))
+              (setf index new-index))
             ;; cell = (#<field> DATA . more) - "more" is the tail of the plist
             ;; CELL now points to the cons where DATA should go.
             (let* ((field (field-complex-field (pop cell)))
@@ -960,7 +988,7 @@ Parameters:
                ,size)
               (t
                ,@serializers
-               ,size))))))))
+               (incf ,size (emit-skipped-bytes ,vobj ,vbuf))))))))))
 
 (defun generate-oneof-serializer (message oneof vobj vbuf size)
   "Creates and returns the code that serializes a oneof.
@@ -1277,6 +1305,8 @@ Parameters:
         (vidx (gensym "INDEX"))
         (vlim (gensym "LIMIT"))
         (vendtag (gensym "ENDTAG"))
+        (skipped-bytes (gensym "SKIPPED-BYTES"))
+        (new-index (gensym "NEW-INDEX"))
         ;; Add oneof fields to the list of field descriptors, since we need to
         ;; create a deserializer for each.
         (fields (append (proto-fields message)
@@ -1354,6 +1384,7 @@ Parameters:
                             collect `(,slot ,missing-value))
                     ,@(loop for oneof-slot in oneof-slots
                             collect `(,oneof-slot (make-oneof)))
+                    (,skipped-bytes (make-byte-vector 0 :adjustable t))
                     ,@rtemps)
                 (loop
                   (multiple-value-setq (tag ,vidx)
@@ -1361,34 +1392,46 @@ Parameters:
                   (when (i= tag ,vendtag)
                     (return-from :deserialize-function
                       (values
-                       (,@(if constructor (list constructor)
-                              #+sbcl`(make-instance ',lisp-type)
-                              #-sbcl`(funcall (get-constructor-name ',lisp-type)))
-                        ;; oneofs
-                        ,@(loop for temp in oneof-slots
-                                for mtemp = (slot-value-to-slot-name-symbol temp)
-                                nconc (list (intern (string mtemp) :keyword) temp))
-                        ;; nonrepeating slots
-                        ,@(loop for temp in nslots
-                                for mtemp = (slot-value-to-slot-name-symbol temp)
-                                nconc (list (intern (string mtemp) :keyword) temp))
-                        ;; repeating slots
-                        ,@(loop for field in rfields
-                                for temp in rtemps
-                                for mtemp = (slot-value-to-slot-name-symbol temp)
-                                for conversion = (if (vector-field-p field)
-                                                     `(coerce (nreverse ,temp) 'vector)
-                                                     `(nreverse ,temp))
-                                nconc `(,(intern (string mtemp) :keyword)
-                                        ,(if missing-value
-                                             `(if (null ,temp) ,missing-value
-                                                  ,conversion)
-                                             conversion))))
+                       ;; We may have skipped bytes we have to save to the structure
+                       ;; after we cons it.
+                       (let ((struct
+                               (,@(if constructor (list constructor)
+                                      #+sbcl`(make-instance ',lisp-type)
+                                      #-sbcl`(funcall (get-constructor-name ',lisp-type)))
+                                ;; oneofs
+                                ,@(loop for temp in oneof-slots
+                                        for mtemp = (slot-value-to-slot-name-symbol temp)
+                                        nconc (list (intern (string mtemp) :keyword) temp))
+                                ;; nonrepeating slots
+                                ,@(loop for temp in nslots
+                                        for mtemp = (slot-value-to-slot-name-symbol temp)
+                                        nconc (list (intern (string mtemp) :keyword) temp))
+                                ;; repeating slots
+                                ,@(loop for field in rfields
+                                        for temp in rtemps
+                                        for mtemp = (slot-value-to-slot-name-symbol temp)
+                                        for conversion = (if (vector-field-p field)
+                                                             `(coerce (nreverse ,temp) 'vector)
+                                                             `(nreverse ,temp))
+                                        nconc `(,(intern (string mtemp) :keyword)
+                                                ,(if missing-value
+                                                     `(if (null ,temp) ,missing-value
+                                                          ,conversion)
+                                                     conversion))))))
+                         (unless (zerop (length ,skipped-bytes))
+                           (setf (base-message-%%skipped-bytes struct) ,skipped-bytes))
+                         struct)
                        ,vidx)))
                   (case tag
                     ,@deserializers
                     (otherwise
-                     (setq ,vidx (skip-element ,vbuf ,vidx tag)))))))))))))
+                     (let ((,new-index (skip-element ,vbuf ,vidx tag)))
+                       (setf ,skipped-bytes
+                             (concatenate 'byte-vector
+                                          ,skipped-bytes
+                                          (subseq ,vbuf (i- ,vidx 4)
+                                                  ,new-index)))
+                       (setf ,vidx ,new-index)))))))))))))
 
 (defun make-message-with-bytes (type buffer)
   "Creates an instance of TYPE with BUFFER used as the pre-computed proto

@@ -21,7 +21,8 @@ Parameters:
 
 ;; Type for structure messages.
 (defstruct base-message
-  "Base structure that all protobuf message structs inherit from.")
+  "Base structure that all protobuf message structs inherit from."
+  (%%skipped-bytes (make-byte-vector 0 :adjustable t) :type byte-vector))
 
 ;;; "Thread-local" variables
 
