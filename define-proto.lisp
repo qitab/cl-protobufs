@@ -1024,6 +1024,8 @@ Arguments:
 
          (export '(,public-constructor-name ,is-set-name))
          (defmethod clear ((,obj ,proto-type))
+           (setf (base-message-%%skipped-bytes ,obj)
+                 (make-byte-vector 0))
            ,@(mapcan (lambda (name)
                        (let ((clear-name (fintern "~A.CLEAR-~A" proto-type name)))
                          `((,clear-name ,obj))))
