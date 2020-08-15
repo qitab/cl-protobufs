@@ -129,12 +129,13 @@
 (defun emit-skipped-bytes (object buffer)
   (declare (buffer buffer)
            (base-message object))
-  (let ((skipped-byte-length (length (base-message-%%skipped-bytes object))))
-    (if (zerop skipped-byte-length)
-        0
-        (progn
-          (buffer-ensure-space buffer skipped-byte-length)
-          (fast-octets-out buffer (base-message-%%skipped-bytes object))))))
+  (if (base-message-%%skipped-bytes object)
+      (progn
+        (buffer-ensure-space
+         buffer
+         (length (base-message-%%skipped-bytes object)))
+        (fast-octets-out buffer (base-message-%%skipped-bytes object)))
+      0))
 
 (defun emit-field (object field buffer)
   "Serialize a single field from an object to buffer
