@@ -81,6 +81,7 @@
 ;; There is no applicable method for the generic function
 ;; #<STANDARD-GENERIC-FUNCTION SB-MOP:SLOT-DEFINITION-TYPE (1)>
 ;; with defstruct protobufs.
+#-abcl ;; gives an error that slot is not a standard-class, this is true
 (deftest unsigned-negative (zigzag-suite)
   ;; Verify that the generated class has the correct type declaration
   (let ((class (find-class 'msg)))

@@ -1109,7 +1109,8 @@ Parameters:
                  (let ((tag1 (make-wire-tag $wire-type-start-group index))
                        (tag2 (make-wire-tag $wire-type-end-group index)))
                    (values `(multiple-value-bind (obj end)
-                                ,(call-deserializer msg vbuf vidx nil tag2)
+                                ,(call-deserializer
+                                  msg vbuf vidx most-positive-fixnum tag2)
                               (setq ,vidx end)
                               (push obj ,dest))
                            tag1))
@@ -1190,7 +1191,8 @@ Parameters:
                        (tag2 (make-wire-tag $wire-type-end-group index)))
                    (values
                     `(multiple-value-setq (,dest ,vidx)
-                       ,(call-deserializer msg vbuf vidx nil tag2))
+                       ,(call-deserializer
+                         msg vbuf vidx most-positive-fixnum tag2))
                     tag1))
                  (values
                   `(multiple-value-bind (payload-len payload-start)
