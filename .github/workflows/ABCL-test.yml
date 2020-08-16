@@ -18,7 +18,7 @@ jobs:
           sudo apt install ant
           git clone https://github.com/armedbear/abcl.git
           cd abcl
-          ant build.xml
+          ant
           cd ..
 
       - name: Download quicklisp
