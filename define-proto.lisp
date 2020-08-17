@@ -417,6 +417,7 @@ Parameters:
   VAL-KIND: The protobuf kind of the map value type.
   INDEX: Index of this map type in the field."
   (check-type index integer)
+  (assert val-kind)
   (let* ((slot      type-name)
          (name      (class-name->proto type-name))
          (reader    (let ((msg-conc (proto-conc-name *current-message-descriptor*)))
