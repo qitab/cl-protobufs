@@ -318,6 +318,7 @@
     "George W. Bush" "Barack Obama")
   "A list of presidents from George Washington until Barack Obama")
 
+#-abcl
 (deftest optimize-performance-test (serialization-suite)
   (let ((population (make-population))
         (count 0))
@@ -348,6 +349,7 @@
            (result (time (deserialize-object-from-bytes (type-of population) buffer))))
       (assert-true (proto:proto-equal population result :exact t)))))
 
+#-abcl
 (deftest performance-test (serialization-suite)
   (let ((population (make-population))
         (count 0))

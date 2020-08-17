@@ -36,7 +36,7 @@
 
 (defparameter *optional-field-info*
   ;; field name, default value, value set by tests
-  '((optional-int32 0 101) (optional-int64 0 102)
+  `((optional-int32 0 101) (optional-int64 0 102)
     (optional-uint32 0 103) (optional-uint64 0 104)
     (optional-sint32 0 105) (optional-sint64 0 106)
     (optional-fixed32 0 107) (optional-fixed64 0 108)
@@ -44,18 +44,19 @@
     (optional-float 0s0 111s0) (optional-double 0d0 112d0)
     (optional-bool nil t)
     (optional-string "" "115")
-    (optional-bytes "" #.(make-array '(3) :element-type '(unsigned-byte 8) :initial-contents '(49 49 54)))
+    (optional-bytes
+     "" ,(make-array '(3) :element-type '(unsigned-byte 8) :initial-contents '(49 49 54)))
     (optional-nested-enum :foo :baz)
     (optional-foreign-enum :foreign-foo :foreign-baz)
-    (optional-group nil
-     (cl-protobufs.protobuf-unittest:make-optional-group :a 117))
+    (optional-group
+     nil (cl-protobufs.protobuf-unittest:make-optional-group :a 117))
     (optional-import-enum :import-foo :IMPORT-BAZ)
     ;; XXXX: C++ test does not verify these fields.
     (optional-string-piece "" "124") (optional-cord "" "125")))
 
 (defparameter *default-field-info*
   ;; field name, default value, value set by tests
-  '((default-int32 41 401) (default-int64 42 402)
+  `((default-int32 41 401) (default-int64 42 402)
     (default-uint32 43 403) (default-uint64 44 404)
     (default-sint32 -45 405) (default-sint64 46 406)
     (default-fixed32 47 407) (default-fixed64 48 408)
@@ -63,8 +64,9 @@
     (default-float 51.5s0 411s0) (default-double 52d3 412d0)
     (default-bool t nil)
     (default-string "hello" "415")
-    (default-bytes #.(make-array '(5) :element-type '(unsigned-byte 8) :initial-contents '(119 111 114 108 100))
-     #.(make-array '(3) :element-type '(unsigned-byte 8) :initial-contents '(52 49 54)))
+    (default-bytes
+     ,(make-array '(5) :element-type '(unsigned-byte 8) :initial-contents '(119 111 114 108 100))
+     ,(make-array '(3) :element-type '(unsigned-byte 8) :initial-contents '(52 49 54)))
     (default-nested-enum :bar :foo)
     (default-foreign-enum :foreign-bar :foreign-foo)
     (default-import-enum :import-bar :import-foo)

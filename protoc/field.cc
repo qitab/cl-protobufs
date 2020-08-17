@@ -1,4 +1,3 @@
-
 // Copyright 2016-2020 Google LLC
 //
 // Use of this source code is governed by an MIT-style
@@ -205,7 +204,7 @@ const std::string FieldLispDefault(const FieldDescriptor* field) {
       switch (field->type()) {
         case FieldDescriptor::TYPE_BYTES:
           return StrCat(
-              "#.(cl:make-array ", field->default_value_string().size(),
+              "(cl:make-array ", field->default_value_string().size(),
               " :element-type '(cl:unsigned-byte 8)", " :initial-contents '(",
               StringOctets(field->default_value_string()), "))");
         case FieldDescriptor::TYPE_STRING:
