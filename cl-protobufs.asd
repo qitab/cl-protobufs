@@ -106,7 +106,7 @@
   :description      "Test code for Protobufs for Common Lisp"
   :long-description "Test code for Protobufs for Common Lisp"
   :defsystem-depends-on (:cl-protobufs.asdf)
-  :depends-on (:cl-protobufs :clunit2 :babel)
+  :depends-on (:cl-protobufs :clunit2 :babel :trivial-benchmark)
   :serial t
   :pathname "tests/"
   :components
@@ -291,6 +291,15 @@
     :components
     ((:file "full-tests")
      (:static-file "golden_message.data")
-     (:static-file "golden_packed_message.data"))))
+     (:static-file "golden_packed_message.data")))
+
+   ;; ABCL is slow, these tests take to long.
+   #-abcl
+   (:module "timing-tests"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "proto3")
+                 (:protobuf-source-file "serialization")
+                 (:file "timing-tests"))))
   :perform (test-op (o c)
                     (uiop:symbol-call '#:cl-protobufs.test '#:run-all)))
