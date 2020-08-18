@@ -116,7 +116,6 @@ Paramaters:
   PAIRS: Tuples of (encoded decoded) elements."
   (loop for (input assert-trueed) in pairs
         for assert-trueed-buf = (coerce assert-trueed '(vector (unsigned-byte 8)))
-        for filler = (random #xff)
         when encoder
           do (let* ((buf (make-octet-buffer 16))
                     (array (progn

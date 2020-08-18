@@ -80,6 +80,7 @@
   (unless (slot-boundp self '%fancything)
     (setf (slot-value self '%fancything) "-unset-")))
 
+(declaim (type fixnum *callcount-serialize*))
 (defvar *callcount-serialize* 0
   "The number of times we've called the customer serialize function.")
 
