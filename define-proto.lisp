@@ -428,7 +428,9 @@ Parameters:
                   :internal-slot-name internal-slot-name
                   :external-slot-name slot
                   :type 'hash-table
-                  :initform '(make-hash-table)
+                  :initform (if (eql key-type 'cl:string)
+                                '(make-hash-table :test #'equal)
+                                '(make-hash-table :test #'eq))
                   :accessor reader))
          (mfield (make-instance 'field-descriptor
                   :name (slot-name->proto slot)
@@ -593,14 +595,17 @@ Arguments:
                      (t `(not (eq ,cur-value ,default-form)))))))
 
         ;; Clear function
-        (declaim (inline ,clear-function-name))
-        (defun ,clear-function-name (,obj)
-          ,(if bool-index
-               `(setf (bit (,bit-field-name ,obj) ,bool-index)
-                      ,(if default-form 1 0))
-               `(setf (,hidden-accessor-name ,obj) ,default-form))
-          ,(when index
-            `(setf (bit (,is-set-accessor ,obj) ,index) 0)))
+        ;; Map type clear functions are created in make-map-accessor-forms.
+        ;; todo(benkuehnert): rewrite map types/definers so that this isn't necessary
+        ,@(unless (eq (proto-set-type field) :map)
+            `((declaim (inline ,clear-function-name))
+              (defun ,clear-function-name (,obj)
+                ,(when index
+                   `(setf (bit (,is-set-accessor ,obj) ,index) 0))
+                ,(if bool-index
+                     `(setf (bit (,bit-field-name ,obj) ,bool-index)
+                            ,(if default-form 1 0))
+                     `(setf (,hidden-accessor-name ,obj) ,default-form)))))
 
         ;; Create defmethods to allow for getting/setting compatibly
         ;; with the standard-classes.
@@ -617,7 +622,10 @@ Arguments:
         ,(unless (eq label :singular)
            `(export '(,has-function-name)))
 
-        (export '(,clear-function-name ,public-accessor-name))))))
+        ,(unless (eq (proto-set-type field) :map)
+           `(export '(,clear-function-name)))
+
+        (export '(,public-accessor-name))))))
 
 (defun make-oneof-accessor-forms (proto-type oneof)
   "Make and return forms that define accessor functions for a oneof and its fields.
@@ -736,6 +744,7 @@ Arguments:
   FIELD: The class object field definition of the field."
   (let* ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :map-get))
          (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
+         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
          (method-accessor-name (fintern "~A-gethash" public-slot-name))
          (method-remove-name (fintern "~A-remhash" public-slot-name))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
@@ -776,6 +785,14 @@ Arguments:
                 (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
                     (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
 
+        (declaim (inline ,clear-function-name))
+        (defun ,clear-function-name (,obj)
+          ,(when index
+            `(setf (bit (,is-set-accessor ,obj) ,index) 0))
+          (setf (,hidden-accessor-name ,obj) ,(if (eql val-type 'cl:string)
+                                                  '(make-hash-table :test #'equal)
+                                                  '(make-hash-table :test #'eq))))
+
         ;; These defmethods have the same functionality as the functions defined above
         ;; but they don't require a refernece to the message type, so using them is more
         ;; convenient.
@@ -790,6 +807,7 @@ Arguments:
 
         (export '(,public-accessor-name
                   ,public-remove-name
+                  ,clear-function-name
                   ,method-accessor-name
                   ,method-remove-name))))))
 
