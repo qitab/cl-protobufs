@@ -509,10 +509,6 @@ on the symbol if we are not in SBCL."
            :accessor proto-reader               ; if it's supplied, it's used instead of 'value'
            :initarg :reader
            :initform nil)
-   (writer :type (or null symbol list)          ; A writer that is used to set the value when
-           :accessor proto-writer               ; it's a list, it's something like '(setf title)'
-           :initarg :writer
-           :initform nil)
    (default :accessor proto-default             ; Default value (untyped), pulled out of the options
             :initarg :default
             :initform $empty-default)

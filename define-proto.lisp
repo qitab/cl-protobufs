@@ -1241,8 +1241,7 @@ Arguments:
    'name' can be used to override the defaultly generated Protobufs field name.
    'default' is the default value for the slot.
    'reader' is a Lisp slot reader function to use to get the value, instead of
-   using 'slot-value'; this is often used when aliasing an existing class.
-   'writer' is a Lisp slot writer function to use to set the value."
+   using 'slot-value'; this is often used when aliasing an existing class."
   (let* ((name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
@@ -1401,8 +1400,7 @@ Arguments:
                            (val (object ,type))
                          (,writer object val)))))
                  ;; This so that (de)serialization works
-                 (setf (proto-reader field) reader
-                       (proto-writer field) writer)))
+                 (setf (proto-reader field) reader)))
              (setf (proto-message-type field) :extends)         ;this field is an extension
              (appendf (proto-fields extends) (list field))
              (appendf (proto-extended-fields extends) (list field))))))
@@ -1439,8 +1437,7 @@ Arguments:
    'name' can be used to override the defaultly generated Protobufs field name.
    'default' is the default value for the slot.
    'reader' is a Lisp slot reader function to use to get the value, instead of
-   using 'slot-value'; this is often used when aliasing an existing class.
-   'writer' is a Lisp slot writer function to use to set the value."
+   using 'slot-value'; this is often used when aliasing an existing class."
   (check-type index integer)
   (check-type label (member :required :optional :repeated))
   (let* ((slot    (or type (and name (proto->slot-name name *package*))))
