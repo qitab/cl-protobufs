@@ -186,6 +186,15 @@
     (assert-true (proto-impl::proto-equal p q))
     (assert-false (proto-impl::proto-equal p q :exact t))
 
+    ;; Verify that proto-equal works for repeated message fields
+    (let* ((time1 (cl-protobufs.protobuf-unittest:make-time-protocol :debug-string (list "test1")))
+           (time2 (cl-protobufs.protobuf-unittest:make-time-protocol :debug-string (list "test2")))
+           (proto1 (cl-protobufs.protobuf-unittest:make-test-protocol :tp2 (list time1 time2)))
+           (proto2 (cl-protobufs.protobuf-unittest:make-test-protocol :tp2 (list time1))))
+      ;; proto-equal is asymmetric, so both sides must be checked.
+      (assert-false (proto-impl::proto-equal proto1 proto2))
+      (assert-false (proto-impl::proto-equal proto2 proto1)))
+
     ;; With a sub-object
     (let ((thirteen-1 (cl-protobufs.protobuf-unittest:make-thirteen))
           (thirteen-2 (cl-protobufs.protobuf-unittest:make-thirteen)))
