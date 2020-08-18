@@ -407,7 +407,7 @@ Parameters:
         (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
-(defmacro define-map (type-name &key key-type val-type index)
+(defmacro define-map (type-name &key key-type val-type json-name index)
 "Define a lisp type given the data for a protobuf map type.
 
 Parameters:
@@ -440,6 +440,7 @@ Parameters:
                   :index index
                   :internal-field-name internal-slot-name
                   :external-field-name slot
+                  :json-name json-name
                   :reader reader))
          (map-desc (make-map-descriptor
                     :class class
@@ -472,7 +473,7 @@ Parameters:
           do
        (destructuring-bind
            (slot &key type typename name (default nil default-p)
-                 lazy index documentation &allow-other-keys)
+                 lazy json-name index documentation &allow-other-keys)
            field
          (assert index)
          (let ((default (if default-p default $empty-default)))
@@ -499,6 +500,7 @@ Parameters:
                     :field-offset nil
                     :internal-field-name internal-name
                     :external-field-name slot
+                    :json-name json-name
                     :oneof-offset oneof-offset
                     :default default
                     :lazy (and lazy t)
@@ -1605,7 +1607,7 @@ Arguments
   ;;   (:optional), (:required).
   ;; Documentation is any documentation that has been set for the slot.
   (destructuring-bind (slot &key type typename name (default nil default-p) packed lazy
-                            index label documentation &allow-other-keys)
+                            json-name index label documentation &allow-other-keys)
       field
     (let* (;; Public accessors and setters for slots should be defined later.
            (internal-slot-name (fintern "%~A" slot))
@@ -1666,6 +1668,7 @@ Arguments
                          :field-offset offset
                          :internal-field-name internal-slot-name
                          :external-field-name slot
+                         :json-name json-name
                          :reader reader
                          :default default
                          ;; Pack the field only if requested and it actually makes sense

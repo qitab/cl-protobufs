@@ -212,6 +212,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   std::map<std::string, std::string> vars;
   vars["name"] = FieldLispName(field);
   vars["tag"] = StrCat(field->number());
+  vars["json-name"] = field->json_name();
   if (field->is_map()) {
     vars["key-type"] = FieldLispType(field->message_type()->field(0));
     vars["val-type"] = FieldLispType(field->message_type()->field(1));
@@ -219,6 +220,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
                     "\n(proto:define-map $name$\n"
                     "   :key-type $key-type$\n"
                     "   :val-type $val-type$\n"
+                    "   :json-name \"$json-name$\"\n"
                     "   :index $tag$)");
   } else {
     vars["type"] = FieldLispType(field);
@@ -235,6 +237,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
                    " :type $type$"
                    " :label $label$"
                    " :typename \"$typename$\""
+                   " :json-name \"$json-name$\"\n"
                    "$default$"
                    "$packed$"
                    "$lazy$)");

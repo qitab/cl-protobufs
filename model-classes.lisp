@@ -505,6 +505,10 @@ on the symbol if we are not in SBCL."
     :accessor proto-external-field-name   ; this also serves as the Lisp field name
     :initarg :external-field-name
     :initform nil)
+   (json-name                                   ; The key to use when printing this field to JSON.
+    :type string                                ; This is pulled directly from protoc output.
+    :accessor proto-json-name
+    :initarg :json-name)
    (reader :type (or null symbol)               ; A reader that is used to access the value
            :accessor proto-reader               ; if it's supplied, it's used instead of 'value'
            :initarg :reader

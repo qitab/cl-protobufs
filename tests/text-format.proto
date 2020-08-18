@@ -46,4 +46,5 @@ message TextFormatTest {
     string oneof_string_field = 22;
   }
   map<int32,string> map_field = 23;
+  optional bytes bytes_field = 24;
 }
