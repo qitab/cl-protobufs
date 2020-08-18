@@ -789,7 +789,7 @@ Arguments:
         (defun ,clear-function-name (,obj)
           ,(when index
             `(setf (bit (,is-set-accessor ,obj) ,index) 0))
-          (setf (,hidden-accessor-name ,obj) ,(if (eql val-type 'cl:string)
+          (setf (,hidden-accessor-name ,obj) ,(if (eql key-type 'cl:string)
                                                   '(make-hash-table :test #'equal)
                                                   '(make-hash-table :test #'eq))))
 
