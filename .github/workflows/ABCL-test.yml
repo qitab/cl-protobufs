@@ -1,6 +1,6 @@
-# @file CCL-test.yml
+# @file ABCL-test.yml
 ---
-name: CCL-Tests
+name: ABCL-Tests
 
 on:
   push:
@@ -13,10 +13,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download ccl
+      - name: Download ABCL
         run: |
-          curl -o ccl.tar.gz --location 'https://github.com/Clozure/ccl/releases/download/v1.12/ccl-1.12-linuxx86.tar.gz'
-          tar -xzf ccl.tar.gz
+          sudo apt install ant
+          git clone https://github.com/armedbear/abcl.git
+          cd abcl
+          ant
+          cd ..
 
       - name: Download quicklisp
         run: curl -o quicklisp.lisp 'https://beta.quicklisp.org/quicklisp.lisp'
@@ -24,8 +27,8 @@ jobs:
 
       - name: Install quicklisp
         run: |
-          ./ccl/lx86cl64 --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
-          ./ccl/lx86cl64 --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
+          ./abcl/abcl --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
+          ./abcl/abcl --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
 
       - name: Download repo
         uses: actions/checkout@v2
@@ -44,7 +47,7 @@ jobs:
       - name: Load and run tests
         run: |
           export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
-          ./ccl/lx86cl64 --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
+          ./abcl/abcl --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
           test -f report
           ! grep -q "not ok" report
           grep -q "ok" report

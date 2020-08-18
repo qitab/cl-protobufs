@@ -62,6 +62,21 @@
     (assert-equal (map-all.msgmap-gethash 0 test) nil)
     (assert-equal (map-all.enummap-gethash 0 test) :one)))
 
+;; Verify that the lisp hash-table properly handles string keys
+(deftest string-key-check (map-suite)
+  (let ((msg (make-map-enum)))
+    (setf (map-enum.map-field-gethash "two" msg) :two)
+    (assert-true (eq (map-enum.map-field-gethash "two" msg) :two))
+    ;; Verify that this works after clearing the hash table, too.
+    (map-enum.clear-map-field msg)
+    (setf (map-enum.map-field-gethash "two" msg) :two)
+    (assert-true (eq (map-enum.map-field-gethash "two" msg) :two))
+    (map-enum.clear-map-field msg)
+    (setf (map-enum.map-field-gethash "Two" msg) :two)
+    (setf (map-enum.map-field-gethash "two" msg) :one)
+    ;; Verify that the map is case-sensitive.
+    (assert-true (eq (map-enum.map-field-gethash "Two" msg) :two))
+    (assert-true (eq (map-enum.map-field-gethash "two" msg) :one))))
 
 ;; Verify that generic (de)serialization works.
 (deftest serialization-test (map-suite)

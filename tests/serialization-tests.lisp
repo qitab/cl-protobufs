@@ -338,86 +338,6 @@
       (assert-true (equalp ser-space1 #(#x0A #x00)))
       (assert-true (equalp ser-space2 #(#x0A #x00))))))
 
-;; The next two tests are basic performance tests.
-;; In both tests we generated 5000 protobuf messages
-;; and then try to serialize and then deserialize.
-;; In the first test we use the standard (de)serialize-object
-;; functions.
-;; The second one uses the (de)serializers based on the proto
-;; descriptors created during the generate-* call.
-(defvar *presidents*
-  '("George Washington" "John Adams" "Thomas Jefferson"
-    "James Madison" "James Monroe" "John Quincy Adams"
-    "Andrew Jackson" "Martin Van Buren" "William Henry Harrison"
-    "John Tyler" "James K. Polk" "Zachary Taylor"
-    "Millard Fillmore" "Franklin Pierce" "James Buchanan"
-    "Abraham Lincoln" "Andrew Johnson" "Ulysses S. Grant"
-    "Rutherford B. Hayes" "James A. Garfield" "Chester A. Arthur"
-    "Grover Cleveland" "Benjamin Harrison" "Grover Cleveland"
-    "William McKinley" "Theodore Roosevelt" "William Howard Taft"
-    "Woodrow Wilson" "Warren G. Harding" "Calvin Coolidge"
-    "Herbert Hoover" "Franklin D. Roosevelt" "Harry S. Truman"
-    "Dwight D. Eisenhower" "John F. Kennedy" "Lyndon B. Johnson"
-    "Richard Nixon" "Gerald Ford" "Jimmy Carter"
-    "Ronald Reagan" "George H. W. Bush" "Bill Clinton"
-    "George W. Bush" "Barack Obama")
-  "A list of presidents from George Washington until Barack Obama")
-
-(deftest optimize-performance-test (serialization-suite)
-  (let ((population (make-population))
-        (count 0))
-    (loop repeat 5000 do
-      (loop for name in *presidents* do
-        (let ((address (make-address))
-              (person (make-person))
-              (spouse (make-person)))
-          (incf count)
-          (setf (address.street address) name)
-          (setf (address.s-number address) count)
-          (setf (person.id spouse) 123456)
-          (setf (person.name spouse) "Spouse")
-          (setf (person.id person) count)
-          (setf (person.name person) name)
-          (setf (person.home person) address)
-          (setf (person.spouse person) spouse)
-          (setf (person.odd-p person) (oddp count))
-          (push person (population.people population)))))
-    (proto-impl::make-serializer population)
-    (proto-impl::make-serializer person)
-    (proto-impl::make-serializer address)
-    (proto-impl::make-deserializer population)
-    (proto-impl::make-deserializer person)
-    (proto-impl::make-deserializer address)
-    (format *trace-output* "Optimized performance test")
-    (let* ((buffer (time (serialize-object-to-bytes population (type-of population))))
-           (result (time (deserialize-object-from-bytes (type-of population) buffer))))
-      (assert-true (proto:proto-equal population result :exact t)))))
-
-(deftest performance-test (serialization-suite)
-  (let ((population (make-population))
-        (count 0))
-    (loop repeat 5000 do
-      (loop for name in *presidents* do
-        (let ((address (make-address))
-              (person (make-person))
-              (spouse (make-person)))
-          (incf count)
-          (setf (address.street address) name)
-          (setf (address.s-number address) count)
-          (setf (person.id spouse) 123456)
-          (setf (person.name spouse) "Spouse")
-          (setf (person.id person) count)
-          (setf (person.name person) name)
-          (setf (person.home person) address)
-          (setf (person.spouse person) spouse)
-          (setf (person.odd-p person) (oddp count))
-          (push person (population.people population)))))
-    (format *trace-output* "Non-optimized performance test")
-    (let* ((buffer (time (serialize-object-to-bytes population (type-of population))))
-           (result (time (deserialize-object-from-bytes (type-of population) buffer))))
-      (assert-true (proto:proto-equal population result :exact t)))))
-
-
 ;; Extension example
 ;; This test can not (or should not) work with optimize :SPEED because of poor Lisp style,
 ;; the behavior of which is undefined although practically speaking it does what you think.
@@ -442,23 +362,24 @@
   (metallic :index 2))
 (define-message auto-color
     (:conc-name "")
-  (name    :index 1 :type string :label (:optional))
-  (r-value :index 2 :type proto:int32 :label (:required))
-  (g-value :index 3 :type proto:int32 :label (:required))
-  (b-value :index 4 :type proto:int32 :label (:required))
+  (name    :index 1 :type string :label (:optional)      :json-name "name")
+  (r-value :index 2 :type proto:int32 :label (:required) :json-name "rValue")
+  (g-value :index 3 :type proto:int32 :label (:required) :json-name "gValue")
+  (b-value :index 4 :type proto:int32 :label (:required) :json-name "bValue")
   (define-extension 1000 max))
 (define-extend auto-color
     (:conc-name "")
-  (paint-type :index 1000 :type (or paint-type null) :label (:optional)))
+  (paint-type :index 1000 :type (or paint-type null) :label (:optional) :json-name "paintType"))
 (define-message automobile
     (:conc-name "")
-  (model  :index 1 :type string :label (:required))
-  (color  :index 2 :type (or null auto-color) :label (:required))
-  (status :index 3 :type (or null auto-status) :label (:required) :default :new))
+  (model  :index 1 :type string :label (:required) :json-name "model")
+  (color  :index 2 :type (or null auto-color) :label (:required) :json-name "color")
+  (status :index 3 :type (or null auto-status) :label (:required) :default :new
+          :json-name "status"))
 (define-message buy-car-request ()
-  (auto :index 1 :type (or null automobile) :label (:required)))
+  (auto :index 1 :type (or null automobile) :label (:required) :json-name "auto"))
 (define-message buy-car-response ()
-  (price :index 1 :type proto:uint32 :label (:optional)))
+  (price :index 1 :type proto:uint32 :label (:optional) :json-name "price"))
 
 ;;; The define-service macro expands to code in a package named <current-package>-rpc.
 ;;; Normally the package would be created in the generated code but we do it manually

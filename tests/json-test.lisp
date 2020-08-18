@@ -46,6 +46,10 @@
     \"int_field\": 2
   },
   \"bytes_field\": \"AwUHcFE=\",
+  \"bool_field\": true,
+  \"int64_field\": \"12\",
+  \"sint64_field\": \"-1\",
+  \"int_vals\": null,
   \"oneof_int_field\": 5
 }
 ")
@@ -54,22 +58,25 @@
   (let ((msg-parse (proto:parse-json
                     'cl-protobufs.test-proto:text-format-test
                     :stream (make-string-input-stream *json-msg*))))
-    (assert-true (eql 100 (cl-protobufs.test-proto:int-field msg-parse)))
-    (assert-true (eql -1 (cl-protobufs.test-proto:sint-field msg-parse)))
-    (assert-true (eql 1 (cl-protobufs.test-proto:uint-field msg-parse)))
-    (assert-true (eql 1.5 (cl-protobufs.test-proto:float-field msg-parse)))
-    (assert-true (eql 1.5d0 (cl-protobufs.test-proto:double-field msg-parse)))
-    (assert-true (string-equal "A string" (cl-protobufs.test-proto:string-field msg-parse)))
-    (assert-true (equal '("First" "Second")  (cl-protobufs.test-proto:string-fields msg-parse)))
-    (assert-true (equal '(:NONE :TWENTY-ONE) (cl-protobufs.test-proto:enum-vals msg-parse)))
-    (assert-true (equal 2 (cl-protobufs.test-proto:int-field
-                           (cl-protobufs.test-proto:two-level-nesting msg-parse))))
-    (assert-true (string= (text-format-test.map-field-gethash 1 msg-parse) "one"))
-    (assert-true (string= (text-format-test.map-field-gethash 2 msg-parse) "two"))
-    (assert-true (eql 5 (cl-protobufs.test-proto:oneof-int-field msg-parse)))
+    (assert-true (eql 100 (int-field msg-parse)))
+    (assert-true (eql -1 (sint-field msg-parse)))
+    (assert-true (eql 1 (uint-field msg-parse)))
+    (assert-true (eql 1.5 (float-field msg-parse)))
+    (assert-true (eql 1.5d0 (double-field msg-parse)))
+    (assert-true (string-equal "A string" (string-field msg-parse)))
+    (assert-true (equal '("First" "Second")  (string-fields msg-parse)))
+    (assert-true (equal '(:NONE :TWENTY-ONE) (enum-vals msg-parse)))
+    (assert-true (equal 2 (int-field (two-level-nesting msg-parse))))
+    (assert-true (string= (map-field-gethash 1 msg-parse) "one"))
+    (assert-true (string= (map-field-gethash 2 msg-parse) "two"))
+    (assert-true (bool-field msg-parse))
+    (assert-true (= 12 (int64-field msg-parse)))
+    (assert-true (= -1 (sint64-field msg-parse)))
+    (assert-true (eql 5 (oneof-int-field msg-parse)))
+    (assert-false (int-vals msg-parse))
     (assert-true (equalp (make-array 5 :element-type '(unsigned-byte 8)
                                        :initial-contents '(3 5 7 112 81))
-                         (cl-protobufs.test-proto:bytes-field msg-parse)))))
+                         (bytes-field msg-parse)))))
 
 ;; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-text-format (json-suite)
@@ -88,7 +95,11 @@
                  :one-level-nesting nested
                  :oneof-int-field 5
                  :bytes-field (make-array 5 :element-type '(unsigned-byte 8)
-                                            :initial-contents '(3 5 7 112 81)))))
+                                            :initial-contents '(3 5 7 112 81))
+                 :bool-field t
+                 :int64-field 12
+                 :sint64-field -1))
+           )
       (setf (text-format-test.map-field-gethash 1 msg) "one")
       (setf (text-format-test.map-field-gethash 2 msg) "two")
       (let* ((text (with-output-to-string (s)
@@ -100,4 +111,3 @@
                           (parse-json 'cl-protobufs.test-proto:text-format-test
                                       :stream s))))
         (assert-true (proto:proto-equal msg-parse msg))))))
-

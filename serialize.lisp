@@ -385,7 +385,7 @@ Contains the INDEX of the field as according to protobuf, an internal
 OFFSET, the BOOL-NUMBER (for simple boolean fields), a flag ONEOF-P which indicates if the field
 is part of a oneof, the INITARG, the COMPLEX-FIELD datastructure.
 See field-descriptor for the distinction between index, offset, and bool-number."
-  index
+  (index -1 :type fixnum)
   offset
   bool-index
   oneof-p
@@ -427,6 +427,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
 ;; Given a field-number and a field-map, return the FIELD metadata or NIL.
 (declaim (inline find-in-field-map))
 (defun find-in-field-map (field-number field-map)
+  (declare (type fixnum field-number))
   (if (svref field-map 0)
       (unless (>= field-number (length field-map))
         (svref field-map field-number))
@@ -1109,7 +1110,8 @@ Parameters:
                  (let ((tag1 (make-wire-tag $wire-type-start-group index))
                        (tag2 (make-wire-tag $wire-type-end-group index)))
                    (values `(multiple-value-bind (obj end)
-                                ,(call-deserializer msg vbuf vidx nil tag2)
+                                ,(call-deserializer
+                                  msg vbuf vidx most-positive-fixnum tag2)
                               (setq ,vidx end)
                               (push obj ,dest))
                            tag1))
@@ -1190,7 +1192,8 @@ Parameters:
                        (tag2 (make-wire-tag $wire-type-end-group index)))
                    (values
                     `(multiple-value-setq (,dest ,vidx)
-                       ,(call-deserializer msg vbuf vidx nil tag2))
+                       ,(call-deserializer
+                         msg vbuf vidx most-positive-fixnum tag2))
                     tag1))
                  (values
                   `(multiple-value-bind (payload-len payload-start)

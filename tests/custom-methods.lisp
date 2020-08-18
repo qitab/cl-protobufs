@@ -66,13 +66,13 @@
     :syntax :proto2
     :package 'cl-protobufs.test.custom-proto-test)
   (define-message example-parent (:conc-name "")
-    (code :index 1 :type protobufs:int64 :label (:required))
-    (name :index 3 :type string :label (:required))
-    (submessage :index 4 :type (or null submessage) :label (:required)))
+    (code :index 1 :type protobufs:int64 :label (:required) :json-name "code")
+    (name :index 3 :type string :label (:required) :json-name "name")
+    (submessage :index 4 :type (or null submessage) :label (:required) :json-name "submessage"))
   (define-message submessage (:conc-name "")
-    (code :index 1 :type string :label (:required))
-    (fancything :index 2 :type string :label (:required))
-    (othercode :index 3 :type string :label (:required))))
+    (code :index 1 :type string :label (:required) :json-name "code")
+    (fancything :index 2 :type string :label (:required) :json-name "fancything")
+    (othercode :index 3 :type string :label (:required) :json-name "othercode")))
 
 ;; Helper to ensure the deserializer reconstructs this slot
 (defmethod initialize-instance :after ((self submessage) &rest initargs)
@@ -80,6 +80,7 @@
   (unless (slot-boundp self '%fancything)
     (setf (slot-value self '%fancything) "-unset-")))
 
+(declaim (type fixnum *callcount-serialize*))
 (defvar *callcount-serialize* 0
   "The number of times we've called the customer serialize function.")
 

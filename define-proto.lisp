@@ -414,7 +414,9 @@ Parameters:
   TYPE-NAME: Map type name.
   KEY-TYPE: The lisp type of the map's keys.
   VAL-TYPE: The lisp type of the map's values.
+  JSON-NAME: The string to use as a JSON name for the field.
   INDEX: Index of this map type in the field."
+  (assert json-name)
   (check-type index integer)
   (let* ((slot      type-name)
          (name      (class-name->proto type-name))
@@ -428,7 +430,9 @@ Parameters:
                   :internal-slot-name internal-slot-name
                   :external-slot-name slot
                   :type 'hash-table
-                  :initform '(make-hash-table)
+                  :initform (if (eql key-type 'cl:string)
+                                '(make-hash-table :test #'equal)
+                                '(make-hash-table :test #'eq))
                   :accessor reader))
          (mfield (make-instance 'field-descriptor
                   :name (slot-name->proto slot)
@@ -475,6 +479,7 @@ Parameters:
            (slot &key type typename name (default nil default-p)
                  lazy json-name index documentation &allow-other-keys)
            field
+         (assert json-name)
          (assert index)
          (let ((default (if default-p default $empty-default)))
            (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
@@ -595,14 +600,17 @@ Arguments:
                      (t `(not (eq ,cur-value ,default-form)))))))
 
         ;; Clear function
-        (declaim (inline ,clear-function-name))
-        (defun ,clear-function-name (,obj)
-          ,(if bool-index
-               `(setf (bit (,bit-field-name ,obj) ,bool-index)
-                      ,(if default-form 1 0))
-               `(setf (,hidden-accessor-name ,obj) ,default-form))
-          ,(when index
-            `(setf (bit (,is-set-accessor ,obj) ,index) 0)))
+        ;; Map type clear functions are created in make-map-accessor-forms.
+        ;; todo(benkuehnert): rewrite map types/definers so that this isn't necessary
+        ,@(unless (eq (proto-set-type field) :map)
+            `((declaim (inline ,clear-function-name))
+              (defun ,clear-function-name (,obj)
+                ,(when index
+                   `(setf (bit (,is-set-accessor ,obj) ,index) 0))
+                ,(if bool-index
+                     `(setf (bit (,bit-field-name ,obj) ,bool-index)
+                            ,(if default-form 1 0))
+                     `(setf (,hidden-accessor-name ,obj) ,default-form)))))
 
         ;; Create defmethods to allow for getting/setting compatibly
         ;; with the standard-classes.
@@ -619,7 +627,10 @@ Arguments:
         ,(unless (eq label :singular)
            `(export '(,has-function-name)))
 
-        (export '(,clear-function-name ,public-accessor-name))))))
+        ,(unless (eq (proto-set-type field) :map)
+           `(export '(,clear-function-name)))
+
+        (export '(,public-accessor-name))))))
 
 (defun make-oneof-accessor-forms (proto-type oneof)
   "Make and return forms that define accessor functions for a oneof and its fields.
@@ -738,6 +749,7 @@ Arguments:
   FIELD: The class object field definition of the field."
   (let* ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :map-get))
          (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
+         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
          (method-accessor-name (fintern "~A-gethash" public-slot-name))
          (method-remove-name (fintern "~A-remhash" public-slot-name))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
@@ -778,6 +790,14 @@ Arguments:
                 (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
                     (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
 
+        (declaim (inline ,clear-function-name))
+        (defun ,clear-function-name (,obj)
+          ,(when index
+            `(setf (bit (,is-set-accessor ,obj) ,index) 0))
+          (setf (,hidden-accessor-name ,obj) ,(if (eql val-type 'cl:string)
+                                                  '(make-hash-table :test #'equal)
+                                                  '(make-hash-table :test #'eq))))
+
         ;; These defmethods have the same functionality as the functions defined above
         ;; but they don't require a refernece to the message type, so using them is more
         ;; convenient.
@@ -792,6 +812,7 @@ Arguments:
 
         (export '(,public-accessor-name
                   ,public-remove-name
+                  ,clear-function-name
                   ,method-accessor-name
                   ,method-remove-name))))))
 
@@ -1290,8 +1311,8 @@ Arguments:
                                                      :weakness :key :test #'eq)))
                                        ,@(and reader `((defmethod ,reader ((object ,type))
                                                          (gethash object ,stable ,default))))
-                                       ,@(and writer `((defmethod ,writer ((object ,type) value)
-                                                         (declare (type ,stype value))
+                                       ,@(and writer `((defmethod ,writer ((object ,type) ,stype)
+                                                         #-ccl (declare (type ,stype value))
                                                          (setf (gethash object ,stable) value))))
                                        ;; For Python compatibility
                                        (defmethod get-extension ((object ,type)
@@ -1359,7 +1380,7 @@ Arguments:
                        ,@(and reader `((defmethod ,reader ((object ,type))
                                          (gethash object ,stable ,default))))
                        ,@(and writer `((defmethod ,writer ((object ,type) value)
-                                         (declare (type ,stype value))
+                                         #-ccl (declare (type ,stype value))
                                          (setf (gethash object ,stable) value))))
                        (defmethod get-extension ((object ,type) (slot (eql ',fname)))
                          (values (gethash object ,stable ,default)))
@@ -1609,6 +1630,7 @@ Arguments
   (destructuring-bind (slot &key type typename name (default nil default-p) packed lazy
                             json-name index label documentation &allow-other-keys)
       field
+    (assert json-name)
     (let* (;; Public accessors and setters for slots should be defined later.
            (internal-slot-name (fintern "%~A" slot))
            (reader (and conc-name

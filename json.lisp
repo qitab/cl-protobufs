@@ -124,13 +124,14 @@ Parameters:
     ((:string)
      (format stream "\"~A\"" value))
     ((:bool)
-     (format stream "~A" (if val "true" "false")))
+     (format stream "~A" (if value "true" "false")))
     ((:bytes)
      (format stream "\"~A\"" (cl-base64:usb8-array-to-base64-string value)))
     ((:symbol :keyword)
-     (let ((val (if (keywordp val)
-                    (string val)
-                    (format nil "~A:~A" (package-name (symbol-package val)) (symbol-name val)))))
+     (let ((val (if (keywordp value)
+                    (string value)
+                    (format nil "~A:~A" (package-name (symbol-package value))
+                                        (symbol-name value)))))
        (format stream "\"~A\"" val)))))
 
 (defun print-enum-to-json (value type stream numeric-enums-p)
@@ -165,7 +166,7 @@ Parameters:
         (format stream "~&~V,0T}" indent)
         (format stream "}")))
 
-;;; Parse objects that were serialized using the text format
+;;; Parse objects that were serialized using JSON format.
 
 (defgeneric parse-json (type &key stream)
   (:documentation
@@ -201,19 +202,26 @@ Parameters:
         (if (null field)
             (skip-json-value stream)
             (let (val error-p)
-              (if (eql (peek-char nil stream nil) #\[)
-                  (progn
-                    (expect-char stream #\[)
-                    (loop
-                      (multiple-value-bind (data err)
-                          (parse-value-from-json type :stream stream)
-                        (if err
-                            (setf error-p t)
-                            (push data val)))
-                      (if (eql (peek-char nil stream nil) #\,)
-                          (expect-char stream #\,)
-                          (return)))
-                    (expect-char stream #\]))
+              (if (eq (proto-label field) :repeated)
+                  (case (peek-char nil stream nil)
+                    ;; Repeated field is in list format
+                    ((#\[)
+                     (expect-char stream #\[)
+                     (loop
+                       (multiple-value-bind (data err)
+                           (parse-value-from-json type :stream stream)
+                         (if err
+                             (setf error-p t)
+                             (push data val)))
+                       (if (eql (peek-char nil stream nil) #\,)
+                           (expect-char stream #\,)
+                           (return)))
+                     (expect-char stream #\]))
+                    ;; 'null' is parsed as an empty list. Anything else is an error.
+                    ((#\n)
+                     (let ((tok (parse-token stream)))
+                       (unless (string= tok "null")
+                         (setf error-p t)))))
                   (multiple-value-setq (val error-p)
                     (parse-value-from-json type :stream stream)))
               (cond
@@ -232,7 +240,7 @@ Parameters:
                      (pushnew slot rslots))))))))
       (if (eql (peek-char nil stream nil) #\,)
         (expect-char stream #\,)
-        (progn 
+        (progn
           (expect-char stream #\})
           (dolist (slot rslots)
             (setf (proto-slot-value object slot)
@@ -259,9 +267,9 @@ Parameters:
              ((:bytes)  (cl-base64:base64-string-to-usb8-array (parse-string stream)))
              (otherwise (if (eql (peek-char nil stream nil) #\")
                             (let (ret)
-                              (expect-char #\")
+                              (expect-char stream #\")
                               (setf ret (parse-signed-int stream))
-                              (expect-char #\")
+                              (expect-char stream #\")
                               ret)
                             (parse-signed-int stream)))))
           ((typep desc 'message-descriptor)
@@ -300,7 +308,7 @@ Parameters:
           (t (values nil t)))))
 
 (defun skip-json-value (stream)
-  "Skip a single JSON value in stream. This can
+  "Skip a single JSON value in STREAM. This can
 be either an array, object, or primitive."
   (skip-whitespace stream)
   (case (peek-char nil stream nil)
