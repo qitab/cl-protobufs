@@ -362,23 +362,24 @@
   (metallic :index 2))
 (define-message auto-color
     (:conc-name "")
-  (name    :index 1 :type string :label (:optional))
-  (r-value :index 2 :type proto:int32 :label (:required))
-  (g-value :index 3 :type proto:int32 :label (:required))
-  (b-value :index 4 :type proto:int32 :label (:required))
+  (name    :index 1 :type string :label (:optional)      :json-name "name")
+  (r-value :index 2 :type proto:int32 :label (:required) :json-name "rValue")
+  (g-value :index 3 :type proto:int32 :label (:required) :json-name "gValue")
+  (b-value :index 4 :type proto:int32 :label (:required) :json-name "bValue")
   (define-extension 1000 max))
 (define-extend auto-color
     (:conc-name "")
-  (paint-type :index 1000 :type (or paint-type null) :label (:optional)))
+  (paint-type :index 1000 :type (or paint-type null) :label (:optional) :json-name "paintType"))
 (define-message automobile
     (:conc-name "")
-  (model  :index 1 :type string :label (:required))
-  (color  :index 2 :type (or null auto-color) :label (:required))
-  (status :index 3 :type (or null auto-status) :label (:required) :default :new))
+  (model  :index 1 :type string :label (:required) :json-name "model")
+  (color  :index 2 :type (or null auto-color) :label (:required) :json-name "color")
+  (status :index 3 :type (or null auto-status) :label (:required) :default :new
+          :json-name "status"))
 (define-message buy-car-request ()
-  (auto :index 1 :type (or null automobile) :label (:required)))
+  (auto :index 1 :type (or null automobile) :label (:required) :json-name "auto"))
 (define-message buy-car-response ()
-  (price :index 1 :type proto:uint32 :label (:optional)))
+  (price :index 1 :type proto:uint32 :label (:optional) :json-name "price"))
 
 ;;; The define-service macro expands to code in a package named <current-package>-rpc.
 ;;; Normally the package would be created in the generated code but we do it manually

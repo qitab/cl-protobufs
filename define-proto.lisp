@@ -407,14 +407,16 @@ Parameters:
         (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
-(defmacro define-map (type-name &key key-type val-type index)
+(defmacro define-map (type-name &key key-type val-type json-name index)
 "Define a lisp type given the data for a protobuf map type.
 
 Parameters:
   TYPE-NAME: Map type name.
   KEY-TYPE: The lisp type of the map's keys.
   VAL-TYPE: The lisp type of the map's values.
+  JSON-NAME: The string to use as a JSON name for the field.
   INDEX: Index of this map type in the field."
+  (assert json-name)
   (check-type index integer)
   (let* ((slot      type-name)
          (name      (class-name->proto type-name))
@@ -442,6 +444,7 @@ Parameters:
                   :index index
                   :internal-field-name internal-slot-name
                   :external-field-name slot
+                  :json-name json-name
                   :reader reader))
          (map-desc (make-map-descriptor
                     :class class
@@ -474,8 +477,9 @@ Parameters:
           do
        (destructuring-bind
            (slot &key type typename name (default nil default-p)
-                 lazy index documentation &allow-other-keys)
+                 lazy json-name index documentation &allow-other-keys)
            field
+         (assert json-name)
          (assert index)
          (let ((default (if default-p default $empty-default)))
            (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
@@ -501,6 +505,7 @@ Parameters:
                     :field-offset nil
                     :internal-field-name internal-name
                     :external-field-name slot
+                    :json-name json-name
                     :oneof-offset oneof-offset
                     :default default
                     :lazy (and lazy t)
@@ -1620,8 +1625,9 @@ Arguments
   ;;   (:optional), (:required).
   ;; Documentation is any documentation that has been set for the slot.
   (destructuring-bind (slot &key type typename name (default nil default-p) packed lazy
-                            index label documentation &allow-other-keys)
+                            json-name index label documentation &allow-other-keys)
       field
+    (assert json-name)
     (let* (;; Public accessors and setters for slots should be defined later.
            (internal-slot-name (fintern "%~A" slot))
            (reader (and conc-name
@@ -1681,6 +1687,7 @@ Arguments
                          :field-offset offset
                          :internal-field-name internal-slot-name
                          :external-field-name slot
+                         :json-name json-name
                          :reader reader
                          :default default
                          ;; Pack the field only if requested and it actually makes sense

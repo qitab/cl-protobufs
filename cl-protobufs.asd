@@ -22,7 +22,8 @@
                ;; For SBCL we'll use its builtin UTF8 encoder/decoder.
                #-sbcl :babel
                :alexandria
-               :trivial-garbage)
+               :trivial-garbage
+               :cl-base64)
   :serial t
   :in-order-to ((test-op (test-op :cl-protobufs/tests)))
   :components
@@ -60,6 +61,7 @@
     :components
     ((:file "buffers")
      (:file "text-format")
+     (:file "json")
      (:file "wire-format")
      (:file "serialize")))
    (:module "misc"
@@ -273,6 +275,12 @@
     :components ((:protobuf-source-file "text-format"
                   :proto-search-path ("../" "../google/protobuf/"))
                  (:file "text-format-test")))
+
+   (:module "json-test"
+    :serial t
+    :pathname ""
+    :depends-on ("text-format-test")
+    :components ((:file "json-test")))
 
    (:module "zigzag-test"
     :serial t

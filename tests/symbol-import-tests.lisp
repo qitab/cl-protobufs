@@ -42,7 +42,8 @@
   :syntax :proto2
   :import 'symbol-imported-schema)
 (proto:define-message symbol-importer-message ()
-  (imported-type-field :index 1 :type (or null symbol-imported-message) :label (:optional)))
+  (imported-type-field :index 1 :type (or null symbol-imported-message) :label (:optional)
+                       :json-name "importedTypeField"))
 
 ;;; We need an actual test to make this test pass. If we can make an instance of the message it must
 ;;; have compiled successfully.

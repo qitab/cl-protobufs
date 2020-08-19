@@ -91,6 +91,10 @@
    #:parse-text-format
    #:print-text-format
 
+   ;; JSON
+   #:parse-json
+   #:print-json
+
    ;; Extensions
    #:get-extension
    #:set-extension
