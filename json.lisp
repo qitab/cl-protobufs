@@ -28,7 +28,7 @@ Parameters:
     (when indent (format stream "~%"))
     ;; Boolean that tracks if a field is printed. Used for printing commas
     ;; correctly.
-    (let ((field-printed nil))
+    (let (field-printed)
       (dolist (field (proto-fields message))
         (when (if (eq (slot-value field 'message-type) :extends)
                   (has-extension object (slot-value field 'internal-field-name))
@@ -47,42 +47,42 @@ Parameters:
             (if indent
                 (format stream "~&~V,0T\"~A\": " (+ indent 2) name)
                 (format stream "\"~A\":" name))
-            (if (eq (proto-label field) :repeated)
-                (let ((repeated-printed))
+            (if (not (eq (proto-label field) :repeated))
+                (print-field-to-json value type (and indent (+ indent 2))
+                                     stream camel-case-p numeric-enums-p)
+                (let (repeated-printed)
                   (format stream "[")
                   (doseq (v value)
-                         (if repeated-printed
-                             (format stream ",")
-                             (setf repeated-printed t))
-                         (when indent (format stream "~&~V,0T" (+ indent 4)))
-                         (print-field-to-json v type (and indent (+ indent 4))
-                                              stream camel-case-p numeric-enums-p))
+                    (if repeated-printed
+                        (format stream ",")
+                        (setf repeated-printed t))
+                    (when indent (format stream "~&~V,0T" (+ indent 4)))
+                    (print-field-to-json v type (and indent (+ indent 4))
+                                         stream camel-case-p numeric-enums-p))
                   (if indent
                       (format stream "~&~V,0T]" (+ indent 2))
-                      (format stream "]")))
-                (print-field-to-json value type (and indent (+ indent 2))
-                                     stream camel-case-p numeric-enums-p)))))
-    (dolist (oneof (proto-oneofs message))
-      (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
-             (set-field (oneof-set-field oneof-data)))
-        (when set-field
-          (let* ((field-desc (aref (oneof-descriptor-fields oneof) set-field))
-                 (type (proto-class field-desc))
-                 (value (oneof-value oneof-data))
-                 (name (if camel-case-p
-                           (proto-json-name field-desc)
-                           (proto-name field-desc))))
-            (if field-printed
-                (format stream ",")
-                (setf field-printed t))
-             (if indent
-                (format stream "~&~V,0T\"~A\": " (+ indent 2) name)
-                (format stream "\"~A\":" name))
-            (print-field-to-json value type (and indent (+ indent 2))
-                                 stream camel-case-p numeric-enums-p)))))
+                      (format stream "]")))))))
+      (dolist (oneof (proto-oneofs message))
+        (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
+               (set-field (oneof-set-field oneof-data)))
+          (when set-field
+            (let* ((field-desc (aref (oneof-descriptor-fields oneof) set-field))
+                   (type (proto-class field-desc))
+                   (value (oneof-value oneof-data))
+                   (name (if camel-case-p
+                             (proto-json-name field-desc)
+                             (proto-name field-desc))))
+              (if field-printed
+                  (format stream ",")
+                  (setf field-printed t))
+              (if indent
+                  (format stream "~&~V,0T\"~A\": " (+ indent 2) name)
+                  (format stream "\"~A\":" name))
+              (print-field-to-json value type (and indent (+ indent 2))
+                                   stream camel-case-p numeric-enums-p))))))
     (if indent
         (format stream "~&~V,0T}" indent)
-        (format stream "}")))))
+        (format stream "}"))))
 
 (defun print-field-to-json (value type indent stream camel-case-p numeric-enums-p)
   "Print a field to JSON format.
@@ -202,7 +202,9 @@ Parameters:
         (if (null field)
             (skip-json-value stream)
             (let (val error-p)
-              (if (eq (proto-label field) :repeated)
+              (if (not (eq (proto-label field) :repeated))
+                  (multiple-value-setq (val error-p)
+                    (parse-value-from-json type :stream stream))
                   (case (peek-char nil stream nil)
                     ;; Repeated field is in list format
                     ((#\[)
@@ -221,9 +223,7 @@ Parameters:
                     ((#\n)
                      (let ((tok (parse-token stream)))
                        (unless (string= tok "null")
-                         (setf error-p t)))))
-                  (multiple-value-setq (val error-p)
-                    (parse-value-from-json type :stream stream)))
+                         (setf error-p t))))))
               (cond
                 (error-p
                  (undefined-field-type "While parsing ~S from JSON format,"
@@ -254,24 +254,26 @@ Parameters:
                   (find-map-descriptor type))))
     (cond ((scalarp type)
            (case type
-             ((:float)  (parse-float stream))
+             ((:float) (parse-float stream))
              ((:double) (parse-double stream))
              ((:string) (parse-string stream))
-             ((:bool)   (let ((token (parse-token stream)))
-                          (cond ((string= token "true") t)
-                                ((string= token "false") nil)
-                                ;; Parsing failed, return T as
-                                ;; a second value to indicate a
-                                ;; failure.
-                                (t (values nil t)))))
-             ((:bytes)  (cl-base64:base64-string-to-usb8-array (parse-string stream)))
-             (otherwise (if (eql (peek-char nil stream nil) #\")
-                            (let (ret)
-                              (expect-char stream #\")
-                              (setf ret (parse-signed-int stream))
-                              (expect-char stream #\")
-                              ret)
-                            (parse-signed-int stream)))))
+             ((:bool)
+              (let ((token (parse-token stream)))
+                (cond ((string= token "true") t)
+                      ((string= token "false") nil)
+                      ;; Parsing failed, return T as a second
+                      ;; value to indicate a failure.
+                      (t (values nil t)))))
+             ((:bytes)
+              (cl-base64:base64-string-to-usb8-array (parse-string stream)))
+             (otherwise
+              (if (eql (peek-char nil stream nil) #\")
+                  (let (ret)
+                    (expect-char stream #\")
+                    (setf ret (parse-signed-int stream))
+                    (expect-char stream #\")
+                    ret)
+                  (parse-signed-int stream)))))
           ((typep desc 'message-descriptor)
            (parse-json desc :stream stream))
           ((typep desc 'enum-descriptor)
