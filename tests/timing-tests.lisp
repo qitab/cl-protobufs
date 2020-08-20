@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(defpackage #:cl-protobufs.test.timing-tests
+(defpackage #:cl-protobufs.test.timing
   (:use #:cl
         #:clunit
         #:cl-protobufs)
@@ -12,9 +12,10 @@
    (#:serial-proto #:cl-protobufs.serialization-test)
    (#:oneof-proto #:cl-protobufs.oneof-test)
    (#:proto3-proto #:cl-protobufs.proto3-test)
-   (#:map-proto #:cl-protobufs.map-test)))
+   (#:map-proto #:cl-protobufs.map-test))
+  (:export #:run))
 
-(in-package #:cl-protobufs.test.timing-tests)
+(in-package #:cl-protobufs.test.timing)
 
 (defsuite timing-suite (cl-protobufs.test:root-suite))
 

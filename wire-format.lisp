@@ -68,7 +68,6 @@
       (make-wire-tag tag-bits index))))
 
 (define-compiler-macro make-tag (&whole form type index)
-  (setq type (fold-symbol type))
   (cond ((typep type 'fixnum)
          `(ilogior ,type (iash ,index 3)))
         ((keywordp type)
@@ -87,31 +86,6 @@
                        ((:date :time :datetime :timestamp) $wire-type-64bit))))
            `(ilogior ,type (iash ,index 3))))
         (t form)))
-
-;; BUG: FOLD-SYMBOL is just wrong. It's not "intrinsically" broken - it behaves exactly as it
-;; is documented to, however *using* it is broken with respect to ordinary Lisp semantics.
-;; Suppose the following have been defined:
-;;  (defconstant a 'b)
-;;  (defconstant b :bool)
-;; Then (SERIALIZE-SCALAR x a tag buffer) should generate a runtime error, because the symbol B,
-;; which is what the function receives, is not a known scalar value type.
-;; However FOLD-SYMBOL translates A into :BOOL.
-;; Compiler-macros should never alter a form's semantics.
-;;
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun fold-symbol (x)
-    "Given an expression 'x', constant-fold it until it can be folded no more."
-    (let ((last '#:last))
-      (loop
-        (cond ((eq x last) (return x))
-              ((and (listp x)
-                    (eq (first x) 'quote)
-                    (constantp (second x)))
-               (shiftf last x (second x)))
-              ((and (symbolp x)
-                    (boundp x))
-               (shiftf last x (symbol-value x)))
-              (t (return x)))))))
 
 (defun packed-tag (index)
   "Takes a field INDEX, and returns a tag for a packed field with that same index."
@@ -244,8 +218,6 @@ and a buffer which encodes the value to the buffer."
     (:double   (lambda (val b) (encode-double val b)))))
 
 (define-compiler-macro serialize-scalar (&whole form val type tag buffer)
-  (setq type (fold-symbol type)
-        tag  (fold-symbol tag))
   (let ((encoder (get-scalar-encoder-form type val buffer)))
     (if encoder
         `(locally (declare #.$optimize-serialization)
@@ -296,8 +268,6 @@ and a buffer which encodes the value to the buffer."
 ;;  ... you must be new here :)
 (define-compiler-macro serialize-packed (&whole form values type index buffer
                                          &optional (vectorp nil vectorp-supplied-p))
-  (setq type (fold-symbol type)
-        index (fold-symbol index))
   (if vectorp-supplied-p
       (let ((encode (or (get-scalar-encoder-form type 'val buffer)
                         (error "No scalar encoder for ~S" type))))
@@ -596,7 +566,6 @@ and a buffer which encodes the value to the buffer."
        (decode-uint64 buffer index)))))
 
 (define-compiler-macro deserialize-scalar (&whole form type buffer index)
-  (setq type (fold-symbol type))
   (let ((decoder
           (case type
             (:int32    `(decode-int32 ,buffer ,index))
@@ -686,7 +655,6 @@ and a buffer which encodes the value to the buffer."
               (setq idx nidx))))))))
 
 (define-compiler-macro deserialize-packed (&whole form type buffer index)
-  (setq type (fold-symbol type))
   (if (member type '(:int32 :uint32 :int64 :uint64 :sint32 :sint64
                      :fixed32 :sfixed32 :fixed64 :sfixed64
                      :bool :float :double))
@@ -806,7 +774,6 @@ and a buffer which encodes the value to the buffer."
 ;; The optimized serializers supply 'vectorp' so we can generate better code
 (define-compiler-macro packed-size (&whole form values type
                                     &optional (vectorp nil vectorp-p))
-  (setq type (fold-symbol type))
   (let ((size-form
           (case type
             (:int32  `(length32 val))
