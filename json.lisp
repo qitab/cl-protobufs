@@ -200,31 +200,33 @@ Parameters:
              (slot  (and field (proto-external-field-name field))))
         (expect-char stream #\:)
         (if (null field)
+            ;; Should we signal an error here?
             (skip-json-value stream)
-            (let (val error-p)
-              (if (not (eq (proto-label field) :repeated))
-                  (multiple-value-setq (val error-p)
-                    (parse-value-from-json type :stream stream))
-                  (case (peek-char nil stream nil)
-                    ;; Repeated field is in list format
-                    ((#\[)
-                     (expect-char stream #\[)
-                     (loop
-                       (multiple-value-bind (data err)
-                           (parse-value-from-json type :stream stream)
-                         (if err
-                             (setf error-p t)
-                             (push data val)))
-                       (if (eql (peek-char nil stream nil) #\,)
-                           (expect-char stream #\,)
-                           (return)))
-                     (expect-char stream #\]))
-                    ;; 'null' is parsed as an empty list. Anything else is an error.
-                    ((#\n)
-                     (let ((tok (parse-token stream)))
-                       (unless (string= tok "null")
-                         (setf error-p t))))))
+            (let (val error-p null-p)
               (cond
+                ;; If we see an 'n', then the value MUST be 'null'. I
+                ;; this case, parse the 'null' and continune.
+                ((eql (peek-char nil stream nil) #\n)
+                 (parse-token stream)
+                 (skip-whitespace stream)
+                 (setf null-p t))
+                ((eq (proto-label field) :repeated)
+                 (expect-char stream #\[)
+                 (loop
+                   (multiple-value-bind (data err)
+                       (parse-value-from-json type :stream stream)
+                     (if err
+                         (setf error-p t)
+                         (push data val)))
+                   (if (eql (peek-char nil stream nil) #\,)
+                       (expect-char stream #\,)
+                       (return)))
+                 (expect-char stream #\]))
+                (t (multiple-value-setq (val error-p)
+                    (parse-value-from-json type :stream stream))))
+              (cond
+                ;; If we read a null, do nothing.
+                (null-p nil)
                 (error-p
                  (undefined-field-type "While parsing ~S from JSON format,"
                                        msg-desc type field)

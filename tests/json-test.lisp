@@ -50,7 +50,8 @@
   \"int64_field\": \"12\",
   \"sint64_field\": \"-1\",
   \"int_vals\": null,
-  \"oneof_int_field\": 5
+  \"oneof_int_field\": 5,
+  \"embedded_comment_a\": null
 }
 ")
 
@@ -74,6 +75,7 @@
     (assert-true (= -1 (sint64-field msg-parse)))
     (assert-true (eql 5 (oneof-int-field msg-parse)))
     (assert-false (int-vals msg-parse))
+    (assert-false (text-format-test.has-embedded-comment-a msg-parse))
     (assert-true (equalp (make-array 5 :element-type '(unsigned-byte 8)
                                        :initial-contents '(3 5 7 112 81))
                          (bytes-field msg-parse)))))
