@@ -499,9 +499,8 @@ Parameters:
                                      (or name (slot-name->proto slot)))
                     :label :optional
                     :index index
-                    ;; Oneof fields don't have a bit in the %%is-set vector, but
-                    ;; if they don't have an offset, then some code treats them
-                    ;; as extension fields.
+                    ;; Oneof fields don't have a bit in the %%is-set vector, as field
+                    ;; presence is tracked via the SET-FIELD slot of the oneof struct.
                     :field-offset nil
                     :internal-field-name internal-name
                     :external-field-name slot
