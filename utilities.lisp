@@ -348,23 +348,32 @@ Arguments:
 
 ;; A parameterized list type for repeated fields.  The elements aren't type-checked.
 (deftype list-of (type)
-  (if (eq type 'nil)                ; a list that cannot have any element (element-type nil) is null
+  (if (eq type nil)         ; a list that cannot have any element (element-type nil) is null
       'null
       'list))
 
 ;; A parameterized vector type for repeated fields.  The elements aren't type-checked.
 (deftype vector-of (type)
-  (if (eq type 'nil)        ; an array that cannot have any element (element-type nil) is of size 0
+  (if (eq type nil)         ; an array that cannot have any element (element-type nil) is of size 0
       '(array * (0))
       '(array * (*))))      ; a 1-dimensional array of any type
 
-;; This corresponds to the :bytes protobuf type
+;;; This can't be simple-vector because #() is used as the default in some places. Fix it.
+;;; This corresponds to the :bytes protobuf type.
 (deftype byte-vector () '(array (unsigned-byte 8) (*)))
 
 (defun make-byte-vector (size &key adjustable)
   "Make a byte vector of length SIZE, optionally ADJUSTABLE."
   (make-array size :element-type '(unsigned-byte 8)
                    :adjustable adjustable))
+
+(defconstant +field-number-bits+ 29
+  "Number of bits in a field number.")
+
+(defconstant +max-field-number+ (- (ash 1 +field-number-bits+) 1)
+  "Maximum field number is 2^29 - 1")
+
+(deftype field-number () `(integer 0 ,+max-field-number+))
 
 ;; The protobuf integer types
 (deftype    int32 () '(signed-byte 32))
