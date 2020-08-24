@@ -43,22 +43,26 @@
 ;;; https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/any.proto
 ;;;
 
+(defun resolve-type-url (type-url)
+  "Given a string TYPE-URL, find and return the lisp type that it names. If no
+message is found, signal an error."
+  (assert (find #\/  type-url :from-end t) ()
+          "Could not find / inside of type-url.")
+  (let* ((type-part-of-url
+           (subseq type-url (1+ (position #\/ type-url :from-end t))))
+         (type
+           (proto-impl::find-message-by-qualified-name
+            type-part-of-url)))
+    (assert type ()
+            "Could not find class for type: ~S." type-part-of-url)
+    type))
+
 (defun unpack-any (any-message)
   "Given an Any message unpack retrieve the stored proto message.
 Parameters:
   ANY-MESSAGE: The message to unpack."
-  (assert (find #\/ (cl-protobufs.google.protobuf:any.type-url any-message) :from-end t) ()
-          "Could not find / inside of any.type-url.")
-  (let* ((type-part-of-url
-          (subseq (cl-protobufs.google.protobuf:any.type-url any-message)
-                  (1+ (position #\/ (cl-protobufs.google.protobuf:any.type-url any-message)
-                                :from-end t))))
-         (type
-          (proto-impl::find-message-by-qualified-name
-           type-part-of-url))
-         (value (cl-protobufs.google.protobuf:any.value any-message)))
-    (assert type ()
-            "Could not find class for type: ~S." type-part-of-url)
+  (let ((type (resolve-type-url (cl-protobufs.google.protobuf:any.type-url any-message)))
+        (value (cl-protobufs.google.protobuf:any.value any-message)))
     (deserialize-object-from-bytes type value)))
 
 (defun pack-any (message &key (base-url "type.googleapis.com"))
