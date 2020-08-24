@@ -992,73 +992,69 @@ Parameters:
                                          message class field)))))
          ((nil) nil)))))
 
-(defun generate-field-deserializer (message field vbuf vidx &key raw-p)
+(defun generate-field-deserializer (message field vbuf vidx)
   "Generate a deserializer for a single field.
 
 Parameters:
   MESSAGE: The message-descriptor that contains the field.
   FIELD: The field-descriptor to deserialize.
-  VBUF: The buffer to deserialize from.
-  VIDX: The index of the buffer to rea dfrom.
-  RAW-P: If true, return a list of the arguments passed to any recursive
-         deserialization call instead of calling the function."
-  (let ((nslot nil)
-        (rslot nil))
-    (let* ((class  (proto-class field))
-           (index  (proto-index field))
-           (lazy-p (proto-lazy-p field))
-           (temp (fintern (string (proto-internal-field-name field))))
-           (oneof-offset (proto-oneof-offset field)))
-      (cond ((eq (proto-label field) :repeated)
-             (setf rslot (list field temp))
-             (multiple-value-bind (deserializer tag list?)
-                 (generate-repeated-field-deserializer
-                  class index lazy-p vbuf vidx temp :raw-p raw-p)
-               (if deserializer
-                   (if list?
-                       (return-from generate-field-deserializer
-                         (values tag deserializer
-                                 nslot rslot))
-                       (return-from generate-field-deserializer
-                         (values (list tag) (list deserializer)
-                                 nslot rslot)))
-                   (undefined-field-type "While generating 'deserialize-object' for ~S,"
-                                         message class field))))
-            ;; If this field is contained in a oneof, we need to put the value in the
-            ;; proper slot in the one-of data struct.
-            (oneof-offset
-             (let ((oneof-val (gensym "ONEOF-VAL")))
-               (multiple-value-bind (deserializer tag)
-                   (generate-non-repeated-field-deserializer
-                    class index lazy-p vbuf vidx oneof-val :raw-p raw-p)
-                 (when deserializer
-                   (setf deserializer
-                         `(progn
-                            (let ((,oneof-val))
-                              ,deserializer
-                              (setf (oneof-value ,temp) ,oneof-val)
-                              (setf (oneof-set-field ,temp) ,oneof-offset))))
-                   (return-from generate-field-deserializer
-                     (values (list tag) (list deserializer) nil nil temp)))
+  VBUF: The symbol naming the buffer to deserialize from.
+  VIDX: The symbol naming the index of the buffer to read from."
+  (let* (non-repeated-slot
+         repeated-slot
+         (class (proto-class field))
+         (index (proto-index field))
+         (lazy-p (proto-lazy-p field))
+         (temp (fintern (string (proto-internal-field-name field))))
+         (oneof-offset (proto-oneof-offset field)))
+    (cond ((eq (proto-label field) :repeated)
+           (setf repeated-slot (list field temp))
+           (multiple-value-bind (deserializer tag list?)
+               (generate-repeated-field-deserializer
+                class index lazy-p vbuf vidx temp)
+             (if deserializer
+                 (if list?
+                     (return-from generate-field-deserializer
+                       (values tag deserializer
+                               non-repeated-slot repeated-slot))
+                     (return-from generate-field-deserializer
+                       (values (list tag) (list deserializer)
+                               non-repeated-slot repeated-slot)))
                  (undefined-field-type "While generating 'deserialize-object' for ~S,"
                                        message class field))))
-            ;; Non-repeated field.
-            (t
-             (setf nslot temp)
+          ;; If this field is contained in a oneof, we need to put the value in the
+          ;; proper slot in the one-of data struct.
+          (oneof-offset
+           (let ((oneof-val (gensym "ONEOF-VAL")))
              (multiple-value-bind (deserializer tag)
                  (generate-non-repeated-field-deserializer
-                  class index lazy-p vbuf vidx temp :raw-p raw-p)
-               (if deserializer
-                   (return-from generate-field-deserializer
-                     (values (list tag) (list deserializer)
-                             nslot rslot))
-                   (undefined-field-type "While generating 'deserialize-object' for ~S,"
-                                         message class field)))))))
-
-  (assert nil))
+                  class index lazy-p vbuf vidx oneof-val)
+               (when deserializer
+                 (setf deserializer
+                       `(progn
+                          (let ((,oneof-val))
+                            ,deserializer
+                            (setf (oneof-value ,temp) ,oneof-val)
+                            (setf (oneof-set-field ,temp) ,oneof-offset))))
+                 (return-from generate-field-deserializer
+                   (values (list tag) (list deserializer) nil nil temp)))
+               (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                                     message class field))))
+          ;; Non-repeated field.
+          (t
+           (setf non-repeated-slot temp)
+           (multiple-value-bind (deserializer tag)
+               (generate-non-repeated-field-deserializer
+                class index lazy-p vbuf vidx temp)
+             (if deserializer
+                 (return-from generate-field-deserializer
+                   (values (list tag) (list deserializer)
+                           non-repeated-slot repeated-slot))
+                 (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                                       message class field)))))))
 
 (defun generate-repeated-field-deserializer
-    (class index lazy-p vbuf vidx dest &key raw-p)
+    (class index lazy-p vbuf vidx dest)
   "Returns three values: The first is a (list of) s-expressions that deserializes the
 specified object to dest and updates vidx to the new index. The second is (list of)
 tag(s) of this field. The third is true if and only if lists are being returned.
@@ -1069,17 +1065,13 @@ Parameters:
   LAZY-P: True if and only if the field is lazy.
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
-  DEST: The symbol name for the destination of deserialized data.
-  RAW-P: If true, return a list of the arguments passed to any recursive
-         deserialization call instead of calling the function."
+  DEST: The symbol name for the destination of deserialized data."
   (let ((msg (and class (not (scalarp class))
                   (or (find-message class)
                       (find-enum class)
                       (find-map-descriptor class)))))
     (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
-             (if raw-p
-                 `(list ,vbuf ,start ,end ,end-tag)
-                 (call-pseudo-method :deserialize msg vbuf start end end-tag))))
+             (call-pseudo-method :deserialize msg vbuf start end end-tag)))
       (cond ((scalarp class)
              (let* ((tag (make-tag class index))
                     (packed-tag (when (packed-type-p class)
@@ -1159,7 +1151,7 @@ Parameters:
             (t nil)))))
 
 (defun generate-non-repeated-field-deserializer
-    (class index lazy-p vbuf vidx dest &key raw-p)
+    (class index lazy-p vbuf vidx dest)
   "Returns two values: The first is lisp code that deserializes the specified object
 to dest and updates vidx to the new index. The second is the tag of this field.
 
@@ -1169,18 +1161,13 @@ Parameters:
   LAZY-P: True if and only if the field is lazy.
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
-  DEST: The symbol name for the destination of deserialized data.
-  RAW-P: If true, return a list of the arguments passed to any recursive
-         deserialization call instead of calling the function."
-
+  DEST: The symbol name for the destination of deserialized data."
   (let ((msg (and class (not (scalarp class))
                   (or (find-message class)
                       (find-enum class)
                       (find-map-descriptor class)))))
     (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
-             (if raw-p
-                 `(list ,vbuf ,start ,end ,end-tag)
-                 (call-pseudo-method :deserialize msg vbuf start end end-tag))))
+             (call-pseudo-method :deserialize msg vbuf start end end-tag)))
       (cond ((scalarp class)
              (values
               `(multiple-value-setq (,dest ,vidx)
@@ -1261,8 +1248,7 @@ Parameters:
 (defun generate-deserializer (message &key (name message) constructor
                                       (missing-value :%unset)
                                       (skip-fields nil)
-                                      (include-fields :all)
-                                      (raw-p nil))
+                                      (include-fields :all))
   "Generate a 'deserialize-object' method for the given message.
 Parameters:
   MESSAGE: The message model class to make a deserializer for.
@@ -1270,12 +1256,7 @@ Parameters:
   CONSTRUCTOR: The constructor to use when making the object.
   MISSING-VALUE: The value to set a field to if not found while deserializing.
   SKIP-FIELDS: Fields to skip while deserializing.
-  INCLUDE-FIELDS: Fields to include while deserializing.
-  RAW-P"
-  ;; I am somewhat perplexed by the fact that in many places the macro is "careful"
-  ;; to use gensyms but in other places not. Actually I think they're largely unnecessary,
-  ;; because there is no code that could accidentally look at these symbols.
-  ;; All they serve to do is make the expansion damned ugly.
+  INCLUDE-FIELDS: Fields to include while deserializing."
   (let ((vbuf (gensym "BUFFER"))
         (vidx (gensym "INDEX"))
         (vlim (gensym "LIMIT"))
@@ -1316,7 +1297,7 @@ Parameters:
           (when (and (include-field field)
                      (not (skip-field field)))
             (multiple-value-bind (tags deserializers nslot rslot oneof-slot)
-                (generate-field-deserializer message field vbuf vidx :raw-p raw-p)
+                (generate-field-deserializer message field vbuf vidx)
               (assert tags)
               (assert deserializers)
               (loop for tag in tags
