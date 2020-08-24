@@ -477,19 +477,22 @@ on the symbol if we are not in SBCL."
               :initform nil)
    (set-type  :accessor proto-set-type          ; The type obtained directly
               :initarg :set-type)               ; from the protobuf schema.
+   ;; :singular is what we're calling proto3 fields with the "optional" label.
    (label :type (member :required :optional :repeated :singular)
           :accessor proto-label
           :initarg :label)
-   (index :type (unsigned-byte 29)              ; The index number for this field
-          :accessor proto-index                 ; which must be strictly positive
+   ;; TODO(cgay): rename to field-number and proto-field-number. Why be coy?
+   (index :type field-number
+          :accessor proto-index
           :initarg :index)
-   (field-offset :type (or null (unsigned-byte 29))
+   ;; Offset into the is-set bit vector. nil for members of a oneof.
+   (field-offset :type (or null field-number)
                  :accessor proto-field-offset
                  :initarg :field-offset)
    ;; If this field is contained in a oneof, this holds the order of this field
    ;; as it was defined in the oneof. This slot is nil if and only if the field
    ;; is not part of a oneof.
-   (oneof-offset :type (or null (unsigned-byte 29))
+   (oneof-offset :type (or null field-number)
                  :accessor proto-oneof-offset
                  :initarg :oneof-offset
                  :initform nil)
@@ -589,11 +592,11 @@ on the symbol if we are not in SBCL."
 
 (defclass extension-descriptor (abstract-descriptor)
   ;; The start of the extension range.
-  ((from :type (integer 1 #.(1- (ash 1 29)))
+  ((from :type field-number
          :accessor proto-extension-from
          :initarg :from)
    ;; The end of the extension range, inclusive.
-   (to :type (integer 1 #.(1- (ash 1 29)))
+   (to :type field-number
        :accessor proto-extension-to
        :initarg :to))
   (:documentation
@@ -653,7 +656,6 @@ on the symbol if we are not in SBCL."
   (find index (proto-methods service) :key #'proto-index))
 
 
-;;; TODO(cgay): make slot names match accessor names (sans prefix).
 (defclass method-descriptor (descriptor)
   ;; Name of the Stubby service for which this is a method.
   ((service-name :type string
@@ -718,32 +720,27 @@ on the symbol if we are not in SBCL."
     (format stream "~S" (proto-class m))))
 
 (defstruct oneof
-  "Object which stores all necessary data for a oneof slot."
-  ;; This slot stores the data which is set in the oneof.
-  ;; Typing this slot as an OR of the oneof's field types doesn't seem
-  ;; to get us any additional space savings. Furthermore, trying to add
-  ;; a type would require making a new oneof defstruct for each oneof
-  ;; defined, which greatly adds to the code's complexity.
+  "Stores data for a oneof slot."
+  ;; Value of the currently set field in the oneof. Only the one (untyped) slot
+  ;; is needed to store the oneof's current value.
   (value nil)
-  ;; This slot indicates which field is set in the oneof
-  ;; It is either nil or a number. If it is nil, then nothing is set.
-  ;; if it is a number, say N, then the N-th field in the oneof is set.
+  ;; Indicates which field is set in the oneof. If nil, then nothing is set in
+  ;; the oneof. If a number, say N, then the N-th field in the oneof is set.
   (set-field nil :type (or null (unsigned-byte 32))))
 
 (defstruct oneof-descriptor
-  "The meta-object for a protobuf oneof"
-  ;; A boolean which indicates if the oneof is synthetic.
-  ;; A synthetic oneof is a oneof which is created by protoc in order to
-  ;; create has-* functions for proto3 optional fields. Special accessors
-  ;; (the clear, has, and case functions) are not created for synthetic
-  ;; oneofs.
+  "Describes a oneof"
+  ;; Indicates whether the oneof is synthetic. A synthetic oneof is a oneof
+  ;; created by protoc in order to create has-* functions for proto3 optional
+  ;; fields. Special accessors (the clear, has, and case functions) are not
+  ;; created for synthetic oneofs.
   (synthetic-p nil :type boolean)
-  ;; A vector which stores the oneof's field descriptor.
-  (fields nil :type array)
+  ;; One field-descriptor for each field in the one-of, in order.
+  (fields nil :type simple-vector)
+  ;; A symbol naming the oneof field.
+  (external-name nil :type symbol)
   ;; The external name, but with '%' prepended.
-  (internal-name nil :type symbol)
-  ;; A symbol whose name is the name of the oneof.
-  (external-name nil :type symbol))
+  (internal-name nil :type symbol))
 
 (defmethod make-load-form ((o oneof-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
