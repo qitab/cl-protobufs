@@ -130,8 +130,8 @@
 ;; (uncamel-case "new_RPC_LispService") => "NEW-RPC-LISP-SERVICE"
 ;; (uncamel-case "RPC_LispServiceRequest_get_request") => "RPC-LISP-SERVICE-REQUEST-GET-REQUEST"
 ;; (uncamel-case "TCP2Name3") => "TCP2-NAME3"
-(defun uncamel-case (name)
-  "Convert NAME from camel-case to a hyphen-separated string."
+(defun uncamel-case (name &optional (separator #\-))
+  "Convert NAME from camel-case to a SEPARATOR-separated string."
   ;; We need a whole state machine to get this right
   (labels ((uncamel (chars state result)
              (let ((ch (first chars)))
@@ -143,9 +143,9 @@
                                  ((upper)
                                   ;; "TCPConnection" => "TCP-CONNECTION"
                                   (if (and (second chars) (lower-case-p (second chars)))
-                                      (list* ch #\- result)
+                                      (list* ch separator result)
                                       (cons ch result)))
-                                 ((lower digit) (list* ch #\- result))
+                                 ((lower digit) (list* ch separator result))
                                  (otherwise (cons ch result)))))
                      ((lower-case-p ch)
                       (uncamel (rest chars) 'lower

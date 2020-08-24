@@ -10,7 +10,8 @@
 ;;; The exported symbols are parse-json and print-json.
 
 (defun print-json (object &key (indent 0) (stream *standard-output*)
-                          (camel-case-p t) (numeric-enums-p nil))
+                            (camel-case-p t) (numeric-enums-p nil)
+                            (spliced-p nil))
   "Prints a protocol buffer message to a stream in JSON format.
 Parameters:
   OBJECT: The protocol buffer message to print.
@@ -18,17 +19,24 @@ Parameters:
     output will not be pretty-printed.
   STREAM: The stream to print to.
   CAMEL-CASE-P: If true print proto field names in camelCase.
-  NUMERIC-ENUMS-P: If true, use enum numeric values rather than names."
+  NUMERIC-ENUMS-P: If true, use enum numeric values rather than names.
+  SPLICED-P: If true, print this object inside of an existing JSON object
+    in the stream. This means that no open bracket is printed."
   (let* ((type (type-of object))
          (message (find-message-for-class type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
-
-    (format stream "{")
-    (when indent (format stream "~%"))
+    ;; If TYPE has a special JSON mapping, use that.
+    (when (special-json-p type)
+      (print-special-json object type stream indent camel-case-p numeric-enums-p)
+      (return-from print-json))
+    (unless spliced-p
+      (format stream "{")
+      (when indent (format stream "~%")))
     ;; Boolean that tracks if a field is printed. Used for printing commas
-    ;; correctly.
-    (let (field-printed)
+    ;; correctly. If this object is spliced into an existing JSON object, then
+    ;; a field has been already printed, so always print a comma.
+    (let ((field-printed spliced-p))
       (dolist (field (proto-fields message))
         (when (if (eq (slot-value field 'message-type) :extends)
                   (has-extension object (slot-value field 'internal-field-name))
@@ -168,20 +176,22 @@ Parameters:
 
 ;;; Parse objects that were serialized using JSON format.
 
-(defgeneric parse-json (type &key stream)
+(defgeneric parse-json (type &key stream spliced-p)
   (:documentation
-   "Parses an object message of type TYPE from the stream STREAM using JSON."))
+   "Parses an object message of type TYPE from the stream STREAM using JSON. If
+SPLICED-P is true, then do not attempt to parse an opening bracket."))
 
 (defmethod parse-json ((type symbol)
-                              &key (stream *standard-input*))
+                              &key (stream *standard-input*) (spliced-p nil))
   (let ((message (find-message-for-class type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
-    (parse-json message :stream stream)))
+    (parse-json message :stream stream :spliced-p spliced-p)))
 
 (defmethod parse-json ((msg-desc message-descriptor)
-                       &key (stream *standard-input*))
-  "Parse a JSON formatted message with descriptor MSG-DESC from STREAM."
+                       &key (stream *standard-input*) (spliced-p nil))
+  "Parse a JSON formatted message with descriptor MSG-DESC from STREAM. If SPLICED-P is true,
+then do not attempt to parse an opening bracket."
   (let ((object #+sbcl (make-instance (or (proto-alias-for msg-desc)
                                           (proto-class msg-desc)))
                 #-sbcl (funcall (get-constructor-name
@@ -189,7 +199,10 @@ Parameters:
                                      (proto-class msg-desc)))))
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
-    (expect-char stream #\{)
+    (when (special-json-p (proto-class msg-desc))
+      (return-from parse-json (parse-special-json (proto-class msg-desc) stream)))
+    (unless spliced-p
+      (expect-char stream #\{))
     (loop
       (let* ((name  (parse-string stream))
              (field (or (find-field msg-desc name)
@@ -257,7 +270,7 @@ Parameters:
     (cond ((scalarp type)
            (case type
              ((:float) (parse-float stream))
-             ((:double) (parse-double stream))
+             ((:double) (parse-double stream :append-d0 t))
              ((:string) (parse-string stream))
              ((:bool)
               (let ((token (parse-token stream)))
@@ -350,3 +363,177 @@ be either an array, object, or primitive."
            thereis (find name (oneof-descriptor-fields oneof)
                          :key #'proto-json-name
                          :test #'string=))))
+
+;; Special JSON mappings for well known types below
+
+(defun special-json-p (type)
+  "Check if the message TYPE has a special JSON mapping."
+  (member type '(cl-protobufs.google.protobuf:any
+                 cl-protobufs.google.protobuf:timestamp
+                 cl-protobufs.google.protobuf:duration
+;;               cl-protobufs.google.protobuf:struct
+;;               cl-protobufs.google.protobuf:value
+                 cl-protobufs.google.protobuf:field-mask
+;;               cl-protobufs.google.protobuf:list-value
+                 cl-protobufs.google.protobuf:bool-value
+                 cl-protobufs.google.protobuf:string-value
+                 cl-protobufs.google.protobuf:bytes-value
+                 cl-protobufs.google.protobuf:double-value
+                 cl-protobufs.google.protobuf:float-value
+                 cl-protobufs.google.protobuf:int32-value
+                 cl-protobufs.google.protobuf:int64-value
+                 cl-protobufs.google.protobuf:u-int32-value
+                 cl-protobufs.google.protobuf:u-int64-value)))
+
+(defun wrapper-message->type (type)
+  "For a well known wrapper type TYPE, return the type being wrapped."
+  (ecase type
+    ((cl-protobufs.google.protobuf:bool-value) :bool)
+    ((cl-protobufs.google.protobuf:string-value) :string)
+    ((cl-protobufs.google.protobuf:bytes-value) :bytes)
+    ((cl-protobufs.google.protobuf:double-value) :double)
+    ((cl-protobufs.google.protobuf:float-value) :float)
+    ((cl-protobufs.google.protobuf:int32-value) :int32)
+    ((cl-protobufs.google.protobuf:int64-value) :int64)
+    ((cl-protobufs.google.protobuf:u-int32-value) :uint32)
+    ((cl-protobufs.google.protobuf:u-int64-value) :uint64)))
+
+(defun print-special-json (object type stream indent camel-case-p numeric-enums-p)
+  "For an OBJECT whose TYPE is a well-known type, print the object's special JSON mapping
+to STREAM. INDENT, CAMEL-CASE-P, and NUMERIC-ENUMS-P are passed recursively to PRINT-JSON
+for any types."
+  (case type
+    ((cl-protobufs.google.protobuf:any)
+     (let ((url (cl-protobufs.google.protobuf:any.type-url object))
+           (packed-message (cl-protobufs.well-known-types:unpack-any object)))
+       (format stream "{")
+       (if indent
+           (format stream "~&~V,0T\"url\": \"~A\"" (+ indent 2) url)
+           (format stream "\"url\": \"~A\"" url))
+       (if (special-json-p (type-of packed-message))
+           ;; special handling for nested special json mapping within an ANY.
+           (progn
+             (if indent
+                 (format stream ",~&~V,0T\"value\": " (+ indent 2))
+                 (format stream ",\"value\":"))
+             (print-special-json packed-message (type-of packed-message) stream
+                                 (and indent (+ indent 2)) camel-case-p numeric-enums-p)
+             (if indent
+                 (format stream "~&~V,0T}" indent)
+                 (format stream "}")))
+           (print-json packed-message :stream stream
+                                      :indent indent
+                                      :camel-case-p camel-case-p
+                                      :numeric-enums-p numeric-enums-p
+                                      :spliced-p t))))
+    ;; todo(benkuehnert): LOCAL-TIME's utility f or printing rfc3339 strings does not
+    ;; support nanosecond precision and uses milisecond precision by default. Proto
+    ;; spec says that nanosecond precision should be used whenever possible.
+    ((cl-protobufs.google.protobuf:timestamp)
+     (let ((timestamp (local-time:unix-to-timestamp
+                       (cl-protobufs.google.protobuf:timestamp.seconds object)
+                       :nsec (cl-protobufs.google.protobuf:timestamp.nanos object))))
+       (format stream "~S" (local-time:format-rfc3339-timestring nil timestamp))))
+    ((cl-protobufs.google.protobuf:duration)
+     (let ((seconds (cl-protobufs.google.protobuf:duration.seconds object))
+           (nanos (cl-protobufs.google.protobuf:duration.nanos object)))
+       (assert (eql (signum seconds) (signum nanos)))
+       (format stream "\"~D.~V,VDs\"" seconds 9 #\0 (abs nanos))))
+    ((cl-protobufs.google.protobuf:field-mask)
+     (let ((paths (cl-protobufs.google.protobuf:field-mask.paths object)))
+       (format stream "\"~{~a~^,~}\"" (mapcar (lambda (name)
+                                            (camel-case-but-one name '(#\_)))
+                                              paths))))
+    ;; Otherwise, TYPE is a wrapper type.
+    (t (if object
+           (print-scalar-to-json (cl-protobufs.google.protobuf:value object)
+                                 (wrapper-message->type type)
+                                 stream)
+           (format stream "null")))))
+
+(defun parse-special-json (type stream)
+  "Parse a well known type TYPE from STREAM."
+  ;; If the stream starts with 'n', then the data is NULL. In which case, return NIL.
+  (when (eql (peek-char nil stream nil) #\n)
+    (assert (string= (parse-token stream) "null"))
+    (return-from parse-special-json nil))
+  (case type
+    ((cl-protobufs.google.protobuf:any)
+     (expect-char stream #\{)
+     (let ((token (parse-string stream)))
+       (assert (string= token "url")))
+     (expect-char stream #\:)
+     (let* ((type-url (parse-string stream))
+            (type (cl-protobufs.well-known-types::resolve-type-url type-url)))
+       (expect-char stream #\,)
+       (if (not (special-json-p type))
+           ;; Parse the remaining elements in the object into a new message, then pack that message.
+           (cl-protobufs.well-known-types::pack-any
+            (parse-json type :stream stream :spliced-p t))
+           ;; If URL names a well-known-type, then the next element in the object has key "VALUE",
+           ;; and the value is the special JSON format. Parse that and close the object.
+           (let ((val-string (parse-string stream))
+                 ret)
+             (assert (string= val-string "value"))
+             (expect-char stream #\:)
+             (setf ret (parse-special-json type stream))
+             (expect-char stream #\})
+             (cl-protobufs.well-known-types::pack-any ret)))))
+
+    ((cl-protobufs.google.protobuf:timestamp)
+     (let* ((timestring (parse-string stream))
+            (timestamp (local-time:parse-rfc3339-timestring timestring)))
+       (cl-protobufs.google.protobuf:make-timestamp
+        :seconds (local-time:timestamp-to-unix timestamp)
+        :nanos (local-time:nsec-of timestamp))))
+
+    ;; Durations can feasibly have 64-bit seconds place, so parsing a float/double is lossy.
+    ((cl-protobufs.google.protobuf:duration)
+     (expect-char stream #\")
+     (let ((seconds (parse-signed-int stream)))
+       (ecase (peek-char nil stream nil)
+         ;; Duration has no decimal component.
+         ((#\s)
+          (expect-char stream #\s)
+          (expect-char stream #\")
+          (cl-protobufs.google.protobuf:make-duration :seconds seconds))
+         ((#\.)
+          (expect-char stream #\.)
+          ;; Parse the decimal part of the string, and convert to nanoseconds.
+          (let ((remainder (parse-token stream)))
+            (assert (eql (char remainder (1- (length remainder))) #\s)
+                    nil "Duration string ~S.~A does end with \"s\"" seconds remainder)
+            (expect-char stream #\")
+            (let* ((decimals (subseq remainder 0 (1- (length remainder))))
+                   ;; If there are more than 9 decimal points, trim to length 9.
+                   (decimals (if (< 9 (length decimals))
+                                 (subseq decimals 0 10)
+                                 decimals))
+                   (dec-length (length decimals)))
+              (cl-protobufs.google.protobuf:make-duration
+               :seconds seconds
+               ;; Nanoseconds are in the range 0 through 999,999,999. Pad the decimal string
+               ;; with 0s to make the string have total length 9.
+               ;; Lastly, multiply by the sign of SECONDS, as NANOS and and SECONDS must
+               ;; have the same sign.
+               :nanos (* (if (= 0 seconds) 1 (signum seconds))
+                         (parse-integer (concatenate 'string
+                                                     decimals
+                                                     (make-string (- 9 dec-length)
+                                                                  :initial-element #\0)))))))))))
+
+    ;; Field masks are in the form \"camelCasePath1,path2,path3\". We need to first split,
+    ;; then convert to proto field name format (lowercase, separated by underscore).
+    ((cl-protobufs.google.protobuf:field-mask)
+     (let ((camel-case-paths (split-string (parse-string stream) :separators '(#\,))))
+
+       (cl-protobufs.google.protobuf:make-field-mask
+        :paths (mapcar (lambda (path) (nstring-downcase (uncamel-case path #\_)))
+                       camel-case-paths))))
+
+    ;; Otherwise, the well known type is a wrapper type.
+    (t (let ((object #+sbcl (make-instance type)
+                     #-sbcl (funcall (get-constructor-name type)))
+             (value (parse-value-from-json (wrapper-message->type type) :stream stream)))
+         (setf (cl-protobufs.google.protobuf:value object) value)
+         object))))

@@ -23,7 +23,8 @@
                #-sbcl :babel
                :alexandria
                :trivial-garbage
-               :cl-base64)
+               :cl-base64
+               :local-time)
   :serial t
   :in-order-to ((test-op (test-op :cl-protobufs/tests)))
   :components
@@ -61,7 +62,6 @@
     :components
     ((:file "buffers")
      (:file "text-format")
-     (:file "json")
      (:file "wire-format")
      (:file "serialize")))
    (:module "misc"
@@ -97,7 +97,12 @@
       :proto-pathname "google/protobuf/timestamp.proto")
      (:protobuf-source-file "wrappers"
       :proto-pathname "google/protobuf/wrappers.proto")
-     (:file "well-known-types")))))
+     (:file "well-known-types")))
+   (:module "json"
+    :serial t
+    :pathname ""
+    :depends-on ("well-known-types" "serialization")
+    :components ((:file "json")))))
 
 (defsystem :cl-protobufs/tests
   :name "Protobufs Tests"

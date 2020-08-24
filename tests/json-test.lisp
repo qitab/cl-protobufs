@@ -81,7 +81,7 @@
                          (bytes-field msg-parse)))))
 
 ;; tests a round trip of proto message -> text -> proto.
-(deftest test-roundtrip-text-format (json-suite)
+(deftest test-roundtrip-json (json-suite)
   ;; Try several different flags when printing. The parser should handle each one.
   (dolist (key '(nil :no-pretty-print :no-camel-case :numeric-enums))
     (let* ((nested (make-text-format-test.nested-message1 :int-field 2))
