@@ -80,6 +80,15 @@
                                        :initial-contents '(3 5 7 112 81))
                          (bytes-field msg-parse)))))
 
+(defun json-roundtrip (msg)
+  "For a message object MSG, print to JSON, then parse from JSON and assert that
+the result is PROTO-EQUAL with MSG."
+  (let* ((text (with-output-to-string (s)
+                 (print-json msg :stream s)))
+         (msg-parse (with-input-from-string (s text)
+                      (parse-json (type-of msg) :stream s))))
+    (assert-true (proto:proto-equal msg-parse msg))))
+
 ;; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-json (json-suite)
   ;; Try several different flags when printing. The parser should handle each one.
@@ -100,16 +109,109 @@
                                             :initial-contents '(3 5 7 112 81))
                  :bool-field t
                  :int64-field 12
-                 :sint64-field -1))
-           )
+                 :sint64-field -1)))
       (setf (text-format-test.map-field-gethash 1 msg) "one")
       (setf (text-format-test.map-field-gethash 2 msg) "two")
-      (let* ((text (with-output-to-string (s)
-                     (print-json msg :stream s
-                                     :indent (if (eq key :no-pretty-print) nil 0)
-                                     :camel-case-p (not (eq key :no-camel-case))
-                                     :numeric-enums-p (eq key :numeric-enums))))
-             (msg-parse (with-input-from-string (s text)
-                          (parse-json 'cl-protobufs.test-proto:text-format-test
-                                      :stream s))))
-        (assert-true (proto:proto-equal msg-parse msg))))))
+      (json-roundtrip msg))))
+
+
+(deftest any-roundtrip (json-suite)
+  (let* ((nested (make-text-format-test.nested-message1 :int-field 2))
+         (msg (make-text-format-test :int-field 100 :float-field 1.5 :one-level-nesting nested))
+         (any (cl-protobufs.well-known-types:pack-any msg)))
+    (json-roundtrip any)))
+
+(deftest timestamp-rountrip (json-suite)
+  (let* ((timestamp (cl-protobufs.google.protobuf:make-timestamp :seconds 1598289366 :nanos 4000)))
+    (json-roundtrip timestamp)))
+
+(deftest duration-roundtrip (json-suite)
+  ;; Ensure JSON format works for both positive and negative durations.
+  (let* ((pos-dur (cl-protobufs.google.protobuf:make-duration :seconds 86400 :nanos 20))
+         (neg-dur (cl-protobufs.google.protobuf:make-duration :seconds -86400 :nanos -20)))
+    (json-roundtrip pos-dur)
+    (json-roundtrip neg-dur)))
+  
+(deftest fieldmask-roundtrip (json-suite)
+  (let* ((field-mask (cl-protobufs.google.protobuf:make-field-mask
+                      :paths '("user.display_name" "photo"))))
+    (json-roundtrip field-mask)))
+
+(deftest wrapper-roundtrip (json-suite)
+  (let* ((double-wrap (cl-protobufs.google.protobuf:make-double-value :value 12.3d0))
+         (float-wrap (cl-protobufs.google.protobuf:make-float-value :value 3.14))
+         (bool-wrap (cl-protobufs.google.protobuf:make-bool-value :value t))
+         (string-wrap (cl-protobufs.google.protobuf:make-string-value :value "test"))
+         (bytes-wrap (cl-protobufs.google.protobuf:make-bytes-value
+                      :value (make-array 5 :element-type '(unsigned-byte 8)
+                                           :initial-contents '(3 5 7 112 81))))
+         (int32-wrap (cl-protobufs.google.protobuf:make-int32-value :value -200))
+         (int64-wrap (cl-protobufs.google.protobuf:make-int64-value :value -3200000000))
+         (uint32-wrap (cl-protobufs.google.protobuf:make-u-int32-value :value 200))
+         (uint64-wrap (cl-protobufs.google.protobuf:make-u-int64-value :value 3200000000)))
+    (json-roundtrip double-wrap)
+    (json-roundtrip float-wrap)
+    (json-roundtrip bool-wrap)
+    (json-roundtrip string-wrap)
+    (json-roundtrip bytes-wrap)
+    (json-roundtrip int32-wrap)
+    (json-roundtrip int64-wrap)
+    (json-roundtrip uint32-wrap)
+    (json-roundtrip uint64-wrap)))
+
+;; This tests the JSON parser/printer handling any messages that contain packed well known types.
+(deftest special-json-nested (json-suite)
+  (let* ((nested (make-text-format-test.nested-message1 :int-field 2))
+         (msg (make-text-format-test :int-field 100 :float-field 1.5 :one-level-nesting nested))
+         (timestamp (cl-protobufs.google.protobuf:make-timestamp :seconds 1598289366 :nanos 4000))
+         (pos-dur (cl-protobufs.google.protobuf:make-duration :seconds 86400 :nanos 20))
+         (double-wrap (cl-protobufs.google.protobuf:make-double-value :value 12.3d0))
+         (float-wrap (cl-protobufs.google.protobuf:make-float-value :value 3.14))
+         (bool-wrap (cl-protobufs.google.protobuf:make-bool-value :value t))
+         (string-wrap (cl-protobufs.google.protobuf:make-string-value :value "test"))
+         (bytes-wrap (cl-protobufs.google.protobuf:make-bytes-value
+                      :value (make-array 5 :element-type '(unsigned-byte 8)
+                                           :initial-contents '(3 5 7 112 81))))
+         (int32-wrap (cl-protobufs.google.protobuf:make-int32-value :value -200)))
+    (flet ((roundtrip-with-any (msg)
+             (json-roundtrip (cl-protobufs.well-known-types:pack-any msg))))
+      ;; Test the an any inside of an any
+      (roundtrip-with-any (cl-protobufs.well-known-types:pack-any msg))
+      (roundtrip-with-any timestamp)
+      (roundtrip-with-any pos-dur)
+      (roundtrip-with-any float-wrap)
+      (roundtrip-with-any double-wrap)
+      (roundtrip-with-any bool-wrap)
+      (roundtrip-with-any string-wrap)
+      (roundtrip-with-any bytes-wrap)
+      (roundtrip-with-any int32-wrap))))
+
+(defparameter *any-with-null*
+"{
+  \"url\": \"type.googleapis.com/test_proto.TextFormatTest\",
+  \"intField\": null,
+  \"string_field\": \"A string\"
+}
+")
+
+;; Verify that seeing 'null' in text has the right behavior for any messages.
+(deftest any-null-test (json-suite)
+  (let* ((parsed-msg (with-input-from-string (s *any-with-null*)
+                       (parse-json 'cl-protobufs.google.protobuf:any :stream s)))
+         (unpacked-msg (cl-protobufs.well-known-types:unpack-any parsed-msg)))
+    (assert-true (= (int-field unpacked-msg) 0))
+    (assert-true (string= (string-field unpacked-msg) "A string"))))
+
+(deftest wrapper-null-test (json-suite)
+  (flet ((test-wrapper-type (type)
+           (with-input-from-string (s "null")
+             (assert-false (proto-impl::parse-special-json type s)))))
+    (test-wrapper-type 'cl-protobufs.google.protobuf:bool-value)
+    (test-wrapper-type 'cl-protobufs.google.protobuf:string-value)
+    (test-wrapper-type 'cl-protobufs.google.protobuf:bytes-value)
+    (test-wrapper-type 'cl-protobufs.google.protobuf:double-value)
+    (test-wrapper-type 'cl-protobufs.google.protobuf:float-value)
+    (test-wrapper-type 'cl-protobufs.google.protobuf:int32-value)
+    (test-wrapper-type 'cl-protobufs.google.protobuf:int64-value)
+    (test-wrapper-type 'cl-protobufs.google.protobuf:u-int32-value)
+    (test-wrapper-type 'cl-protobufs.google.protobuf:u-int64-value)))
