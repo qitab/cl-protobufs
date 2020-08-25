@@ -14,7 +14,7 @@
   :author "Scott McKay"
   :version "2.0"
   :licence "MIT-style"
-  :maintainer '("Jon Godbout" "Carl Gay")
+  :maintainer '("Jon Godbout" "Carl Gay" "Ben Kuehnert")
   :description      "Protobufs for Common Lisp"
   :long-description "Protobufs for Common Lisp"
   :defsystem-depends-on (:cl-protobufs.asdf)
@@ -104,7 +104,7 @@
   :author "Scott McKay"
   :version "2.0"
   :licence "MIT-style"
-  :maintainer '("Jon Godbout" "Carl Gay")
+  :maintainer '("Jon Godbout" "Carl Gay" "Ben Kuehnert")
   :description      "Test code for Protobufs for Common Lisp"
   :long-description "Test code for Protobufs for Common Lisp"
   :defsystem-depends-on (:cl-protobufs.asdf)
