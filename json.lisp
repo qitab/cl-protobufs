@@ -4,7 +4,20 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(in-package "PROTO-IMPL")
+(defpackage #:cl-protobufs.json
+  (:use #:cl
+        #:cl-protobufs
+        #:proto-impl)
+  (:shadow
+   #:find-method)
+  (:export #:print-json
+           #:parse-json)
+  (:local-nicknames
+   (#:pi #:proto-impl)
+   (#:google #:cl-protobufs.google.protobuf)
+   (#:wkt #:cl-protobufs.well-known-types)))
+
+(in-package #:cl-protobufs.json)
 
 ;;; This file implements the protobuf JSON parser and printer.
 ;;; The exported symbols are parse-json and print-json.
@@ -38,17 +51,17 @@ Parameters:
     ;; a field has been already printed, so always print a comma.
     (let ((field-printed spliced-p))
       (dolist (field (proto-fields message))
-        (when (if (eq (slot-value field 'message-type) :extends)
+        (when (if (eq (slot-value field 'pi::message-type) :extends)
                   (has-extension object (slot-value field 'internal-field-name))
-                  (has-field object (slot-value field 'external-field-name)))
+                  (has-field object (slot-value field 'pi::external-field-name)))
           (let* ((name (if camel-case-p
-                           (proto-json-name field)
+                           (pi::proto-json-name field)
                            (proto-name field)))
                  (type (proto-class field))
                  (value
-                   (if (eq (slot-value field 'message-type) :extends)
-                       (get-extension object (slot-value field 'external-field-name))
-                       (proto-slot-value object (slot-value field 'external-field-name)))))
+                   (if (eq (slot-value field 'pi::message-type) :extends)
+                       (get-extension object (slot-value field 'pi::external-field-name))
+                       (proto-slot-value object (slot-value field 'pi::external-field-name)))))
             (if field-printed
                 (format stream ",")
                 (setf field-printed t))
@@ -60,7 +73,7 @@ Parameters:
                                      stream camel-case-p numeric-enums-p)
                 (let (repeated-printed)
                   (format stream "[")
-                  (doseq (v value)
+                  (pi::doseq (v value)
                     (if repeated-printed
                         (format stream ",")
                         (setf repeated-printed t))
@@ -70,15 +83,15 @@ Parameters:
                   (if indent
                       (format stream "~&~V,0T]" (+ indent 2))
                       (format stream "]")))))))
-      (dolist (oneof (proto-oneofs message))
-        (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
-               (set-field (oneof-set-field oneof-data)))
+      (dolist (oneof (pi::proto-oneofs message))
+        (let* ((oneof-data (slot-value object (pi::oneof-descriptor-internal-name oneof)))
+               (set-field (pi::oneof-set-field oneof-data)))
           (when set-field
-            (let* ((field-desc (aref (oneof-descriptor-fields oneof) set-field))
+            (let* ((field-desc (aref (pi::oneof-descriptor-fields oneof) set-field))
                    (type (proto-class field-desc))
-                   (value (oneof-value oneof-data))
+                   (value (pi::oneof-value oneof-data))
                    (name (if camel-case-p
-                             (proto-json-name field-desc)
+                             (pi::proto-json-name field-desc)
                              (proto-name field-desc))))
               (if field-printed
                   (format stream ",")
@@ -106,17 +119,17 @@ Parameters:
                         (find-enum type)
                         (find-map-descriptor type))))
     (cond
-      ((scalarp type)
+      ((pi::scalarp type)
        (print-scalar-to-json value type stream))
-      ((typep descriptor 'message-descriptor)
+      ((typep descriptor 'pi::message-descriptor)
        (print-json value
                    :indent indent
                    :stream stream
                    :camel-case-p camel-case-p
                    :numeric-enums-p numeric-enums-p))
-      ((typep descriptor 'enum-descriptor)
+      ((typep descriptor 'pi::enum-descriptor)
        (print-enum-to-json value type stream numeric-enums-p))
-      ((typep descriptor 'map-descriptor)
+      ((typep descriptor 'pi::map-descriptor)
        (print-map-to-json value descriptor indent
                           stream camel-case-p numeric-enums-p)))))
 
@@ -147,7 +160,7 @@ Parameters:
 rather than its name."
   (if numeric-enums-p
       (format stream "~D" (enum->numeral type value))
-      (format stream "\"~A\"" (enum-name->proto value))))
+      (format stream "\"~A\"" (pi::enum-name->proto value))))
 
 (defun print-map-to-json (value map-descriptor indent stream camel-case-p numeric-enums-p)
   "Print a map type to JSON.
@@ -168,7 +181,7 @@ Parameters:
              (if indent
                  (format stream "~&~V,0T\"~A\": " (+ indent 2) (write-to-string k))
                  (format stream "\"~A\":"  (write-to-string k)))
-             (print-field-to-json v (map-descriptor-val-class map-descriptor)
+             (print-field-to-json v (pi::map-descriptor-val-class map-descriptor)
                                   (and indent (+ indent 4)) stream camel-case-p numeric-enums-p)))
     (if indent
         (format stream "~&~V,0T}" indent)
@@ -192,7 +205,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."))
                        &key (stream *standard-input*) (spliced-p nil))
   "Parse a JSON formatted message with descriptor MSG-DESC from STREAM. If SPLICED-P is true,
 then do not attempt to parse an opening bracket."
-  (let ((object #+sbcl (make-instance (or (proto-alias-for msg-desc)
+  (let ((object #+sbcl (make-instance (or (pi::proto-alias-for msg-desc)
                                           (proto-class msg-desc)))
                 #-sbcl (funcall (get-constructor-name
                                  (or (proto-alias-for msg-desc)
@@ -202,16 +215,16 @@ then do not attempt to parse an opening bracket."
     (when (special-json-p (proto-class msg-desc))
       (return-from parse-json (parse-special-json (proto-class msg-desc) stream)))
     (unless spliced-p
-      (expect-char stream #\{))
+      (pi::expect-char stream #\{))
     (loop
-      (let* ((name  (parse-string stream))
+      (let* ((name  (pi::parse-string stream))
              (field (or (find-field msg-desc name)
                         (find-field-by-json-name msg-desc name)))
              (type  (and field (if (eq (proto-class field) 'boolean)
                                    :bool
                                    (proto-class field))))
-             (slot  (and field (proto-external-field-name field))))
-        (expect-char stream #\:)
+             (slot  (and field (pi::proto-external-field-name field))))
+        (pi::expect-char stream #\:)
         (if (null field)
             ;; Should we signal an error here?
             (skip-json-value stream)
@@ -220,11 +233,11 @@ then do not attempt to parse an opening bracket."
                 ;; If we see an 'n', then the value MUST be 'null'. I
                 ;; this case, parse the 'null' and continune.
                 ((eql (peek-char nil stream nil) #\n)
-                 (parse-token stream)
-                 (skip-whitespace stream)
+                 (pi::parse-token stream)
+                 (pi::skip-whitespace stream)
                  (setf null-p t))
                 ((eq (proto-label field) :repeated)
-                 (expect-char stream #\[)
+                 (pi::expect-char stream #\[)
                  (loop
                    (multiple-value-bind (data err)
                        (parse-value-from-json type :stream stream)
@@ -232,9 +245,9 @@ then do not attempt to parse an opening bracket."
                          (setf error-p t)
                          (push data val)))
                    (if (eql (peek-char nil stream nil) #\,)
-                       (expect-char stream #\,)
+                       (pi::expect-char stream #\,)
                        (return)))
-                 (expect-char stream #\]))
+                 (pi::expect-char stream #\]))
                 (t (multiple-value-setq (val error-p)
                     (parse-value-from-json type :stream stream))))
               (cond
@@ -244,7 +257,7 @@ then do not attempt to parse an opening bracket."
                  (undefined-field-type "While parsing ~S from JSON format,"
                                        msg-desc type field)
                  (return-from parse-json))
-                ((eq (proto-set-type field) :map)
+                ((eq (pi::proto-set-type field) :map)
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
                          (cdr pair))))
@@ -254,9 +267,9 @@ then do not attempt to parse an opening bracket."
                    (when (eq (proto-label field) :repeated)
                      (pushnew slot rslots))))))))
       (if (eql (peek-char nil stream nil) #\,)
-        (expect-char stream #\,)
+        (pi::expect-char stream #\,)
         (progn
-          (expect-char stream #\})
+          (pi::expect-char stream #\})
           (dolist (slot rslots)
             (setf (proto-slot-value object slot)
                   (nreverse (proto-slot-value object slot))))
@@ -267,145 +280,146 @@ then do not attempt to parse an opening bracket."
   (let ((desc (or (find-message type)
                   (find-enum type)
                   (find-map-descriptor type))))
-    (cond ((scalarp type)
+    (cond ((pi::scalarp type)
            (case type
-             ((:float) (parse-float stream))
-             ((:double) (parse-double stream :append-d0 t))
-             ((:string) (parse-string stream))
+             ((:float) (pi::parse-float stream))
+             ((:double) (pi::parse-double stream :append-d0 t))
+             ((:string) (pi::parse-string stream))
              ((:bool)
-              (let ((token (parse-token stream)))
+              (let ((token (pi::parse-token stream)))
                 (cond ((string= token "true") t)
                       ((string= token "false") nil)
                       ;; Parsing failed, return T as a second
                       ;; value to indicate a failure.
                       (t (values nil t)))))
              ((:bytes)
-              (cl-base64:base64-string-to-usb8-array (parse-string stream)))
+              (cl-base64:base64-string-to-usb8-array (pi::parse-string stream)))
              (otherwise
               (if (eql (peek-char nil stream nil) #\")
                   (let (ret)
-                    (expect-char stream #\")
-                    (setf ret (parse-signed-int stream))
-                    (expect-char stream #\")
+                    (pi::expect-char stream #\")
+                    (setf ret (pi::parse-signed-int stream))
+                    (pi::expect-char stream #\")
                     ret)
-                  (parse-signed-int stream)))))
-          ((typep desc 'message-descriptor)
+                  (pi::parse-signed-int stream)))))
+          ((typep desc 'pi::message-descriptor)
            (parse-json desc :stream stream))
-          ((typep desc 'enum-descriptor)
+          ((typep desc 'pi::enum-descriptor)
            (multiple-value-bind (name type-parsed)
-               (parse-token-or-string stream)
+               (pi::parse-token-or-string stream)
              (let ((enum (if (eql type-parsed 'symbol)
                              ;; If the parsed type is a symbol, then the enum was printed
                              ;; as an integer. Otherwise, it is a string which names a
                              ;; keyword.
                              (find (parse-integer name) (enum-descriptor-values desc)
-                                   :key #'enum-value-descriptor-value)
-                             (find (keywordify name) (enum-descriptor-values desc)
-                                   :key #'enum-value-descriptor-name))))
-               (and enum (enum-value-descriptor-name enum)))))
+                                   :key #'pi::enum-value-descriptor-value)
+                             (find (pi::keywordify name)
+                                   (pi::enum-descriptor-values desc)
+                                   :key #'pi::enum-value-descriptor-name))))
+               (and enum (pi::enum-value-descriptor-name enum)))))
           ;; In the case of maps, return a list of key-value pairs.
-          ((typep desc 'map-descriptor)
-           (expect-char stream #\{)
-           (let ((key-type (map-descriptor-key-class desc))
-                 (val-type (map-descriptor-val-class desc)))
+          ((typep desc 'pi::map-descriptor)
+           (pi::expect-char stream #\{)
+           (let ((key-type (pi::map-descriptor-key-class desc))
+                 (val-type (pi::map-descriptor-val-class desc)))
              (loop with pairs = ()
                    for pair = (cons nil nil)
                    do (if (eql key-type :string)
-                          (setf (car pair) (parse-string stream))
+                          (setf (car pair) (pi::parse-string stream))
                           (setf (car pair) (parse-integer
-                                            (parse-string stream))))
-                      (expect-char stream #\:)
+                                            (pi::parse-string stream))))
+                      (pi::expect-char stream #\:)
                       (setf (cdr pair) (parse-value-from-json val-type :stream stream))
                       (push pair pairs)
                       (if (eql (peek-char nil stream nil) #\,)
-                          (expect-char stream #\,)
+                          (pi::expect-char stream #\,)
                           (progn
-                            (expect-char stream #\})
+                            (pi::expect-char stream #\})
                             (return pairs))))))
           (t (values nil t)))))
 
 (defun skip-json-value (stream)
   "Skip a single JSON value in STREAM. This can
 be either an array, object, or primitive."
-  (skip-whitespace stream)
+  (pi::skip-whitespace stream)
   (case (peek-char nil stream nil)
     ((#\{) (skip-json-object stream))
     ((#\[) (skip-json-array stream))
-    (t (parse-token-or-string stream))))
+    (t (pi::parse-token-or-string stream))))
 
 (defun skip-json-array (stream)
   "Skip a JSON array in STREAM."
-  (expect-char stream #\[)
+  (pi::expect-char stream #\[)
   (loop do (skip-json-value stream)
            (if (eql (peek-char nil stream nil) #\,)
-               (expect-char stream #\,)
+               (pi::expect-char stream #\,)
                (return)))
-  (skip-whitespace stream)
-  (expect-char stream #\]))
+  (pi::skip-whitespace stream)
+  (pi::expect-char stream #\]))
 
 (defun skip-json-object (stream)
   "Skip a JSON object in STREAM."
-  (expect-char stream #\{)
-  (loop do (parse-string stream)
-           (expect-char stream #\:)
+  (pi::expect-char stream #\{)
+  (loop do (pi::parse-string stream)
+           (pi::expect-char stream #\:)
            (skip-json-value stream)
            (if (eql (peek-char nil stream nil) #\,)
-               (expect-char stream #\,)
+               (pi::expect-char stream #\,)
                (return)))
-  (skip-whitespace stream)
-  (expect-char stream #\}))
+  (pi::skip-whitespace stream)
+  (pi::expect-char stream #\}))
 
 (defun find-field-by-json-name (msg-desc name)
   "Return the field-descriptor with json-name NAME in MSG-DESC."
   (or
-   (find name (proto-fields msg-desc) :key #'proto-json-name :test #'string=)
-   (loop for oneof in (proto-oneofs msg-desc)
-           thereis (find name (oneof-descriptor-fields oneof)
-                         :key #'proto-json-name
+   (find name (proto-fields msg-desc) :key #'pi::proto-json-name :test #'string=)
+   (loop for oneof in (pi::proto-oneofs msg-desc)
+           thereis (find name (pi::oneof-descriptor-fields oneof)
+                         :key #'pi::proto-json-name
                          :test #'string=))))
 
 ;; Special JSON mappings for well known types below
 
 (defun special-json-p (type)
   "Check if the message TYPE has a special JSON mapping."
-  (member type '(cl-protobufs.google.protobuf:any
-                 cl-protobufs.google.protobuf:timestamp
-                 cl-protobufs.google.protobuf:duration
-;;               cl-protobufs.google.protobuf:struct
-;;               cl-protobufs.google.protobuf:value
-                 cl-protobufs.google.protobuf:field-mask
-;;               cl-protobufs.google.protobuf:list-value
-                 cl-protobufs.google.protobuf:bool-value
-                 cl-protobufs.google.protobuf:string-value
-                 cl-protobufs.google.protobuf:bytes-value
-                 cl-protobufs.google.protobuf:double-value
-                 cl-protobufs.google.protobuf:float-value
-                 cl-protobufs.google.protobuf:int32-value
-                 cl-protobufs.google.protobuf:int64-value
-                 cl-protobufs.google.protobuf:u-int32-value
-                 cl-protobufs.google.protobuf:u-int64-value)))
+  (member type '(google:any
+                 google:timestamp
+                 google:duration
+;;               google:struct
+;;               google:value
+                 google:field-mask
+;;               google:list-value
+                 google:bool-value
+                 google:string-value
+                 google:bytes-value
+                 google:double-value
+                 google:float-value
+                 google:int32-value
+                 google:int64-value
+                 google:u-int32-value
+                 google:u-int64-value)))
 
 (defun wrapper-message->type (type)
   "For a well known wrapper type TYPE, return the type being wrapped."
   (ecase type
-    ((cl-protobufs.google.protobuf:bool-value) :bool)
-    ((cl-protobufs.google.protobuf:string-value) :string)
-    ((cl-protobufs.google.protobuf:bytes-value) :bytes)
-    ((cl-protobufs.google.protobuf:double-value) :double)
-    ((cl-protobufs.google.protobuf:float-value) :float)
-    ((cl-protobufs.google.protobuf:int32-value) :int32)
-    ((cl-protobufs.google.protobuf:int64-value) :int64)
-    ((cl-protobufs.google.protobuf:u-int32-value) :uint32)
-    ((cl-protobufs.google.protobuf:u-int64-value) :uint64)))
+    ((google:bool-value) :bool)
+    ((google:string-value) :string)
+    ((google:bytes-value) :bytes)
+    ((google:double-value) :double)
+    ((google:float-value) :float)
+    ((google:int32-value) :int32)
+    ((google:int64-value) :int64)
+    ((google:u-int32-value) :uint32)
+    ((google:u-int64-value) :uint64)))
 
 (defun print-special-json (object type stream indent camel-case-p numeric-enums-p)
   "For an OBJECT whose TYPE is a well-known type, print the object's special JSON mapping
 to STREAM. INDENT, CAMEL-CASE-P, and NUMERIC-ENUMS-P are passed recursively to PRINT-JSON
 for any types."
   (case type
-    ((cl-protobufs.google.protobuf:any)
-     (let ((url (cl-protobufs.google.protobuf:any.type-url object))
-           (packed-message (cl-protobufs.well-known-types:unpack-any object)))
+    ((google:any)
+     (let ((url (google:any.type-url object))
+           (packed-message (wkt:unpack-any object)))
        (format stream "{")
        (if indent
            (format stream "~&~V,0T\"url\": \"~A\"" (+ indent 2) url)
@@ -429,24 +443,24 @@ for any types."
     ;; todo(benkuehnert): LOCAL-TIME's utility f or printing rfc3339 strings does not
     ;; support nanosecond precision and uses milisecond precision by default. Proto
     ;; spec says that nanosecond precision should be used whenever possible.
-    ((cl-protobufs.google.protobuf:timestamp)
+    ((google:timestamp)
      (let ((timestamp (local-time:unix-to-timestamp
-                       (cl-protobufs.google.protobuf:timestamp.seconds object)
-                       :nsec (cl-protobufs.google.protobuf:timestamp.nanos object))))
+                       (google:timestamp.seconds object)
+                       :nsec (google:timestamp.nanos object))))
        (format stream "~S" (local-time:format-rfc3339-timestring nil timestamp))))
-    ((cl-protobufs.google.protobuf:duration)
-     (let ((seconds (cl-protobufs.google.protobuf:duration.seconds object))
-           (nanos (cl-protobufs.google.protobuf:duration.nanos object)))
+    ((google:duration)
+     (let ((seconds (google:duration.seconds object))
+           (nanos (google:duration.nanos object)))
        (assert (eql (signum seconds) (signum nanos)))
        (format stream "\"~D.~V,VDs\"" seconds 9 #\0 (abs nanos))))
-    ((cl-protobufs.google.protobuf:field-mask)
-     (let ((paths (cl-protobufs.google.protobuf:field-mask.paths object)))
+    ((google:field-mask)
+     (let ((paths (google:field-mask.paths object)))
        (format stream "\"~{~a~^,~}\"" (mapcar (lambda (name)
-                                            (camel-case-but-one name '(#\_)))
+                                            (pi::camel-case-but-one name '(#\_)))
                                               paths))))
     ;; Otherwise, TYPE is a wrapper type.
     (t (if object
-           (print-scalar-to-json (cl-protobufs.google.protobuf:value object)
+           (print-scalar-to-json (google:value object)
                                  (wrapper-message->type type)
                                  stream)
            (format stream "null")))))
@@ -455,62 +469,62 @@ for any types."
   "Parse a well known type TYPE from STREAM."
   ;; If the stream starts with 'n', then the data is NULL. In which case, return NIL.
   (when (eql (peek-char nil stream nil) #\n)
-    (assert (string= (parse-token stream) "null"))
+    (assert (string= (pi::parse-token stream) "null"))
     (return-from parse-special-json nil))
   (case type
-    ((cl-protobufs.google.protobuf:any)
-     (expect-char stream #\{)
-     (let ((token (parse-string stream)))
+    ((google:any)
+     (pi::expect-char stream #\{)
+     (let ((token (pi::parse-string stream)))
        (assert (string= token "url")))
-     (expect-char stream #\:)
-     (let* ((type-url (parse-string stream))
-            (type (cl-protobufs.well-known-types::resolve-type-url type-url)))
-       (expect-char stream #\,)
+     (pi::expect-char stream #\:)
+     (let* ((type-url (pi::parse-string stream))
+            (type (wkt::resolve-type-url type-url)))
+       (pi::expect-char stream #\,)
        (if (not (special-json-p type))
            ;; Parse the remaining elements in the object into a new message, then pack that message.
-           (cl-protobufs.well-known-types::pack-any
+           (wkt:pack-any
             (parse-json type :stream stream :spliced-p t))
            ;; If URL names a well-known-type, then the next element in the object has key "VALUE",
            ;; and the value is the special JSON format. Parse that and close the object.
-           (let ((val-string (parse-string stream))
+           (let ((val-string (pi::parse-string stream))
                  ret)
              (assert (string= val-string "value"))
-             (expect-char stream #\:)
+             (pi::expect-char stream #\:)
              (setf ret (parse-special-json type stream))
-             (expect-char stream #\})
-             (cl-protobufs.well-known-types::pack-any ret)))))
+             (pi::expect-char stream #\})
+             (wkt:pack-any ret)))))
 
-    ((cl-protobufs.google.protobuf:timestamp)
-     (let* ((timestring (parse-string stream))
+    ((google:timestamp)
+     (let* ((timestring (pi::parse-string stream))
             (timestamp (local-time:parse-rfc3339-timestring timestring)))
-       (cl-protobufs.google.protobuf:make-timestamp
+       (google:make-timestamp
         :seconds (local-time:timestamp-to-unix timestamp)
         :nanos (local-time:nsec-of timestamp))))
 
     ;; Durations can feasibly have 64-bit seconds place, so parsing a float/double is lossy.
-    ((cl-protobufs.google.protobuf:duration)
-     (expect-char stream #\")
-     (let ((seconds (parse-signed-int stream)))
+    ((google:duration)
+     (pi::expect-char stream #\")
+     (let ((seconds (pi::parse-signed-int stream)))
        (ecase (peek-char nil stream nil)
          ;; Duration has no decimal component.
          ((#\s)
-          (expect-char stream #\s)
-          (expect-char stream #\")
-          (cl-protobufs.google.protobuf:make-duration :seconds seconds))
+          (pi::expect-char stream #\s)
+          (pi::expect-char stream #\")
+          (google:make-duration :seconds seconds))
          ((#\.)
-          (expect-char stream #\.)
+          (pi::expect-char stream #\.)
           ;; Parse the decimal part of the string, and convert to nanoseconds.
-          (let ((remainder (parse-token stream)))
+          (let ((remainder (pi::parse-token stream)))
             (assert (eql (char remainder (1- (length remainder))) #\s)
                     nil "Duration string ~S.~A does end with \"s\"" seconds remainder)
-            (expect-char stream #\")
+            (pi::expect-char stream #\")
             (let* ((decimals (subseq remainder 0 (1- (length remainder))))
                    ;; If there are more than 9 decimal points, trim to length 9.
                    (decimals (if (< 9 (length decimals))
                                  (subseq decimals 0 10)
                                  decimals))
                    (dec-length (length decimals)))
-              (cl-protobufs.google.protobuf:make-duration
+              (google:make-duration
                :seconds seconds
                ;; Nanoseconds are in the range 0 through 999,999,999. Pad the decimal string
                ;; with 0s to make the string have total length 9.
@@ -524,16 +538,16 @@ for any types."
 
     ;; Field masks are in the form \"camelCasePath1,path2,path3\". We need to first split,
     ;; then convert to proto field name format (lowercase, separated by underscore).
-    ((cl-protobufs.google.protobuf:field-mask)
-     (let ((camel-case-paths (split-string (parse-string stream) :separators '(#\,))))
-
-       (cl-protobufs.google.protobuf:make-field-mask
-        :paths (mapcar (lambda (path) (nstring-downcase (uncamel-case path #\_)))
+    ((google:field-mask)
+     (let ((camel-case-paths (pi::split-string (pi::parse-string stream)
+                                                       :separators '(#\,))))
+       (google:make-field-mask
+        :paths (mapcar (lambda (path) (nstring-downcase (pi::uncamel-case path #\_)))
                        camel-case-paths))))
 
     ;; Otherwise, the well known type is a wrapper type.
     (t (let ((object #+sbcl (make-instance type)
                      #-sbcl (funcall (get-constructor-name type)))
              (value (parse-value-from-json (wrapper-message->type type) :stream stream)))
-         (setf (cl-protobufs.google.protobuf:value object) value)
+         (setf (google:value object) value)
          object))))
