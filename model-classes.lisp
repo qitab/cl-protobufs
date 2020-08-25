@@ -81,13 +81,9 @@ Parameters:
    (options :type (list-of option-descriptor)
             :accessor proto-options
             :initarg :options
-            :initform ())
-   (doc :type (or null string)
-        :accessor proto-documentation
-        :initarg :documentation
-        :initform nil))
+            :initform ()))
   (:documentation
-   "Shared attributes for most kinds of protobuf objects."))
+   "Shared attributes for protobuf descriptors."))
 
 (defun find-qualified-name (name protos
                             &key (proto-key #'proto-name) (full-key #'proto-qualified-name)

@@ -180,15 +180,14 @@ the oneof and its nested fields.
         (error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
 (defun define-schema (type &key name syntax package import
-                           optimize options documentation)
+                           optimize options)
   "Define a schema named TYPE, corresponding to a .proto file of that name.
    NAME can be used to override the defaultly generated Protobufs name.
    SYNTAX and PACKAGE are as they would be in a .proto file.
    IMPORT is a list of pathname strings to be imported.
    OPTIMIZE can be either :space (the default) or :speed; if it is :speed, the
    serialization code will be much faster, but much less compact.
-   OPTIONS is a property list, i.e., (\"key1\" \"val1\" \"key2\" \"val2\" ...).
-   DOCUMENTATION is the documentation for the proto."
+   OPTIONS is a property list, i.e., (\"key1\" \"val1\" \"key2\" \"val2\" ...)."
   (let* ((name     (or name (class-name->proto type)))
          (package  (and package (if (stringp package)
                                     package
@@ -219,8 +218,7 @@ the oneof and its nested fields.
                                                      "SPEED"
                                                      "CODE_SIZE")
                                                  'symbol)))
-                                  options)
-                    :documentation documentation)))
+                                  options))))
     (record-schema schema)
     (setf *current-file-descriptor* schema)
     (validate-imports schema imports)))
@@ -475,7 +473,7 @@ Parameters:
           for oneof-offset from 0
           do
        (destructuring-bind (slot &key type typename name (default nil default-p)
-                                 lazy json-name index documentation &allow-other-keys)
+                                 lazy json-name index &allow-other-keys)
            field
          (assert json-name)
          (assert index)
@@ -505,8 +503,7 @@ Parameters:
                                   :json-name json-name
                                   :oneof-offset oneof-offset
                                   :default default
-                                  :lazy (and lazy t)
-                                  :documentation documentation))))))
+                                  :lazy (and lazy t)))))))
     `(progn
        ,(make-oneof-descriptor :internal-name internal-name
                                :external-name name
@@ -1054,21 +1051,24 @@ Arguments:
   (and (member 'cl:boolean field)
        (not (member :repeated field))))
 
-(defmacro define-message (type (&key name conc-name alias-for options
-                                documentation)
+;;; TODO(cgay): Is the NAME option used anymore, now that define-message isn't
+;;; called directly in non-generated Lisp code?
+(defmacro define-message (type (&key name conc-name alias-for options)
                           &body fields &environment env)
-  "Define a message named 'type' and by default a corresponding Lisp class.
-   'name' can be used to override the defaultly generated Protobufs message name.
-   The body consists of fields, or 'define-enum' or 'define-message' forms.
-   'conc-name' will be used as the prefix to the Lisp slot accessors, if it's supplied.
-   If 'alias-for' is given, no Lisp class is defined. Instead, the message will be
-   used as an alias for a class that already exists in Lisp. This feature is intended
-   to be used to define messages that will be serialized from existing Lisp classes;
-   unless you get the slot names or readers exactly right for each field, it will be
-   the case that trying to (de)serialize into a Lisp object won't work.
-   'options' is a set of keyword/value pairs, both of which are strings.
+  "Define a new protobuf message struct type.
 
-   The form for fields is documented in process-field."
+ Parameters:
+   TYPE - Symbol naming the new type.
+   NAME - Optional symbol used to override the defaultly generated protobuf message name.
+   CONC-NAME - Prefix to the Lisp slot accessors, if supplied.
+   ALIAS-FOR - If supplied, no Lisp struct is defined. Instead, the message is used
+     as an alias for a class that already exists. This feature is intended to be
+     used to define messages that will be serialized from existing Lisp classes;
+     unless you get the slot names or readers exactly right for each field,
+     trying to (de)serialize into a Lisp object won't work.
+   OPTIONS - A set of keyword/value pairs, both of which are strings.
+   FIELDS - Either field specs of the form (name :index n :type t ...) or
+     define-{message,enum,oneof,map} forms. See process-field for more info."
   (let* ((name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
@@ -1082,8 +1082,7 @@ Arguments:
                                                    name)
                                   :alias-for alias-for
                                   :conc-name conc-name
-                                  :options   (remove-options options "default" "packed")
-                                  :documentation documentation))
+                                  :options (remove-options options "default" "packed")))
          (field-offset 0)
          (top-level-form-p (null *current-message-descriptor*))
          (*current-message-descriptor* msg-desc)
@@ -1228,21 +1227,9 @@ Arguments:
                        :to (if (eq to 'max) +max-field-number+ to))
        ())))
 
-(defmacro define-extend (type (&key name conc-name options documentation)
-                         &body fields &environment env)
-  "Define an extension to the message named 'type'.
-   'name' can be used to override the defaultly generated Protobufs message name.
-   The body consists only  of fields.
-   'options' is a set of keyword/value pairs, both of which are strings.
-
-   Fields take the form (slot &key index type name default reader)
-   'slot' is  a symbol giving the field name.
-   'index' is the index of the field in the proto.
-   'type' is the type of the slot.
-   'name' can be used to override the defaultly generated Protobufs field name.
-   'default' is the default value for the slot.
-   'reader' is a Lisp slot reader function to use to get the value, instead of
-   using 'slot-value'; this is often used when aliasing an existing class."
+(defmacro define-extend (type (&key name conc-name options) &body fields &environment env)
+  "Define an extension to the message named TYPE. See define-message for descriptions of the
+   NAME, CONC-NAME, OPTIONS, and FIELDS parameters."
   (let* ((name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
@@ -1263,8 +1250,7 @@ Arguments:
                         :options  (remove-options
                                    (or options (copy-list (proto-options message)))
                                    "default" "packed")
-                        :message-type :extends ; this message is an extension
-                        :documentation documentation)))
+                        :message-type :extends))) ; this message is an extension
          (top-level-form-p (null *current-message-descriptor*))
          ;; Only now can we bind *current-message-descriptor* to the new extended message
          (*current-message-descriptor* extends))
@@ -1415,30 +1401,14 @@ Arguments:
                    (i<= index (proto-extension-to ext))))
           extensions)))
 
-(defmacro define-group (type (&key index label name conc-name alias-for reader options
-                                   documentation)
+(defmacro define-group (type (&key index label name conc-name alias-for reader options)
                         &body fields &environment env)
-  "Define a message named 'type' and a Lisp 'defclass', *and* a field named type.
-   This is deprecated in Protobufs, but if you have to use it, you must give
-   'index' as the field index and 'label' of :required, :optional or :repeated.
-   'name' can be used to override the defaultly generated Protobufs message name.
-   The body consists of fields, or 'define-enum' or 'define-message' forms.
-   'conc-name' will be used as the prefix to the Lisp slot accessors, if it's supplied.
-   If 'alias-for' is given, no Lisp class is defined. Instead, the message will be
-   used as an alias for a class that already exists in Lisp. This feature is intended
-   to be used to define messages that will be serialized from existing Lisp classes;
-   unless you get the slot names or readers exactly right for each field, it will be
-   the case that trying to (de)serialize into a Lisp object won't work.
-   'options' is a set of keyword/value pairs, both of which are strings.
-
-   Fields take the form (slot &key index type name default reader)
-   'slot' is a symbol giving the field name
-   'index' is the index of the field in the group.
-   'type' is the type of the slot.
-   'name' can be used to override the defaultly generated Protobufs field name.
-   'default' is the default value for the slot.
-   'reader' is a Lisp slot reader function to use to get the value, instead of
-   using 'slot-value'; this is often used when aliasing an existing class."
+  "Define a new protobuf message struct AND a field named by TYPE.
+ Parameters:
+   TYPE, INDEX, NAME, CONC-NAME, ALIAS-FOR, and OPTIONS are as for define-message.
+   LABEL - nil (proto3), :required, :optional or :repeated.
+   READER - A symbol naming a function to use to get the value, instead of
+     using slot-value; this is often used when aliasing an existing class."
   (check-type index integer)
   (check-type label (member :required :optional :repeated))
   (let* ((slot    (or type (and name (proto->slot-name name *package*))))
@@ -1483,8 +1453,7 @@ Arguments:
                     :alias-for alias-for
                     :conc-name conc-name
                     :options   (remove-options options "default" "packed")
-                    :message-type :group                ;this message is a group
-                    :documentation documentation))
+                    :message-type :group)) ; this message is a group
          (field-offset 0)
          (bool-count (count-if #'non-repeated-bool-field fields))
          (bool-index -1)
@@ -1594,34 +1563,32 @@ Arguments:
 
 (defun process-field (field &key conc-name alias-for field-offset bool-index bool-values)
   "Process one field descriptor within 'define-message' or 'define-extend'.
-Returns a 'proto-field' object, a CLOS slot form, the field index, and a boolean which
-indicates if FIELD has an offset.
+   Returns a field-descriptor object, a defstruct slot form, the field number,
+   and a boolean indicating whether FIELD has an offset.
 
-Arguments
-  FIELD: The description of the field as laid out in the proto schema.
-  CONC-NAME: The name to concatenate to the beginning of the field accessor.
-  ALIAS-FOR is to determine if this is an alias for a difference field.
-  FIELD-OFFSET is an internal concept of the index of a field
-    in a proto-message.
-  BOOL-INDEX: nil if this is not a simple (non-repeated) boolean field.
-    If this is a simple boolean field, this is the index into the bit vector of all
-    simple boolean fields (i.e., the bool-values argument).
-  BOOL-VALUES: A bit-vector holding all boolean values for a message.
-    On exit this vector holds the correct default value for FIELD if it is a
-    simple boolean field."
-  ;; Slot is a symbol giving the field name
-  ;; Type is the lisp type specified in a defstruct field or defclass slot.
-  ;; Typename is the name of the type from the .proto file.
-  ;; Name can be used to override the defaultly generated Protobufs field name.
-  ;; Index is the index of the field in the proto.
-  ;; Default is the default value for the slot.
-  ;; Packed determines if the field is a packed field with respect to proto api.
-  ;; Lazy determines whether to lazily deserialize a field with respect to proto api.
-  ;; Label is a member of (:repeated :vector), (:repeated :list),
-  ;;   (:optional), (:required).
-  ;; Documentation is any documentation that has been set for the slot.
+ Parameters:
+   FIELD: A list whose first element is the Lisp symbol for the field name, followed
+     by keyword / value pairs:
+     :type - A symbol naming the Lisp type of this field.
+     :index - The field number.
+     :typename - The field type name from the .proto file, a string.
+     :name - Optional. Used to override the defaultly generated protobuf field name.
+     :default - Optional. The default value for the slot.
+     :packed - Determines if the field is packed with respect to the proto API.
+     :lazy - Determines whether to lazily deserialize the field with respect to the proto API.
+     :label - One of (:repeated :vector), (:repeated :list), (:optional), (:required).
+   CONC-NAME: The name to concatenate to the beginning of the field accessor.
+   ALIAS-FOR is to determine if this is an alias for a difference field.
+   FIELD-OFFSET is an internal concept of the index of a field
+     in a proto-message.
+   BOOL-INDEX: nil if this is not a simple (non-repeated) boolean field.
+     If this is a simple boolean field, this is the index into the bit vector of all
+     simple boolean fields (i.e., the bool-values argument).
+   BOOL-VALUES: A bit-vector holding all boolean values for a message.
+     On exit this vector holds the correct default value for FIELD if it is a
+     simple boolean field."
   (destructuring-bind (slot &key type typename name (default nil default-p) packed lazy
-                            json-name index label documentation &allow-other-keys)
+                            json-name index label &allow-other-keys)
       field
     (assert json-name)
     (let* (;; Public accessors and setters for slots should be defined later.
@@ -1689,8 +1656,7 @@ Arguments
                          ;; Pack the field only if requested and it actually makes sense
                          :packed  (and (eq label :repeated) packed t)
                          :lazy (and lazy t)
-                         :bool-index bool-index
-                         :documentation documentation)))
+                         :bool-index bool-index)))
             (when (and bool-index default (not (eq default $empty-default)))
               (setf (bit bool-values bool-index) 1))
             (values field cslot index (and offset t))))))))
@@ -1702,13 +1668,10 @@ Arguments
   "The Lisp function that implements RPC client-side calls.
    This should be set when an RPC package that uses CL-Protobufs gets loaded.")
 
-(defmacro define-service (type (&key name options
-                                documentation source-location)
-                          &body method-specs)
+(defmacro define-service (type (&key name options source-location) &body method-specs)
   "Define a service named TYPE and a generic function for each method.
    NAME can be used to override the defaultly generated service name.
    OPTIONS is a set of keyword/value pairs, both of which are strings.
-   DOCUMENTATION is an optional description of the service (a string).
    SOURCE-LOCATION is an optional source location.
 
    The body is a set of METHOD-SPECS of the form (name (input-type [=>] output-type) &key options).
@@ -1723,13 +1686,11 @@ Arguments
                                  :qualified-name (make-qualified-name *current-file-descriptor*
                                                                       name)
                                  :options options
-                                 :documentation documentation
                                  :source-location source-location))
          (index 0))
     (with-collectors ((forms collect-form))
       (dolist (method method-specs)
-        (destructuring-bind (function (&rest types)
-                             &key name options documentation)
+        (destructuring-bind (function (&rest types) &key name options)
             method
           (let* ((input-type   (first types))
                  (output-type  (if (string= (string (second types)) "=>")
@@ -1786,8 +1747,7 @@ Arguments
                            :streams-name (and streams-type
                                               (or streams-name (class-name->proto streams-type)))
                            :index (iincf index)
-                           :options options
-                           :documentation documentation)))
+                           :options options)))
             (appendf (proto-methods service) (list method))
             ;; The following are the hooks to an RPC implementation
             (let* ((vrequest  (intern "REQUEST" package))
@@ -1810,7 +1770,6 @@ Arguments
               ;; response as an application object.
               (collect-form
                `(defgeneric ,client-fn (,vchannel ,vrequest &key ,vcallback ,vresponse)
-                  ,@(and documentation `((:documentation ,documentation)))
                   #+(or ccl)
                   (declare (values ,output-type))
                   (:method (,vchannel ,vrequest &key ,vcallback ,vresponse)
@@ -1835,7 +1794,6 @@ Arguments
               ;; The RPC code provides the channel classes and does (de)serialization, etc.
               ;; The VRPC argument is always of type RPC2:SERVER-RPC.
               (collect-form `(defgeneric ,server-fn (,vchannel ,vrequest ,vrpc)
-                               ,@(and documentation `((:documentation ,documentation)))
                                #+(or ccl)
                                (declare (values ,output-type))))))))
       (collect-form `(appendf (proto-services *current-file-descriptor*) (list ,service)))
