@@ -440,7 +440,7 @@ Parameters:
                   :class class
                   :qualified-name qual-name
                   :set-type :map
-                  :label :optional
+                  :label :proto2-optional
                   :index index
                   :internal-field-name internal-slot-name
                   :external-field-name slot
@@ -494,7 +494,7 @@ Parameters:
                                   :qualified-name (make-qualified-name
                                                    *current-message-descriptor*
                                                    (or name (slot-name->proto slot)))
-                                  :label :optional
+                                  :label :proto2-optional
                                   :index index
                                   ;; Oneof fields don't have a bit in the %%is-set vector, but
                                   ;; if they don't have an offset, then some code treats them
@@ -565,7 +565,7 @@ Arguments:
         (label (proto-label field)))
 
     ;; If index is nil, then this field does not have a reserved bit in the %%is-set vector.
-    ;; This means that the field is singular, so checking for field presence must be done by
+    ;; This means that the field is proto3-optional, so checking for field presence must be done by
     ;; checking if the bound value is default.
     (with-gensyms (obj new-value cur-value)
       `(
@@ -579,9 +579,9 @@ Arguments:
                `(setf (,hidden-accessor-name ,obj) ,new-value)))
 
 
-        ;; For singular fields, the has-* function is repurposed. It now answers the question:
-        ;; "Is this field set to the default value?". This is done so that the optimized
-        ;; serializer can use the has-* function to check if a singular field should be serialized.
+        ;; For proto3-optional fields, the has-* function is repurposed. It now answers the
+        ;; question: "Is this field set to the default value?". This is done so that the optimized
+        ;; serializer can use the has-* function to check if the field should be serialized.
         (declaim (inline ,has-function-name))
         (defun ,has-function-name (,obj)
           ,(if index
@@ -618,9 +618,9 @@ Arguments:
 
         (proto-impl::set-field-accessor-functions ',proto-type ',public-slot-name)
 
-        ;; has-* functions are not exported for singular fields. They are only for
+        ;; has-* functions are not exported for proto3-optional fields. They are only for
         ;; internal usage.
-        ,(unless (eq label :singular)
+        ,(unless (eq label :proto3-optional)
            `(export '(,has-function-name)))
 
         ,(unless (eq (proto-set-type field) :map)
@@ -1440,7 +1440,7 @@ Arguments:
    'reader' is a Lisp slot reader function to use to get the value, instead of
    using 'slot-value'; this is often used when aliasing an existing class."
   (check-type index integer)
-  (check-type label (member :required :optional :repeated))
+  (check-type label (member :required :proto2-optional :repeated))
   (let* ((slot    (or type (and name (proto->slot-name name *package*))))
          (name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
@@ -1458,7 +1458,7 @@ Arguments:
                            :type
                            (case label
                              (:required `(or ,type null))
-                             (:optional `(or ,type null))
+                             (:proto2-optional `(or ,type null))
                              (:repeated `(list-of ,type)))
                            :initform nil
                            :accessor reader
@@ -1618,7 +1618,7 @@ Arguments
   ;; Packed determines if the field is a packed field with respect to proto api.
   ;; Lazy determines whether to lazily deserialize a field with respect to proto api.
   ;; Label is a member of (:repeated :vector), (:repeated :list),
-  ;;   (:optional), (:required).
+  ;;   (:proto2-optional), (:required), (:proto3-optional).
   ;; Documentation is any documentation that has been set for the slot.
   (destructuring-bind (slot &key type typename name (default nil default-p) packed lazy
                             json-name index label documentation &allow-other-keys)
@@ -1635,13 +1635,9 @@ Arguments
         (declare (ignore packed-p enum-values))
         (assert index)
         (multiple-value-bind (label repeated-type) (values-list label)
-          ;; Proto3 optional fields are known as 'singular' fields, and are handled differently.
-          (let* ((label (if (and (eq (proto-syntax *current-file-descriptor*) :proto3)
-                                 (eq label :optional))
-                            :singular
-                            label))
-                 ;; Singular fields do not have offsets, as they don't have has-* functions.
-                 (offset (and (not (eq label :singular)) field-offset))
+          ;; Proto3 optional fields are handled differently. They do not track field presence,
+          ;; hence they do not have offsets and we do not create has-* functions.
+          (let* ((offset (and (not (eq label :proto3-optional)) field-offset))
                  (default
                   (cond ((and (eq label :repeated)
                               (eq repeated-type :vector))
@@ -1664,9 +1660,9 @@ Arguments
                                          `(make-array 5 :fill-pointer 0 :adjustable t)
                                          nil))
                                  ((and (not default-p)
-                                          (eq label :optional)
-                                          ;; Use unbound for booleans only
-                                          (not (eq pclass :bool)))
+                                       (member label '(:proto2-optional :proto3-optional))
+                                       ;; Use unbound for booleans only
+                                       (not (eq pclass :bool)))
                                   nil)
                                  (default-p `,default)))))
                  (field (make-instance

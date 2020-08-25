@@ -477,8 +477,7 @@ on the symbol if we are not in SBCL."
               :initform nil)
    (set-type  :accessor proto-set-type          ; The type obtained directly
               :initarg :set-type)               ; from the protobuf schema.
-   ;; :singular is what we're calling proto3 fields with the "optional" label.
-   (label :type (member :required :optional :repeated :singular)
+   (label :type (member :required :proto2-optional :repeated :proto3-optional)
           :accessor proto-label
           :initarg :label)
    ;; TODO(cgay): rename to field-number and proto-field-number. Why be coy?
@@ -575,7 +574,7 @@ on the symbol if we are not in SBCL."
           (eq default $empty-list)
           (eq default $empty-vector)
           ;; Special handling for imported CLOS classes
-          (and (not (eq (proto-label field) :optional))
+          (and (not (eq (proto-label field) :proto2-optional))
                (or (null default) (equalp default #())))))))
 
 (defgeneric vector-field-p (field)

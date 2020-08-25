@@ -53,7 +53,7 @@ namespace {
 const std::string FieldKeywordLabel(const FieldDescriptor::Label label) {
   switch (label) {
     case FieldDescriptor::LABEL_OPTIONAL:
-      return ":optional";
+      return ":proto2-optional";
     case FieldDescriptor::LABEL_REQUIRED:
       return ":required";
     case FieldDescriptor::LABEL_REPEATED:

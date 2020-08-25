@@ -115,7 +115,10 @@ const std::string FieldLispLabel(const FieldDescriptor* field) {
     case FieldDescriptor::Label::LABEL_REQUIRED:
       return "(:required)";
     case FieldDescriptor::Label::LABEL_OPTIONAL:
-      return "(:optional)";
+      if (field->file()->syntax() == FileDescriptor::Syntax::SYNTAX_PROTO3)
+        return "(:proto3-optional)";
+      else
+        return "(:proto2-optional)";
     case FieldDescriptor::Label::LABEL_REPEATED:
       if (field->options().HasExtension(lisp_container)) {
         switch (field->options().GetExtension(lisp_container)) {
