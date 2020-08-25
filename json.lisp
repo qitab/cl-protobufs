@@ -200,31 +200,36 @@ Parameters:
              (slot  (and field (proto-external-field-name field))))
         (expect-char stream #\:)
         (if (null field)
+            ;; If FIELD is null, then we assume that MSG-DESC describes a
+            ;; different version of the proto on the wire which doesn't
+            ;; have FIELD, and continue,
+            ;; todo(benkuehnert): Add a flag to optionally throw an error
+            ;; in this spot.
             (skip-json-value stream)
-            (let (val error-p)
-              (if (not (eq (proto-label field) :repeated))
-                  (multiple-value-setq (val error-p)
-                    (parse-value-from-json type :stream stream))
-                  (case (peek-char nil stream nil)
-                    ;; Repeated field is in list format
-                    ((#\[)
-                     (expect-char stream #\[)
-                     (loop
-                       (multiple-value-bind (data err)
-                           (parse-value-from-json type :stream stream)
-                         (if err
-                             (setf error-p t)
-                             (push data val)))
-                       (if (eql (peek-char nil stream nil) #\,)
-                           (expect-char stream #\,)
-                           (return)))
-                     (expect-char stream #\]))
-                    ;; 'null' is parsed as an empty list. Anything else is an error.
-                    ((#\n)
-                     (let ((tok (parse-token stream)))
-                       (unless (string= tok "null")
-                         (setf error-p t))))))
+            (let (val error-p null-p)
               (cond
+                ;; If we see an 'n', then the value MUST be 'null'. In
+                ;; this case, parse the 'null' and continue.
+                ((eql (peek-char nil stream nil) #\n)
+                 (assert (string= (parse-token stream) "null"))
+                 (skip-whitespace stream)
+                 (setf null-p t))
+                ((eq (proto-label field) :repeated)
+                 (expect-char stream #\[)
+                 (loop
+                   (multiple-value-bind (data err)
+                       (parse-value-from-json type :stream stream)
+                     (if err
+                         (setf error-p t)
+                         (push data val)))
+                   (if (eql (peek-char nil stream nil) #\,)
+                       (expect-char stream #\,)
+                       (return)))
+                 (expect-char stream #\]))
+                (t (multiple-value-setq (val error-p)
+                    (parse-value-from-json type :stream stream))))
+              (cond
+                (null-p nil)
                 (error-p
                  (undefined-field-type "While parsing ~S from JSON format,"
                                        msg-desc type field)
