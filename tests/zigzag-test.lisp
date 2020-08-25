@@ -50,9 +50,9 @@
     :package 'proto-test)
 
   (proto:define-message msg ()
-    (s :index 1 :type (or null proto:sint64) :label (:optional) :json-name "s")
-    (u :index 2 :type (or null proto:uint64) :label (:optional) :json-name "u")
-    (i :index 3 :type (or null proto:int64) :label (:optional) :json-name "i")))
+    (s :index 1 :type (or null proto:sint64) :label (:proto2-optional) :json-name "s")
+    (u :index 2 :type (or null proto:uint64) :label (:proto2-optional) :json-name "u")
+    (i :index 3 :type (or null proto:int64) :label (:proto2-optional) :json-name "i")))
 
 (defconstant +TAG-S+ (proto-impl::make-tag :int32 1))
 (defconstant +TAG-U+ (proto-impl::make-tag :int32 2))
