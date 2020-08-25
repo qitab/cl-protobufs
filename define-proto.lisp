@@ -540,10 +540,9 @@ Parameters:
          :clear (proto-slot-function-name message-name field-name :clear))))
 
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
-  "Create the common forms needed for all message fields
-has, is-set, clear, set.
+  "Create the common forms needed for all message fields has, is-set, clear, set.
 
-Arguments:
+ Parameters:
   PROTO-TYPE: The Lisp type name of the proto message.
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix).
   SLOT-NAME: Slot name for the field (with the #\% prefix).
@@ -734,7 +733,7 @@ guarantee that the resulting map can be properly serialized, whereas if one modi
 the underlying map (which is accessed via the make-common-forms-for-structure-class
 function) then there is no guarantee on the serialize function working properly.
 
-Arguments:
+ Parameters:
   PROTO-TYPE: The Lisp type name of the proto message.
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix).
   SLOT-NAME: Slot name for the field (with the #\% prefix).
@@ -811,7 +810,7 @@ Arguments:
 (defun make-structure-class-forms-lazy (proto-type field public-slot-name)
   "Makes forms for the lazy fields of a proto message using STRUCTURE-CLASS.
 
-Arguments:
+ Parameters:
   PROTO-TYPE: The Lisp type name of the proto message.
   FIELD: The field definition for which to define accessors.
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix)."
@@ -855,7 +854,7 @@ Arguments:
 (defun make-structure-class-forms-non-lazy (proto-type field public-slot-name)
   "Makes forms for the non-lazy fields of a proto message.
 
-Arguments:
+ Parameters:
   PROTO-TYPE: The Lisp type name of the proto message.
   FIELD: The field definition for which to define accessors.
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix)."
@@ -880,39 +879,24 @@ Arguments:
              proto-type public-slot-name slot-name field))))))
 
 
-(let ((default-form (make-hash-table)))
-  (setf (gethash 'cl:double-float default-form) 0.0d0)
-  (setf (gethash 'cl:float default-form) 0.0)
-  (setf (gethash 'proto:int64 default-form)
-        (coerce 0 'proto:int64))
-  (setf (gethash 'proto:uint64 default-form)
-        (coerce 0 'proto:uint64))
-  (setf (gethash 'proto:int32 default-form)
-        (coerce 0 'proto:int32))
-  (setf (gethash 'proto:fixed64 default-form)
-        (coerce 0 'proto:fixed64))
-  (setf (gethash 'proto:fixed32 default-form)
-        (coerce 0 'proto:fixed32))
-  (setf (gethash 'proto:sfixed64 default-form)
-        (coerce 0 'proto:sfixed64))
-  (setf (gethash 'proto:sfixed32 default-form)
-        (coerce 0 'proto:sfixed32))
-  (setf (gethash 'cl:boolean default-form) nil)
-  (setf (gethash 'cl:string default-form) "")
-  (setf (gethash 'proto:byte-vector default-form)
-        '(make-byte-vector 0 :adjustable t))
-  (setf (gethash 'proto:uint32 default-form)
-        (coerce 0 'proto:uint32))
-  (setf (gethash 'proto:sint32 default-form)
-        (coerce 0 'proto:sint32))
-  (setf (gethash 'proto:sint64 default-form)
-        (coerce 0 'proto:sint64))
-  ;; One of the "Home grown types..."
-  (setf (gethash 'cl:keyword default-form)
-        :default-keyword)
+(let ((defaults (make-hash-table)))
+  (loop for type in '(int32 uint32 fixed32 sfixed32 sint32
+                      int64 uint64 fixed64 sfixed64 sint64)
+        do (setf (gethash type defaults) 0))
+
+  (setf (gethash 'double-float defaults) 0.0d0)
+  (setf (gethash 'float defaults) 0.0)
+  (setf (gethash 'boolean defaults) nil)
+  (setf (gethash 'string defaults) "")
+  (setf (gethash 'byte-vector defaults) '(make-byte-vector 0 :adjustable t))
+
+  ;; Home grown types
+  (setf (gethash 'cl:keyword defaults) :default-keyword)
+  (setf (gethash 'cl:symbol defaults) nil)
+
   (defun get-default-form (type default)
     "Get the default value for TYPE and the proto set DEFAULT"
-    (let ((possible-default (gethash type default-form)))
+    (let ((possible-default (gethash type defaults)))
       (cond
         ((not (member default
                       (list $empty-vector $empty-list $empty-default nil)))
@@ -932,13 +916,15 @@ Arguments:
          nil)
         ((eq type :map)
          '(make-hash-table))
-        ((enum-default-value `,type) (enum-default-value `,type))
-        (t `(enum-default-value ',type))))))
+        ((enum-default-value `,type)
+         (enum-default-value `,type))
+        (t
+         `(enum-default-value ',type))))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
   "Makes the definition forms for the define-group and define-message macros.
 
-Arguments:
+ Parameters:
   PROTO-TYPE: The Lisp type name of the proto message.
   SLOTS: Slot definitions created by PROCESS-FIELD.
   NON-LAZY-FIELDS: Field definitions for non-lazy fields.

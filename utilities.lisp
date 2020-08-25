@@ -280,6 +280,7 @@ Arguments:
                                            (symbol-name slot)))
                    (symbol-package proto-type))))))
 
+;;; TODO(cgay): use ace.core.collect when that works on CCL and ABCL.
 (defmacro with-collectors ((&rest collection-descriptions) &body body)
   "COLLECTION-DESCRIPTIONS is a list of clauses of the form (collection function).
    The body can call 'function' to add a value to the corresponding 'collection'. Elements are added
