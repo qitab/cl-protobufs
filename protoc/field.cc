@@ -88,8 +88,10 @@ const std::string FieldLispType(const FieldDescriptor* field) {
   }
 
   if (field->type() == FieldDescriptor::TYPE_MESSAGE &&
-      !field->is_repeated() &&
-      !field->containing_type()->options().map_entry())
+      !field->is_repeated())
+    // WARNING: the define-map macro assumes that messages types will be
+    // in the form "(cl:or cl:null message)". Any change to this output
+    // must be reflected in the define-map macro.
     return StrCat("(cl:or cl:null ", type, ")");
   if (field->is_required() || field->is_optional()) return type;
   if (field->is_repeated()) {
