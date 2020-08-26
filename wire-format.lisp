@@ -9,21 +9,18 @@
 
 ;;; Protocol buffers wire format
 
-;;; Utilities
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
   ;; Warning:
-  ;; If you need to debug the (de)serializer, (pushnew :debug-serialization *features*)
-  ;; Otherwise, we remove type checking and type conversion
-  ;; from the (de)serializers for speed.
-  ;; For the cl-protobuf this is fine, we will make a guarantee that
-  ;; we will serialize/deserialize the right type.
+  ;; If you need to debug the (de)serializer, (pushnew :debug-serialization
+  ;; *features*) Otherwise, we remove type checking and type conversion from
+  ;; the (de)serializers for speed.  For cl-protobufs this is fine, we will
+  ;; make a guarantee that we will serialize/deserialize the right type.
   ;;
-  ;; Note: The debugging feature should be used cautiously, you
-  ;; can run into bugs by running in debug mode and getting type-conversion
-  ;; then turning off debug mode and getting type failures.
-  ;; This is because debug mode turns on type checking and type conversion.
+  ;; Note: The debugging feature should be used cautiously, you can run into
+  ;; bugs by running in debug mode and getting type-conversion then turning off
+  ;; debug mode and getting type failures.  This is because debug mode turns on
+  ;; type checking and type conversion.
   (defparameter $optimize-serialization
     #+debug-serialization *optimize-default*
     #-debug-serialization *optimize-fast-unsafe*)
@@ -34,22 +31,21 @@
   (defconstant $wire-type-start-group 3)          ;supposedly deprecated, but no such luck
   (defconstant $wire-type-end-group   4)          ;supposedly deprecated
   (defconstant $wire-type-32bit  5)
-  )       ;eval-when
-
+) ; eval-when
 
 (declaim (inline make-wire-tag))
 (defun make-wire-tag (wire-type field-number)
   "Create a protobuf field tag, the combination of a WIRE-TYPE (3 bits) and a
-   FIELD-NUMBER (29 bits) that precedes the field data itself."
+   FIELD-NUMBER (29 bits, minimum value 1) that precedes the field data itself."
   (declare (type (unsigned-byte 3) wire-type)
-           (type (unsigned-byte 29) field-number))
+           (type field-number field-number))
   (the (unsigned-byte 32)
        (ilogior wire-type (iash field-number 3))))
 
 (defun make-tag (type index)
   "Given the name of a protobuf type (a keyword symbol) and a field index,
    return the field tag that encodes both of them."
-  (declare (type (unsigned-byte 29) index))
+  (declare (type field-number index))
   (locally (declare #.$optimize-serialization)
     (let ((tag-bits (ecase type
                       ((:int32 :uint32) $wire-type-varint)
@@ -88,8 +84,8 @@
         (t form)))
 
 (defun packed-tag (index)
-  "Takes a field INDEX, and returns a tag for a packed field with that same index."
-  (declare (type (unsigned-byte 29) index))
+  "Takes a field number, INDEX, and returns a tag for a packed field with that same index."
+  (declare (type field-number index))
   (make-wire-tag $wire-type-string index))
 
 (defun length-encoded-tag-p (tag)

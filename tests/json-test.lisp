@@ -35,6 +35,15 @@
   \"one_level_nesting\": {
     \"int_field\": 2
   },
+  \"unknown_field_1\": [
+    {
+      \"sub_field_1\": 4,
+      \"sub_field_2\": 6
+    },
+    {
+      \"sub_field_3\": \"test\"
+    }
+  ],
   \"enum_vals\": [
     \"NONE\",
     \"TWENTY_ONE\"

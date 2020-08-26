@@ -226,7 +226,11 @@ then do not attempt to parse an opening bracket."
              (slot  (and field (pi::proto-external-field-name field))))
         (pi::expect-char stream #\:)
         (if (null field)
-            ;; Should we signal an error here?
+            ;; If FIELD is null, then we assume that MSG-DESC describes a
+            ;; different version of the proto on the wire which doesn't
+            ;; have FIELD, and continue,
+            ;; todo(benkuehnert): Add a flag to optionally throw an error
+            ;; in this spot.
             (skip-json-value stream)
             (let (val error-p null-p)
               (cond
@@ -251,7 +255,6 @@ then do not attempt to parse an opening bracket."
                 (t (multiple-value-setq (val error-p)
                     (parse-value-from-json type :stream stream))))
               (cond
-                ;; If we read a null, do nothing.
                 (null-p nil)
                 (error-p
                  (undefined-field-type "While parsing ~S from JSON format,"
@@ -311,7 +314,7 @@ then do not attempt to parse an opening bracket."
                              ;; If the parsed type is a symbol, then the enum was printed
                              ;; as an integer. Otherwise, it is a string which names a
                              ;; keyword.
-                             (find (parse-integer name) (enum-descriptor-values desc)
+                             (find (parse-integer name) (pi::enum-descriptor-values desc)
                                    :key #'pi::enum-value-descriptor-value)
                              (find (pi::keywordify name)
                                    (pi::enum-descriptor-values desc)
