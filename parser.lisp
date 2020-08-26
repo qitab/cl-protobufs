@@ -232,20 +232,26 @@
     (when number
       (coerce number 'float))))
 
-(defun parse-double (stream)
+(defun parse-double (stream &key append-d0)
   "Parse the next token in the STREAM as a double, then skip the following whitespace.
-   The returned value is the double-float."
-  (let ((number (parse-number stream)))
+If APPEND-D0 is true, then append 'd0' to the parsed number before attempting to convert
+to a double. This is necessary in order to parse doubles from the stream which do not
+already have the 'd0' suffix. The returned value is the double-float."
+  (let ((number (parse-number stream :append-d0 append-d0)))
     (when number
       (coerce number 'double-float))))
 
-(defun parse-number (stream)
+(defun parse-number (stream &key append-d0)
+  "Parse a number from STREAM. If APPEND-D0 is true, append \"d0\"
+to the end of the parsed numerical string."
   (when (let ((ch (peek-char nil stream nil)))
           (or (digit-char-p ch) (member ch '(#\- #\+ #\.))))
     (let ((token (parse-token stream '(#\- #\+ #\.))))
       (when token
         (skip-whitespace stream)
-        (parse-numeric-string token)))))
+        (if append-d0
+            (parse-numeric-string (concatenate 'string token "d0"))
+            (parse-numeric-string token))))))
 
 (defun parse-numeric-string (string)
   (cond ((starts-with string "0x")
