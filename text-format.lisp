@@ -44,7 +44,6 @@ Parameters:
                  (if (eq (slot-value field 'message-type) :extends)
                      (get-extension object (slot-value field 'external-field-name))
                      (proto-slot-value object (slot-value field 'external-field-name)))))
-          ;; For singular fields, only print if VALUE is not default.
           (if (eq (proto-label field) :repeated)
               (print-repeated-field value
                                     (proto-class field)

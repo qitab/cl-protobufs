@@ -473,8 +473,7 @@ on the symbol if we are not in SBCL."
               :initform nil)
    (set-type  :accessor proto-set-type          ; The type obtained directly
               :initarg :set-type)               ; from the protobuf schema.
-   ;; :singular is what we're calling proto3 fields with the "optional" label.
-   (label :type (member :required :optional :repeated :singular)
+   (label :type (member :required :optional :repeated)
           :accessor proto-label
           :initarg :label)
    ;; TODO(cgay): rename to field-number and proto-field-number. Why be coy?
