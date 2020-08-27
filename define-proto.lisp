@@ -563,12 +563,11 @@ Parameters:
         (index (proto-field-offset field))
         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
         (bool-index (proto-bool-index field))
-        (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
-        (label (proto-label field)))
+        (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type)))
 
     ;; If index is nil, then this field does not have a reserved bit in the %%is-set vector.
-    ;; This means that the field is singular, so checking for field presence must be done by
-    ;; checking if the bound value is default.
+    ;; This means that the field is proto3-style optional, so checking for field presence must
+    ;; be done by checking if the bound value is default.
     (with-gensyms (obj new-value cur-value)
       `(
         (declaim (inline (setf ,public-accessor-name)))
@@ -581,9 +580,9 @@ Parameters:
                `(setf (,hidden-accessor-name ,obj) ,new-value)))
 
 
-        ;; For singular fields, the has-* function is repurposed. It now answers the question:
-        ;; "Is this field set to the default value?". This is done so that the optimized
-        ;; serializer can use the has-* function to check if a singular field should be serialized.
+        ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
+        ;; question: "Is this field set to the default value?". This is done so that the optimized
+        ;; serializer can use the has-* function to check if an optional field should be serialized.
         (declaim (inline ,has-function-name))
         (defun ,has-function-name (,obj)
           ,(if index
@@ -620,9 +619,9 @@ Parameters:
 
         (proto-impl::set-field-accessor-functions ',proto-type ',public-slot-name)
 
-        ;; has-* functions are not exported for singular fields. They are only for
+        ;; has-* functions are not exported for proto3-style optional fields. They are only for
         ;; internal usage.
-        ,(unless (eq label :singular)
+        ,(unless (eq (proto-syntax *current-file-descriptor*) :proto3)
            `(export '(,has-function-name)))
 
         ,(unless (eq (proto-set-type field) :map)
@@ -1588,13 +1587,11 @@ function) then there is no guarantee on the serialize function working properly.
         (declare (ignore packed-p enum-values))
         (assert index)
         (multiple-value-bind (label repeated-type) (values-list label)
-          ;; Proto3 optional fields are known as 'singular' fields, and are handled differently.
-          (let* ((label (if (and (eq (proto-syntax *current-file-descriptor*) :proto3)
-                                 (eq label :optional))
-                            :singular
-                            label))
-                 ;; Singular fields do not have offsets, as they don't have has-* functions.
-                 (offset (and (not (eq label :singular)) field-offset))
+          (let* (;; Proto3 optional fields do not have offsets, as they don't have has-* functions.
+                 ;; Note that proto2-style optional fields in proto3 files are wrapped in oneofs by
+                 ;; protoc, and hence process-field is never called.
+                 (offset (and (not (eq (proto-syntax *current-file-descriptor*) :proto3))
+                              field-offset))
                  (default
                   (cond ((and (eq label :repeated)
                               (eq repeated-type :vector))
