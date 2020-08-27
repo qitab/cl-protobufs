@@ -191,3 +191,39 @@ message ProtoDifferentThanWire {
   optional string beginning = 1;
   optional string always = 2;
 }
+
+enum AutoStatus {
+  NEW = 1;
+  USED = 2;
+}
+
+enum PaintType {
+  NORMAL = 1;
+  METALLIC = 2;
+}
+
+message AutoColor {
+  optional string name = 1;
+  optional int32 r_value = 2;
+  optional int32 g_value = 3;
+  optional int32 b_value = 4;
+  extensions 1000 to 2000;
+}
+
+extend AutoColor {
+  optional PaintType paint_type = 1000;
+}
+
+message Automobile {
+  optional string model = 1;
+  optional AutoColor color = 2;
+  optional AutoStatus status = 3 [default = NEW];
+}
+
+message BuyCarRequest {
+  optional Automobile auto = 1;
+}
+
+message BuyCarResponse {
+  optional uint32 price = 1;
+}
