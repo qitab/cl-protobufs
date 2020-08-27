@@ -1,0 +1,31 @@
+name: update-wkt
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  update-wkt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repo
+        uses: actions/checkout@v2
+
+      - name: Install protoc
+        run: git clone --recursive https://github.com/google/protobuf protobuf && cd protobuf && ./autogen.sh && ./configure --prefix=/usr/local && make && sudo make install && sudo ldconfig
+
+      - name: Install protoc plug-in
+        run: cd protoc && PROTOC_ROOT=/usr/local make
+
+      - name: Generate all well known type .lisp files
+        run: for file in google/protobuf/*.proto; do if [ $(basename -- $file) == "proto2-descriptor-extensions.proto" ] ; then continue; fi; protoc --plugin=protoc-gen-lisp=$GITHUB_WORKSPACE/protoc/protoc-gen-lisp --lisp_out=output-file=$(basename $file .proto).lisp:.wkt -I=google/protobuf/ google/protobuf/$(basename -- $file); done;
+
+      - name: Commit any changes. 
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Automatic update of well known types schemas
+          file_pattern: .wkt/*.lisp
+          commit_user_name: common-lisp-dev-copybara
+          commit_user_email: common-lisp-dev-copybara@google.com
+          commit_author: common-lisp-dev-copybara <common-lisp-dev-copybara@google.com>

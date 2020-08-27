@@ -75,6 +75,7 @@
     :pathname ""
     :depends-on ("models" "misc")
     :components
+    #+protoc
     ((:protobuf-source-file "any"
       :proto-pathname "google/protobuf/any.proto")
      (:protobuf-source-file "source_context"
@@ -97,12 +98,37 @@
       :proto-pathname "google/protobuf/timestamp.proto")
      (:protobuf-source-file "wrappers"
       :proto-pathname "google/protobuf/wrappers.proto")
+     (:file "well-known-types"))
+    #-protoc
+    ((:file ".wkt/any")
+     (:file ".wkt/source_context")
+     #-ccl
+     (:file ".wkt/type")
+     #-ccl
+     (:file ".wkt/api")
+     (:file ".wkt/duration")
+     (:file ".wkt/empty")
+     (:file ".wkt/field_mask")
+     (:file ".wkt/timestamp")
+     (:file ".wkt/wrappers")
      (:file "well-known-types")))
    (:module "json"
     :serial t
     :pathname ""
     :depends-on ("well-known-types" "serialization")
     :components ((:file "json")))))
+
+(defmethod perform :before ((op asdf:prepare-op) (system (eql (find-system :cl-protobufs))))
+  "Checks if protoc + lisp plugin are installed on the machine."
+  (flet ((executable-installed (name)
+           (not (string= (uiop:run-program (format nil "which ~A" name)
+                                           :output :string
+                                           :ignore-error-status t)
+                         ""))))
+    (if (and (executable-installed "protoc")
+             (executable-installed "protoc-gen-lisp"))
+        (pushnew :protoc *features*)
+        (remove :protoc *features*))))
 
 (defsystem :cl-protobufs/tests
   :name "Protobufs Tests"
