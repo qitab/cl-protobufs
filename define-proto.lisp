@@ -448,7 +448,14 @@ Parameters:
                     :class class
                     :name name
                     :key-class (lisp-type-to-protobuf-class key-type)
-                    :val-class (lisp-type-to-protobuf-class val-type)
+                    ;; If the value type is a message, then VAL-TYPE will take the form
+                    ;; (cl:or cl:null message). In this case, set VAL-CLASS to be 'message'
+                    ;; as that is the class of the value type.
+                    :val-class (if (listp val-type)
+                                   (destructuring-bind (a b msg-type) val-type
+                                     (assert (and (eq a 'or) (eq b 'null)))
+                                     msg-type)
+                                   (lisp-type-to-protobuf-class val-type))
                     :key-type key-type
                     :val-type val-type)))
     (record-protobuf-object class map-desc :map)
@@ -758,28 +765,22 @@ function) then there is no guarantee on the serialize function working properly.
           (setf (bit (,is-set-accessor ,obj) ,index) 1)
           (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
 
-        ;; If the map's value type is a message, then the default value returned
-        ;; should be nil. However, we do not want to allow the user to insert nil
-        ;; into the map, so this binding only applies to the clear and get functions.
-        ,@(let ((val-type (if (find-message val-type)
-                              (list 'or 'null val-type)
-                              val-type)))
-            `((declaim (inline ,public-accessor-name))
-              (defun ,public-accessor-name (,new-key ,obj)
-                (declare (type ,key-type ,new-key))
-                (the (values ,val-type t)
-                     (multiple-value-bind (val flag)
-                         (gethash ,new-key (,hidden-accessor-name ,obj))
-                       (if flag
-                           (values val flag)
-                           (values ,val-default-form nil)))))
+        (declaim (inline ,public-accessor-name))
+        (defun ,public-accessor-name (,new-key ,obj)
+          (declare (type ,key-type ,new-key))
+          (the (values ,val-type t)
+               (multiple-value-bind (val flag)
+                   (gethash ,new-key (,hidden-accessor-name ,obj))
+                 (if flag
+                     (values val flag)
+                     (values ,val-default-form nil)))))
 
-              (declaim (inline ,public-remove-name))
-              (defun ,public-remove-name (,new-key ,obj)
-                (declare (type ,key-type ,new-key))
-                (remhash ,new-key (,hidden-accessor-name ,obj))
-                (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
-                    (setf (bit (,is-set-accessor ,obj) ,index) 0)))))
+        (declaim (inline ,public-remove-name))
+        (defun ,public-remove-name (,new-key ,obj)
+          (declare (type ,key-type ,new-key))
+          (remhash ,new-key (,hidden-accessor-name ,obj))
+          (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
+              (setf (bit (,is-set-accessor ,obj) ,index) 0)))
 
         (declaim (inline ,clear-function-name))
         (defun ,clear-function-name (,obj)
