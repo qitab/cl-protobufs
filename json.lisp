@@ -189,22 +189,26 @@ Parameters:
 
 ;;; Parse objects that were serialized using JSON format.
 
-(defgeneric parse-json (type &key stream spliced-p)
+(defgeneric parse-json (type &key stream ignore-unknown-fields-p spliced-p)
   (:documentation
-   "Parses an object message of type TYPE from the stream STREAM using JSON. If
-SPLICED-P is true, then do not attempt to parse an opening bracket."))
+   "Parses an object message of type TYPE from the stream STREAM using JSON.
+If IGNORE-UNKNOWN-FIELDS-P is true, then skip fields which are not defined in the
+message TYPE. Otherwise, throw an error. If SPLICED-P is true, then do not attempt
+to parse an opening bracket."))
 
 (defmethod parse-json ((type symbol)
-                              &key (stream *standard-input*) (spliced-p nil))
+                       &key (stream *standard-input*) ignore-unknown-fields-p spliced-p)
   (let ((message (find-message-for-class type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
-    (parse-json message :stream stream :spliced-p spliced-p)))
+    (parse-json message :stream stream :spliced-p spliced-p
+                        :ignore-unknown-fields-p ignore-unknown-fields-p)))
 
 (defmethod parse-json ((msg-desc message-descriptor)
-                       &key (stream *standard-input*) (spliced-p nil))
-  "Parse a JSON formatted message with descriptor MSG-DESC from STREAM. If SPLICED-P is true,
-then do not attempt to parse an opening bracket."
+                       &key (stream *standard-input*) ignore-unknown-fields-p spliced-p)
+  "Parse a JSON formatted message with descriptor MSG-DESC from STREAM. If IGNORE-UNKNOWN-FIELDS-P
+is true, then skip fields which are not defined in MSG-DESC. Otherwise, throw an error. If
+SPLICED-P is true, then do not attempt to parse an opening bracket."
   (let ((object #+sbcl (make-instance (or (pi::proto-alias-for msg-desc)
                                           (proto-class msg-desc)))
                 #-sbcl (funcall (get-constructor-name
@@ -213,7 +217,9 @@ then do not attempt to parse an opening bracket."
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
     (when (special-json-p (proto-class msg-desc))
-      (return-from parse-json (parse-special-json (proto-class msg-desc) stream)))
+      (return-from parse-json (parse-special-json (proto-class msg-desc)
+                                                  stream
+                                                  ignore-unknown-fields-p)))
     (unless spliced-p
       (pi::expect-char stream #\{))
     (loop
@@ -229,13 +235,11 @@ then do not attempt to parse an opening bracket."
             ;; If FIELD is null, then we assume that MSG-DESC describes a
             ;; different version of the proto on the wire which doesn't
             ;; have FIELD, and continue,
-            ;; todo(benkuehnert): Add a flag to optionally throw an error
-            ;; in this spot.
-            (skip-json-value stream)
+            (if ignore-unknown-fields-p
+                (skip-json-value stream)
+                (error "Unknown field ~S encountered in message ~S" name msg-desc))
             (let (val error-p null-p)
               (cond
-                ;; If we see an 'n', then the value MUST be 'null'. I
-                ;; this case, parse the 'null' and continune.
                 ((eql (peek-char nil stream nil) #\n)
                  (pi::parse-token stream)
                  (pi::skip-whitespace stream)
@@ -244,7 +248,8 @@ then do not attempt to parse an opening bracket."
                  (pi::expect-char stream #\[)
                  (loop
                    (multiple-value-bind (data err)
-                       (parse-value-from-json type :stream stream)
+                       (parse-value-from-json type :stream stream
+                                                   :ignore-unknown-fields-p ignore-unknown-fields-p)
                      (if err
                          (setf error-p t)
                          (push data val)))
@@ -253,7 +258,9 @@ then do not attempt to parse an opening bracket."
                        (return)))
                  (pi::expect-char stream #\]))
                 (t (multiple-value-setq (val error-p)
-                    (parse-value-from-json type :stream stream))))
+                     (parse-value-from-json type
+                                            :stream stream
+                                            :ignore-unknown-fields-p ignore-unknown-fields-p))))
               (cond
                 (null-p nil)
                 (error-p
@@ -278,8 +285,9 @@ then do not attempt to parse an opening bracket."
                   (nreverse (proto-slot-value object slot))))
           (return-from parse-json object))))))
 
-(defun parse-value-from-json (type &key (stream *standard-input*))
-  "Parse a single JSON value of type TYPE from STREAM."
+(defun parse-value-from-json (type &key (stream *standard-input*) ignore-unknown-fields-p)
+  "Parse a single JSON value of type TYPE from STREAM. IGNORE-UNKNOWN-FIELDS-P is passed
+to recursive calls to PARSE-JSON."
   (let ((desc (or (find-message type)
                   (find-enum type)
                   (find-map-descriptor type))))
@@ -306,7 +314,7 @@ then do not attempt to parse an opening bracket."
                     ret)
                   (pi::parse-signed-int stream)))))
           ((typep desc 'pi::message-descriptor)
-           (parse-json desc :stream stream))
+           (parse-json desc :stream stream :ignore-unknown-fields-p ignore-unknown-fields-p))
           ((typep desc 'pi::enum-descriptor)
            (multiple-value-bind (name type-parsed)
                (pi::parse-token-or-string stream)
@@ -468,8 +476,9 @@ for any types."
                                  stream)
            (format stream "null")))))
 
-(defun parse-special-json (type stream)
-  "Parse a well known type TYPE from STREAM."
+(defun parse-special-json (type stream ignore-unknown-fields-p)
+  "Parse a well known type TYPE from STREAM. IGNORE-UNKNOWN-FIELDS-P is passed to recursive
+calls to PARSE-JSON."
   ;; If the stream starts with 'n', then the data is NULL. In which case, return NIL.
   (when (eql (peek-char nil stream nil) #\n)
     (assert (string= (pi::parse-token stream) "null"))
@@ -486,14 +495,16 @@ for any types."
        (if (not (special-json-p type))
            ;; Parse the remaining elements in the object into a new message, then pack that message.
            (wkt:pack-any
-            (parse-json type :stream stream :spliced-p t))
+            (parse-json type :stream stream
+                             :ignore-unknown-fields-p ignore-unknown-fields-p
+                             :spliced-p t))
            ;; If URL names a well-known-type, then the next element in the object has key "VALUE",
            ;; and the value is the special JSON format. Parse that and close the object.
            (let ((val-string (pi::parse-string stream))
                  ret)
              (assert (string= val-string "value"))
              (pi::expect-char stream #\:)
-             (setf ret (parse-special-json type stream))
+             (setf ret (parse-special-json type stream ignore-unknown-fields-p))
              (pi::expect-char stream #\})
              (wkt:pack-any ret)))))
 

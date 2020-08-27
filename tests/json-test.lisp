@@ -68,7 +68,8 @@
 (deftest test-parse-json (json-suite)
   (let ((msg-parse (proto:parse-json
                     'cl-protobufs.test-proto:text-format-test
-                    :stream (make-string-input-stream *json-msg*))))
+                    :stream (make-string-input-stream *json-msg*)
+                    :ignore-unknown-fields-p t)))
     (assert-true (eql 100 (int-field msg-parse)))
     (assert-true (eql -1 (sint-field msg-parse)))
     (assert-true (eql 1 (uint-field msg-parse)))
@@ -215,7 +216,7 @@ the result is PROTO-EQUAL with MSG."
 (deftest wrapper-null-test (json-suite)
   (flet ((test-wrapper-type (type)
            (with-input-from-string (s "null")
-             (assert-false (cl-protobufs.json::parse-special-json type s)))))
+             (assert-false (cl-protobufs.json::parse-special-json type s nil)))))
     (test-wrapper-type 'google:bool-value)
     (test-wrapper-type 'google:string-value)
     (test-wrapper-type 'google:bytes-value)
