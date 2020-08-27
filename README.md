@@ -1,3 +1,4 @@
+
 # cl-protobufs
 ![SBCL-Tests](https://github.com/qitab/cl-protobufs/workflows/SBCL-Tests/badge.svg?branch=master)
 ![CCL-Tests](https://github.com/qitab/cl-protobufs/workflows/CCL-Tests/badge.svg?branch=master)
@@ -609,3 +610,35 @@ base-url/qualified-name.
 Creates an `Any` protobuf message given a protobuf `message` and a `base-url`.
 
 TODO: examples
+
+## JSON Mapping
+
+The `cl-protobufs.json` package exports functions to convert between protobuf
+objects and [the canonical JSON encoding](https://developers.google.com/protocol-buffers/docs/proto3#json).
+
+```lisp
+(defun print-json (message &key (indent 0) (stream *standard-output*)
+                             (camel-case-p t) numeric-enums-p))
+```
+
+Takes any protobuf message `message` and prints its JSON. The options are as
+follows:
+- `indent`: Indent the output by `indent` spaces. If `indent` is `nil`, then do
+not pretty-print the output.
+- `stream`: The Lisp stream to output to.
+- `camel-case-p`: Print field names in camelCase. If `nil`, then print field
+names as they appear in the .proto file.
+- `numeric-enums-p`: If true, print enum values by their number rather than
+their name.
+
+```lisp
+(defgeneric parse-json (type &key stream ignore-unknown-fields-p)
+```
+
+Parse a JSON encoding and return the parsed protobuf object. The options are as
+follows:
+- `type`: Either the Lisp type or the `message-descriptor` of the object to
+parse.
+- `stream`: The stream to read from. By default, this is \*standard-input\*.
+- `ignore-unknown-fields-p`: If true, silently ignore any unrecognized fields
+encountered when parsing. If `nil`, the parser will throw an error.
