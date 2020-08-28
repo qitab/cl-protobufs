@@ -176,29 +176,6 @@ const std::string FieldLispDefault(const FieldDescriptor* field) {
   GOOGLE_LOG(FATAL) << "Unsupported FileDescriptorType: " << field->DebugString();
   return "";
 }
-
-const std::string FieldTypeName(const FieldDescriptor* field) {
-  switch (field->type()) {
-      case FieldDescriptor::TYPE_ENUM:
-        return  (field->enum_type()->file() == field->file() &&
-                 (field->enum_type()->containing_type() ==
-                  field->containing_type() ||
-                  field->enum_type()->containing_type() ==
-                  field->containing_type()->containing_type())) ?
-            field->enum_type()->name():
-            field->enum_type()->full_name();
-      case FieldDescriptor::TYPE_MESSAGE:
-        return  (field->message_type()->file() == field->file() &&
-                 (field->message_type()->containing_type() ==
-                  field->containing_type() ||
-                  field->message_type()->containing_type() ==
-                  field->containing_type()->containing_type())) ?
-            field->message_type()->name():
-            field->message_type()->full_name();
-      default:
-        return field->type_name();
-    }
-}
 }  // namespace
 
 const std::string FieldLispName(const FieldDescriptor* field) {
@@ -226,7 +203,6 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   } else {
     vars["type"] = FieldLispType(field);
     vars["label"] = FieldLispLabel(field);
-    vars["typename"] = FieldTypeName(field);
     vars["packed"] = field->options().packed() ? " :packed cl:t" : "";
     vars["lazy"] = field->options().lazy() ? " :lazy cl:t" : "";
     vars["default"] = field->has_default_value()
@@ -237,7 +213,6 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
                    " :index $tag$ "
                    " :type $type$"
                    " :label $label$"
-                   " :typename \"$typename$\""
                    " :json-name \"$json-name$\"\n"
                    "$default$"
                    "$packed$"
