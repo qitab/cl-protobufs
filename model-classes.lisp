@@ -464,10 +464,7 @@ on the symbol if we are not in SBCL."
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
 (defclass field-descriptor (descriptor)
-  ((type :type string                           ; The name of the Protobuf type for the field
-         :accessor proto-type
-         :initarg :type)
-   (lisp-type :type (or null string)            ; Override the name of the Lisp type for the field
+  ((lisp-type :type (or null string)            ; Override the name of the Lisp type for the field
               :accessor proto-lisp-type
               :initarg :lisp-type
               :initform nil)

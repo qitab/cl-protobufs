@@ -434,7 +434,6 @@ Parameters:
                   :accessor reader))
          (mfield (make-instance 'field-descriptor
                   :name (slot-name->proto slot)
-                  :type "map"
                   :class class
                   :qualified-name qual-name
                   :set-type :map
@@ -479,7 +478,7 @@ Parameters:
     (loop for field in fields
           for oneof-offset from 0
           do
-       (destructuring-bind (slot &key type typename name (default nil default-p)
+       (destructuring-bind (slot &key type name (default nil default-p)
                                  lazy json-name index &allow-other-keys)
            field
          (assert json-name)
@@ -487,11 +486,10 @@ Parameters:
          (let ((default (if default-p default $empty-default)))
            (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
                (clos-type-to-protobuf-type type)
-             (declare (ignore packed-p enum-values))
+             (declare (ignore packed-p enum-values ptype))
              (setf (aref field-descriptors oneof-offset)
                    (make-instance 'field-descriptor
                                   :name (or name (slot-name->proto slot))
-                                  :type (or typename ptype)
                                   :lisp-type (when root-lisp-type (qualified-symbol-name
                                                                    root-lisp-type))
                                   :set-type type
@@ -1420,7 +1418,6 @@ function) then there is no guarantee on the serialize function working properly.
                            :initarg (kintern (symbol-name slot)))))
          (mfield  (make-instance 'field-descriptor
                     :name  (slot-name->proto slot)
-                    :type  name
                     :class type
                     :qualified-name (make-qualified-name *current-message-descriptor*
                                                          (slot-name->proto slot))
@@ -1556,7 +1553,6 @@ function) then there is no guarantee on the serialize function working properly.
      by keyword / value pairs:
      :type - A symbol naming the Lisp type of this field.
      :index - The field number.
-     :typename - The field type name from the .proto file, a string.
      :name - Optional. Used to override the defaultly generated protobuf field name.
      :default - Optional. The default value for the slot.
      :packed - Determines if the field is packed with respect to the proto API.
@@ -1572,7 +1568,7 @@ function) then there is no guarantee on the serialize function working properly.
    BOOL-VALUES: A bit-vector holding all boolean values for a message.
      On exit this vector holds the correct default value for FIELD if it is a
      simple boolean field."
-  (destructuring-bind (slot &key type typename name (default nil default-p) packed lazy
+  (destructuring-bind (slot &key type name (default nil default-p) packed lazy
                             json-name index label &allow-other-keys)
       field
     (assert json-name)
@@ -1581,10 +1577,8 @@ function) then there is no guarantee on the serialize function working properly.
            (reader (and conc-name
                         (fintern "~A~A" conc-name slot))))
       (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
-          ;; The protobuf returned by clos-type-to-protobuf-type may be incorrect due to
-          ;; camel-case shenanigans.  Prefer typename, if available.
           (clos-type-to-protobuf-type type)
-        (declare (ignore packed-p enum-values))
+        (declare (ignore packed-p enum-values ptype))
         (assert index)
         (multiple-value-bind (label repeated-type) (values-list label)
           (let* (;; Proto3 optional fields do not have offsets, as they don't have has-* functions.
@@ -1622,7 +1616,6 @@ function) then there is no guarantee on the serialize function working properly.
                  (field (make-instance
                          'field-descriptor
                          :name  (or name (slot-name->proto slot))
-                         :type  (or typename ptype)
                          :lisp-type (when root-lisp-type (qualified-symbol-name root-lisp-type))
                          :set-type type
                          :class pclass
