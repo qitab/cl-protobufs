@@ -484,14 +484,13 @@ Parameters:
          (assert json-name)
          (assert index)
          (let ((default (if default-p default $empty-default)))
-           (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
+
+           (multiple-value-bind (ptype pclass)
                (clos-type-to-protobuf-type type)
-             (declare (ignore packed-p enum-values ptype))
+             (declare (ignore ptype))
              (setf (aref field-descriptors oneof-offset)
                    (make-instance 'field-descriptor
                                   :name (or name (slot-name->proto slot))
-                                  :lisp-type (when root-lisp-type (qualified-symbol-name
-                                                                   root-lisp-type))
                                   :set-type type
                                   :class pclass
                                   :qualified-name (make-qualified-name
@@ -1576,9 +1575,9 @@ function) then there is no guarantee on the serialize function working properly.
            (internal-slot-name (fintern "%~A" slot))
            (reader (and conc-name
                         (fintern "~A~A" conc-name slot))))
-      (multiple-value-bind (ptype pclass packed-p enum-values root-lisp-type)
+      (multiple-value-bind (ptype pclass)
           (clos-type-to-protobuf-type type)
-        (declare (ignore packed-p enum-values ptype))
+        (declare (ignore ptype))
         (assert index)
         (multiple-value-bind (label repeated-type) (values-list label)
           (let* (;; Proto3 optional fields do not have offsets, as they don't have has-* functions.
@@ -1616,7 +1615,6 @@ function) then there is no guarantee on the serialize function working properly.
                  (field (make-instance
                          'field-descriptor
                          :name  (or name (slot-name->proto slot))
-                         :lisp-type (when root-lisp-type (qualified-symbol-name root-lisp-type))
                          :set-type type
                          :class pclass
                          :qualified-name (make-qualified-name *current-message-descriptor*
