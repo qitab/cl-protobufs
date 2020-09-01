@@ -1022,6 +1022,7 @@ function) then there is no guarantee on the serialize function working properly.
 
          (export '(,public-constructor-name ,is-set-name))
          (defmethod clear ((,obj ,proto-type))
+           (setf (base-message-%%skipped-bytes ,obj) nil)
            ,@(mapcan (lambda (name)
                        (let ((clear-name (fintern "~A.CLEAR-~A" proto-type name)))
                          `((,clear-name ,obj))))

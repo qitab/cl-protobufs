@@ -382,6 +382,19 @@
              (res3 (deserialize-object-from-bytes 'color-wheel2-wrap ser3)))
         (assert-true (proto-equal res3 rqst3))))))
 
+(defun clear-serialization-functions (proto-name)
+  #-sbcl
+  (setf (get `,proto-name :serialize) nil
+        (get `,proto-name :deserialize) nil)
+  #+sbcl (fmakunbound (list :protobuf :serialize proto-name))
+  #+sbcl (fmakunbound (list :protobuf :deserialize proto-name)))
+
+(defun clear-test-proto-backwards-compatibility ()
+  (loop for message in '(proto-on-wire
+                         proto-different-than-wire)
+        do
+     (clear-serialization-functions message)))
+
 ;;; We make two protos: ProtoOnWire and ProtoDifferentThanWire.
 ;;; The difference is that ProtoOnWire contains a superset of the
 ;;; fields ProtoOnWire contains.
@@ -389,19 +402,33 @@
 ;;; We create a ProtoOnWire, serialize, and then deserialize
 ;;; using the ProtoOnWire's bytes to a ProtoDifferentThanWire
 ;;;
-;;; This aims to test updateing a protocol buffer and deserializing
+;;; This aims to test updating a protocol buffer and deserializing
 ;;; on a binary containing the previous version.
 (deftest test-proto-backwards-compatibility (serialization-suite)
-  (let* ((proto-on-wire (make-proto-on-wire
-                         :beginning "char"
-                         :always "pika-pal"
-                         :end (list "mander")))
-         (proto-on-wire-octet-bytes (serialize-object-to-bytes proto-on-wire))
-         (my-deserialized-proto
-          (deserialize-object 'proto-different-than-wire
-                              proto-on-wire-octet-bytes))
-         (proto-different-than-wire (make-proto-different-than-wire
-                                     :beginning "char"
-                                     :always "pika-pal")))
-    (assert-true my-deserialized-proto)
-    (assert-true (proto-equal my-deserialized-proto proto-different-than-wire))))
+  (loop :for optimized :in '(nil t) :do
+    (print optimized)
+    (when optimized
+      (dolist (class '(proto-on-wire proto-different-than-wire))
+        (let ((message (proto:find-message-for-class class)))
+          (handler-bind ((style-warning #'muffle-warning))
+            (eval (proto-impl::generate-deserializer message))
+            (eval (proto-impl::generate-serializer message))))))
+
+    (let* ((proto-on-wire (make-proto-on-wire
+                           :beginning "char"
+                           :always "pika-pal"
+                           :end (list "mander")))
+           (proto-on-wire-octet-bytes (serialize-object-to-bytes proto-on-wire))
+           (my-deserialized-proto
+            (deserialize-object 'proto-different-than-wire
+                                proto-on-wire-octet-bytes))
+           (proto-different-than-wire (make-proto-different-than-wire
+                                       :beginning "char"
+                                       :always "pika-pal")))
+      (assert-true my-deserialized-proto)
+      (assert-true (proto-equal my-deserialized-proto proto-different-than-wire))
+      (let* ((reserializaed-proto-octets (serialize-object-to-bytes my-deserialized-proto))
+             (should-be-original-proto
+              (deserialize-object 'proto-on-wire
+                                  reserializaed-proto-octets)))
+        (assert-true (proto-equal should-be-original-proto proto-on-wire))))))

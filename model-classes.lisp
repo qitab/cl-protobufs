@@ -21,7 +21,12 @@ Parameters:
 
 ;; Type for structure messages.
 (defstruct base-message
-  "Base structure that all protobuf message structs inherit from.")
+  "Base structure that all protobuf message structs inherit from."
+  ;; %%skipped-bytes will contain all of the bytes we couldn't
+  ;; identify when we tried to deserialize a proto but will
+  ;; add to the serialized bytes for the proto if we serialize it.
+  ;; See https://developers.google.com/protocol-buffers/docs/overview#updating
+  (%%skipped-bytes nil :type (or null byte-vector)))
 
 ;;; "Thread-local" variables
 
