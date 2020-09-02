@@ -427,8 +427,8 @@
                                        :always "pika-pal")))
       (assert-true my-deserialized-proto)
       (assert-true (proto-equal my-deserialized-proto proto-different-than-wire))
-      (let* ((reserializaed-proto-octets (serialize-object-to-bytes my-deserialized-proto))
+      (let* ((reserialized-proto-octets (serialize-object-to-bytes my-deserialized-proto))
              (should-be-original-proto
               (deserialize-object 'proto-on-wire
-                                  reserializaed-proto-octets)))
+                                  reserialized-proto-octets)))
         (assert-true (proto-equal should-be-original-proto proto-on-wire))))))
