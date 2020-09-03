@@ -209,14 +209,9 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
         ? StrCat(" :default ", FieldLispDefault(field))
         : "";
     printer->Print(vars,
-                   "\n($name$ "
-                   " :index $tag$ "
-                   " :type $type$"
-                   " :label $label$"
-                   " :json-name \"$json-name$\"\n"
-                   "$default$"
-                   "$packed$"
-                   "$lazy$)");
+                   "\n($name$\n"
+                   " :index $tag$ :type $type$ :label $label$"
+                   " :json-name \"$json-name$\"$default$$packed$$lazy$)");
   }
   printer->Annotate("name", field);
 }

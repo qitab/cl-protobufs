@@ -74,7 +74,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
   if (descriptor_->options().map_entry())
     return;
   const bool group = tag >= 0;
-  printer->Print("\n");
+  printer->Print("\n\n");
   printer->Print((group ? "(proto:define-group $name$" :
                           "(proto:define-message $name$"),
                  "name", lisp_name);
@@ -105,14 +105,14 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
   printer->Outdent();
 
   if (descriptor_->enum_type_count() > 0) {
-    printer->Print("\n;; Nested enums.");
+    printer->Print("\n;; Nested enums");
     for (int i = 0; i < descriptor_->enum_type_count(); ++i) {
       enums_[i]->Generate(printer);
     }
   }
 
   if (descriptor_->nested_type_count() > 0) {
-    printer->Print("\n;; Nested messages.");
+    printer->Print("\n;; Nested messages");
     int printed = 0;
     for (int n = 0; n < descriptor_->nested_type_count(); ++n) {
       // Strange handling of group fields.
@@ -135,10 +135,11 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
   }
 
   if (descriptor_->field_count() > 0) {
-    printer->Print("\n;; Fields.");
+    printer->Print("\n;; Fields");
 
     std::unordered_set<int> seen_fields;
 
+    // oneof fields
     if (descriptor_->oneof_decl_count() > 0) {
       for (int i = 0; i < descriptor_->oneof_decl_count(); ++i) {
         const OneofDescriptor* oneof = descriptor_->oneof_decl(i);
@@ -169,6 +170,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
       }
     }
 
+    // Regular fields and groups
     for (int i = 0; i < descriptor_->field_count(); ++i) {
       const FieldDescriptor* field = descriptor_->field(i);
       if (seen_fields.find(field->index()) == seen_fields.end()) {
@@ -187,7 +189,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
   }
 
   if (descriptor_->extension_count() > 0) {
-    printer->Print("\n;; Extensions.");
+    printer->Print("\n;; Extensions");
     for (int i = 0; i < descriptor_->extension_count(); ++i) {
       GenerateExtension(
           printer, descriptor_->extension(i), descriptor_->file());
@@ -195,7 +197,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
   }
 
   if (descriptor_->extension_range_count() > 0) {
-    printer->Print("\n;; Extension ranges.");
+    printer->Print("\n;; Extension ranges");
     for (int i = 0; i < descriptor_->extension_range_count(); ++i) {
       const Descriptor::ExtensionRange* range = descriptor_->extension_range(i);
       printer->Print(

@@ -131,15 +131,16 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     printer->Print(")"); sep = "\n ";
   }
   // END schema options
-  printer->Print("))\n");
+  printer->Print(")\n");
   printer->Outdent();
   printer->Outdent();
+  printer->Print(")\n");
 
   std::vector<std::string> exports;
   exports.push_back(schema_name_);
 
   if (file_->enum_type_count() > 0) {
-    printer->Print("\n;; Top-Level enums.");
+    printer->Print("\n\n;;; Top-Level enums");
     for (int i = 0; i < file_->enum_type_count(); ++i) {
       enums_[i]->Generate(printer);
       enums_[i]->AddExports(&exports);
@@ -147,7 +148,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   }
 
   if (file_->message_type_count() > 0) {
-    printer->Print("\n;; Top-Level messages.");
+    printer->Print("\n\n;;; Top-Level messages");
     for (int i = 0; i < file_->message_type_count(); ++i) {
       messages_[i]->Generate(printer);
       messages_[i]->AddExports(&exports);
@@ -155,7 +156,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   }
 
   if (file_->extension_count() > 0) {
-    printer->Print("\n;; Top-Level extensions.");
+    printer->Print("\n\n;;; Top-Level extensions");
     for (int i = 0; i < file_->extension_count(); ++i) {
       GenerateExtension(printer, file_->extension(i), file_);
     }
@@ -163,7 +164,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
 
   std::vector<std::string> rpc_exports;
   if (file_->service_count() > 0) {
-    printer->Print("\n;; Services.");
+    printer->Print("\n\n;;; Services");
     for (int i = 0; i < file_->service_count(); ++i) {
       services_[i]->Generate(printer);
       services_[i]->AddExports(&exports);
@@ -184,6 +185,9 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   if (!lisp_package_name_.empty()) {
     // Export symbols.
     if (!exports.empty()) {
+      std::sort(exports.begin(), exports.end());
+      auto last = std::unique(exports.begin(), exports.end());
+      exports.erase(last, exports.end());
       sep = "(";
       printer->Print("\n(cl:export '");
       for (const std::string& e : exports) {
