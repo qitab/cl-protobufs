@@ -160,7 +160,11 @@ the oneof and its nested fields.
 |#
 
 
-;; TODO(jgodbout): remove this, we already have field-descriptor
+;;; TODO(jgodbout): remove this, we already have field-descriptor
+;;; "The only reason you would ever want a field-data struct instead of a
+;;; field-descriptor is when you define a slot on the object which doesn't
+;;; constitute a field (i.e. the %%BOOL-VALUES and %%IS-SET vectors). So in
+;;; that sense, the name field-data is quite bad." --bkuehnert
 (defstruct field-data
   "Keep field metadata for making the structure object."
   (internal-slot-name nil :type symbol)
