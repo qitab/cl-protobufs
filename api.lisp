@@ -90,7 +90,7 @@ only if the same fields have been explicitly set."
           for lisp-type
             = (when set-field-1 (proto-class
                                  (aref (oneof-descriptor-fields oneof)
-                                      set-field-1)))
+                                       set-field-1)))
           unless (and set-field-1 set-field-2)
             do (when (or set-field-1 set-field-2)
                  (return-from proto-equal nil))

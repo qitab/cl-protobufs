@@ -166,12 +166,11 @@ Parameters:
                                     object type field))))))
 
 (defun emit-repeated-field (value type packed-p index buffer)
-  "Serialize a repeated field.
-Warning: this function does not signal the undefined-field-type if serialization fails.
+  "Serialize a repeated field to buffer. Return nil on failure.
 
 Parameters:
   VALUE: The data to serialize, e.g. the data resulting from calling read-slot on a field.
-  TYPE: The :class slot of the field.
+  TYPE: The proto-class of the field.
   PACKED-P: Whether or not the field in question is packed.
   INDEX: The index of the field (used for making tags).
   BUFFER: The buffer to write to."
@@ -189,8 +188,7 @@ Parameters:
              (doseq (v value)
                (iincf size (serialize-scalar v type tag buffer)))
              size))
-          ((typep (setq desc (and type (or (find-message type) ; Why would TYPE ever be nil?
-                                           (find-enum type))))
+          ((typep (setq desc (or (find-message type) (find-enum type)))
                   'message-descriptor)
            (if (eq (proto-message-type desc) :group)
                (doseq (v value)
@@ -241,8 +239,7 @@ Parameters:
           (t nil))))
 
 (defun emit-non-repeated-field (value type index buffer)
-  "Serialize a non-repeated field.
-Warning: this function does not signal the undefined-field-type if serialization fails.
+  "Serialize a non-repeated field to buffer. Return nil on failure.
 
 Parameters:
   VALUE: The data to serialize, e.g. the data resulting from calling read-slot on a field.
@@ -257,9 +254,9 @@ Parameters:
     (cond ((scalarp type)
            (serialize-scalar value type (make-tag type index)
                              buffer))
-          ((typep (setq desc (and type (or (find-message type)
-                                           (find-enum type)
-                                           (find-map-descriptor type))))
+          ((typep (setq desc (or (find-message type)
+                                 (find-enum type)
+                                 (find-map-descriptor type)))
                   'message-descriptor)
            (cond ((not value) 0)
                  ((eq (proto-message-type desc) :group)
@@ -331,15 +328,14 @@ Parameters:
     (read-sequence buffer stream)
     (deserialize-object-from-bytes type buffer)))
 
-(defun deserialize-object-from-bytes (type buffer
-                                      &optional (start 0) (end (length buffer)))
+(defun deserialize-object-from-bytes (type buffer &optional (start 0) (end (length buffer)))
   "Deserialize an object of type TYPE from BUFFER, which is a simple
    array of (unsigned-byte 8).
 
-   TYPE is the Lisp name of a Protobufs message (usually the name of a
-   Lisp class) or a 'message-descriptor'.
-   The primary return value is the new object,
-   and the secondary value is the final index into BUFFER."
+   TYPE is a symbol naming the type to be deserialized.
+   START is the first byte.
+   END is the last byte plus one.
+   Returns two values: the new object and the final index into BUFFER."
   (assert (symbolp type))
   (let ((fast-function
           #-sbcl (get type :deserialize)

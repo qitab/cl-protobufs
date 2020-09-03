@@ -68,8 +68,10 @@ Parameters:
 ;; It would be nice if most of the slots had only reader functions, but
 ;; that makes writing the protobuf parser a good deal more complicated.
 (defclass descriptor (abstract-descriptor)
-  ;; The Lisp name for this object. For messages and groups this is the name of a struct.
-  ((class :type (or null symbol)
+  ;; The Lisp name for the type of this object. For messages and groups it's
+  ;; the name of a struct. For proto scalar types it's PROTO:INT32, STRING,
+  ;; etc.
+  ((class :type symbol
           :accessor proto-class
           :initarg :class
           :initform nil)
@@ -160,11 +162,9 @@ Parameters:
   (if *print-escape*
       (print-unreadable-object (file-desc stream :type t :identity t)
         (format stream "~@[~S~]~@[ (package ~A)~]"
-                (and (slot-boundp file-desc 'class)
-                     (proto-class file-desc))
+                (proto-class file-desc)
                 (proto-package file-desc)))
-      (format stream "~S" (and (slot-boundp file-desc 'class)
-                               (proto-class file-desc)))))
+      (format stream "~S" (proto-class file-desc))))
 
 ;; find-* functions for finding different proto meta-objects
 
@@ -429,15 +429,14 @@ on the symbol if we are not in SBCL."
   (if *print-escape*
     (print-unreadable-object (msg-desc stream :type t :identity t)
       (format stream "~S~@[ (alias for ~S)~]~@[ (group~*)~]~@[ (extended~*)~]"
-              (and (slot-boundp msg-desc 'class)
-                   (proto-class msg-desc))
+              (proto-class msg-desc)
               (and (slot-boundp msg-desc 'alias)
                    (proto-alias-for msg-desc))
               (and (slot-boundp msg-desc 'message-type)
                    (eq (proto-message-type msg-desc) :group))
               (and (slot-boundp msg-desc 'message-type)
                    (eq (proto-message-type msg-desc) :extends))))
-    (format stream "~S" (and (slot-boundp msg-desc 'class) (proto-class msg-desc)))))
+    (format stream "~S" (proto-class msg-desc))))
 
 ;; Extensions protocol
 (defgeneric get-extension (object slot)
@@ -547,7 +546,7 @@ on the symbol if we are not in SBCL."
       (print-unreadable-object (f stream :type t :identity t)
         (format stream "~S :: ~S = ~D~@[ (group~*)~]~@[ (extended~*)~]"
                 (proto-internal-field-name f)
-                (and (slot-boundp f 'class) (proto-class f))
+                (proto-class f)
                 (proto-index f)
                 (eq (proto-message-type f) :group)
                 (eq (proto-message-type f) :extends)))

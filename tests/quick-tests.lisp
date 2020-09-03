@@ -239,11 +239,11 @@
                "protobuf_unittest.bbaz")))
 
 
-;;; Some tests for the mechanism that maps a field number to its metaobject,
+;;; Some tests for the mechanism that maps a field number to its metaobject.
 ;;; The need for such is that in deserializing a structure using the generic path,
 ;;; we want to lookup the structure's initialization argument given the field number.
 ;;; The obvious-but-slow way to do that is
-;;;   (keywordify (proto-name (find-field schema-message field-number)))
+;;;   (keywordify (proto-name (find-field msg-descriptor field-number)))
 ;;; It would be really nice if, in general, FIND-FIELD would use other than linear scan,
 ;;; however tackling that was more than I was willing to undertake at present.
 
@@ -264,7 +264,9 @@
                      (return (mapcar (lambda (x)
                                        (make-instance
                                         'proto-impl::field-descriptor
-                                        :index x :internal-field-name 'foo
+                                        :index x
+                                        :class 'proto:int32
+                                        :internal-field-name 'foo
                                         :field-offset n))
                                      list)))))))))
     (let ((worst-n-probes 0))
@@ -297,7 +299,9 @@
   (proto-impl::make-field-map
    (mapcar (lambda (x)
              (make-instance 'proto-impl::field-descriptor
-                            :index (first x) :internal-field-name (second x)
+                            :index (first x)
+                            :class 'boolean
+                            :internal-field-name (second x)
                             :field-offset (first x)))
            list)))
 
