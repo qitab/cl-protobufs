@@ -605,7 +605,8 @@ Parameters:
              (when (eq (proto-label field) :repeated)
                (let ((data (nreverse (cadr cell))))
                  (setf (cadr cell)
-                       (if (vector-field-p field) (coerce data 'vector) data))))
+                       (if (eq :vector (proto-container field))
+                           (coerce data 'vector) data))))
              (cond ((eq (proto-message-type field) :extends)
                     ;; If an extension we'll have to set it manually later...
                     (progn
@@ -932,7 +933,7 @@ Parameters:
          (index  (proto-index field)))
     (when reader
       (if (eq (proto-label field) :repeated)
-          (let ((vector-p (vector-field-p field))
+          (let ((vector-p (eq :vector (proto-container field)))
                 (packed-p (proto-packed field)))
             (or (generate-repeated-field-serializer
                  class index boundp reader vbuf size vector-p packed-p)
@@ -1418,7 +1419,7 @@ Parameters:
                                ,@(loop for field in rfields
                                        for temp in rtemps
                                        for mtemp = (slot-value-to-slot-name-symbol temp)
-                                       for conversion = (if (vector-field-p field)
+                                       for conversion = (if (eq :vector (proto-container field))
                                                             `(coerce (nreverse ,temp) 'vector)
                                                             `(nreverse ,temp))
                                        nconc `(,(intern (string mtemp) :keyword)

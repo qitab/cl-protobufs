@@ -146,6 +146,7 @@
    #:proto-class
    #:proto-external-field-name
    #:proto-default
+   #:proto-container
    #:proto-fields
    #:proto-index
    #:proto-input-name

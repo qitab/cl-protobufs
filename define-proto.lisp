@@ -169,6 +169,7 @@ the oneof and its nested fields.
   "Keep field metadata for making the structure object."
   (internal-slot-name nil :type symbol)
   (external-slot-name nil :type symbol)
+  (container nil :type (member nil :vector :list))
   (accessor nil)
   (type nil)
   (initarg nil)
@@ -560,12 +561,12 @@ Parameters:
         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
         (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
         (default-form (get-default-form (proto-set-type field)
-                                        (proto-default field)))
+                                        (proto-default field)
+                                        (proto-container field)))
         (index (proto-field-offset field))
         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
         (bool-index (proto-bool-index field))
         (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type)))
-
     ;; If index is nil, then this field does not have a reserved bit in the %%is-set vector.
     ;; This means that the field is proto3-style optional, so checking for field presence must
     ;; be done by checking if the bound value is default.
@@ -685,7 +686,8 @@ Paramters:
                    (clear-function-name  (proto-slot-function-name
                                           proto-type public-slot-name :clear))
                    (default-form (get-default-form (proto-set-type field)
-                                                   (proto-default field)))
+                                                   (proto-default field)
+                                                   (proto-container field)))
                    (field-type (proto-set-type field))
                    (oneof-offset (proto-oneof-offset field)))
               ;; If a field isn't currently set inside of the oneof, just return its
@@ -753,7 +755,7 @@ function) then there is no guarantee on the serialize function working properly.
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
          (key-type (map-descriptor-key-type (find-map-descriptor (proto-class field))))
          (val-type (map-descriptor-val-type (find-map-descriptor (proto-class field))))
-         (val-default-form (get-default-form val-type $empty-default))
+         (val-default-form (get-default-form val-type $empty-default nil))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
     (with-gensyms (obj new-val new-key)
@@ -817,7 +819,7 @@ function) then there is no guarantee on the serialize function working properly.
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix)."
   (let* ((slot-name (proto-internal-field-name field))
          (repeated (eq (proto-label field) :repeated))
-         (vectorp (vector-field-p field))
+         (vectorp (eq :vector (proto-container field)))
          (public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
          (hidden-accessor-name (fintern "~A-~A" proto-type slot-name)))
     (with-gensyms (obj field-obj bytes)
@@ -895,22 +897,24 @@ function) then there is no guarantee on the serialize function working properly.
   (setf (gethash 'cl:keyword defaults) :default-keyword)
   (setf (gethash 'cl:symbol defaults) nil)
 
-  (defun get-default-form (type default)
-    "Get the default value for TYPE and the proto set DEFAULT"
+  (defun get-default-form (type default container)
+    "Find the default value for a specified type.
+
+  Parameters:
+    TYPE: The type we want to get the default form for.
+    DEFAULT: A user defined default or one of nil $empty-default.
+    CONTAINER: If the field we're getting the default for is repeated then
+      the type of container to hold the repeated data in."
     (let ((possible-default (gethash type defaults)))
       (cond
-        ((not (member default
-                      (list $empty-vector $empty-list $empty-default nil)))
+        ((not (member default (list $empty-default nil)))
          default)
         ((or possible-default
              (eq type 'cl:boolean))
          possible-default)
-        ((and (listp type)
-              (eq (first type) 'cl-protobufs:vector-of))
+        ((eq container :vector)
          '(make-array 0 :adjustable t))
-        ((and (listp type)
-              (eq (first type) 'cl-protobufs:list-of))
-         nil)
+        ((eq container :list) nil)
         ((and (listp type)
               (eq (first type) 'cl:or)
               (eq (second type) 'cl:null))
@@ -958,9 +962,10 @@ function) then there is no guarantee on the serialize function working properly.
                (mapcar (lambda (slot)
                         (let ((name (field-data-internal-slot-name slot))
                               (type (field-data-type slot))
-                              (initform (field-data-initform slot)))
+                              (initform (field-data-initform slot))
+                              (container (field-data-container slot)))
                           (unless (eq type 'boolean)
-                            `(,name ,(get-default-form type initform) :type ,type))))
+                            `(,name ,(get-default-form type initform container) :type ,type))))
                        slots)
                (mapcar (lambda (oneof)
                          (let ((name (oneof-descriptor-internal-name oneof)))
@@ -1161,6 +1166,7 @@ function) then there is no guarantee on the serialize function working properly.
           :external-slot-name 'proto-impl::%%bool-values
           :type `(bit-vector ,bool-count)
           :initarg :%%bool-values
+          :container :vector
           :initform `(make-array ,bool-count :element-type 'bit
                                              :initial-contents ,bool-values))))
 
@@ -1173,6 +1179,7 @@ function) then there is no guarantee on the serialize function working properly.
         :external-slot-name 'proto-impl::%%is-set
         :type `(bit-vector ,field-offset)
         :initarg :%%is-set
+        :container :vector
         :initform `(make-array ,field-offset
                                :element-type 'bit
                                :initial-element 0)))
@@ -1410,16 +1417,17 @@ function) then there is no guarantee on the serialize function working properly.
          (internal-slot-name (fintern "%~A" slot))
          (mslot   (unless alias-for
                     (make-field-data
-                           :internal-slot-name internal-slot-name
-                           :external-slot-name slot
-                           :type
-                           (case label
-                             (:required `(or ,type null))
-                             (:optional `(or ,type null))
-                             (:repeated `(list-of ,type)))
-                           :initform nil
-                           :accessor reader
-                           :initarg (kintern (symbol-name slot)))))
+                     :internal-slot-name internal-slot-name
+                     :external-slot-name slot
+                     :type
+                     (case label
+                       (:required `(or ,type null))
+                       (:optional `(or ,type null))
+                       (:repeated `(list-of ,type)))
+                     :initform nil
+                     :accessor reader
+                     :container (when (eq label :repeated) :list)
+                     :initarg (kintern (symbol-name slot)))))
          (mfield  (make-instance 'field-descriptor
                     :name  (slot-name->proto slot)
                     :class type
@@ -1515,6 +1523,7 @@ function) then there is no guarantee on the serialize function working properly.
           :external-slot-name 'proto-impl::%%is-set
           :type `(bit-vector ,field-offset)
           :initarg :%%is-set
+          :container :vector
           :initform `(make-array ,field-offset
                                  :element-type 'bit
                                  :initial-element 0)))
@@ -1526,6 +1535,7 @@ function) then there is no guarantee on the serialize function working properly.
           :external-slot-name 'proto-impl::%%bool-values
           :type `(bit-vector ,bool-count)
           :initarg :%%bool-values
+          :container :vector
           :initform `(make-array ,bool-count :element-type 'bit
                                              :initial-contents ,bool-values))))
 
@@ -1591,13 +1601,9 @@ function) then there is no guarantee on the serialize function working properly.
                  (offset (and (not (eq (proto-syntax *current-file-descriptor*) :proto3))
                               field-offset))
                  (default
-                  (cond ((and (eq label :repeated)
-                              (eq repeated-type :vector))
-                         $empty-vector)
-                        ((eq label :repeated)
-                         $empty-list)
-                        (default-p default)
-                        (t $empty-default)))
+                  (if default-p
+                      default
+                      $empty-default))
                  (cslot (unless alias-for
                           (make-field-data
                            :internal-slot-name internal-slot-name
@@ -1605,6 +1611,7 @@ function) then there is no guarantee on the serialize function working properly.
                            :type `,type
                            :accessor reader
                            :initarg (kintern (symbol-name slot))
+                           :container (when (eq label :repeated) repeated-type)
                            :initform
                            (cond ((eq label :repeated)
                                      ;; Repeated fields get a container for their elements
@@ -1634,6 +1641,7 @@ function) then there is no guarantee on the serialize function working properly.
                          :default default
                          ;; Pack the field only if requested and it actually makes sense
                          :packed  (and (eq label :repeated) packed t)
+                         :container (when (eq label :repeated) repeated-type)
                          :lazy (and lazy t)
                          :bool-index bool-index)))
             (when (and bool-index default (not (eq default $empty-default)))

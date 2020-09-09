@@ -462,8 +462,6 @@ on the symbol if we are not in SBCL."
 
 (defconstant $empty-default 'empty-default
   "The marker used in 'proto-default' used to indicate that there is no default value.")
-(defconstant $empty-list    'empty-list)
-(defconstant $empty-vector  'empty-vector)
 
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
@@ -515,6 +513,10 @@ on the symbol if we are not in SBCL."
            :accessor proto-packed
            :initarg :packed
            :initform nil)
+   (container :accessor proto-container         ; If the field is repeated, this specifies the
+              :type (member nil :vector :list)  ; container type. If not, this field is nil.
+              :initarg :container
+              :initform nil)
    (lazy :type boolean                          ; Lazy, pulled out of the options
          :accessor proto-lazy-p
          :initarg :lazy
@@ -564,23 +566,9 @@ on the symbol if we are not in SBCL."
   (:method ((field field-descriptor))
     (let ((default (proto-default field)))
       (or (eq default $empty-default)
-          (eq default $empty-list)
-          (eq default $empty-vector)
           ;; Special handling for imported CLOS classes
           (and (not (eq (proto-label field) :optional))
                (or (null default) (equalp default #())))))))
-
-(defgeneric vector-field-p (field)
-  (:documentation
-   "Returns true if the storage for a 'repeated' field is a vector,
-    returns false if the storage is a list.")
-  (:method ((field field-descriptor))
-    ;; NB: the FieldOption (lisp_container) attempts to generalize whether a repeated field is a
-    ;; list or a vector, but for now the only indication that a field-descriptor wants to be a
-    ;; vector is what its default is.
-    (let ((default (proto-default field)))
-      (or (eq default $empty-vector)
-          (and (vectorp default) (not (stringp default)))))))
 
 (defclass extension-descriptor (abstract-descriptor)
   ;; The start of the extension range.

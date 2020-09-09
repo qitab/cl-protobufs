@@ -71,7 +71,8 @@ Parameters:
   MESSAGE: The messag to pack.
   BASE-URL: The base part of the URL without the final '/'."
   (let* ((m (proto-impl::find-message (type-of message))))
-    (cl-protobufs.google.protobuf:make-any :type-url (proto-impl::strcat base-url
-                                            "/"
-                                            (proto-impl::proto-qualified-name m))
-              :value (serialize-object-to-bytes message))))
+    (cl-protobufs.google.protobuf:make-any
+     :type-url (proto-impl::strcat base-url
+                                   "/"
+                                   (proto-impl::proto-qualified-name m))
+     :value (serialize-object-to-bytes message))))
