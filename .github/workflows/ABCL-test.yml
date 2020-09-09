@@ -24,7 +24,6 @@ jobs:
       - name: Download quicklisp
         run: curl -o quicklisp.lisp 'https://beta.quicklisp.org/quicklisp.lisp'
 
-
       - name: Install quicklisp
         run: |
           ./abcl/abcl --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
@@ -35,19 +34,28 @@ jobs:
         with:
           path: quicklisp/local-projects/cl-protobufs
 
-      - name: Add cl-protobufs/protoc to path
-        run: echo "::add-path:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
-
-      - name: Download and install protobuf
-        run: git clone --recursive https://github.com/google/protobuf $GITHUB_WORKSPACE/protobuf && cd $GITHUB_WORKSPACE/protobuf && ./autogen.sh && ./configure --prefix=/usr/local && make && sudo make install && sudo ldconfig
-
-      - name: Install protoc plug-in
-        run: cd $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc && PROTOC_ROOT=/usr/local make
-
-      - name: Load and run tests
+      - name: Diagnostic for where cl-protobufs occurs on the filesystem
         run: |
           export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
-          ./abcl/abcl --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
+          ./abcl/abcl --eval '(asdf:system-source-directory :cl-protobufs)'
+
+      - name: Install test dependencies
+        run: |
+          export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/" 
+          ./abcl/abcl --eval '(ql:quickload :cl-protobufs/tests)'
+
+      - name: Diagnostic for where cl-protobufs occurs on the filesystem
+        run: |
+          export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
+          ./abcl/abcl --eval '(asdf:system-source-directory :cl-protobufs)'
+
+      - name: Run tests
+        run: |
+          export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
+          ./abcl/abcl --eval '(asdf:test-system :cl-protobufs)' >> report
           test -f report
           ! grep -q "not ok" report
           grep -q "ok" report
+
+                
+

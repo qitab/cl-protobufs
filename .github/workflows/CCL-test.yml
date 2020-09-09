@@ -32,6 +32,11 @@ jobs:
         with:
           path: quicklisp/local-projects/cl-protobufs
 
+      - name: Diagnostic for where cl-protobufs occurs on the filesystem
+        run: |
+          export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
+          ./ccl/lx86cl64 --eval '(asdf:system-source-directory :cl-protobufs)'
+
       - name: Add cl-protobufs/protoc to path
         run: echo "::add-path:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
 
