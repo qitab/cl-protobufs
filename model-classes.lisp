@@ -314,7 +314,8 @@ Parameters:
   (key-class nil :type symbol) ;; the :class of the key
   (val-class nil :type symbol) ;; the :class of the value
   (key-type nil)  ;; the lisp type of the key.
-  (val-type nil)) ;; the lisp type of the value.
+  (val-type nil)  ;; the lisp type of the value.
+  (val-kind nil :type (member :scalar :message :group :enum)))
 
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
@@ -466,7 +467,10 @@ on the symbol if we are not in SBCL."
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
 (defclass field-descriptor (descriptor)
-  ((set-type  :accessor proto-set-type          ; The type obtained directly
+  ((kind :type (member :message :group :extends :enum :map :scalar nil)
+         :accessor proto-kind
+         :initarg :kind)
+   (set-type  :accessor proto-set-type          ; The type obtained directly
               :initarg :set-type)               ; from the protobuf schema.
    (label :type (member :required :optional :repeated)
           :accessor proto-label
@@ -524,12 +528,7 @@ on the symbol if we are not in SBCL."
    (bool-index :type (or null integer)      ; For non-repeated boolean fields only, the
                :accessor proto-bool-index   ; index into the bit-vector of boolean field values.
                :initarg :bool-index
-               :initform nil)
-   ;; Copied from 'proto-message-type' of the field
-   (message-type :type (member :message :group :extends)
-                 :accessor proto-message-type
-                 :initarg :message-type
-                 :initform :message))
+               :initform nil))
   (:documentation
    "The model class that represents one field within a Protobufs message."))
 
@@ -550,8 +549,8 @@ on the symbol if we are not in SBCL."
                 (proto-internal-field-name f)
                 (proto-class f)
                 (proto-index f)
-                (eq (proto-message-type f) :group)
-                (eq (proto-message-type f) :extends)))
+                (eq (proto-kind f) :group)
+                (eq (proto-kind f) :extends)))
       (format stream "~S" (proto-internal-field-name f))))
 
 (defmethod proto-slot ((field field-descriptor))

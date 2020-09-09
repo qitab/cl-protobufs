@@ -51,7 +51,7 @@ Parameters:
     ;; a field has been already printed, so always print a comma.
     (let ((field-printed spliced-p))
       (dolist (field (proto-fields message))
-        (when (if (eq (slot-value field 'pi::message-type) :extends)
+        (when (if (eq (slot-value field 'pi::kind) :extends)
                   (has-extension object (slot-value field 'internal-field-name))
                   (has-field object (slot-value field 'pi::external-field-name)))
           (let* ((name (if camel-case-p
@@ -59,7 +59,7 @@ Parameters:
                            (proto-name field)))
                  (type (proto-class field))
                  (value
-                   (if (eq (slot-value field 'pi::message-type) :extends)
+                   (if (eq (slot-value field 'pi::kind) :extends)
                        (get-extension object (slot-value field 'pi::external-field-name))
                        (proto-slot-value object (slot-value field 'pi::external-field-name)))))
             (if field-printed

@@ -110,6 +110,73 @@ const std::string FieldLispType(const FieldDescriptor* field) {
   return ":error";
 }
 
+const std::string FieldLispKind(const FieldDescriptor* field) {
+  std::string proto_kind;
+
+  switch (field->type()) {
+    case FieldDescriptor::TYPE_DOUBLE:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_FLOAT:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_INT64:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_UINT32:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_UINT64:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_INT32:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_FIXED64:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_FIXED32:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_BOOL:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_STRING:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_SFIXED32:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_SFIXED64:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_SINT32:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_SINT64:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_BYTES:
+      proto_kind = ":scalar";
+      break;
+    case FieldDescriptor::TYPE_MESSAGE:
+      proto_kind = ":message";
+      break;
+    case FieldDescriptor::TYPE_GROUP:
+      proto_kind = ":group";
+      break;
+    case FieldDescriptor::TYPE_ENUM:
+      proto_kind = ":enum";
+      break;
+    default:
+      GOOGLE_LOG(FATAL) << "Unsupported FileDescriptorType: "
+                 << field->DebugString();
+      break;
+  }
+  return proto_kind;
+}
+
+
 // Return the "arity" of the field, i.e. whether it's required, optional, or
 // repeated, and if repeated the type of repeated.
 const std::string FieldLispLabel(const FieldDescriptor* field) {
@@ -194,14 +261,17 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   if (field->is_map()) {
     vars["key-type"] = FieldLispType(field->message_type()->field(0));
     vars["val-type"] = FieldLispType(field->message_type()->field(1));
+    vars["val-kind"] = FieldLispKind(field->message_type()->field(1));
     printer->Print(vars,
-                    "\n(proto:define-map $name$\n"
-                    "   :key-type $key-type$\n"
-                    "   :val-type $val-type$\n"
-                    "   :json-name \"$json-name$\"\n"
-                    "   :index $tag$)");
+                   "\n(proto:define-map $name$\n"
+                   "   :key-type $key-type$\n"
+                   "   :val-type $val-type$\n"
+                   "   :json-name \"$json-name$\"\n"
+                   "   :val-kind $val-kind$\n"
+                   "   :index $tag$)");
   } else {
     vars["type"] = FieldLispType(field);
+    vars["kind"] = FieldLispKind(field);
     vars["label"] = FieldLispLabel(field);
     vars["packed"] = field->options().packed() ? " :packed cl:t" : "";
     vars["lazy"] = field->options().lazy() ? " :lazy cl:t" : "";
@@ -210,7 +280,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
         : "";
     printer->Print(vars,
                    "\n($name$\n"
-                   " :index $tag$ :type $type$ :label $label$"
+                   " :index $tag$ :type $type$ :kind $kind$ :label $label$"
                    " :json-name \"$json-name$\"$default$$packed$$lazy$)");
   }
   printer->Annotate("name", field);

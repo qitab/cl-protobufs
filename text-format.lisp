@@ -37,11 +37,11 @@ Parameters:
               (format stream "~A { " name))
           (format stream "{")))
     (dolist (field (proto-fields message))
-      (when (if (eq (slot-value field 'message-type) :extends)
+      (when (if (eq (slot-value field 'kind) :extends)
                 (has-extension object (slot-value field 'internal-field-name))
                 (has-field object (slot-value field 'external-field-name)))
         (let* ((value
-                 (if (eq (slot-value field 'message-type) :extends)
+                 (if (eq (slot-value field 'kind) :extends)
                      (get-extension object (slot-value field 'external-field-name))
                      (proto-slot-value object (slot-value field 'external-field-name)))))
           (if (eq (proto-label field) :repeated)

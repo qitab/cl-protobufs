@@ -410,7 +410,7 @@ Parameters:
         (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
-(defmacro define-map (type-name &key key-type val-type json-name index)
+(defmacro define-map (type-name &key key-type val-type json-name index val-kind)
 "Define a lisp type given the data for a protobuf map type.
 
 Parameters:
@@ -418,8 +418,10 @@ Parameters:
   KEY-TYPE: The lisp type of the map's keys.
   VAL-TYPE: The lisp type of the map's values.
   JSON-NAME: The string to use as a JSON name for the field.
+  VAL-KIND: The protobuf kind of the map value type.
   INDEX: Index of this map type in the field."
   (assert json-name)
+  (assert val-kind)
   (check-type index integer)
   (let* ((slot      type-name)
          (name      (class-name->proto type-name))
@@ -447,7 +449,8 @@ Parameters:
                   :internal-field-name internal-slot-name
                   :external-field-name slot
                   :json-name json-name
-                  :reader reader))
+                  :reader reader
+                  :kind :map))
          (map-desc (make-map-descriptor
                     :class class
                     :name name
@@ -461,7 +464,8 @@ Parameters:
                                      msg-type)
                                    (lisp-type-to-protobuf-class val-type))
                     :key-type key-type
-                    :val-type val-type)))
+                    :val-type val-type
+                    :val-kind val-kind)))
     (record-protobuf-object class map-desc :map)
     `(progn
        define-map ;; the type of this model
@@ -484,7 +488,7 @@ Parameters:
           for oneof-offset from 0
           do
        (destructuring-bind (slot &key type name (default nil default-p)
-                                 lazy json-name index &allow-other-keys)
+                                 lazy json-name index kind &allow-other-keys)
            field
          (assert json-name)
          (assert index)
@@ -497,6 +501,7 @@ Parameters:
                    (make-instance 'field-descriptor
                                   :name (or name (slot-name->proto slot))
                                   :set-type type
+                                  :kind kind
                                   :class pclass
                                   :qualified-name (make-qualified-name
                                                    *current-message-descriptor*
@@ -1321,7 +1326,7 @@ function) then there is no guarantee on the serialize function working properly.
                                        (defmethod (setf ,reader)
                                            (val (object ,type))
                                          (,writer object val)))))))
-                (setf (proto-message-type extra-field) :extends)        ;this field is an extension
+                (setf (proto-kind extra-field) :extends)
                 (appendf (proto-fields extends) (list extra-field))
                 (appendf (proto-extended-fields extends) (list extra-field))))))
           (otherwise
@@ -1382,7 +1387,7 @@ function) then there is no guarantee on the serialize function working properly.
                          (,writer object val)))))
                  ;; This so that (de)serialization works
                  (setf (proto-reader field) reader)))
-             (setf (proto-message-type field) :extends)         ;this field is an extension
+             (setf (proto-kind field) :extends)
              (appendf (proto-fields extends) (list field))
              (appendf (proto-extended-fields extends) (list field))))))
       (collect-form `(record-protobuf-object ',type ,extends :message))
@@ -1439,7 +1444,7 @@ function) then there is no guarantee on the serialize function working properly.
                     :internal-field-name internal-slot-name
                     :external-field-name slot
                     :reader reader
-                    :message-type :group))
+                    :kind :group))
          (message (make-instance 'message-descriptor
                     :class type
                     :name  name
@@ -1572,6 +1577,7 @@ function) then there is no guarantee on the serialize function working properly.
      :packed - Determines if the field is packed with respect to the proto API.
      :lazy - Determines whether to lazily deserialize the field with respect to the proto API.
      :label - One of (:repeated :vector), (:repeated :list), (:optional), (:required).
+     :kind - One of :enum :map :scalar :group :message :extends
    CONC-NAME: The name to concatenate to the beginning of the field accessor.
    ALIAS-FOR is to determine if this is an alias for a difference field.
    FIELD-OFFSET is an internal concept of the index of a field
@@ -1583,7 +1589,7 @@ function) then there is no guarantee on the serialize function working properly.
      On exit this vector holds the correct default value for FIELD if it is a
      simple boolean field."
   (destructuring-bind (slot &key type name (default nil default-p) packed lazy
-                            json-name index label &allow-other-keys)
+                            json-name index label kind &allow-other-keys)
       field
     (assert json-name)
     (let* (;; Public accessors and setters for slots should be defined later.
@@ -1628,6 +1634,7 @@ function) then there is no guarantee on the serialize function working properly.
                          'field-descriptor
                          :name  (or name (slot-name->proto slot))
                          :set-type type
+                         :kind kind
                          :class pclass
                          :qualified-name (make-qualified-name *current-message-descriptor*
                                                               (or name (slot-name->proto slot)))

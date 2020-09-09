@@ -144,7 +144,7 @@ Parameters:
   FIELD: The field-descriptor describing which field of OBJECT to serialize.
   BUFFER: The buffer to serialize to."
   (declare (type field-descriptor field))
-  (let ((message-type (slot-value field 'message-type)))
+  (let ((message-type (slot-value field 'kind)))
     (unless
         (if (eq message-type :extends)
             (has-extension object (slot-value field 'internal-field-name))
@@ -607,7 +607,7 @@ Parameters:
                  (setf (cadr cell)
                        (if (eq :vector (proto-container field))
                            (coerce data 'vector) data))))
-             (cond ((eq (proto-message-type field) :extends)
+             (cond ((eq (proto-kind field) :extends)
                     ;; If an extension we'll have to set it manually later...
                     (progn
                       (push `(,(proto-internal-field-name field) ,(cadr cell))
