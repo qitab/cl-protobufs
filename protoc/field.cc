@@ -86,28 +86,7 @@ const std::string FieldLispType(const FieldDescriptor* field) {
         break;
     }
   }
-
-  if (field->type() == FieldDescriptor::TYPE_MESSAGE &&
-      !field->is_repeated())
-    // WARNING: the define-map macro assumes that messages types will be
-    // in the form "(cl:or cl:null message)". Any change to this output
-    // must be reflected in the define-map macro.
-    return StrCat("(cl:or cl:null ", type, ")");
-  if (field->is_required() || field->is_optional()) return type;
-  if (field->is_repeated()) {
-    if (field->options().HasExtension(lisp_container)) {
-      switch (field->options().GetExtension(lisp_container)) {
-        case LIST:
-          return StrCat("(proto:list-of ", type, ")");
-        case VECTOR:
-          return StrCat("(proto:vector-of ", type, ")");
-      }
-    } else {
-      return StrCat("(proto:list-of ", type, ")");
-    }
-  }
-  GOOGLE_LOG(FATAL) << "Error determining field type: " << field->DebugString();
-  return ":error";
+  return type;
 }
 
 const std::string FieldLispKind(const FieldDescriptor* field) {

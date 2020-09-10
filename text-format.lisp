@@ -293,7 +293,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
                  (when slot
                    (pushnew slot rslots)
                    (push val (proto-slot-value object slot))))
-                ((eq (proto-set-type field) :map)
+                ((eq (proto-kind field) :map)
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
                          (cdr pair))))

@@ -470,8 +470,9 @@ on the symbol if we are not in SBCL."
   ((kind :type (member :message :group :extends :enum :map :scalar nil)
          :accessor proto-kind
          :initarg :kind)
-   (set-type  :accessor proto-set-type          ; The type obtained directly
-              :initarg :set-type)               ; from the protobuf schema.
+   (type :type (or null symbol)
+         :accessor proto-type
+         :initarg :type)
    (label :type (member :required :optional :repeated)
           :accessor proto-label
           :initarg :label)

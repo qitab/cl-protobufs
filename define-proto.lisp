@@ -172,6 +172,7 @@ the oneof and its nested fields.
   (container nil :type (member nil :vector :list))
   (accessor nil)
   (type nil)
+  (kind nil)
   (initarg nil)
   (initform nil))
 
@@ -443,13 +444,13 @@ Parameters:
                   :name (slot-name->proto slot)
                   :class class
                   :qualified-name qual-name
-                  :set-type :map
                   :label :optional
                   :index index
                   :internal-field-name internal-slot-name
                   :external-field-name slot
                   :json-name json-name
                   :reader reader
+                  :type 'cl:hash-table
                   :kind :map))
          (map-desc (make-map-descriptor
                     :class class
@@ -500,7 +501,7 @@ Parameters:
              (setf (aref field-descriptors oneof-offset)
                    (make-instance 'field-descriptor
                                   :name (or name (slot-name->proto slot))
-                                  :set-type type
+                                  :type type
                                   :kind kind
                                   :class pclass
                                   :qualified-name (make-qualified-name
@@ -565,9 +566,10 @@ Parameters:
         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
         (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
-        (default-form (get-default-form (proto-set-type field)
+        (default-form (get-default-form (proto-type field)
                                         (proto-default field)
-                                        (proto-container field)))
+                                        (proto-container field)
+                                        (proto-type field)))
         (index (proto-field-offset field))
         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
         (bool-index (proto-bool-index field))
@@ -597,16 +599,18 @@ Parameters:
                `(let ((,cur-value ,(if bool-index
                                        `(plusp (bit (,bit-field-name ,obj) ,bool-index))
                                        `(,hidden-accessor-name ,obj))))
-                  ,(case (proto-set-type field)
-                     ((proto:byte-vector cl:string) `(not (= (length ,cur-value) 0)))
-                     ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
-                     ;; Otherwise, the type is integral. EQ suffices to check equality.
-                     (t `(not (eq ,cur-value ,default-form)))))))
+                  ,(if (proto-container field)
+                       cur-value
+                       (case (proto-type field)
+                         ((proto:byte-vector cl:string) `(not (= (length ,cur-value) 0)))
+                         ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
+                         ;; Otherwise, the type is integral. EQ suffices to check equality.
+                         (t `(not (eq ,cur-value ,default-form))))))))
 
         ;; Clear function
         ;; Map type clear functions are created in make-map-accessor-forms.
         ;; todo(benkuehnert): rewrite map types/definers so that this isn't necessary
-        ,@(unless (eq (proto-set-type field) :map)
+        ,@(unless (eq (proto-kind field) :map)
             `((declaim (inline ,clear-function-name))
               (defun ,clear-function-name (,obj)
                 ,(when index
@@ -631,7 +635,7 @@ Parameters:
         ,(unless (eq (proto-syntax *current-file-descriptor*) :proto3)
            `(export '(,has-function-name)))
 
-        ,(unless (eq (proto-set-type field) :map)
+        ,(unless (eq (proto-kind field) :map)
            `(export '(,clear-function-name)))
 
         (export '(,public-accessor-name))))))
@@ -690,10 +694,11 @@ Paramters:
                                           proto-type public-slot-name :has))
                    (clear-function-name  (proto-slot-function-name
                                           proto-type public-slot-name :clear))
-                   (default-form (get-default-form (proto-set-type field)
+                   (default-form (get-default-form (proto-type field)
                                                    (proto-default field)
-                                                   (proto-container field)))
-                   (field-type (proto-set-type field))
+                                                   (proto-container field)
+                                                   (proto-kind field)))
+                   (field-type (proto-type field))
                    (oneof-offset (proto-oneof-offset field)))
               ;; If a field isn't currently set inside of the oneof, just return its
               ;; default value.
@@ -758,11 +763,14 @@ function) then there is no guarantee on the serialize function working properly.
          (method-accessor-name (fintern "~A-gethash" public-slot-name))
          (method-remove-name (fintern "~A-remhash" public-slot-name))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
-         (key-type (map-descriptor-key-type (find-map-descriptor (proto-class field))))
-         (val-type (map-descriptor-val-type (find-map-descriptor (proto-class field))))
-         (val-default-form (get-default-form val-type $empty-default nil))
+         (map-descriptor (find-map-descriptor (proto-class field)))
+         (key-type (map-descriptor-key-type map-descriptor))
+         (val-type (map-descriptor-val-type map-descriptor))
+         (val-kind (map-descriptor-val-kind map-descriptor))
+         (val-default-form (get-default-form val-type $empty-default nil val-kind))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
+
     (with-gensyms (obj new-val new-key)
       `(
         (declaim (inline (setf ,public-accessor-name)))
@@ -772,15 +780,22 @@ function) then there is no guarantee on the serialize function working properly.
           (setf (bit (,is-set-accessor ,obj) ,index) 1)
           (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
 
-        (declaim (inline ,public-accessor-name))
-        (defun ,public-accessor-name (,new-key ,obj)
-          (declare (type ,key-type ,new-key))
-          (the (values ,val-type t)
-               (multiple-value-bind (val flag)
-                   (gethash ,new-key (,hidden-accessor-name ,obj))
-                 (if flag
-                     (values val flag)
-                     (values ,val-default-form nil)))))
+        ;; If the map's value type is a message, then the default value returned
+        ;; should be nil. However, we do not want to allow the user to insert nil
+        ;; into the map, so this binding only applies to get function.
+        ,@(let ((val-type (if (member val-kind '(:message :group :extends))
+                              (list 'or 'null val-type)
+                              val-type)))
+
+            `((declaim (inline ,public-accessor-name))
+              (defun ,public-accessor-name (,new-key ,obj)
+                (declare (type ,key-type ,new-key))
+                (the (values ,val-type t)
+                     (multiple-value-bind (val flag)
+                         (gethash ,new-key (,hidden-accessor-name ,obj))
+                       (if flag
+                           (values val flag)
+                           (values ,val-default-form nil)))))))
 
         (declaim (inline ,public-remove-name))
         (defun ,public-remove-name (,new-key ,obj)
@@ -792,7 +807,7 @@ function) then there is no guarantee on the serialize function working properly.
         (declaim (inline ,clear-function-name))
         (defun ,clear-function-name (,obj)
           ,(when index
-            `(setf (bit (,is-set-accessor ,obj) ,index) 0))
+             `(setf (bit (,is-set-accessor ,obj) ,index) 0))
           (setf (,hidden-accessor-name ,obj) ,(if (eql key-type 'cl:string)
                                                   '(make-hash-table :test #'equal)
                                                   '(make-hash-table :test #'eq))))
@@ -902,30 +917,30 @@ function) then there is no guarantee on the serialize function working properly.
   (setf (gethash 'cl:keyword defaults) :default-keyword)
   (setf (gethash 'cl:symbol defaults) nil)
 
-  (defun get-default-form (type default container)
+  (defun get-default-form (type default container kind)
     "Find the default value for a specified type.
 
   Parameters:
     TYPE: The type we want to get the default form for.
     DEFAULT: A user defined default or one of nil $empty-default.
     CONTAINER: If the field we're getting the default for is repeated then
-      the type of container to hold the repeated data in."
+      the type of container to hold the repeated data in.
+    KIND: The kind of message this is, one of :group :message :extends
+      :enum :scalar."
     (let ((possible-default (gethash type defaults)))
       (cond
         ((not (member default (list $empty-default nil)))
          default)
-        ((or possible-default
-             (eq type 'cl:boolean))
-         possible-default)
         ((eq container :vector)
          '(make-array 0 :adjustable t))
         ((eq container :list) nil)
-        ((and (listp type)
-              (eq (first type) 'cl:or)
-              (eq (second type) 'cl:null))
+        ((member kind '(:group :message :extends))
          nil)
         ((eq type :map)
          '(make-hash-table))
+        ((or possible-default
+             (eq type 'cl:boolean))
+         possible-default)
         ((enum-default-value `,type)
          (enum-default-value `,type))
         (t
@@ -968,9 +983,10 @@ function) then there is no guarantee on the serialize function working properly.
                         (let ((name (field-data-internal-slot-name slot))
                               (type (field-data-type slot))
                               (initform (field-data-initform slot))
-                              (container (field-data-container slot)))
+                              (container (field-data-container slot))
+                              (kind (field-data-kind slot)))
                           (unless (eq type 'boolean)
-                            `(,name ,(get-default-form type initform container) :type ,type))))
+                            `(,name ,(get-default-form type initform container kind) :type ,type))))
                        slots)
                (mapcar (lambda (oneof)
                          (let ((name (oneof-descriptor-internal-name oneof)))
@@ -1006,7 +1022,7 @@ function) then there is no guarantee on the serialize function working properly.
            (let ((,obj (,hidden-constructor-name)))
              ,@(mapcan
                 (lambda (field)
-                  (let* ((type (proto-set-type field))
+                  (let* ((type (proto-type field))
                          (public-slot-name (proto-external-field-name field))
                          (set-check (if (eq type 'cl:boolean)
                                         `(eq ,public-slot-name :%unset)
@@ -1046,7 +1062,8 @@ function) then there is no guarantee on the serialize function working properly.
 (defun non-repeated-bool-field (field)
   "Determine if a field given by a FIELD is a non-repeated boolean."
   (and (member 'cl:boolean field)
-       (not (member :repeated field))))
+       (not (member '(:repeated :list) field :test #'equal))
+       (not (member '(:repeated :vector) field :test #'equal))))
 
 ;;; TODO(cgay): Is the NAME option used anymore, now that define-message isn't
 ;;; called directly in non-generated Lisp code?
@@ -1426,19 +1443,20 @@ function) then there is no guarantee on the serialize function working properly.
                      :external-slot-name slot
                      :type
                      (case label
-                       (:required `(or ,type null))
-                       (:optional `(or ,type null))
-                       (:repeated `(list-of ,type)))
+                       (:required (list 'cl:or 'cl:null `,type))
+                       (:optional (list 'cl:or 'cl:null `,type))
+                       (:repeated (list 'proto:list-of `,type)))
                      :initform nil
                      :accessor reader
                      :container (when (eq label :repeated) :list)
-                     :initarg (kintern (symbol-name slot)))))
+                     :initarg (kintern (symbol-name slot))
+                     :kind :group)))
          (mfield  (make-instance 'field-descriptor
                     :name  (slot-name->proto slot)
                     :class type
                     :qualified-name (make-qualified-name *current-message-descriptor*
                                                          (slot-name->proto slot))
-                    :set-type type
+                    :type type
                     :label label
                     :index index
                     :internal-field-name internal-slot-name
@@ -1600,7 +1618,7 @@ function) then there is no guarantee on the serialize function working properly.
           (clos-type-to-protobuf-type type)
         (declare (ignore ptype))
         (assert index)
-        (multiple-value-bind (label repeated-type) (values-list label)
+        (multiple-value-bind (label repeated-storage-type) (values-list label)
           (let* (;; Proto3 optional fields do not have offsets, as they don't have has-* functions.
                  ;; Note that proto2-style optional fields in proto3 files are wrapped in oneofs by
                  ;; protoc, and hence process-field is never called.
@@ -1614,14 +1632,22 @@ function) then there is no guarantee on the serialize function working properly.
                           (make-field-data
                            :internal-slot-name internal-slot-name
                            :external-slot-name slot
-                           :type `,type
+                           :type
+                           (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
+                                  (list 'proto:vector-of `,type))
+                                 ((and (eq label :repeated) (eq repeated-storage-type :list))
+                                  (list 'proto:list-of `,type))
+                                 ((member kind '(:message :group))
+                                  (list 'cl:or 'cl:null `,type))
+                                 (t `,type))
                            :accessor reader
                            :initarg (kintern (symbol-name slot))
-                           :container (when (eq label :repeated) repeated-type)
+                           :container (when (eq label :repeated) repeated-storage-type)
+                           :kind kind
                            :initform
                            (cond ((eq label :repeated)
                                      ;; Repeated fields get a container for their elements
-                                     (if (eq repeated-type :vector)
+                                     (if (eq repeated-storage-type :vector)
                                          `(make-array 5 :fill-pointer 0 :adjustable t)
                                          nil))
                                  ((and (not default-p)
@@ -1633,7 +1659,7 @@ function) then there is no guarantee on the serialize function working properly.
                  (field (make-instance
                          'field-descriptor
                          :name  (or name (slot-name->proto slot))
-                         :set-type type
+                         :type type
                          :kind kind
                          :class pclass
                          :qualified-name (make-qualified-name *current-message-descriptor*
@@ -1648,7 +1674,7 @@ function) then there is no guarantee on the serialize function working properly.
                          :default default
                          ;; Pack the field only if requested and it actually makes sense
                          :packed  (and (eq label :repeated) packed t)
-                         :container (when (eq label :repeated) repeated-type)
+                         :container (when (eq label :repeated) repeated-storage-type)
                          :lazy (and lazy t)
                          :bool-index bool-index)))
             (when (and bool-index default (not (eq default $empty-default)))

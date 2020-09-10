@@ -267,7 +267,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
                  (undefined-field-type "While parsing ~S from JSON format,"
                                        msg-desc type field)
                  (return-from parse-json))
-                ((eq (pi::proto-set-type field) :map)
+                ((eq (pi::proto-kind field) :map)
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
                          (cdr pair))))
