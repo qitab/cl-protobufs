@@ -142,20 +142,17 @@ only if the same fields have been explicitly set."
   (:documentation
    "Initialize all of the fields of 'object' to their default values."))
 
-(declaim (inline has-field))
-(defun has-field (object field)
+(defun-inline has-field (object field)
   "Check if OBJECT has FIELD set."
   (funcall (field-accessors-has (get field (type-of object)))
            object))
 
-(declaim (inline clear-field))
-(defun clear-field (object field)
+(defun-inline clear-field (object field)
   "Check if OBJECT has FIELD set."
   (funcall (field-accessors-clear (get field (type-of object)))
            object))
 
-(declaim (inline proto-slot-value))
-(defun proto-slot-value (object slot)
+(defun-inline proto-slot-value (object slot)
   "Get the value of a field in a protobuf object.
 Parameters:
   OBJECT: The protobuf object.
@@ -163,8 +160,7 @@ Parameters:
   (funcall (field-accessors-get (get slot (type-of object)))
            object))
 
-(declaim (inline (setf proto-slot-value)))
-(defun (setf proto-slot-value) (value object slot)
+(defun-inline (setf proto-slot-value) (value object slot)
     "Set the value of a field in a protobuf object.
 Parameters:
   VALUE: The new value for the field.

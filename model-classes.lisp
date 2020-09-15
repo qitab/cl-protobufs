@@ -179,8 +179,7 @@ class symbol.
 For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message.")
 
 ;; TODO(cgay): Rename to find-message-descriptor
-(declaim (inline find-message))
-(defun find-message (type)
+(defun-inline find-message (type)
   "Return the message-descriptor instance either named by TYPE (a symbol)
 or that's named by the class-name of TYPE."
   ;; TODO(cgay): I suspect this is left over from before the switch to structs.
@@ -189,8 +188,7 @@ or that's named by the class-name of TYPE."
                type)
            *messages*))
 
-(declaim (inline find-message))
-(defun find-message-by-qualified-name (qualified-name)
+(defun-inline find-message-by-qualified-name (qualified-name)
   "Return the protobuf-message symbol named by qualified-name.
    Parameters:
      QUALIFIED-NAME: The qualified name of a protobuf message.
@@ -208,16 +206,14 @@ Parameters:
 (defvar *maps* (make-hash-table :test 'eq)
   "Maps map names (symbols) to map-descriptor instances.")
 
-(declaim (inline find-map-descriptor))
-(defun find-map-descriptor (type)
+(defun-inline find-map-descriptor (type)
   "Return a map-descriptor instance named by TYPE (a symbol)."
   (gethash type *maps*))
 
 (defvar *enums* (make-hash-table :test 'eq)
   "Maps enum names (symbols) to enum-descriptor instances.")
 
-(declaim (inline find-enum))
-(defun find-enum (type)
+(defun-inline find-enum (type)
   "Return a enum-descriptor instance named by TYPE (a symbol)."
   (gethash type *enums*))
 

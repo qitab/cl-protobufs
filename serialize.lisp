@@ -49,15 +49,13 @@
 ;; resort to using the globaldb to ask for the fast method, which is actually
 ;; slower than GET.  Easy come, easy go.
 
-(declaim (inline custom-serializer))
-(defun custom-serializer (type)
+(defun-inline custom-serializer (type)
   (the (or null function)
        #+sbcl (let ((name `(:protobuf :serialize ,type)))
                 (if (fboundp name) (fdefinition name)))
        #-sbcl (get type :serialize)))
 
-(declaim (inline custom-deserializer))
-(defun custom-deserializer (type)
+(defun-inline custom-deserializer (type)
   (the (or null function)
        #+sbcl(let ((name `(:protobuf :deserialize ,type)))
                (if (fboundp name) (fdefinition name)))
@@ -101,8 +99,7 @@
 
 ;; Serialize the object using the given protobuf type
 
-(declaim (inline emit-skipped-bytes))
-(defun emit-skipped-bytes (object buffer)
+(defun-inline emit-skipped-bytes (object buffer)
   "Add the bytes in the protobuf OBJECT base-message skipped-bytes slot
 to the BUFFER. Returns the number of bytes added to BUFFER."
   (declare (buffer buffer))
@@ -371,8 +368,7 @@ Parameters:
 ;; To that end, I am "hiding" the methods as %DESERIALIZE-OBJECT
 ;; and allowing DESERIALIZE-OBJECT to be called as it was before.
 
-(declaim (inline deserialize-object))
-(defun deserialize-object (type buffer &optional (start 0) (end (length buffer)))
+(defun-inline deserialize-object (type buffer &optional (start 0) (end (length buffer)))
   (deserialize-object-from-bytes type buffer start end))
 
 ;; Allow clients to add their own methods
@@ -449,8 +445,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                 (push (wrap field) (svref map bin)))))))))
 
 ;; Given a field-number and a field-map, return the FIELD metadata or NIL.
-(declaim (inline find-in-field-map))
-(defun find-in-field-map (field-number field-map)
+(defun-inline find-in-field-map (field-number field-map)
   (declare (type fixnum field-number))
   (if (svref field-map 0)
       (unless (>= field-number (length field-map))
@@ -551,8 +546,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                     (t                       ; keep on looking
                      (insert-in (cdr field-list)))))))))
 
-(declaim (inline make-skipped-byte-vector))
-(defun make-skipped-byte-vector (skipped-bytes-tuples buffer)
+(defun-inline make-skipped-byte-vector (skipped-bytes-tuples buffer)
   "Take the list of skipped byte in buffer noted by the offsets in
 skipped-bytes-tuples and place them in an array that will be returned.
 

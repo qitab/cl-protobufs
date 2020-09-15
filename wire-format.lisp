@@ -33,8 +33,7 @@
   (defconstant $wire-type-32bit  5)
 ) ; eval-when
 
-(declaim (inline make-wire-tag))
-(defun make-wire-tag (wire-type field-number)
+(defun-inline make-wire-tag (wire-type field-number)
   "Create a protobuf field tag, the combination of a WIRE-TYPE (3 bits) and a
    FIELD-NUMBER (29 bits, minimum value 1) that precedes the field data itself."
   (declare (type (unsigned-byte 3) wire-type)
@@ -282,8 +281,7 @@ and a buffer which encodes the value to the buffer."
                  (i+ tag-len prefix-len payload-len)))))
       form))
 
-(declaim (inline find-enum-value))
-(defun find-enum-value (name value-descriptors)
+(defun-inline find-enum-value (name value-descriptors)
   "Find the enum value corresponding to NAME by searching for it in
    VALUE-DESCRIPTORS."
   (declare (type keyword name))
@@ -291,8 +289,7 @@ and a buffer which encodes the value to the buffer."
     (assert desc () "There is no enum value for name ~S" name)
     (the sfixed32 (enum-value-descriptor-value desc))))
 
-(declaim (inline find-enum-name))
-(defun find-enum-name (value value-descriptors)
+(defun-inline find-enum-name (value value-descriptors)
   "Find the enum name corresponding to VALUE by searching for it in
    VALUE-DESCRIPTORS."
   (declare (type sfixed32 value))
@@ -966,9 +963,7 @@ and a buffer which encodes the value to the buffer."
           (fast-octet-out buffer byte)))
       8)))
 
-(progn
-(declaim (inline fast-utf8-encode))
-(defun fast-utf8-encode (string)
+(defun-inline fast-utf8-encode (string)
   #+sbcl
   (sb-kernel:with-array-data ((string string) (start 0) (end nil)
                               :check-fill-pointer t)
@@ -978,7 +973,7 @@ and a buffer which encodes the value to the buffer."
                (sb-impl::get-external-format-or-lose :utf-8)))
              string start end 0))
   #-sbcl
-  (babel:string-to-octets string)))
+  (babel:string-to-octets string))
 
 ;; The number of bytes to reserve to write a 'uint32' for the length of
 ;; a sub-message. In theory a uint32 should reserve 5 bytes,

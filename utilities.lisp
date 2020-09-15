@@ -21,6 +21,12 @@
 ) ; eval-when
 
 
+(defmacro defun-inline (name arglist &body body)
+  "Define an inline function with NAME, ARGLIST, and BODY."
+  `(progn (declaim (inline ,name))
+          (defun ,name ,arglist ,@body)))
+
+
 (defmacro i+ (&rest fixnums)
   "Do fixnum addition on FIXNUMS."
   `(the fixnum (+ ,@(loop for n in fixnums collect `(the fixnum ,n)))))

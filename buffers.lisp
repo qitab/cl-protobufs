@@ -46,9 +46,6 @@
 (defmethod print-object ((self buffer) stream)
   (print-unreadable-object (self stream :type t :identity t)))
 
-(declaim (inline buffer-block-capacity
-                 buffer-absolute-position))
-
 ;; BUFFER-SAP is a macro because it makes little sense to write a function
 ;; that returns a pointer to something that can go stale on you.
 ;; Otherwise any extraction of a SAP from the buffer would be reliable only
@@ -58,11 +55,11 @@
 (defmacro buffer-sap (buffer)
   `(sb-sys:vector-sap (buffer-block ,buffer)))
 
-(defun buffer-block-capacity (buffer)
+(defun-inline buffer-block-capacity (buffer)
   (declare (optimize (safety 0)))
   (length (buffer-block buffer)))
 
-(defun buffer-absolute-position (buffer)
+(defun-inline buffer-absolute-position (buffer)
   (i+ (buffer-%block-absolute-start buffer)
       (buffer-index buffer)))
 
@@ -181,8 +178,7 @@
 ;; the next block will contain all N bytes.
 ;; This inlined wrapper punts to the general case if available space is inadequate.
 ;;
-(declaim (inline buffer-ensure-space))
-(defun buffer-ensure-space (buffer n)
+(defun-inline buffer-ensure-space (buffer n)
   (declare ((and fixnum unsigned-byte) n) #.$optimize-buffering)
   (or (>= (- (buffer-block-capacity buffer) (buffer-index buffer)) n)
       (%buffer-ensure-space buffer n)))
@@ -244,8 +240,7 @@
 
 ;; Perform OCTET-OUT, but if the current block can hold no more,
 ;; assume existence of a pre-made next block.
-(declaim (inline fast-octet-out))
-(defun fast-octet-out (buffer val)
+(defun-inline fast-octet-out (buffer val)
   (declare (octet-buffer buffer) #.$optimize-buffering)
   (let* ((block (buffer-block buffer))
          (index (buffer-index buffer)))
@@ -434,9 +429,8 @@
 ;; A simple wrapper on REPLACE. This function is used only in one place.
 ;; It shouldn't be needed, but small copies using REPLACE are slower than a loop.
 ;; It turns out that a foreign call to memmove would be faster for 80 bytes or more.
-(declaim (inline fast-replace))
-(defun fast-replace (destination destination-index
-                     source source-index count)
+(defun-inline fast-replace (destination destination-index
+                            source source-index count)
   (declare (array-index destination-index count)
            ((simple-array octet-type 1) destination source))
   (let ((limit (the array-index (+ destination-index count))))

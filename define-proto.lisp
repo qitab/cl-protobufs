@@ -524,13 +524,11 @@ Parameters:
                                :synthetic-p (and synthetic-p t)
                                :fields field-descriptors))))
 
-(declaim (inline proto-%bytes))
-(defun proto-%bytes (obj)
+(defun-inline proto-%bytes (obj)
   "Returns the %bytes field of the proto object OBJ."
   (slot-value obj '%bytes))
 
-(declaim (inline (setf proto-%bytes)))
-(defun (setf proto-%bytes) (new-value obj)
+(defun-inline (setf proto-%bytes) (new-value obj)
   "Sets the %bytes field of the proto object OBJ with NEW-VALUE."
   (setf (slot-value obj '%bytes) new-value))
 
@@ -579,8 +577,7 @@ Parameters:
     ;; be done by checking if the bound value is default.
     (with-gensyms (obj new-value cur-value)
       `(
-        (declaim (inline (setf ,public-accessor-name)))
-        (defun (setf ,public-accessor-name) (,new-value ,obj)
+        (defun-inline (setf ,public-accessor-name) (,new-value ,obj)
           ,(when index
              `(setf (bit (,is-set-accessor ,obj) ,index) 1))
           ,(if bool-index
@@ -592,8 +589,7 @@ Parameters:
         ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
         ;; question: "Is this field set to the default value?". This is done so that the optimized
         ;; serializer can use the has-* function to check if an optional field should be serialized.
-        (declaim (inline ,has-function-name))
-        (defun ,has-function-name (,obj)
+        (defun-inline ,has-function-name (,obj)
           ,(if index
                `(= (bit (,is-set-accessor ,obj) ,index) 1)
                `(let ((,cur-value ,(if bool-index
@@ -611,8 +607,7 @@ Parameters:
         ;; Map type clear functions are created in make-map-accessor-forms.
         ;; todo(benkuehnert): rewrite map types/definers so that this isn't necessary
         ,@(unless (eq (proto-kind field) :map)
-            `((declaim (inline ,clear-function-name))
-              (defun ,clear-function-name (,obj)
+            `((defun-inline ,clear-function-name (,obj)
                 ,(when index
                    `(setf (bit (,is-set-accessor ,obj) ,index) 0))
                 ,(if bool-index
@@ -658,20 +653,17 @@ Paramters:
         ;; particularly useful for the user when writing code surrounding oneof types. This
         ;; creates a function which returns a symbol with the same name as the field which
         ;; is currently set. If the field is not set, this function returns nil.
-        (declaim (inline ,case-function-name))
-        (defun ,case-function-name (,obj)
+        (defun-inline ,case-function-name (,obj)
           (ecase (oneof-set-field (,hidden-accessor-name ,obj))
             ,@(loop for field across (oneof-descriptor-fields oneof)
                     collect
                     `(,(proto-oneof-offset field) ',(proto-external-field-name field)))
             ((nil) nil)))
 
-        (declaim (inline ,has-function-name))
-        (defun ,has-function-name (,obj)
+        (defun-inline ,has-function-name (,obj)
           (not (eql (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
 
-        (declaim (inline ,clear-function-name))
-        (defun ,clear-function-name (,obj)
+        (defun-inline ,clear-function-name (,obj)
           (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
           (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil))
 
@@ -703,8 +695,7 @@ Paramters:
               ;; If a field isn't currently set inside of the oneof, just return its
               ;; default value.
               (with-gensyms (obj new-value bytes field-obj)
-                `((declaim (inline ,public-accessor-name))
-                  (defun ,public-accessor-name (,obj)
+                `((defun-inline ,public-accessor-name (,obj)
                     (if (eq (oneof-set-field (,hidden-accessor-name ,obj))
                             ,oneof-offset)
                         ,(if (proto-lazy-p field)
@@ -717,20 +708,17 @@ Paramters:
                              `(oneof-value (,hidden-accessor-name ,obj)))
                         ,default-form))
 
-                  (declaim (inline (setf ,public-accessor-name)))
-                  (defun (setf ,public-accessor-name) (,new-value ,obj)
+                  (defun-inline (setf ,public-accessor-name) (,new-value ,obj)
                     (declare (type ,field-type ,new-value))
                     (setf (oneof-set-field (,hidden-accessor-name ,obj))
                           ,oneof-offset)
                     (setf (oneof-value (,hidden-accessor-name ,obj)) ,new-value))
 
-                  (declaim (inline ,has-function-name))
-                  (defun ,has-function-name (,obj)
+                  (defun-inline ,has-function-name (,obj)
                     (eq (oneof-set-field (,hidden-accessor-name ,obj))
                         ,oneof-offset))
 
-                  (declaim (inline ,clear-function-name))
-                  (defun ,clear-function-name (,obj)
+                  (defun-inline ,clear-function-name (,obj)
                     (when (,has-function-name ,obj)
                       (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
                       (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
@@ -773,8 +761,7 @@ function) then there is no guarantee on the serialize function working properly.
 
     (with-gensyms (obj new-val new-key)
       `(
-        (declaim (inline (setf ,public-accessor-name)))
-        (defun (setf ,public-accessor-name) (,new-val ,new-key ,obj)
+        (defun-inline (setf ,public-accessor-name) (,new-val ,new-key ,obj)
           (declare (type ,key-type ,new-key)
                    (type ,val-type ,new-val))
           (setf (bit (,is-set-accessor ,obj) ,index) 1)
@@ -787,8 +774,7 @@ function) then there is no guarantee on the serialize function working properly.
                               (list 'or 'null val-type)
                               val-type)))
 
-            `((declaim (inline ,public-accessor-name))
-              (defun ,public-accessor-name (,new-key ,obj)
+            `((defun-inline ,public-accessor-name (,new-key ,obj)
                 (declare (type ,key-type ,new-key))
                 (the (values ,val-type t)
                      (multiple-value-bind (val flag)
@@ -797,15 +783,13 @@ function) then there is no guarantee on the serialize function working properly.
                            (values val flag)
                            (values ,val-default-form nil)))))))
 
-        (declaim (inline ,public-remove-name))
-        (defun ,public-remove-name (,new-key ,obj)
+        (defun-inline ,public-remove-name (,new-key ,obj)
           (declare (type ,key-type ,new-key))
           (remhash ,new-key (,hidden-accessor-name ,obj))
           (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
               (setf (bit (,is-set-accessor ,obj) ,index) 0)))
 
-        (declaim (inline ,clear-function-name))
-        (defun ,clear-function-name (,obj)
+        (defun-inline ,clear-function-name (,obj)
           ,(when index
              `(setf (bit (,is-set-accessor ,obj) ,index) 0))
           (setf (,hidden-accessor-name ,obj) ,(if (eql key-type 'cl:string)
@@ -843,10 +827,7 @@ function) then there is no guarantee on the serialize function working properly.
          (public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
          (hidden-accessor-name (fintern "~A-~A" proto-type slot-name)))
     (with-gensyms (obj field-obj bytes)
-      `(
-        ;; Public reader.
-        (declaim (inline ,public-accessor-name))
-        (defun ,public-accessor-name (,obj)
+      `((defun-inline ,public-accessor-name (,obj)
           ,(if (not repeated)
                `(let* ((,field-obj (,hidden-accessor-name ,obj))
                        (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
@@ -887,8 +868,7 @@ function) then there is no guarantee on the serialize function working properly.
          (bool-index (proto-bool-index field))
          (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type)))
     (with-gensyms (obj)
-      `((declaim (inline ,public-accessor-name))
-        (defun ,public-accessor-name (,obj)
+      `((defun-inline ,public-accessor-name (,obj)
           ,(if bool-index
                `(plusp (bit (,bit-field-name ,obj) ,bool-index))
                `(,hidden-accessor-name ,obj)))
@@ -1010,8 +990,7 @@ function) then there is no guarantee on the serialize function working properly.
                    oneofs)
 
          ;; Define public constructor.
-         (declaim (inline ,public-constructor-name))
-         (defun ,public-constructor-name
+         (defun-inline ,public-constructor-name
              (&key
               ,@(loop for sn in public-non-lazy-slot-names
                       collect `(,sn :%unset))
