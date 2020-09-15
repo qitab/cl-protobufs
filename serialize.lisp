@@ -131,9 +131,9 @@ to the BUFFER. Returns the number of bytes added to BUFFER."
         (when set-field
           (let* ((field (aref fields set-field))
                  (type  (proto-class field))
-                 (index (proto-index field)))
+                 (field-num (proto-index field)))
             (iincf size
-                   (emit-non-repeated-field value type index buffer))))))
+                   (emit-non-repeated-field value type field-num buffer))))))
     (incf size (emit-skipped-bytes object buffer))))
 
 (defun emit-field (object field buffer)
@@ -151,47 +151,47 @@ Parameters:
             (has-field object (slot-value field 'external-field-name)))
       (return-from emit-field 0))
     (let* ((type   (slot-value field 'class))
-           (index  (proto-index field))
+           (field-num  (proto-index field))
            (value  (cond ((eq message-type :extends)
                           (get-extension object (slot-value field 'external-field-name)))
                          ((proto-lazy-p field)
                           (slot-value object (slot-value field 'internal-field-name)))
                          (t (proto-slot-value object (slot-value field 'external-field-name))))))
       (if (eq (proto-label field) :repeated)
-          (or (emit-repeated-field value type (proto-packed field) index buffer)
+          (or (emit-repeated-field value type (proto-packed field) field-num buffer)
               (undefined-field-type "While serializing ~S,"
                                     object type field))
-          (or (emit-non-repeated-field value type index buffer)
+          (or (emit-non-repeated-field value type field-num buffer)
               (undefined-field-type "While serializing ~S,"
                                     object type field))))))
 
-(defun emit-repeated-field (value type packed-p index buffer)
+(defun emit-repeated-field (value type packed-p field-num buffer)
   "Serialize a repeated field to buffer. Return nil on failure.
 
 Parameters:
   VALUE: The data to serialize, e.g. the data resulting from calling read-slot on a field.
   TYPE: The proto-class of the field.
   PACKED-P: Whether or not the field in question is packed.
-  INDEX: The index of the field (used for making tags).
+  FIELD-NUM: The number of the field (used for making tags).
   BUFFER: The buffer to write to."
-  (declare (fixnum index) (buffer buffer))
+  (declare (field-number field-num) (buffer buffer))
   (let (desc)
     (cond ((and packed-p (packed-type-p type))
            ;; Handle scalar types. proto-packed-p of enum types returns nil,
            ;; so packed enum fields are handled below.
-           (serialize-packed value type index buffer))
+           (serialize-packed value type field-num buffer))
           ((scalarp type)
-           (let ((tag (make-tag type index))
+           (let ((tag (make-tag type field-num))
                  (size 0))
              (doseq (v value)
                (iincf size (serialize-scalar v type tag buffer)))
              size))
           ((setq desc (find-message type))
-           (emit-repeated-message-field desc value type index buffer))
+           (emit-repeated-message-field desc value type field-num buffer))
           ((setq desc (find-enum type))
            (if packed-p
-               (serialize-packed-enum value (enum-descriptor-values desc) index buffer)
-               (let ((tag (make-wire-tag $wire-type-varint index))
+               (serialize-packed-enum value (enum-descriptor-values desc) field-num buffer)
+               (let ((tag (make-wire-tag $wire-type-varint field-num))
                      (size 0))
                  (doseq (name value)
                    (iincf size (serialize-enum name (enum-descriptor-values desc) tag buffer)))
@@ -406,19 +406,19 @@ Parameters:
                      (format stream "#<~D~S>" (field-index self) (field-initarg self)))))
   "Field metadata for a protocol buffer.
 Contains the INDEX of the field as according to protobuf, an internal
-OFFSET, the BOOL-NUMBER (for simple boolean fields), a flag ONEOF-P which indicates if the field
+OFFSET, the BOOL-INDEX (for simple boolean fields), a flag ONEOF-P which indicates if the field
 is part of a oneof, the INITARG, the COMPLEX-FIELD datastructure.
 See field-descriptor for the distinction between index, offset, and bool-number."
-  (index -1 :type fixnum)
+  (index -1 :type field-number)         ; TODO(cgay): rename to field-number
   offset
   bool-index
   oneof-p
   initarg
   complex-field)
 
-;; Make a map from field index to a FIELD structure in a vector.
+;; Make a map from field number to a FIELD structure in a vector.
 ;; As long as at least half of the vector elements will not be wasted,
-;; the lookup is direct by field index, otherwise it is a hash-like lookup.
+;; the lookup is direct by field number, otherwise it is a hash-like lookup.
 ;; For consecutive indices starting at 1, direct lookup is always used.
 ;; Consecutive numbers starting at other than 1 could in theory be
 ;; direct-mapped by subtracting the "origin" but such usage is uncommon,
@@ -866,38 +866,37 @@ Parameters:
                                              ,tag ,vbuf)))))))
           (t nil))))
 
-(defun generate-non-repeated-field-serializer
-    (class index boundp reader vbuf size)
+(defun generate-non-repeated-field-serializer (class field-num boundp reader vbuf size)
   "Generate the field serializer for a non-repeated field
 
 Parameters:
   CLASS: The class of the field.
-  INDEX: The field number.
+  FIELD-NUM: The field number.
   BOUNDP: Symbol naming a variable that evaluates to T if this field is set.
   READER: Symbol naming a function which returns the field value.
   VBUF: Symbol naming the buffer to write to.
   SIZE: Symbol naming the variable which keeps track of the serialized length."
-  (declare (type field-number index))
+  (declare (type field-number field-num))
   (let ((vval (gensym "VAL"))
         (msg (and class (not (scalarp class))
                   (or (find-message class)
                       (find-enum class)
                       (find-map-descriptor class)))))
     (cond ((scalarp class)
-           (let ((tag (make-tag class index)))
+           (let ((tag (make-tag class field-num)))
              `(when ,boundp
                 (let ((,vval ,reader))
                   (iincf ,size (serialize-scalar ,vval ,class ,tag ,vbuf))))))
           ((typep msg 'message-descriptor)
            (if (eq (proto-message-type msg) :group)
-               (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                     (tag2 (make-wire-tag $wire-type-end-group   index)))
+               (let ((tag1 (make-wire-tag $wire-type-start-group field-num))
+                     (tag2 (make-wire-tag $wire-type-end-group   field-num)))
                  `(let ((,vval ,reader))
                     (when ,vval
                       (iincf ,size (encode-uint32 ,tag1 ,vbuf))
                       (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
                       (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
-               (let ((tag (make-wire-tag $wire-type-string index)))
+               (let ((tag (make-wire-tag $wire-type-string field-num)))
                  `(let ((,vval ,reader))
                     (when ,vval
                       (iincf ,size (encode-uint32 ,tag ,vbuf))
@@ -905,14 +904,14 @@ Parameters:
                         (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
                           (iincf ,size (i+ len (backpatch len))))))))))
           ((typep msg 'enum-descriptor)
-           (let ((tag (make-wire-tag $wire-type-varint index)))
+           (let ((tag (make-wire-tag $wire-type-varint field-num)))
              `(when ,boundp
                 (let ((,vval ,reader))
                   (iincf ,size (serialize-enum
                                 ,vval '(,@(enum-descriptor-values msg))
                                 ,tag ,vbuf))))))
           ((typep msg 'map-descriptor)
-           (let* ((tag      (make-wire-tag $wire-type-string index))
+           (let* ((tag      (make-wire-tag $wire-type-string field-num))
                   (key-class (map-descriptor-key-class msg))
                   (val-class (map-descriptor-val-class msg)))
              `(when ,boundp
@@ -945,18 +944,18 @@ Parameters:
   VBUF: The buffer to write to.
   SIZE: A symbol which stores the number of bytes serialized."
   (let* ((class  (proto-class field))
-         (index  (proto-index field)))
+         (field-num  (proto-index field)))
     (when reader
       (if (eq (proto-label field) :repeated)
           (let ((vector-p (eq :vector (proto-container field)))
                 (packed-p (proto-packed field)))
             (or (generate-repeated-field-serializer
-                 class index boundp reader vbuf size vector-p packed-p)
+                 class field-num boundp reader vbuf size vector-p packed-p)
                 (undefined-field-type "While generating 'serialize-object' for ~S,"
                                       msg class field)))
 
           (or (generate-non-repeated-field-serializer
-               class index boundp reader vbuf size)
+               class field-num boundp reader vbuf size)
               (undefined-field-type "While generating 'serialize-object' for ~S,"
                                     msg class field))))))
 
@@ -1044,16 +1043,16 @@ Parameters:
          ,@(loop for field across fields
                  collect
                  (let ((class (proto-class field))
-                       (index (proto-index field))
+                       (field-num (proto-index field))
                        (offset (proto-oneof-offset field)))
                    ;; The BOUNDP argument is T here, since if we get to this point
                    ;; then the slot must be bound, as SET-FIELD indicates that a
                    ;; field is set.
                    `((,offset) ,(or (generate-non-repeated-field-serializer
-                                         class index t 'value vbuf size)
-                                        (undefined-field-type
-                                         "While generating 'serialize-object' for ~S,"
-                                         message class field)))))
+                                     class field-num t 'value vbuf size)
+                                    (undefined-field-type
+                                     "While generating 'serialize-object' for ~S,"
+                                     message class field)))))
          ((nil) nil)))))
 
 (defun generate-field-deserializer (message field vbuf vidx)
