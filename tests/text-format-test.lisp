@@ -81,13 +81,13 @@
       (assert-true (proto:proto-equal msg-parse msg)))))
 
 (deftest test-parse-text-format-nested-symbol-names (text-format-suite)
-  (assert-true (find-message-for-class 'cl-protobufs.test-proto:text-format-test))
+  (assert-true (find-message 'cl-protobufs.test-proto:text-format-test))
   ;; TODO(dlroxe) should expect nested name, not top-level name
-  (assert-true (find-message-for-class 'text-format-test.nested-message1))
-  ;; (assert-true (find-message-for-class 'cl-protobufs.test-proto:text-format-test.nested-message1))
+  (assert-true (find-message 'text-format-test.nested-message1))
+  ;; (assert-true (find-message 'cl-protobufs.test-proto:text-format-test.nested-message1))
 
   ;; TODO(dlroxe) should assert-true nested name, not top-level name
-  (assert-true (find-message-for-class 'text-format-test.nested-message1.nested-message2))
-  ;; (assert-true (find-message-for-class
+  (assert-true (find-message 'text-format-test.nested-message1.nested-message2))
+  ;; (assert-true (find-message
   ;;               'cl-protobufs.test-proto:text-format-test.nested-message1.nested-message2))
   T)

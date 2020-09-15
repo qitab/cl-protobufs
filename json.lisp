@@ -36,7 +36,7 @@ Parameters:
   SPLICED-P: If true, print this object inside of an existing JSON object
     in the stream. This means that no open bracket is printed."
   (let* ((type (type-of object))
-         (message (find-message-for-class type)))
+         (message (find-message type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
     ;; If TYPE has a special JSON mapping, use that.
@@ -198,7 +198,7 @@ to parse an opening bracket."))
 
 (defmethod parse-json ((type symbol)
                        &key (stream *standard-input*) ignore-unknown-fields-p spliced-p)
-  (let ((message (find-message-for-class type)))
+  (let ((message (find-message type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
     (parse-json message :stream stream :spliced-p spliced-p

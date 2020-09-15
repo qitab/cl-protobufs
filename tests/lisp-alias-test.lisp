@@ -82,6 +82,6 @@
 ;; cl-protobufs message metadata
 
 (deftest find-message-for-alias (alias-suite)
-  (assert-true (find-message-for-class 'cl-protobufs.alias-test::aliased-struct))
-  (assert-true (eq (find-message-for-class 'cl-protobufs.alias-test::aliased-message)
-              (find-message-for-class 'aliased-struct))))
+  (assert-true (find-message 'cl-protobufs.alias-test::aliased-struct))
+  (assert-true (eq (find-message 'cl-protobufs.alias-test::aliased-message)
+                   (find-message 'aliased-struct))))

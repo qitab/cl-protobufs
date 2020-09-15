@@ -27,7 +27,7 @@ Parameters:
   PRETTY-PRINT: When true, generate line breaks and other human readable output
     in the text format. When false, replace line breaks with spaces."
   (let* ((type (type-of object))
-         (message (find-message-for-class type)))
+         (message (find-message type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
     (let ((name (or name (proto-name message))))
@@ -243,7 +243,7 @@ Parameters:
 
 (defmethod parse-text-format ((type symbol)
                               &key (stream *standard-input*) (parse-name t))
-  (let ((message (find-message-for-class type)))
+  (let ((message (find-message type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
     (parse-text-format message :stream stream :parse-name parse-name)))
