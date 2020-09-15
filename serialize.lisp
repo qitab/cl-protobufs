@@ -174,126 +174,101 @@ Parameters:
   PACKED-P: Whether or not the field in question is packed.
   INDEX: The index of the field (used for making tags).
   BUFFER: The buffer to write to."
-  (declare (fixnum index)
-           (buffer buffer))
-  (let ((size 0)
-        desc)
-    (declare (fixnum size))
+  (declare (fixnum index) (buffer buffer))
+  (let (desc)
     (cond ((and packed-p (packed-type-p type))
            ;; Handle scalar types. proto-packed-p of enum types returns nil,
            ;; so packed enum fields are handled below.
            (serialize-packed value type index buffer))
           ((scalarp type)
-           (let ((tag (make-tag type index)))
+           (let ((tag (make-tag type index))
+                 (size 0))
              (doseq (v value)
                (iincf size (serialize-scalar v type tag buffer)))
              size))
-          ((typep (setq desc (or (find-message type) (find-enum type)))
-                  'message-descriptor)
-           (if (eq (proto-message-type desc) :group)
-               (doseq (v value)
-                 ;; To serialize a group, we encode a start tag,
-                 ;; serialize the fields, then encode an end tag
-                 (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                       (tag2 (make-wire-tag $wire-type-end-group   index)))
-                   (iincf size (encode-uint32 tag1 buffer))
-                   (dolist (f (proto-fields desc))
-                     (iincf size (emit-field v f buffer)))
-                   (iincf size (encode-uint32 tag2 buffer))))
-               ;; I don't understand this at all - if there is a slot, then the slot
-               ;; holds a list of objects, otherwise just serialize this object?
-               (let ((tag (make-wire-tag $wire-type-string index))
-                     (custom-serializer (custom-serializer type)))
-                 (doseq (v value)
-                   ;; To serialize an embedded message, first say that it's
-                   ;; a string, then encode its size, then serialize its fields
-                   (iincf size (encode-uint32 tag buffer))
-                   ;; If OBJECT has BYTES bound, then it is a lazy field, and BYTES is
-                   ;; the pre-computed serialization of OBJECT, so output that.
-                   (let ((precomputed-bytes (and (slot-exists-p v '%bytes)
-                                                 (proto-%bytes v)))
-                         (submessage-size 0))
-                     (with-placeholder (buffer)
-                       (cond (precomputed-bytes
-                              (setq submessage-size (length precomputed-bytes))
-                              (buffer-ensure-space buffer submessage-size)
-                              (fast-octets-out buffer precomputed-bytes))
-                             (custom-serializer
-                              (setq submessage-size
-                                    (funcall custom-serializer v buffer)))
-                             (t
-                              (setq submessage-size
-                                    (serialize-object v desc buffer))))
-                       (iincf size (+ (backpatch submessage-size)
-                                      submessage-size)))))))
-           size)
-          ((typep desc 'enum-descriptor)
+          ((setq desc (find-message type))
+           (emit-repeated-message-field desc value type index buffer))
+          ((setq desc (find-enum type))
            (if packed-p
-               (serialize-packed-enum
-                value
-                (enum-descriptor-values desc) index buffer)
-               (let ((tag (make-wire-tag $wire-type-varint index)))
-                 (doseq (v value size)
-                   (iincf size
-                          (serialize-enum v (enum-descriptor-values desc) tag buffer))))))
+               (serialize-packed-enum value (enum-descriptor-values desc) index buffer)
+               (let ((tag (make-wire-tag $wire-type-varint index))
+                     (size 0))
+                 (doseq (name value)
+                   (iincf size (serialize-enum name (enum-descriptor-values desc) tag buffer)))
+                 size)))
           (t nil))))
 
-(defun emit-non-repeated-field (value type index buffer)
-  "Serialize a non-repeated field to buffer. Return nil on failure.
-
-Parameters:
-  VALUE: The data to serialize, e.g. the data resulting from calling read-slot on a field.
-  TYPE: The :class slot of the field.
-  INDEX: The index of the field (used for making tags).
-  BUFFER: The buffer to write to."
-  (declare (fixnum index)
+(defun emit-repeated-message-field (msg-desc messages type field-num buffer)
+  "Serialize a repeated message (or group) field.
+  Parameters:
+    MSG-DESC: A message-descriptor for the message or group type.
+    MESSAGES: The messages (or groups) to serialize.
+    TYPE: The symbol naming the message type.
+    FIELD-NUM: The number of the field being serialized.
+    BUFFER: The buffer to write to.
+  Returns: The number of bytes output to BUFFER."
+  (declare (message-descriptor msg-desc)
+           (field-number field-num)
            (buffer buffer))
-  (let ((size 0)
-        desc)
+  (let ((size 0))
     (declare (fixnum size))
+    (if (eq (proto-message-type msg-desc) :group)
+        (let ((tag1 (make-wire-tag $wire-type-start-group field-num))
+              (tag2 (make-wire-tag $wire-type-end-group   field-num))
+              (fields (proto-fields msg-desc)))
+          (doseq (group messages)
+            (iincf size (encode-uint32 tag1 buffer))
+            (dolist (field fields)
+              (iincf size (emit-field group field buffer)))
+            (iincf size (encode-uint32 tag2 buffer))))
+        ;; I don't understand this at all - if there is a slot, then the slot
+        ;; holds a list of objects, otherwise just serialize this object?
+        (let ((tag (make-wire-tag $wire-type-string field-num))
+              (custom-serializer (custom-serializer type)))
+          (doseq (msg messages)
+            ;; To serialize an embedded message, first say that it's
+            ;; a string, then encode its size, then serialize its fields.
+            (iincf size (encode-uint32 tag buffer))
+            ;; If MSG has %BYTES bound, then it is a lazy field, and BYTES is
+            ;; the pre-computed serialization of MSG, so output that.
+            (let ((precomputed-bytes (and (slot-exists-p msg '%bytes)
+                                          (proto-%bytes msg)))
+                  (submessage-size 0))
+              (with-placeholder (buffer) ; reserve space for submessage-size in buffer
+                (cond (precomputed-bytes
+                       (setq submessage-size (length precomputed-bytes))
+                       (buffer-ensure-space buffer submessage-size)
+                       (fast-octets-out buffer precomputed-bytes))
+                      (custom-serializer
+                       (setq submessage-size
+                             (funcall custom-serializer msg buffer)))
+                      (t
+                       (setq submessage-size
+                             (serialize-object msg msg-desc buffer))))
+                (iincf size (+ (backpatch submessage-size) submessage-size)))))))
+    size))
+
+(defun emit-non-repeated-field (value type field-num buffer)
+  "Serialize a non-repeated field to buffer.
+  Parameters:
+    VALUE: The data to serialize, e.g. the data resulting from calling read-slot on a field.
+    TYPE: The :class slot of the field.
+    FIELD-NUM: The number of the field being serialized (used for making tags).
+    BUFFER: The buffer to write to.
+  Returns: The number of bytes output to BUFFER, or NIL on error."
+  (declare (field-number field-num)
+           (buffer buffer))
+  (let (desc)
     (cond ((scalarp type)
-           (serialize-scalar value type (make-tag type index)
-                             buffer))
-          ((typep (setq desc (or (find-message type)
-                                 (find-enum type)
-                                 (find-map-descriptor type)))
-                  'message-descriptor)
-           (cond ((not value) 0)
-                 ((eq (proto-message-type desc) :group)
-                  (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                        (tag2 (make-wire-tag $wire-type-end-group   index)))
-                    (iincf size (encode-uint32 tag1 buffer))
-                    (dolist (f (proto-fields desc)
-                               (i+ size (encode-uint32 tag2 buffer)))
-                      (iincf size (emit-field value f buffer)))))
-                 (t
-                  ;; If OBJECT has BYTES bound, then it is a lazy field, and BYTES is
-                  ;; the pre-computed serialization of OBJECT, so output that.
-                  (let ((precomputed-bytes (and (slot-exists-p value '%bytes)
-                                                (proto-%bytes value)))
-                        (custom-serializer (custom-serializer type))
-                        (tag-size
-                         (encode-uint32 (make-wire-tag $wire-type-string index)
-                                        buffer))
-                        (submessage-size 0))
-                    (with-placeholder (buffer)
-                      (cond (precomputed-bytes
-                             (setq submessage-size (length precomputed-bytes))
-                             (buffer-ensure-space buffer submessage-size)
-                             (fast-octets-out buffer precomputed-bytes))
-                            (custom-serializer
-                             (setq submessage-size
-                                   (funcall custom-serializer value buffer)))
-                            (t
-                             (setq submessage-size
-                                   (serialize-object value desc buffer))))
-                      (+ tag-size (backpatch submessage-size) submessage-size))))))
-          ((typep desc 'enum-descriptor)
+           (serialize-scalar value type (make-tag type field-num) buffer))
+          ((setq desc (find-message type))
+           (emit-non-repeated-message-field desc value type field-num buffer))
+          ((setq desc (find-enum type))
            (serialize-enum value (enum-descriptor-values desc)
-                           (make-wire-tag $wire-type-varint index)
+                           (make-wire-tag $wire-type-varint field-num)
                            buffer))
-          ((typep desc 'map-descriptor)
-           (let* ((tag (make-wire-tag $wire-type-string index))
+          ((setq desc (find-map-descriptor type))
+           (let* ((tag (make-wire-tag $wire-type-string field-num))
                   (key-class (map-descriptor-key-class desc))
                   (val-class (map-descriptor-val-class desc)))
              (flet ((serialize-pair (k v)
@@ -310,6 +285,46 @@ Parameters:
                        using (hash-value v)
                      sum (serialize-pair k v)))))
           (t nil))))
+
+(defun emit-non-repeated-message-field (msg-desc msg type field-num buffer)
+  "Serialize a non-repeated message field to buffer.
+  Parameters:
+    MSG-DESC: The message-descriptor for MSG.
+    MSG: The data to serialize.
+    TYPE: The :class slot of the field.
+    FIELD-NUM: The number of the field being serialized (used for making tags).
+    BUFFER: The buffer to write to.
+  Returns: The number of bytes output to BUFFER, or NIL on error."
+  (cond ((not msg)
+         0)
+        ((eq (proto-message-type msg-desc) :group)
+         (let ((tag1 (make-wire-tag $wire-type-start-group field-num))
+               (tag2 (make-wire-tag $wire-type-end-group   field-num))
+               (size 0))
+           (iincf size (encode-uint32 tag1 buffer))
+           (dolist (f (proto-fields msg-desc))
+             (iincf size (emit-field msg f buffer)))
+           (i+ size (encode-uint32 tag2 buffer))))
+        (t
+         ;; If MSG has %BYTES bound, then it is a lazy field, and %BYTES is
+         ;; the pre-computed serialization of MSG, so output that.
+         (let ((precomputed-bytes (and (slot-exists-p msg '%bytes)
+                                       (proto-%bytes msg)))
+               (custom-serializer (custom-serializer type))
+               (tag-size (encode-uint32 (make-wire-tag $wire-type-string field-num) buffer))
+               (submessage-size 0))
+           (with-placeholder (buffer)
+             (cond (precomputed-bytes
+                    (setq submessage-size (length precomputed-bytes))
+                    (buffer-ensure-space buffer submessage-size)
+                    (fast-octets-out buffer precomputed-bytes))
+                   (custom-serializer
+                    (setq submessage-size
+                          (funcall custom-serializer msg buffer)))
+                   (t
+                    (setq submessage-size
+                          (serialize-object msg msg-desc buffer))))
+             (+ tag-size (backpatch submessage-size) submessage-size))))))
 
 ;;; Deserialization
 
