@@ -932,7 +932,9 @@ function) then there is no guarantee on the serialize function working properly.
         ((not (member default (list $empty-default nil)))
          default)
         ((eq container :vector)
-         '(make-array 0 :adjustable t))
+         `(make-array 0 :element-type ',type
+                        :adjustable t
+                        :fill-pointer 0))
         ((eq container :list) nil)
         ((member kind '(:group :message :extends))
          nil)
