@@ -174,19 +174,11 @@ Parameters:
 message-descriptor.")
 
 (defvar *qualified-messages* (make-hash-table :test 'equal)
-  "Map from the qualified-name to the protobuf-message
-class symbol.
-For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message.")
+  "Map from the proto-qualified-name of a message (a string) to its Lisp type symbol.")
 
-;; TODO(cgay): Rename to find-message-descriptor
 (defun-inline find-message (type)
-  "Return the message-descriptor instance either named by TYPE (a symbol)
-or that's named by the class-name of TYPE."
-  ;; TODO(cgay): I suspect this is left over from before the switch to structs.
-  (gethash (if (typep type 'standard-object)
-               (class-name type)
-               type)
-           *messages*))
+  "Return the message-descriptor named by TYPE (a symbol), or nil."
+  (gethash type *messages*))
 
 (defun-inline find-message-by-qualified-name (qualified-name)
   "Return the protobuf-message symbol named by qualified-name.
@@ -194,14 +186,6 @@ or that's named by the class-name of TYPE."
      QUALIFIED-NAME: The qualified name of a protobuf message.
        For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message."
   (gethash qualified-name *qualified-messages*))
-
-(defun find-message-for-class (class)
-  "Find a message for class.
-Parameters:
-  CLASS: Either a symbol naming the class or a class."
-  (find-message (if (typep class 'symbol)
-                    class
-                    (class-name class))))
 
 (defvar *maps* (make-hash-table :test 'eq)
   "Maps map names (symbols) to map-descriptor instances.")

@@ -39,7 +39,7 @@
      (when optimized
        (dolist (class '(basic-test1 basic-test2 basic-test3 basic-test4
                         basic-test5 basic-test6 basic-test7 subgroups))
-         (let ((message (proto:find-message-for-class class)))
+         (let ((message (proto:find-message class)))
            (handler-bind ((style-warning #'muffle-warning))
              (eval (proto-impl::generate-deserializer message))
              (eval (proto-impl::generate-serializer message))))))
@@ -409,7 +409,7 @@
     (print optimized)
     (when optimized
       (dolist (class '(proto-on-wire proto-different-than-wire))
-        (let ((message (proto:find-message-for-class class)))
+        (let ((message (proto:find-message class)))
           (handler-bind ((style-warning #'muffle-warning))
             (eval (proto-impl::generate-deserializer message))
             (eval (proto-impl::generate-serializer message))))))

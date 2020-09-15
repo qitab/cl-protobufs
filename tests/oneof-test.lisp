@@ -77,7 +77,7 @@
         :do
            (when optimized
              (dolist (class '(oneof-proto nested-oneof oneof-test.int-list oneof-test))
-               (let ((message (proto:find-message-for-class class)))
+               (let ((message (proto:find-message class)))
                  (handler-bind ((style-warning #'muffle-warning))
                    (eval (proto-impl::generate-serializer message))
                    (eval (proto-impl::generate-deserializer message))))))

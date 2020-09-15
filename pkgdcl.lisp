@@ -56,7 +56,6 @@
 
    ;; Object lookup
    #:find-message
-   #:find-message-for-class
    #:find-schema
    #:find-service
 

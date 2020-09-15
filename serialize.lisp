@@ -93,7 +93,7 @@
             (b (make-octet-buffer 100)))
         (if fast-function
             (funcall (the function fast-function) object b)
-            (serialize-object object (find-message-for-class type) b))
+            (serialize-object object (find-message type) b))
         (let ((compact-buf (compactify-blocks b)))
           (concatenate-blocks compact-buf)))))
 
@@ -382,7 +382,7 @@ Parameters:
     The return values are the object and the index at which deserialization stopped."))
 
 (defmethod %deserialize-object (type buffer start end &optional (end-tag 0))
-  (let ((message (find-message-for-class type)))
+  (let ((message (find-message type)))
     (assert message ()
             "There is no Protobuf message having the type ~S" type)
     (%deserialize-object message buffer start end end-tag)))
@@ -1455,7 +1455,7 @@ Parameters:
   "Creates an instance of TYPE with BUFFER used as the pre-computed proto
    serialization bytes to return when deserializing.  Useful for passing an
    object through without ever needing to deserialize it."
-  (let* ((message (find-message-for-class type))
+  (let* ((message (find-message type))
          (message-name (or (proto-alias-for message) (proto-class message)))
          (object  #+sbcl (make-instance message-name)
                   #-sbcl (funcall (get-constructor-name message-name))))
