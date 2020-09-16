@@ -6,7 +6,6 @@ import "proto2-descriptor-extensions.proto"; // descriptor extension
 
 
 message RepeatedProto {
-  // Repeated
   repeated    int32 repeated_int32    = 1 [(lisp_container) = VECTOR];
   repeated    int64 repeated_int64    = 2 [(lisp_container) = VECTOR];
   repeated   uint32 repeated_uint32   = 3 [(lisp_container) = VECTOR];
@@ -25,7 +24,6 @@ message RepeatedProto {
 
 
 message RepeatedListProto {
-  // Repeated
   repeated    int32 repeated_int32    = 1;
   repeated    int64 repeated_int64    = 2;
   repeated   uint32 repeated_uint32   = 3;
@@ -40,4 +38,8 @@ message RepeatedListProto {
   repeated   double repeated_double   = 12;
   repeated     bool repeated_bool     = 13;
   repeated   string repeated_string   = 14;
+}
+
+message OuterProto {
+  repeated RepeatedProto repeated_proto = 1 [(lisp_container) = VECTOR];
 }

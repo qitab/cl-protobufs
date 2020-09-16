@@ -662,10 +662,12 @@ Parameters:
                                 proto-type public-slot-name :get))
          (push-function-name (proto-slot-function-name
                               proto-type public-slot-name :push))
-         (push-method-name (fintern "PUSH-~A" public-slot-name)))
+         (push-method-name (fintern "PUSH-~A" public-slot-name))
+         (field-type (proto-type field)))
     (with-gensyms (obj element)
       `((defun ,push-function-name (,element ,obj)
-          (declare (type ,proto-type ,obj))
+          (declare (type ,proto-type ,obj)
+                   (type ,field-type ,element))
           ,(if (eq (proto-container field) :vector)
                `(progn (vector-push-extend ,element
                                            (,public-accessor-name ,obj))

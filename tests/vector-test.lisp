@@ -36,7 +36,8 @@
            (repeated-proto.push-repeated-sfixed64 i vector-proto) i)
        (assert-eql (repeated-proto.push-repeated-float (coerce i 'float) vector-proto)
            (coerce i 'float))
-       (assert-eq (repeated-proto.push-repeated-double i vector-proto) i)
+       (assert-eql (repeated-proto.push-repeated-double (coerce i 'double-float) vector-proto)
+           (coerce i 'double-float))
        (assert-eql
            (repeated-proto.push-repeated-bool (= (mod i 2) 0) vector-proto)
            (= (mod i 2) 0))
@@ -164,3 +165,14 @@
     (assert-true (repeated-list-proto.has-repeated-int32 vector-proto))
     (pop (repeated-list-proto.repeated-int32 vector-proto))
     (assert-false (repeated-list-proto.has-repeated-int32 vector-proto))))
+
+;; Test that we properly type check a message when pushing into a repeated
+;; field.
+(deftest test-message-type-checking (vector-suite)
+  (let ((outer-proto (make-outer-proto)))
+    (dolist (element (list nil 1 "a"))
+      (handler-case
+          (outer-proto.push-repeated-proto element outer-proto)
+        (error nil)
+        (:no-error (assert-fail))))
+    (assert-true (outer-proto.push-repeated-proto (make-repeated-proto) outer-proto))))
