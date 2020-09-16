@@ -1,0 +1,43 @@
+syntax = "proto2";      // for compatibility with internal Google compiler
+
+package repeated_proto;
+
+import "proto2-descriptor-extensions.proto"; // descriptor extension
+
+
+message RepeatedProto {
+  // Repeated
+  repeated    int32 repeated_int32    = 1 [(lisp_container) = VECTOR];
+  repeated    int64 repeated_int64    = 2 [(lisp_container) = VECTOR];
+  repeated   uint32 repeated_uint32   = 3 [(lisp_container) = VECTOR];
+  repeated   uint64 repeated_uint64   = 4 [(lisp_container) = VECTOR];
+  repeated   sint32 repeated_sint32   = 5 [(lisp_container) = VECTOR];
+  repeated   sint64 repeated_sint64   = 6 [(lisp_container) = VECTOR];
+  repeated  fixed32 repeated_fixed32  = 7 [(lisp_container) = VECTOR];
+  repeated  fixed64 repeated_fixed64  = 8 [(lisp_container) = VECTOR];
+  repeated sfixed32 repeated_sfixed32 = 9 [(lisp_container) = VECTOR];
+  repeated sfixed64 repeated_sfixed64 = 10 [(lisp_container) = VECTOR];
+  repeated    float repeated_float    = 11 [(lisp_container) = VECTOR];
+  repeated   double repeated_double   = 12 [(lisp_container) = VECTOR];
+  repeated     bool repeated_bool     = 13 [(lisp_container) = VECTOR];
+  repeated   string repeated_string   = 14 [(lisp_container) = VECTOR];
+}
+
+
+message RepeatedListProto {
+  // Repeated
+  repeated    int32 repeated_int32    = 1;
+  repeated    int64 repeated_int64    = 2;
+  repeated   uint32 repeated_uint32   = 3;
+  repeated   uint64 repeated_uint64   = 4;
+  repeated   sint32 repeated_sint32   = 5;
+  repeated   sint64 repeated_sint64   = 6;
+  repeated  fixed32 repeated_fixed32  = 7;
+  repeated  fixed64 repeated_fixed64  = 8;
+  repeated sfixed32 repeated_sfixed32 = 9;
+  repeated sfixed64 repeated_sfixed64 = 10;
+  repeated    float repeated_float    = 11;
+  repeated   double repeated_double   = 12;
+  repeated     bool repeated_bool     = 13;
+  repeated   string repeated_string   = 14;
+}

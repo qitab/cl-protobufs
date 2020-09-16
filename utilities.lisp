@@ -260,14 +260,15 @@ Arguments:
                  This can also be :map-get or :map-rem for the special map functions.
                  Finally, it can be :case for the special oneof function."
   (declare (type symbol proto-type slot)
-           (type (member :has :get :clear :map-get :map-rem :case) function-type))
+           (type (member :has :get :clear :map-get :map-rem :case :push) function-type))
   (let ((f-symbol (ecase function-type
                     (:has 'has)
                     (:clear 'clear)
                     (:get nil)
                     (:map-get 'gethash)
                     (:map-rem 'remhash)
-                    (:case 'case))))
+                    (:case 'case)
+                    (:push 'push))))
     (cond ((member f-symbol '(gethash remhash case))
            (intern (nstring-upcase (format nil "~a.~a-~a"
                                            (symbol-name proto-type)
@@ -321,17 +322,10 @@ Arguments:
 (defmacro dovector ((var vector &optional result) &body body)
   "Like DOLIST, but iterates over VECTOR binding VAR to each successive element.
    Returns RESULT."
-  (with-gensyms (vidx vlen vvec)
-    `(let* ((,vvec ,vector)
-            ;; TODO(shaunm): Added by me - the name of the function should change if it is goint to
-            ;; accept nil
-            (,vlen (if ,vvec (length (the vector ,vvec))
-                       0)))
-       ;; TODO(shaunm): Why isn't this just (loop across)?
-       (loop for ,vidx fixnum from 0 below ,vlen
-             as ,var = (aref ,vvec ,vidx)
-             do (progn ,@body)
-             finally (return ,result)))))
+  `(when ,vector
+     (loop for ,var across ,vector
+           do (progn ,@body)
+           finally (return ,result))))
 
 (defmacro doseq ((var sequence &optional result) &body body)
   "Iterates over SEQUENCE, binding VAR to each element in turn. Uses DOLIST or DOVECTOR depending on

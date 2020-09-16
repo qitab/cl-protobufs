@@ -315,6 +315,13 @@
     :pathname ""
     :components ((:protobuf-source-file "proto3")
                  (:protobuf-source-file "serialization")
-                 (:file "timing-tests"))))
+                 (:file "timing-tests")))
+   (:module "vector-tests"
+    :serial t
+    :pathname ""
+    :depends-on ("descriptor-extensions")
+    :components ((:protobuf-source-file "vector-proto"
+                  :proto-search-path ("../" "../google/protobuf/"))
+                 (:file "vector-test"))))
   :perform (test-op (o c)
                     (uiop:symbol-call '#:cl-protobufs.test '#:run-all)))

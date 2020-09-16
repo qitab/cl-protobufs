@@ -635,6 +635,45 @@ Parameters:
 
         (export '(,public-accessor-name))))))
 
+(defun make-repeated-field-push-function (proto-type field)
+  "Make and return forms that define push functions into a proto repeated slot.
+We will make a method function {PROTO-TYPE}.PUSH-{FIELD-NAME} that
+will take in a a new element and the proto-message and push the element
+onto the repeated FIELD. For a list it will be pushed onto the
+head and for a vector it will be pushed onto the tail.
+We also make the method push-{field-name} that will take
+in the new element and a proto-message and call the
+{PROTO-TYPE}.PUSH-{FIELD-NAME} function with them.
+Both return the element passed.
+
+Parameters:
+  PROTO-TYPE: The Lisp name of the containing message of this oneof.
+  FIELD: The field we are making the push functions for."
+  (let* ((public-slot-name (proto-external-field-name field))
+         (public-accessor-name (proto-slot-function-name
+                                proto-type public-slot-name :get))
+         (push-function-name (proto-slot-function-name
+                              proto-type public-slot-name :push))
+         (push-method-name (fintern "PUSH-~A" public-slot-name))
+         (index (proto-field-offset field))
+         (is-set-accessor (fintern "~A-%%IS-SET" proto-type)))
+    (with-gensyms (obj element)
+      `(,(if (eq (proto-container field) :vector)
+             `(defun ,push-function-name (,element ,obj)
+                (declare (type ,proto-type ,obj))
+                ,(when index
+                   `(setf (bit (,is-set-accessor ,obj) ,index) 1))
+                (vector-push-extend ,element
+                                    (,public-accessor-name ,obj))
+                ,element)
+             `(defun ,push-function-name (element ,obj)
+                (declare (type ,proto-type ,obj))
+                (push element (,public-accessor-name ,obj))))
+        (defmethod ,push-method-name (,element (,obj ,proto-type))
+          (,push-function-name ,element ,obj))
+
+        (export '(,push-method-name ,push-function-name))))))
+
 (defun make-oneof-accessor-forms (proto-type oneof)
   "Make and return forms that define accessor functions for a oneof and its fields.
 
@@ -875,6 +914,9 @@ function) then there is no guarantee on the serialize function working properly.
 
         ,@(make-common-forms-for-structure-class
            proto-type public-slot-name slot-name field)
+
+        ,@(when (proto-container field)
+            (make-repeated-field-push-function proto-type field))
 
         ;; Make special map forms.
         ,@(when (typep (find-map-descriptor (proto-class field)) 'map-descriptor)
