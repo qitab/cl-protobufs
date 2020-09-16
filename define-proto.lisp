@@ -631,7 +631,7 @@ Parameters:
         (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
           (setf (,public-accessor-name ,obj) ,new-value))
 
-        (proto-impl::set-field-accessor-functions ',proto-type ',public-slot-name)
+        (set-field-accessor-functions ',proto-type ',public-slot-name)
 
         ;; has-* functions are not exported for proto3-style optional fields. They are only for
         ;; internal usage.
@@ -772,7 +772,7 @@ Paramters:
                   (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
                     (setf (,public-accessor-name ,obj) ,new-value))
 
-                  (proto-impl::set-field-accessor-functions ',proto-type ',public-slot-name)
+                  (set-field-accessor-functions ',proto-type ',public-slot-name)
 
                   (export '(,has-function-name ,clear-function-name
                             ,public-accessor-name))))))))))
@@ -1202,8 +1202,8 @@ function) then there is no guarantee on the serialize function working properly.
       ;; One extra slot for the make-message-with-bytes feature.
       (collect-slot
        (make-field-data
-        :internal-slot-name 'proto-impl::%bytes
-        :external-slot-name 'proto-impl::%bytes
+        :internal-slot-name '%bytes
+        :external-slot-name '%bytes
         :type '(or null (simple-array (unsigned-byte 8)))
         :initarg :%bytes
         :initform nil))
@@ -1211,8 +1211,8 @@ function) then there is no guarantee on the serialize function working properly.
       (unless (= bool-index -1)
         (collect-slot
          (make-field-data
-          :internal-slot-name 'proto-impl::%%bool-values
-          :external-slot-name 'proto-impl::%%bool-values
+          :internal-slot-name '%%bool-values
+          :external-slot-name '%%bool-values
           :type `(bit-vector ,bool-count)
           :initarg :%%bool-values
           :container :vector
@@ -1224,8 +1224,8 @@ function) then there is no guarantee on the serialize function working properly.
       ;; the memory reads by 1 per slot access.
       (collect-slot
        (make-field-data
-        :internal-slot-name 'proto-impl::%%is-set
-        :external-slot-name 'proto-impl::%%is-set
+        :internal-slot-name '%%is-set
+        :external-slot-name '%%is-set
         :type `(bit-vector ,field-offset)
         :initarg :%%is-set
         :container :vector
@@ -1569,8 +1569,8 @@ function) then there is no guarantee on the serialize function working properly.
       ;; the memory reads by 1 per slot access.
       (collect-slot
        (make-field-data
-          :internal-slot-name 'proto-impl::%%is-set
-          :external-slot-name 'proto-impl::%%is-set
+          :internal-slot-name '%%is-set
+          :external-slot-name '%%is-set
           :type `(bit-vector ,field-offset)
           :initarg :%%is-set
           :container :vector
@@ -1581,8 +1581,8 @@ function) then there is no guarantee on the serialize function working properly.
       (unless (= bool-index -1)
         (collect-slot
          (make-field-data
-          :internal-slot-name 'proto-impl::%%bool-values
-          :external-slot-name 'proto-impl::%%bool-values
+          :internal-slot-name '%%bool-values
+          :external-slot-name '%%bool-values
           :type `(bit-vector ,bool-count)
           :initarg :%%bool-values
           :container :vector
@@ -1782,7 +1782,7 @@ function) then there is no guarantee on the serialize function working properly.
                            :qualified-name (make-qualified-name *current-file-descriptor*
                                                                 (or name
                                                                     (class-name->proto function)))
-                           :service-name (proto-impl::proto-name service)
+                           :service-name (proto-name service)
                            :client-stub client-fn
                            :server-stub server-fn
                            :input-type  input-type
