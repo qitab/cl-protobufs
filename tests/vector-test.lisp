@@ -32,18 +32,19 @@
        (assert-eq (repeated-proto.push-repeated-fixed32 i vector-proto) i)
        (assert-eq (repeated-proto.push-repeated-fixed64 i vector-proto) i)
        (assert-eq
-        (repeated-proto.push-repeated-sfixed32 i vector-proto) i)
+           (repeated-proto.push-repeated-sfixed32 i vector-proto) i)
        (assert-eql
-        (repeated-proto.push-repeated-sfixed64 i vector-proto) i)
+           (repeated-proto.push-repeated-sfixed64 i vector-proto) i)
        (assert-eql (repeated-proto.push-repeated-float (coerce i 'float) vector-proto)
-                   (coerce i 'float))
-       (assert-eq (repeated-proto.push-repeated-double i vector-proto) i)
+           (coerce i 'float))
+       (assert-eql (repeated-proto.push-repeated-double (coerce i 'double-float) vector-proto)
+           (coerce i 'double-float))
        (assert-eql
-        (repeated-proto.push-repeated-bool (= (mod i 2) 0) vector-proto)
-        (= (mod i 2) 0))
+           (repeated-proto.push-repeated-bool (= (mod i 2) 0) vector-proto)
+           (= (mod i 2) 0))
        (assert-equal
-        (repeated-proto.push-repeated-string (write-to-string i) vector-proto)
-        (write-to-string i)))
+           (repeated-proto.push-repeated-string (write-to-string i) vector-proto)
+           (write-to-string i)))
     (assert vector-proto)))
 
 
@@ -64,14 +65,14 @@
        (assert-eq (push-repeated-sfixed32 i vector-proto) i)
        (assert-eq (push-repeated-sfixed64 i vector-proto) i)
        (assert-eq (push-repeated-float (coerce i 'float) vector-proto)
-                  (coerce i 'float))
+           (coerce i 'float))
        (assert-eql (repeated-proto.push-repeated-double (coerce i 'double-float)
                                                         vector-proto)
-                   (coerce i 'double-float))
+           (coerce i 'double-float))
        (assert-eql (push-repeated-bool (= (mod i 2) 0) vector-proto)
-                   (= (mod i 2) 0))
+           (= (mod i 2) 0))
        (assert-equal (push-repeated-string (write-to-string i) vector-proto)
-                     (write-to-string i)))
+           (write-to-string i)))
     (loop for i from 1 to 10
           do
        (push i (repeated-list-proto.repeated-int32 list-proto))
