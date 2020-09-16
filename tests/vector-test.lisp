@@ -31,19 +31,18 @@
        (assert-eq (repeated-proto.push-repeated-sint64 i vector-proto) i)
        (assert-eq (repeated-proto.push-repeated-fixed32 i vector-proto) i)
        (assert-eq (repeated-proto.push-repeated-fixed64 i vector-proto) i)
-       (assert-eq
-        (repeated-proto.push-repeated-sfixed32 i vector-proto) i)
+       (assert-eq (repeated-proto.push-repeated-sfixed32 i vector-proto) i)
        (assert-eql
-        (repeated-proto.push-repeated-sfixed64 i vector-proto) i)
+           (repeated-proto.push-repeated-sfixed64 i vector-proto) i)
        (assert-eql (repeated-proto.push-repeated-float (coerce i 'float) vector-proto)
-                   (coerce i 'float))
+           (coerce i 'float))
        (assert-eq (repeated-proto.push-repeated-double i vector-proto) i)
        (assert-eql
-        (repeated-proto.push-repeated-bool (= (mod i 2) 0) vector-proto)
-        (= (mod i 2) 0))
+           (repeated-proto.push-repeated-bool (= (mod i 2) 0) vector-proto)
+           (= (mod i 2) 0))
        (assert-equal
-        (repeated-proto.push-repeated-string (write-to-string i) vector-proto)
-        (write-to-string i)))
+           (repeated-proto.push-repeated-string (write-to-string i) vector-proto)
+           (write-to-string i)))
     (assert vector-proto)))
 
 
@@ -63,15 +62,15 @@
        (assert-eq (push-repeated-fixed64 i vector-proto) i)
        (assert-eq (push-repeated-sfixed32 i vector-proto) i)
        (assert-eq (push-repeated-sfixed64 i vector-proto) i)
-       (assert-eq (push-repeated-float (coerce i 'float) vector-proto)
-                  (coerce i 'float))
+       (assert-eql (push-repeated-float (coerce i 'float) vector-proto)
+           (coerce i 'float))
        (assert-eql (repeated-proto.push-repeated-double (coerce i 'double-float)
                                                         vector-proto)
-                   (coerce i 'double-float))
+           (coerce i 'double-float))
        (assert-eql (push-repeated-bool (= (mod i 2) 0) vector-proto)
-                   (= (mod i 2) 0))
+           (= (mod i 2) 0))
        (assert-equal (push-repeated-string (write-to-string i) vector-proto)
-                     (write-to-string i)))
+           (write-to-string i)))
     (loop for i from 1 to 10
           do
        (push i (repeated-list-proto.repeated-int32 list-proto))
@@ -137,3 +136,31 @@
     (let ((vector-serialized (serialize-object-to-bytes vector-proto 'repeated-proto))
           (list-serialized (serialize-object-to-bytes list-proto 'repeated-list-proto)))
       (assert-equalp vector-serialized list-serialized))))
+
+
+(deftest test-vector-has-function (vector-suite)
+  (let ((vector-proto (make-repeated-proto)))
+    (assert-false (repeated-proto.has-repeated-int32 vector-proto))
+    (repeated-proto.push-repeated-int32 1 vector-proto)
+    (assert-true (repeated-proto.has-repeated-int32 vector-proto))
+    (repeated-proto.push-repeated-int32 2 vector-proto)
+    (assert-true (repeated-proto.has-repeated-int32 vector-proto))
+    ;; There should be a generated function to remove a value.
+    (vector-pop (repeated-proto.repeated-int32 vector-proto))
+    (assert-true (repeated-proto.has-repeated-int32 vector-proto))
+    (vector-pop (repeated-proto.repeated-int32 vector-proto))
+    (assert-false (repeated-proto.has-repeated-int32 vector-proto))))
+
+
+(deftest test-list-has-function (vector-suite)
+  (let ((vector-proto (make-repeated-list-proto)))
+    (assert-false (repeated-list-proto.has-repeated-int32 vector-proto))
+    (repeated-list-proto.push-repeated-int32 1 vector-proto)
+    (assert-true (repeated-list-proto.has-repeated-int32 vector-proto))
+    (repeated-list-proto.push-repeated-int32 2 vector-proto)
+    (assert-true (repeated-list-proto.has-repeated-int32 vector-proto))
+    ;; There should be a generated function to remove a value.
+    (pop (repeated-list-proto.repeated-int32 vector-proto))
+    (assert-true (repeated-list-proto.has-repeated-int32 vector-proto))
+    (pop (repeated-list-proto.repeated-int32 vector-proto))
+    (assert-false (repeated-list-proto.has-repeated-int32 vector-proto))))

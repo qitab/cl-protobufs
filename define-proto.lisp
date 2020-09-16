@@ -595,13 +595,14 @@ Parameters:
                `(let ((,cur-value ,(if bool-index
                                        `(plusp (bit (,bit-field-name ,obj) ,bool-index))
                                        `(,hidden-accessor-name ,obj))))
-                  ,(if (proto-container field)
-                       cur-value
-                       (case (proto-type field)
-                         ((proto:byte-vector cl:string) `(not (= (length ,cur-value) 0)))
-                         ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
-                         ;; Otherwise, the type is integral. EQ suffices to check equality.
-                         (t `(not (eq ,cur-value ,default-form))))))))
+                  ,(case (proto-container field)
+                     (:vector `(not (= (length ,cur-value) 0)))
+                     (:list `(and ,cur-value t))
+                     (t (case (proto-type field)
+                          ((proto:byte-vector cl:string) `(not (= (length ,cur-value) 0)))
+                          ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
+                          ;; Otherwise, the type is integral. EQ suffices to check equality.
+                          (t `(not (eq ,cur-value ,default-form)))))))))
 
         ;; Clear function
         ;; Map type clear functions are created in make-map-accessor-forms.
@@ -654,21 +655,15 @@ Parameters:
                                 proto-type public-slot-name :get))
          (push-function-name (proto-slot-function-name
                               proto-type public-slot-name :push))
-         (push-method-name (fintern "PUSH-~A" public-slot-name))
-         (index (proto-field-offset field))
-         (is-set-accessor (fintern "~A-%%IS-SET" proto-type)))
+         (push-method-name (fintern "PUSH-~A" public-slot-name)))
     (with-gensyms (obj element)
-      `(,(if (eq (proto-container field) :vector)
-             `(defun ,push-function-name (,element ,obj)
-                (declare (type ,proto-type ,obj))
-                ,(when index
-                   `(setf (bit (,is-set-accessor ,obj) ,index) 1))
-                (vector-push-extend ,element
-                                    (,public-accessor-name ,obj))
-                ,element)
-             `(defun ,push-function-name (element ,obj)
-                (declare (type ,proto-type ,obj))
-                (push element (,public-accessor-name ,obj))))
+      `((defun ,push-function-name (,element ,obj)
+          (declare (type ,proto-type ,obj))
+          ,(if (eq (proto-container field) :vector)
+               `(progn (vector-push-extend ,element
+                                           (,public-accessor-name ,obj))
+                       ,element)
+               `(push ,element (,public-accessor-name ,obj))))
         (defmethod ,push-method-name (,element (,obj ,proto-type))
           (,push-function-name ,element ,obj))
 
@@ -1646,6 +1641,7 @@ function) then there is no guarantee on the serialize function working properly.
                  ;; Note that proto2-style optional fields in proto3 files are wrapped in oneofs by
                  ;; protoc, and hence process-field is never called.
                  (offset (and (not (eq (proto-syntax *current-file-descriptor*) :proto3))
+                              (not (eq label :repeated))
                               field-offset))
                  (default
                   (if default-p
