@@ -59,10 +59,6 @@
    #:find-schema
    #:find-service
 
-   ;; Parser
-   #:parse-schema-from-file
-   #:parse-schema-from-stream
-
    ;; Code generation
    #:define-schema
    #:define-enum

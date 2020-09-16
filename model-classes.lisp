@@ -28,35 +28,6 @@ Parameters:
   ;; See https://developers.google.com/protocol-buffers/docs/overview#updating
   (%%skipped-bytes nil :type (or null byte-vector)))
 
-;;; "Thread-local" variables
-
-;;; These two variables are defined here, rather than in define-proto.lisp,
-;;; because they're needed by parser.lisp, which doesn't depend on
-;;; define-proto.lisp. Once the parser is deleted they can be moved.
-(defvar *current-file-descriptor* nil
-  "The file-descriptor for the file currently being loaded.")
-
-(defvar *current-message-descriptor* nil
-  "The message-descriptor for the message or group currently being loaded.")
-
-(defvar *protobuf-conc-name* nil
-  "Bound to a conc-name to use for all the messages in the schema being defined.
-   This controls the name of the accessors the fields of each message.
-   When it's nil, there is no \"global\" conc-name.
-   When it's t, each message will use the message name as the conc-name.
-   When it's a string, that string will be used as the conc-name for each message.
-   'parse-schema-from-file' defaults conc-name to \"\", meaning that each field in
-   every message has an accessor whose name is the name of the field.")
-
-(defvar *protobuf-pathname* nil
-  "Bound to he name of the file from where the .proto file is being parsed.")
-
-(defvar *protobuf-search-path* ()
-  "Bound to the search-path to use to resolve any relative pathnames.")
-
-(defvar *protobuf-output-path* ()
-  "Bound to the path to use to direct output during imports, etc.")
-
 
 ;;; Descriptor classes -- These classes taken together represent the contents of a .proto file.
 
@@ -137,26 +108,12 @@ Parameters:
                  ,initializer)))))
 
 (defun record-schema (schema &key symbol)
-  "Record all the names by which the Protobufs schema might be known.
-Parameters:
-  SCHEMA: The schema to record.
-  SYMBOL: The symbol to map from in *all-schemas*."
+  "Record SCHEMA in the global schema hash table under the key SYMBOL.
+   The generated code also stores the schema in this hash table using the
+   file pathname as the key."
+  (declare (type file-descriptor schema))
   (let ((symbol (or symbol (proto-class schema))))
-    (when symbol
-      (setf (gethash symbol *all-schemas*) schema))
-    (let ((pathname
-           (or *protobuf-pathname*
-               ;; Try to find the pathname under which a schema matching on CLASS
-               ;; was previously recorded. Remap that pathname onto this schema.
-               (block nil
-                 (maphash (lambda (key existing-schema)
-                            (when (and (pathnamep key)
-                                       (eq (proto-class existing-schema) symbol))
-                              (return key)))
-                          *all-schemas*)))))
-      (when pathname
-        ;; Record the file from which the Protobufs schema came
-        (setf (gethash pathname *all-schemas*) schema)))))
+    (setf (gethash symbol *all-schemas*) schema)))
 
 (defmethod print-object ((file-desc file-descriptor) stream)
   (if *print-escape*

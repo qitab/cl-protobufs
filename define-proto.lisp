@@ -160,6 +160,13 @@ the oneof and its nested fields.
 |#
 
 
+(defvar *current-file-descriptor* nil
+  "The file-descriptor for the file currently being loaded.")
+
+(defvar *current-message-descriptor* nil
+  "The message-descriptor for the message or group currently being loaded.")
+
+
 ;;; TODO(jgodbout): remove this, we already have field-descriptor
 ;;; "The only reason you would ever want a field-data struct instead of a
 ;;; field-descriptor is when you define a slot on the object which doesn't
