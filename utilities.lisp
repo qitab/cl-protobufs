@@ -260,7 +260,9 @@ Arguments:
                  This can also be :map-get or :map-rem for the special map functions.
                  Finally, it can be :case for the special oneof function."
   (declare (type symbol proto-type slot)
-           (type (member :has :get :clear :map-get :map-rem :case :push) function-type))
+           (type (member :has :get :clear :map-get :map-rem :case :push
+                              :length-of :nth)
+                 function-type))
   (let ((f-symbol (ecase function-type
                     (:has 'has)
                     (:clear 'clear)
@@ -268,7 +270,9 @@ Arguments:
                     (:map-get 'gethash)
                     (:map-rem 'remhash)
                     (:case 'case)
-                    (:push 'push))))
+                    (:push 'push)
+                    (:length-of 'length-of)
+                    (:nth 'nth))))
     (cond ((member f-symbol '(gethash remhash case))
            (intern (nstring-upcase (format nil "~a.~a-~a"
                                            (symbol-name proto-type)

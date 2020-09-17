@@ -643,28 +643,36 @@ Parameters:
 
         (export '(,public-accessor-name))))))
 
-(defun make-repeated-field-push-function (proto-type field)
-  "Make and return forms that define push functions into a proto repeated slot.
-We will make a method function {PROTO-TYPE}.PUSH-{FIELD-NAME} that
-will take in a a new element and the proto-message and push the element
-onto the repeated FIELD. For a list it will be pushed onto the
-head and for a vector it will be pushed onto the tail.
-We also make the method push-{field-name} that will take
-in the new element and a proto-message and call the
-{PROTO-TYPE}.PUSH-{FIELD-NAME} function with them.
-Both return the element passed.
+(defun make-repeated-field-accessors (proto-type field)
+  "Make and return forms that define functions that accesses a proto
+repeated slot.
+
+A push function pushes onto the front for a list repeated field,
+and onto the back for a vector repeated field. It returns the element added.
+
+A length function returns a fixnum of the number of the elements in the
+repeated field.
+
+An nth function returns the nth element in a repeated field,
+or signals an out of bounds error.
 
 Parameters:
-  PROTO-TYPE: The Lisp name of the containing message of this oneof.
-  FIELD: The field we are making the push functions for."
+  PROTO-TYPE: The Lisp name of the containing message.
+  FIELD: The field we are making the functions for."
   (let* ((public-slot-name (proto-external-field-name field))
          (public-accessor-name (proto-slot-function-name
                                 proto-type public-slot-name :get))
          (push-function-name (proto-slot-function-name
                               proto-type public-slot-name :push))
          (push-method-name (fintern "PUSH-~A" public-slot-name))
+         (length-function-name (proto-slot-function-name
+                                proto-type public-slot-name :length-OF))
+         (length-method-name (fintern "LENGTH-OF-~A" public-slot-name))
+         (nth-function-name (proto-slot-function-name
+                             proto-type public-slot-name :nth))
+         (nth-method-name (fintern "NTH-~A" public-slot-name))
          (field-type (proto-type field)))
-    (with-gensyms (obj element)
+    (with-gensyms (obj element n)
       `((defun ,push-function-name (,element ,obj)
           (declare (type ,proto-type ,obj)
                    (type ,field-type ,element))
@@ -673,10 +681,33 @@ Parameters:
                                            (,public-accessor-name ,obj))
                        ,element)
                `(push ,element (,public-accessor-name ,obj))))
+        (defun ,length-function-name (,obj)
+          (declare (type ,proto-type ,obj))
+          (the fixnum
+               (length (,public-accessor-name ,obj))))
+
+        (defun ,nth-function-name (,n ,obj)
+          (declare (type ,proto-type ,obj)
+                   (type fixnum ,n))
+          (the ,field-type
+               (let ((length (length (,public-accessor-name ,obj))))
+                 (when (i< length ,n)
+                   (error (format nil "Repeated field ~a is length ~d but asked for element ~d."
+                                  ',public-slot-name length ,n)))
+                 ,(if (eq (proto-container field) :vector)
+                      `(aref (,public-accessor-name ,obj) ,n)
+                      `(nth ,n (,public-accessor-name ,obj))))))
+
         (defmethod ,push-method-name (,element (,obj ,proto-type))
           (,push-function-name ,element ,obj))
+        (defmethod ,length-method-name ((,obj ,proto-type))
+          (,length-function-name ,obj))
+        (defmethod ,nth-method-name ((,n integer) (,obj ,proto-type))
+          (,nth-function-name ,n ,obj))
 
-        (export '(,push-method-name ,push-function-name))))))
+        (export '(,push-method-name ,push-function-name
+                  ,nth-function-name ,nth-method-name
+                  ,length-function-name ,length-method-name))))))
 
 (defun make-oneof-accessor-forms (proto-type oneof)
   "Make and return forms that define accessor functions for a oneof and its fields.
@@ -920,7 +951,7 @@ function) then there is no guarantee on the serialize function working properly.
            proto-type public-slot-name slot-name field)
 
         ,@(when (proto-container field)
-            (make-repeated-field-push-function proto-type field))
+            (make-repeated-field-accessors proto-type field))
 
         ;; Make special map forms.
         ,@(when (typep (find-map-descriptor (proto-class field)) 'map-descriptor)
