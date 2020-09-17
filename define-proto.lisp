@@ -578,13 +578,19 @@ Parameters:
         (index (proto-field-offset field))
         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
         (bool-index (proto-bool-index field))
-        (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type)))
+        (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
+        (field-type (cond ((eq (proto-container field) :vector)
+                           `(cl-protobufs:vector-of ,(proto-type field)))
+                          ((eq (proto-container field) :list)
+                           `(cl-protobufs:list-of ,(proto-type field)))
+                          (t (proto-type field)))))
     ;; If index is nil, then this field does not have a reserved bit in the %%is-set vector.
     ;; This means that the field is proto3-style optional, so checking for field presence must
     ;; be done by checking if the bound value is default.
     (with-gensyms (obj new-value cur-value)
       `(
         (defun-inline (setf ,public-accessor-name) (,new-value ,obj)
+          (declare (type ,field-type ,new-value))
           ,(when index
              `(setf (bit (,is-set-accessor ,obj) ,index) 1))
           ,(if bool-index
@@ -899,34 +905,44 @@ function) then there is no guarantee on the serialize function working properly.
          (repeated (eq (proto-label field) :repeated))
          (vectorp (eq :vector (proto-container field)))
          (public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
-         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name)))
+         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
+         (accessor-return-type
+          (cond ((eq (proto-container field) :vector)
+                 `(cl-protobufs:vector-of ,(proto-type field)))
+                ((eq (proto-container field) :list)
+                 `(cl-protobufs:list-of ,(proto-type field)))
+                ((member (proto-kind field) '(:message :group :extends))
+                 `(or null ,(proto-type field)))
+                (t (proto-type field)))))
     (with-gensyms (obj field-obj bytes)
       `((defun-inline ,public-accessor-name (,obj)
-          ,(if (not repeated)
-               `(let* ((,field-obj (,hidden-accessor-name ,obj))
-                       (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
-                  (if ,bytes
-                      (setf (,hidden-accessor-name ,obj)
-                            ;; Re-create the field object by deserializing its %bytes
-                            ;; field.
-                            (%deserialize-object ',(proto-class field) ,bytes nil nil))
-                      ,field-obj))
-               `(let ((,field-obj (,hidden-accessor-name ,obj)))
-                  (if (notany #'proto-%bytes ,field-obj)
-                      ,field-obj
-                      ,(with-gensyms (maybe-deserialize-object field-element)
-                         `(flet ((,maybe-deserialize-object (,field-element)
-                                   (let ((,bytes (proto-%bytes ,field-element)))
-                                     (if ,bytes
-                                         ;; Re-create the field object by deserializing
-                                         ;; its %bytes field.
-                                         (%deserialize-object ',(proto-class field) ,bytes nil nil)
-                                         ,field-element))))
-                            (setf (,hidden-accessor-name ,obj)
-                                  ,(if vectorp
-                                       `(map 'vector #',maybe-deserialize-object
-                                             (the vector ,field-obj))
-                                       `(mapcar #',maybe-deserialize-object ,field-obj)))))))))
+          (the
+           ,accessor-return-type
+           ,(if (not repeated)
+                `(let* ((,field-obj (,hidden-accessor-name ,obj))
+                        (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
+                   (if ,bytes
+                       (setf (,hidden-accessor-name ,obj)
+                             ;; Re-create the field object by deserializing its %bytes
+                             ;; field.
+                             (%deserialize-object ',(proto-class field) ,bytes nil nil))
+                       ,field-obj))
+                `(let ((,field-obj (,hidden-accessor-name ,obj)))
+                   (if (notany #'proto-%bytes ,field-obj)
+                       ,field-obj
+                       ,(with-gensyms (maybe-deserialize-object field-element)
+                          `(flet ((,maybe-deserialize-object (,field-element)
+                                    (let ((,bytes (proto-%bytes ,field-element)))
+                                      (if ,bytes
+                                          ;; Re-create the field object by deserializing
+                                          ;; its %bytes field.
+                                          (%deserialize-object ',(proto-class field) ,bytes nil nil)
+                                          ,field-element))))
+                             (setf (,hidden-accessor-name ,obj)
+                                   ,(if vectorp
+                                        `(map 'vector #',maybe-deserialize-object
+                                              (the vector ,field-obj))
+                                        `(mapcar #',maybe-deserialize-object ,field-obj))))))))))
         ,@(make-common-forms-for-structure-class proto-type public-slot-name slot-name field)))))
 
 (defun make-structure-class-forms-non-lazy (proto-type field public-slot-name)
@@ -940,12 +956,21 @@ function) then there is no guarantee on the serialize function working properly.
          (public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
          (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
          (bool-index (proto-bool-index field))
-         (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type)))
+         (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
+         (accessor-return-type
+          (cond ((eq (proto-container field) :vector)
+                 `(cl-protobufs:vector-of ,(proto-type field)))
+                ((eq (proto-container field) :list)
+                 `(cl-protobufs:list-of ,(proto-type field)))
+                ((member (proto-kind field) '(:message :group :extends))
+                 `(or null ,(proto-type field)))
+                (t (proto-type field)))))
     (with-gensyms (obj)
       `((defun-inline ,public-accessor-name (,obj)
-          ,(if bool-index
-               `(plusp (bit (,bit-field-name ,obj) ,bool-index))
-               `(,hidden-accessor-name ,obj)))
+          (the ,accessor-return-type
+               ,(if bool-index
+                    `(plusp (bit (,bit-field-name ,obj) ,bool-index))
+                    `(,hidden-accessor-name ,obj))))
 
         ,@(make-common-forms-for-structure-class
            proto-type public-slot-name slot-name field)
@@ -1516,6 +1541,7 @@ function) then there is no guarantee on the serialize function working properly.
                                                          (slot-name->proto slot))
                     :type type
                     :label label
+                    :container (when (eq label :repeated) :list)
                     :index index
                     :internal-field-name internal-slot-name
                     :external-field-name slot
