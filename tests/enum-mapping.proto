@@ -6,7 +6,7 @@
 
 syntax = "proto2";
 
-package third_party.lisp.cl_protobufs.tests;
+package enum_mapping_test;
 
 message MyOtherMessage {
   optional MyMessage.MyEnum other_enum = 1;

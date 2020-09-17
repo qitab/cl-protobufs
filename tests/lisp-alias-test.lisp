@@ -6,17 +6,19 @@
 
 (defpackage #:cl-protobufs.test.alias
   (:use #:cl
-        #:clunit
-        #:cl-protobufs)
+        #:clunit)
+  (:local-nicknames (#:pb #:cl-protobufs.alias-test))
   (:export :run))
 
 (in-package #:cl-protobufs.test.alias)
+
 
 (defsuite alias-suite (cl-protobufs.test:root-suite))
 
 (defun run ()
   "Run all tests in the test suite."
   (cl-protobufs.test:run-suite 'alias-suite))
+
 
 (defstruct aliased-struct i)
 
@@ -26,42 +28,42 @@
 ;; Serialization of cl-protobufs-generated class (as opposed to using a lisp_alias FieldOption)
 
 (defun expect-bytes (list array)
-  (assert-true (equal (coerce list 'list) (coerce array 'list))))
-
+  (assert-equal (coerce list 'list) (coerce array 'list)))
 
 (deftest serialize-regular (alias-suite)
-  (let ((obj (cl-protobufs.test-proto::make-message :i 99)))
+  (let ((obj (pb:make-message :i 99)))
     (expect-bytes (list +TAG-I+ 99)
-                  (serialize-object-to-bytes obj 'cl-protobufs.test-proto:message))))
+                  (proto:serialize-object-to-bytes obj))))
 
 ;; Serialization of the aliased (explicit) message
-(defun internal-serialize-message (val buf &aux (size 0))
+(defun internal-serialize-message (msg buf)
   "Serialization function for message.
-   VAL: The message being serialized.
-   BUF: The buffer to serialize to.
-   SIZE: Auxiliar variable to increment."
-  (let ((i (aliased-struct-i val)))
-    (incf size (proto-impl::serialize-scalar i :int32  +TAG-I+ buf)))
-  size)
+   MSG: The message being serialized.
+   BUF: The buffer to serialize to."
+  (let ((i (aliased-struct-i msg))
+        (size 0))
+    (incf size (proto-impl::serialize-scalar i :int32  +TAG-I+ buf))))
+
 #+sbcl
-(defun (:protobuf :serialize cl-protobufs.test-proto::aliased-message)
+(defun (:protobuf :serialize pb:aliased-message)
     (val buf)
   (internal-serialize-message val buf))
+
 #-sbcl
-(setf (get 'cl-protobufs.test-proto::aliased-message :serialize)
+(setf (get 'pb:aliased-message :serialize)
       (lambda (val buf)
         (internal-serialize-message val buf)))
 
 (deftest serialize-aliased (alias-suite)
   (let ((struct (make-aliased-struct :i 99)))
     (expect-bytes (list +TAG-I+ 99)
-                  (serialize-object-to-bytes struct 'cl-protobufs.test-proto::aliased-message))))
+                  (proto:serialize-object-to-bytes struct 'pb:aliased-message))))
 
 ;;  Serialization of OuterMessage
 
 (deftest serialize-empty-outer (alias-suite)
-  (let ((outer (cl-protobufs.test-proto::make-outer-message)))
-    (expect-bytes nil (proto-impl::serialize-object-to-bytes outer))))
+  (let ((outer (pb:make-outer-message)))
+    (expect-bytes nil (proto:serialize-object-to-bytes outer))))
 
 (defconstant +TAG-MESSAGE+ (proto-impl::make-tag :string 1)
   "The tag that should be used for field OuterMessage.Message")
@@ -70,18 +72,20 @@
   "The tag that should be used for field OuterMessage.Aliased")
 
 (deftest serialize-outer-containing-regular (alias-suite)
-  (let ((outer (cl-protobufs.test-proto::make-outer-message
-                :message (cl-protobufs.test-proto::make-message :i 99))))
-    (expect-bytes (list +TAG-MESSAGE+ 2 +TAG-I+ 99) (serialize-object-to-bytes outer))))
+  (let ((outer (pb:make-outer-message
+                :message (pb:make-message :i 99))))
+    (expect-bytes (list +TAG-MESSAGE+ 2 +TAG-I+ 99)
+                  (proto:serialize-object-to-bytes outer))))
 
 (deftest serialize-outer-containing-aliased (alias-suite)
-  (let ((outer (cl-protobufs.test-proto::make-outer-message
+  (let ((outer (pb:make-outer-message
                 :aliased (make-aliased-struct :i 99))))
-    (expect-bytes (list +TAG-ALIASED+ 2 +TAG-I+ 99) (serialize-object-to-bytes outer))))
+    (expect-bytes (list +TAG-ALIASED+ 2 +TAG-I+ 99)
+                  (proto:serialize-object-to-bytes outer))))
 
 ;; cl-protobufs message metadata
 
 (deftest find-message-for-alias (alias-suite)
-  (assert-true (find-message 'cl-protobufs.alias-test::aliased-struct))
-  (assert-true (eq (find-message 'cl-protobufs.alias-test::aliased-message)
-                   (find-message 'aliased-struct))))
+  (assert-true (proto:find-message 'my.dog.has.fleas::aliased-struct))
+  (assert-eq (proto:find-message 'pb:aliased-message)
+             (proto:find-message 'my.dog.has.fleas::aliased-struct)))

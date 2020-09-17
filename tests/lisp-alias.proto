@@ -8,14 +8,14 @@ syntax = "proto2";
 
 import "proto2-descriptor-extensions.proto"; // descriptor extension
 
-package test_proto;
+package alias_test;
 
 message Message {
   optional int32 i = 1;
 }
 
 message AliasedMessage {
-  option (lisp_alias) = "CL-PROTOBUFS.ALIAS-TEST::ALIASED-STRUCT";
+  option (lisp_alias) = "MY.DOG.HAS.FLEAS::ALIASED-STRUCT";
   optional int32 i = 1;
 }
 

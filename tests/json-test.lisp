@@ -6,11 +6,11 @@
 
 (defpackage #:cl-protobufs.test.json
   (:use #:cl
-        #:clunit
-        #:cl-protobufs.test-proto
-        #:cl-protobufs)
-  (:export :run)
-  (:local-nicknames (#:google #:cl-protobufs.google.protobuf)))
+        #:clunit)
+  (:local-nicknames (#:google #:cl-protobufs.google.protobuf)
+                    (#:pb #:cl-protobufs.test-proto)
+                    (#:wkt #:cl-protobufs.well-known-types))
+  (:export :run))
 
 (in-package :cl-protobufs.test.json)
 
@@ -66,46 +66,46 @@
 ")
 
 (deftest test-parse-json (json-suite)
-  (let ((msg-parse (proto:parse-json
-                    'cl-protobufs.test-proto:text-format-test
-                    :stream (make-string-input-stream *json-msg*)
-                    :ignore-unknown-fields-p t)))
-    (assert-true (eql 100 (int-field msg-parse)))
-    (assert-true (eql -1 (sint-field msg-parse)))
-    (assert-true (eql 1 (uint-field msg-parse)))
-    (assert-true (eql 1.5 (float-field msg-parse)))
-    (assert-true (eql 1.5d0 (double-field msg-parse)))
-    (assert-true (string-equal "A string" (string-field msg-parse)))
-    (assert-true (equal '("First" "Second")  (string-fields msg-parse)))
-    (assert-true (equal '(:NONE :TWENTY-ONE) (enum-vals msg-parse)))
-    (assert-true (equal 2 (int-field (two-level-nesting msg-parse))))
-    (assert-true (string= (map-field-gethash 1 msg-parse) "one"))
-    (assert-true (string= (map-field-gethash 2 msg-parse) "two"))
-    (assert-true (bool-field msg-parse))
-    (assert-true (= 12 (int64-field msg-parse)))
-    (assert-true (= -1 (sint64-field msg-parse)))
-    (assert-true (eql 5 (oneof-int-field msg-parse)))
-    (assert-false (int-vals msg-parse))
-    (assert-false (text-format-test.has-embedded-comment-a msg-parse))
-    (assert-true (equalp (make-array 5 :element-type '(unsigned-byte 8)
-                                       :initial-contents '(3 5 7 112 81))
-                         (bytes-field msg-parse)))))
+  (let ((msg (proto:parse-json 'pb:text-format-test
+                               :stream (make-string-input-stream *json-msg*)
+                               :ignore-unknown-fields-p t)))
+    (assert-eql 100 (pb:int-field msg))
+    (assert-eql -1 (pb:sint-field msg))
+    (assert-eql 1 (pb:uint-field msg))
+    (assert-eql 1.5 (pb:float-field msg))
+    (assert-eql 1.5d0 (pb:double-field msg))
+    (assert-equal "A string" (pb:string-field msg))
+    (assert-equal '("First" "Second")  (pb:string-fields msg))
+    (assert-equal '(:NONE :TWENTY-ONE) (pb:enum-vals msg))
+    (assert-eql 2 (pb:int-field (pb:two-level-nesting msg)))
+    (assert-equal (pb:map-field-gethash 1 msg) "one")
+    (assert-equal (pb:map-field-gethash 2 msg) "two")
+    (assert-true (pb:bool-field msg))
+    (assert-eql 12 (pb:int64-field msg))
+    (assert-eql -1 (pb:sint64-field msg))
+    (assert-eql 5 (pb:oneof-int-field msg))
+    (assert-false (pb:int-vals msg))
+    (assert-false (pb:text-format-test.has-embedded-comment-a msg))
+    (assert-equalp
+        (make-array 5 :element-type '(unsigned-byte 8)
+                      :initial-contents '(3 5 7 112 81))
+        (pb:bytes-field msg))))
 
 (defun json-roundtrip (msg)
   "For a message object MSG, print to JSON, then parse from JSON and assert that
 the result is PROTO-EQUAL with MSG."
   (let* ((text (with-output-to-string (s)
-                 (print-json msg :stream s)))
-         (msg-parse (with-input-from-string (s text)
-                      (parse-json (type-of msg) :stream s))))
-    (assert-true (proto:proto-equal msg-parse msg))))
+                 (proto:print-json msg :stream s)))
+         (msg (with-input-from-string (s text)
+                (proto:parse-json (type-of msg) :stream s))))
+    (assert-true (proto:proto-equal msg msg))))
 
 ;; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-json (json-suite)
   ;; Try several different flags when printing. The parser should handle each one.
   (dolist (key '(nil :no-pretty-print :no-camel-case :numeric-enums))
-    (let* ((nested (make-text-format-test.nested-message1 :int-field 2))
-           (msg (make-text-format-test
+    (let* ((nested (pb:make-text-format-test.nested-message1 :int-field 2))
+           (msg (pb:make-text-format-test
                  :int-field 100
                  :sint-field -1
                  :uint-field 1
@@ -121,15 +121,15 @@ the result is PROTO-EQUAL with MSG."
                  :bool-field t
                  :int64-field 12
                  :sint64-field -1)))
-      (setf (text-format-test.map-field-gethash 1 msg) "one")
-      (setf (text-format-test.map-field-gethash 2 msg) "two")
+      (setf (pb:text-format-test.map-field-gethash 1 msg) "one")
+      (setf (pb:text-format-test.map-field-gethash 2 msg) "two")
       (json-roundtrip msg))))
 
 
 (deftest any-roundtrip (json-suite)
-  (let* ((nested (make-text-format-test.nested-message1 :int-field 2))
-         (msg (make-text-format-test :int-field 100 :float-field 1.5 :one-level-nesting nested))
-         (any (cl-protobufs.well-known-types:pack-any msg)))
+  (let* ((nested (pb:make-text-format-test.nested-message1 :int-field 2))
+         (msg (pb:make-text-format-test :int-field 100 :float-field 1.5 :one-level-nesting nested))
+         (any (wkt:pack-any msg)))
     (json-roundtrip any)))
 
 (deftest timestamp-rountrip (json-suite)
@@ -144,8 +144,7 @@ the result is PROTO-EQUAL with MSG."
     (json-roundtrip neg-dur)))
   
 (deftest fieldmask-roundtrip (json-suite)
-  (let* ((field-mask (google:make-field-mask
-                      :paths '("user.display_name" "photo"))))
+  (let* ((field-mask (google:make-field-mask :paths '("user.display_name" "photo"))))
     (json-roundtrip field-mask)))
 
 (deftest wrapper-roundtrip (json-suite)
@@ -172,8 +171,8 @@ the result is PROTO-EQUAL with MSG."
 
 ;; This tests the JSON parser/printer handling any messages that contain packed well known types.
 (deftest special-json-nested (json-suite)
-  (let* ((nested (make-text-format-test.nested-message1 :int-field 2))
-         (msg (make-text-format-test :int-field 100 :float-field 1.5 :one-level-nesting nested))
+  (let* ((nested (pb:make-text-format-test.nested-message1 :int-field 2))
+         (msg (pb:make-text-format-test :int-field 100 :float-field 1.5 :one-level-nesting nested))
          (timestamp (google:make-timestamp :seconds 1598289366 :nanos 4000))
          (pos-dur (google:make-duration :seconds 86400 :nanos 20))
          (double-wrap (google:make-double-value :value 12.3d0))
@@ -185,9 +184,9 @@ the result is PROTO-EQUAL with MSG."
                                            :initial-contents '(3 5 7 112 81))))
          (int32-wrap (google:make-int32-value :value -200)))
     (flet ((roundtrip-with-any (msg)
-             (json-roundtrip (cl-protobufs.well-known-types:pack-any msg))))
+             (json-roundtrip (wkt:pack-any msg))))
       ;; Test the an any inside of an any
-      (roundtrip-with-any (cl-protobufs.well-known-types:pack-any msg))
+      (roundtrip-with-any (wkt:pack-any msg))
       (roundtrip-with-any timestamp)
       (roundtrip-with-any pos-dur)
       (roundtrip-with-any float-wrap)
@@ -208,10 +207,10 @@ the result is PROTO-EQUAL with MSG."
 ;; Verify that seeing 'null' in text has the right behavior for any messages.
 (deftest any-null-test (json-suite)
   (let* ((parsed-msg (with-input-from-string (s *any-with-null*)
-                       (parse-json 'google:any :stream s)))
-         (unpacked-msg (cl-protobufs.well-known-types:unpack-any parsed-msg)))
-    (assert-true (= (int-field unpacked-msg) 0))
-    (assert-true (string= (string-field unpacked-msg) "A string"))))
+                       (proto:parse-json 'google:any :stream s)))
+         (unpacked-msg (wkt:unpack-any parsed-msg)))
+    (assert-equal (pb:int-field unpacked-msg) 0)
+    (assert-equal (pb:string-field unpacked-msg) "A string")))
 
 (deftest wrapper-null-test (json-suite)
   (flet ((test-wrapper-type (type)

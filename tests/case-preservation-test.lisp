@@ -6,9 +6,8 @@
 
 (defpackage #:cl-protobufs.test.case-preservation
   (:use #:cl
-        #:clunit
-        #:cl-protobufs.protobuf-case-preservation-unittest
-        #:cl-protobufs)
+        #:clunit)
+  (:local-nicknames (#:pb #:cl-protobufs.protobuf-case-preservation-unittest))
   (:export :run))
 
 (in-package #:cl-protobufs.test.case-preservation)
@@ -20,13 +19,15 @@
   (cl-protobufs.test:run-suite 'case-preservation-suite))
 
 (deftest case-preservation-test (case-preservation-suite)
-  (let ((service (proto:find-service 'case-preservation "QUUXService")))
+  (let ((service (proto:find-service 'pb:case-preservation "QUUXService")))
     (assert-true service)
     ;; We're reaching into the implementation to verify the objects have
     ;; been properly constructed.
     (let ((method (proto-impl::find-method service "QUUXMethod")))
       (assert-true method)
-      (assert-true (string= (proto-impl::proto-input-name method)
-                            "protobuf_case_preservation_unittest.QUUXRequest"))
-      (assert-true (string= (proto-impl::proto-output-name method)
-                            "protobuf_case_preservation_unittest.QUUXResponse")))))
+      (assert-equal
+          (proto-impl::proto-input-name method)
+          "protobuf_case_preservation_unittest.QUUXRequest")
+      (assert-equal
+          (proto-impl::proto-output-name method)
+          "protobuf_case_preservation_unittest.QUUXResponse"))))

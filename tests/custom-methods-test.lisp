@@ -25,12 +25,12 @@
 
 (defpackage #:cl-protobufs.test.custom-proto
   (:use #:cl
-        #:clunit
-        #:cl-protobufs
-        #:cl-protobufs.custom-proto)
+        #:clunit)
+  (:local-nicknames (#:pb #:cl-protobufs.custom-proto))
   (:export :run))
 
 (in-package #:cl-protobufs.test.custom-proto)
+
 
 (defsuite custom-proto-suite (cl-protobufs.test:root-suite))
 
@@ -38,11 +38,12 @@
   "Run all tests in the test suite."
   (cl-protobufs.test:run-suite 'custom-proto-suite))
 
+
 ;; Helper to ensure the deserializer reconstructs this slot
-(defmethod initialize-instance :after ((self submessage) &rest initargs)
+(defmethod initialize-instance :after ((self pb:submessage) &rest initargs)
   (declare (ignore initargs))
-  (unless (slot-boundp self 'cl-protobufs.custom-proto::%fancything)
-    (setf (slot-value self 'cl-protobufs.custom-proto::%fancything) "-unset-")))
+  (unless (slot-boundp self 'pb::%fancything)
+    (setf (slot-value self 'pb::%fancything) "-unset-")))
 
 (declaim (type fixnum *callcount-serialize*))
 (defvar *callcount-serialize* 0
@@ -54,27 +55,26 @@
    BUF: The buffer to serialize to.
    SIZE: Auxiliary variable to increment."
   (declare (optimize (speed 3) (safety 0) (debug 0)))
-  (declare (type submessage obj)
+  (declare (type pb:submessage obj)
            (type fixnum size))
   ;; as a double-check that this was called.
   (incf *callcount-serialize*)
-  (let ((val (slot-value obj 'cl-protobufs.custom-proto::%code)))
+  (let ((val (slot-value obj 'pb::%code)))
     (when val
-        (proto-impl::iincf
-         size (proto-impl::serialize-scalar val :string 10 buf))))
+      (proto-impl::iincf size (proto-impl::serialize-scalar val :string 10 buf))))
   ;; skip the FANCYTHING slot
-  (let ((val (slot-value obj 'cl-protobufs.custom-proto::%othercode)))
+  (let ((val (slot-value obj 'pb::%othercode)))
     (when val
       (proto-impl::iincf
        size (proto-impl::serialize-scalar val :string 26 buf))))
   size)
 
 #+sbcl
-(defun (:protobuf :serialize submessage) (obj buf)
+(defun (:protobuf :serialize pb:submessage) (obj buf)
   (internal-serialize-submessage obj buf))
 
 #-sbcl
-(setf (get 'submessage :serialize)
+(setf (get 'pb:submessage :serialize)
       (lambda (obj buf)
         (internal-serialize-submessage obj buf)))
 
@@ -96,7 +96,7 @@
             (values 0 index)))
       (when (proto-impl::i= proto-impl::tag endtag)
         (return-from internal-deserialize-submessage
-          (values (make-submessage
+          (values (pb:make-submessage
                    :code code
                    :fancything (format nil "Reconstructed[~A,~A]" code othercode)
                    :othercode othercode)
@@ -111,56 +111,51 @@
                                 buffer index proto-impl::tag)))))))
 
 #+sbcl
-(defun (:protobuf :deserialize submessage)
+(defun (:protobuf :deserialize pb:submessage)
     (buffer index limit &optional (endtag 0))
-  (internal-deserialize-submessage
-   buffer index limit endtag))
+  (internal-deserialize-submessage buffer index limit endtag))
 
 #-sbcl
-(setf (get 'submessage :deserialize)
+(setf (get 'pb:submessage :deserialize)
       (lambda (buffer index limit
                &optional (endtag 0))
-        (internal-deserialize-submessage
-         buffer index limit endtag)))
+        (internal-deserialize-submessage buffer index limit endtag)))
 
 (defparameter *sending-test*
-  (make-example-parent
+  (pb:make-example-parent
    :code 47
    :name "fruitbat"
-   :submessage (make-submessage :code "feeps"
-                                :othercode "B"
-                                :fancything "do-not-send-me"))
+   :submessage (pb:make-submessage :code "feeps"
+                                   :othercode "B"
+                                   :fancything "do-not-send-me"))
   "Protobuf message used to test custom sending.")
 
 (defparameter *expect*
-  (make-example-parent
+  (pb:make-example-parent
    :code 47
    :name "fruitbat"
-   :submessage (make-submessage :code "feeps"
-                                :othercode "B"
-                                :fancything "Reconstructed[feeps,B]"))
+   :submessage (pb:make-submessage :code "feeps"
+                                   :othercode "B"
+                                   :fancything "Reconstructed[feeps,B]"))
   "Protobuf message used to test outcome of custom sending.")
 
 (deftest test-custom-method (custom-proto-suite)
-  (let ((octets (serialize-object-to-bytes *sending-test*)))
+  (let ((octets (proto:serialize-object-to-bytes *sending-test*)))
     ;; assert that the outer method's generic serializer called the custom inner serializer
-    (assert (plusp *callcount-serialize*))
+    (assert-true (plusp *callcount-serialize*))
     ;; now assert that decoding works as expected
-    (assert (equalp (deserialize-object-from-bytes 'example-parent octets)
-                    *expect*)))
+    (assert-equalp *expect* (proto:deserialize-object-from-bytes 'pb:example-parent octets)))
 
   ;; Produce the standard fast deserialization code for messages of kind EXAMPLE-PARENT.
-  (proto-impl::generate-deserializer (proto-impl::find-message 'example-parent))
+  (proto-impl::generate-deserializer (proto:find-message 'pb:example-parent))
 
   ;; Run the test again
-  (let ((octets (serialize-object-to-bytes *sending-test*)))
-    (assert (equalp (deserialize-object-from-bytes 'example-parent octets)
-                    *expect*)))
+  (let ((octets (proto:serialize-object-to-bytes *sending-test*)))
+    (assert-equalp *expect* (proto:deserialize-object-from-bytes 'pb:example-parent octets)))
 
   ;; Produce the standard fast serialization code for messages of kind EXAMPLE-PARENT.
-  (proto-impl::generate-serializer (proto-impl::find-message 'example-parent))
+  (proto-impl::generate-serializer (proto:find-message 'pb:example-parent))
 
   ;; Run the test again
-  (let ((octets (serialize-object-to-bytes *sending-test*)))
-    (assert (equalp (deserialize-object-from-bytes 'example-parent octets)
-                    *expect*))))
+  (let ((octets (proto:serialize-object-to-bytes *sending-test*)))
+    (assert-equalp *expect* (proto:deserialize-object-from-bytes 'pb:example-parent octets))))

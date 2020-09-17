@@ -210,13 +210,13 @@
     :serial t
     :pathname ""
     :components ((:protobuf-source-file "custom-proto")
-                 (:file "custom-methods")))
+                 (:file "custom-methods-test")))
 
-   (:module "deserialize-object-to-bytes-test"
+   (:module "deserialize-test"
     :serial t
     :pathname ""
     :depends-on ("lisp-alias")
-    :components ((:file "deserialize-object-to-bytes-test")))
+    :components ((:file "deserialize-test")))
 
    (:module "enum-mapping-test"
     :serial t

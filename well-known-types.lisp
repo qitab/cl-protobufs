@@ -44,23 +44,20 @@
 ;;;
 
 (defun resolve-type-url (type-url)
-  "Given a string TYPE-URL, find and return the lisp type that it names. If no
+  "Given a string TYPE-URL, find and return the Lisp type that it names. If no
 message is found, signal an error."
-  (assert (find #\/  type-url :from-end t) ()
+  (assert (find #\/ type-url :from-end t) ()
           "Could not find / inside of type-url.")
-  (let* ((type-part-of-url
-           (subseq type-url (1+ (position #\/ type-url :from-end t))))
-         (type
-           (proto-impl::find-message-by-qualified-name
-            type-part-of-url)))
+  (let* ((type-part-of-url (subseq type-url (1+ (position #\/ type-url :from-end t))))
+         (type (proto-impl::find-message-by-qualified-name type-part-of-url)))
     (assert type ()
             "Could not find class for type: ~S." type-part-of-url)
     type))
 
 (defun unpack-any (any-message)
-  "Given an Any message unpack retrieve the stored proto message.
-Parameters:
-  ANY-MESSAGE: The message to unpack."
+  "Given an Any message decode the contained message and return it.
+  Parameters:
+   ANY-MESSAGE: The message to unpack."
   (let ((type (resolve-type-url (cl-protobufs.google.protobuf:any.type-url any-message)))
         (value (cl-protobufs.google.protobuf:any.value any-message)))
     (deserialize-object-from-bytes type value)))
@@ -70,8 +67,10 @@ Parameters:
 Parameters:
   MESSAGE: The messag to pack.
   BASE-URL: The base part of the URL without the final '/'."
-  (let* ((m (proto-impl::find-message (type-of message))))
+  (let* ((m (proto:find-message (type-of message))))
     (cl-protobufs.google.protobuf:make-any
+     ;; This should either use a URL library or manually deal with the trailing
+     ;; slash correctly.
      :type-url (proto-impl::strcat base-url
                                    "/"
                                    (proto-impl::proto-qualified-name m))
