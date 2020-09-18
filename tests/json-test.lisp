@@ -142,7 +142,7 @@ the result is PROTO-EQUAL with MSG."
          (neg-dur (google:make-duration :seconds -86400 :nanos -20)))
     (json-roundtrip pos-dur)
     (json-roundtrip neg-dur)))
-  
+
 (deftest fieldmask-roundtrip (json-suite)
   (let* ((field-mask (google:make-field-mask :paths '("user.display_name" "photo"))))
     (json-roundtrip field-mask)))

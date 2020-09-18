@@ -19,9 +19,8 @@ Parameters:
   NAME: A string, symbol, or pathname."
   (values (gethash name *all-schemas*)))
 
-;; Type for structure messages.
-(defstruct base-message
-  "Base structure that all protobuf message structs inherit from."
+(defstruct message
+  "All protobuf message objects are of this type."
   ;; %%skipped-bytes will contain all of the bytes we couldn't
   ;; identify when we tried to deserialize a proto but will
   ;; add to the serialized bytes for the proto if we serialize it.

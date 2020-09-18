@@ -99,13 +99,15 @@
 
 ;; Serialize the object using the given protobuf type
 
-(defun-inline emit-skipped-bytes (object buffer)
-  "Add the bytes in the protobuf OBJECT base-message skipped-bytes slot
-to the BUFFER. Returns the number of bytes added to BUFFER."
+(defun-inline emit-skipped-bytes (msg buffer)
+  "If MSG has any bytes that were 'skipped' when it was deserialized (i.e.,
+   because it had unrecognized fields) output them to BUFFER. This effectively
+   passes them through to downstream consumers. Returns the number of bytes
+   added to BUFFER."
   (declare (buffer buffer))
-  (if (and (base-message-p object)
-           (base-message-%%skipped-bytes object))
-      (let ((skipped-bytes (base-message-%%skipped-bytes object)))
+  (if (and (message-p msg)
+           (message-%%skipped-bytes msg))
+      (let ((skipped-bytes (message-%%skipped-bytes msg)))
         (buffer-ensure-space buffer (length skipped-bytes))
         (fast-octets-out buffer skipped-bytes))
       0))
@@ -667,7 +669,7 @@ Parameters:
                 for offset in offset-list do
                   (setf (bit is-set offset) 1))
           (when skipped-bytes-tuple
-            (setf (base-message-%%skipped-bytes new-struct)
+            (setf (message-%%skipped-bytes new-struct)
                   (make-skipped-byte-vector skipped-bytes-tuple buffer)))
           (return-from deserialize-structure-object
             (values new-struct index))))
@@ -1436,8 +1438,8 @@ Parameters:
                                                          ,conversion)
                                                     conversion))))))
                          (when (and ,skipped-bytes-tuple
-                                    (base-message-p struct))
-                           (setf (base-message-%%skipped-bytes struct)
+                                    (message-p struct))
+                           (setf (message-%%skipped-bytes struct)
                                  (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf)))
                          struct)
                        ,vidx)))
@@ -1455,10 +1457,10 @@ Parameters:
   "Creates an instance of TYPE with BUFFER used as the pre-computed proto
    serialization bytes to return when deserializing.  Useful for passing an
    object through without ever needing to deserialize it."
-  (let* ((message (find-message type))
-         (message-name (or (proto-alias-for message) (proto-class message)))
-         (object  #+sbcl (make-instance message-name)
-                  #-sbcl (funcall (get-constructor-name message-name))))
+  (let* ((desc (find-message type))
+         (message-name (or (proto-alias-for desc) (proto-class desc)))
+         (object #+sbcl (make-instance message-name)
+                 #-sbcl (funcall (get-constructor-name message-name))))
     (setf (proto-%bytes object) buffer)
     object))
 

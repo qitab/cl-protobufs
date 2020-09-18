@@ -6,9 +6,8 @@
 
 (defpackage #:cl-protobufs.test.text-format
   (:use #:cl
-        #:clunit
-        #:cl-protobufs.test-proto
-        #:cl-protobufs)
+        #:clunit)
+  (:local-nicknames (#:test-pb #:cl-protobufs.test-proto))
   (:export :run))
 
 (in-package :cl-protobufs.test.text-format)
@@ -41,53 +40,51 @@
 ")
 
 (deftest test-parse-text-format (text-format-suite)
-  (let ((msg-parse (proto:parse-text-format
-                    'cl-protobufs.test-proto:text-format-test
-                    :stream (make-string-input-stream *text-format-msg*))))
-    (assert-true (eql 100 (cl-protobufs.test-proto:int-field msg-parse)))
-    (assert-true (eql -1 (cl-protobufs.test-proto:sint-field msg-parse)))
-    (assert-true (eql 1 (cl-protobufs.test-proto:uint-field msg-parse)))
-    (assert-true (eql 1.5 (cl-protobufs.test-proto:float-field msg-parse)))
-    (assert-true (eql 1.5d0 (cl-protobufs.test-proto:double-field msg-parse)))
-    (assert-true (string-equal "A string" (cl-protobufs.test-proto:string-field msg-parse)))
-    (assert-true (equal '("First" "Second")  (cl-protobufs.test-proto:string-fields msg-parse)))
-    (assert-true (equal '(:NONE :TWENTY-ONE) (cl-protobufs.test-proto:enum-vals msg-parse)))
-    (assert-true (equal 2 (cl-protobufs.test-proto:int-field
-                           (cl-protobufs.test-proto:two-level-nesting msg-parse))))
-    (assert-true (string= (text-format-test.map-field-gethash 1 msg-parse) "one"))
-    (assert-true (string= (text-format-test.map-field-gethash 2 msg-parse) "two"))
-    (assert-true (eql 5 (cl-protobufs.test-proto:oneof-int-field msg-parse)))))
+  (let ((msg (proto:parse-text-format 'test-pb:text-format-test
+                                      :stream (make-string-input-stream *text-format-msg*))))
+    (assert-true (eql 100 (test-pb:int-field msg)))
+    (assert-true (eql -1 (test-pb:sint-field msg)))
+    (assert-true (eql 1 (test-pb:uint-field msg)))
+    (assert-true (eql 1.5 (test-pb:float-field msg)))
+    (assert-true (eql 1.5d0 (test-pb:double-field msg)))
+    (assert-true (string-equal "A string" (test-pb:string-field msg)))
+    (assert-true (equal '("First" "Second")  (test-pb:string-fields msg)))
+    (assert-true (equal '(:NONE :TWENTY-ONE) (test-pb:enum-vals msg)))
+    (assert-true (equal 2 (test-pb:int-field (test-pb:two-level-nesting msg))))
+    (assert-true (string= (test-pb:text-format-test.map-field-gethash 1 msg) "one"))
+    (assert-true (string= (test-pb:text-format-test.map-field-gethash 2 msg) "two"))
+    (assert-true (eql 5 (test-pb:oneof-int-field msg)))))
 
 ; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-text-format (text-format-suite)
-  (let* ((nested (make-text-format-test.nested-message1 :int-field 2))
-         (msg (make-text-format-test :int-field 100
-                                     :sint-field -1
-                                     :uint-field 1
-                                     :float-field 1.5
-                                     :double-field 1.5d0
-                                     :string-field "A string"
-                                     :string-fields (list "First" "Second")
-                                     :enum-vals (list :none :twenty-one)
-                                     :one-level-nesting nested
-                                     :oneof-int-field 5))
+  (let* ((nested (test-pb:make-text-format-test.nested-message1 :int-field 2))
+         (msg (test-pb:make-text-format-test :int-field 100
+                                             :sint-field -1
+                                             :uint-field 1
+                                             :float-field 1.5
+                                             :double-field 1.5d0
+                                             :string-field "A string"
+                                             :string-fields (list "First" "Second")
+                                             :enum-vals (list :none :twenty-one)
+                                             :one-level-nesting nested
+                                             :oneof-int-field 5))
          (out-stream (make-string-output-stream)))
-    (setf (text-format-test.map-field-gethash 1 msg) "one")
-    (setf (text-format-test.map-field-gethash 2 msg) "two")
-    (print-text-format msg :stream out-stream)
+    (setf (test-pb:text-format-test.map-field-gethash 1 msg) "one")
+    (setf (test-pb:text-format-test.map-field-gethash 2 msg) "two")
+    (proto:print-text-format msg :stream out-stream)
     (let* ((text (get-output-stream-string out-stream))
-           (msg-parse (proto:parse-text-format 'cl-protobufs.test-proto:text-format-test
+           (msg-parse (proto:parse-text-format 'test-pb:text-format-test
                                                :stream (make-string-input-stream text))))
       (assert-true (proto:proto-equal msg-parse msg)))))
 
 (deftest test-parse-text-format-nested-symbol-names (text-format-suite)
-  (assert-true (find-message 'cl-protobufs.test-proto:text-format-test))
+  (assert-true (proto:find-message 'test-pb:text-format-test))
   ;; TODO(dlroxe) should expect nested name, not top-level name
-  (assert-true (find-message 'text-format-test.nested-message1))
-  ;; (assert-true (find-message 'cl-protobufs.test-proto:text-format-test.nested-message1))
+  (assert-true (proto:find-message 'test-pb:text-format-test.nested-message1))
+  ;; (assert-true (proto:find-message 'test-pb:text-format-test.nested-message1))
 
   ;; TODO(dlroxe) should assert-true nested name, not top-level name
-  (assert-true (find-message 'text-format-test.nested-message1.nested-message2))
-  ;; (assert-true (find-message
-  ;;               'cl-protobufs.test-proto:text-format-test.nested-message1.nested-message2))
+  (assert-true (proto:find-message 'test-pb:text-format-test.nested-message1.nested-message2))
+  ;; (assert-true (proto:find-message
+  ;;               'test-pb:text-format-test.nested-message1.nested-message2))
   T)

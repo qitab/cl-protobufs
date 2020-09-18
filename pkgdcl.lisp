@@ -13,6 +13,9 @@
   (:use)
 
   (:export
+   ;; Base type for all message instances.
+   #:message
+
    ;; Message field types and related definitions.
    #:int32
    #:int64
@@ -28,9 +31,6 @@
    #:vector-of
    #:byte-vector
    #:make-byte-vector
-
-   ;; Base class for all message instances.
-   #:base-message
 
    ;; Descriptor types
    #:extension-descriptor

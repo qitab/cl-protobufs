@@ -556,7 +556,7 @@ depending on which transport mechanism (HTTP, TCP, IPC, etc) is being used. The
 This section documents the symbols exported from the `cl-protobufs` package.
 
 ```lisp
-(defstruct base-message ...)
+(defstruct message ...)
 ```
 
 The base type from which every generated protobuf message inherits.

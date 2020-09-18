@@ -1057,7 +1057,7 @@ function) then there is no guarantee on the serialize function working properly.
          ;; DEFSTRUCT form.
          (declaim (inline ,hidden-constructor-name))
          (defstruct (,proto-type (:constructor ,hidden-constructor-name)
-                                 (:include base-message)
+                                 (:include message)
                                  ;; Yet more class->struct code we have to add,
                                  ;; todo(jgodbout):delete asap
                                  (:predicate nil))
@@ -1135,7 +1135,7 @@ function) then there is no guarantee on the serialize function working properly.
 
          (export '(,public-constructor-name ,is-set-name))
          (defmethod clear ((,obj ,proto-type))
-           (setf (base-message-%%skipped-bytes ,obj) nil)
+           (setf (message-%%skipped-bytes ,obj) nil)
            ,@(mapcan (lambda (name)
                        (let ((clear-name (fintern "~A.CLEAR-~A" proto-type name)))
                          `((,clear-name ,obj))))
