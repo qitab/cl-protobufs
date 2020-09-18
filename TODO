@@ -12,11 +12,6 @@ TO DO
 [  - 'find-message' and 'find-enum' need to search namespaces			]
 [     if the quick compare against the name/class fails				]
 
-- Get 'merge-from-message' fully working
-  - See the place in 'deserialize-object' that needs to merge, too
-  - Maybe this isn't so useful in Lisp, where I'd prefer to encourage
-    a more function style
-
 - Lose 'proto-class', replace it with 'proto-type';
     its type is (or null symbol)
   'proto-type' should always be the name from the Lisp side

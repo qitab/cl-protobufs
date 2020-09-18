@@ -103,8 +103,6 @@
    #:has-field
    #:proto-slot-value
    #:encoded-field
-   #:merge-from-array
-   #:merge-from-message
 
    ;; Generic functions to convert between numerals and keywords.
    #:numeral->enum

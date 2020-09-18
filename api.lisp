@@ -199,39 +199,3 @@ For repeated fields, returns a list of the encoded values, which may be NILs.")
         (if (eq (proto-label field) :repeated)
             (map 'list #'proto-%bytes value)
             (proto-%bytes value))))))
-
-(defgeneric merge-from-array (object buffer &optional start end)
-  (:documentation
-   "Deserialize the object encoded in 'buffer' and merge it into 'object'.
-    Deserialization starts at the index 'start' and ends at 'end'.
-    'object' must an object whose Lisp class corresponds to the message
-    being deserialized.
-    The return value is the updated object.")
-  (:method ((object standard-object) buffer &optional (start 0) (end (length buffer)))
-    (let* ((class   (type-of object))
-           (message (find-message class))
-           (type    (and message (proto-class message))))
-      (assert message ()
-              "There is no Protobufs message for the class ~S" class)
-      (let* ((start  (or start 0))
-             (end    (or end (length buffer))))
-        (merge-from-message object (deserialize-object type buffer start end))))))
-
-(defgeneric merge-from-message (object source)
-  (:documentation
-   "Merge the fields from the source object 'source' into 'object'.
-    The two objects must be of the same type.
-    Singular fields will be overwritten, with embedded messages being be merged.
-    Repeated fields will be concatenated.
-    The return value is the updated object 'object'.")
-  (:method ((object standard-object) (source standard-object))
-    (let* ((class   (type-of object))
-           (message (find-message class))
-           (type    (and message (proto-class message))))
-      (assert message ()
-              "There is no Protobufs message for the class ~S" class)
-      (assert (eq class (type-of source)) ()
-              "The objects ~S and ~S are of not of the same class" object source)
-      ;;--- Do this (should return side-effected 'object', not 'source')
-      type
-      source)))
