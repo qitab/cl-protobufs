@@ -434,6 +434,71 @@ returns true.
 
 This will clear all fields inside of the oneof `age-oneof`.
 
+### Repeated Fields
+
+We use the following protocol buffer message as an example
+in this section:
+
+```protocol-buffer
+message RepeatedProto {
+  repeated integer my_int_list = 1;
+  repeated integer my_int_vector = 1 [(lisp_container) = VECTOR];
+}
+```
+
+This creates a message with two fields.
+The field `my_int_list` stores a list of integers.
+The default value is the empty list, i.e. `nil`.
+The field `my_int_vector` stores a vector of integers.
+The default value is an empty vector which is extendable with a fill pointer.
+
+The APIs for the list and vector repeated fields are the same.
+There is a minor difference when pushing onto the different types of repeated field.
+
+```lisp
+(repeated-proto.push-my-int-list 1 my-message)
+```
+
+This pushes the integer 1 onto the `my_int_list` field in the `RepeatedProto`.
+Since we push onto a list this will push into the front of the list.
+
+```lisp
+(repeated-proto.push-my-int-vector 1 my-message)
+```
+
+This pushes the integer `1` onto the `my_int_vector` field in the `RepeatedProto`.
+Since we push onto a vector this will push into the back of the vector.
+
+```lisp
+(repeated-proto.has-my-int-list my-message)
+(repeated-proto.has-my-int-vector my-message)
+```
+
+The `has-*` functions on a repeated field return true if there
+are no elements in the sequence.
+
+```lisp
+(repeated-proto.length-of-my-int-list my-message)
+(repeated-proto.length-of-my-int-vector my-message)
+```
+
+The `length-of-*` function returns the number of elements in the repeated field.
+
+```lisp
+(repeated-proto.nth-my-int-list n my-message)
+(repeated-proto.nth-my-int-vector n my-message)
+```
+
+This returns the element at position `n` in the repeated field.
+If the repeated field has length less then `n` we signal an error.
+
+```lisp
+(repeated-proto.clear-my-int-list my-message)
+(repeated-proto.clear-my-int-vector my-message)
+```
+
+This clears the repeated field of all elements.
+
 ### Options
 
 TODO
