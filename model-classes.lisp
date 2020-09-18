@@ -275,6 +275,8 @@ message-descriptor.")
 (defstruct enum-value-descriptor
   "The model class that represents a protobuf enum key/value pair."
   ;; The keyword symbol corresponding to the enum value key.
+  ;; Note that the API uses "keyword-to-int" and "int-to-keyword".
+  ;; Let's make this match that at some point.
   (name nil :type keyword)
   (value nil :type sfixed32))
 

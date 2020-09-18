@@ -32,6 +32,12 @@
    #:byte-vector
    #:make-byte-vector
 
+   ;; Enumerations
+   #:enum-keywords
+   #:enum-ints
+   #:enum-int-to-keyword
+   #:enum-keyword-to-int
+
    ;; Descriptor types
    #:extension-descriptor
    #:field-descriptor
@@ -104,12 +110,7 @@
    #:proto-slot-value
    #:encoded-field
 
-   ;; Generic functions to convert between numerals and keywords.
-   #:numeral->enum
-   #:enum->numeral
-
    ;; Miscellany
-   #:enum-values
    #:find-option
    ))
 

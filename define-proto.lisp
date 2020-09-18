@@ -236,68 +236,54 @@ the oneof and its nested fields.
     (setf *current-file-descriptor* schema)
     (validate-imports schema imports)))
 
-(defun %make-enum->numeral-table (enum-values)
-  "Makes a hash table mapping enum values to numerals.
-ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs."
-  `(case enum
-     ,@(loop for v in enum-values
-             collect
-             `(,(enum-value-descriptor-name v) ,(enum-value-descriptor-value v)))))
-
-(defun %make-numeral->enum-table (enum-values)
-  "Makes a hash table mapping enum values to numerals.
-ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs."
-  `(case numeral
-     ,@(loop with mapped = (make-hash-table)
-             for v in enum-values
-             for enum-value = (enum-value-descriptor-value v)
-             for already-set-p = (gethash enum-value mapped)
-             unless already-set-p
-               do (setf (gethash enum-value mapped) t)
-             unless already-set-p
-               collect `(,enum-value ,(enum-value-descriptor-name v)))))
-
-(deftype numeral () "byte 32" '(signed-byte 32))
-
-(defgeneric cl-protobufs:numeral->enum (enum numeral &optional default)
+(defgeneric enum-int-to-keyword (enum-type integer &optional default)
   (:documentation
-   "Converts a NUMERAL to a corresponding ENUM keyword.
-ENUM is a Lisp symbol name of the ENUM.
-DEFAULT the default value if NUMERAL in not contained in the ENUM."))
+   "Converts INTEGER to the corresponding enum keyword.  If there are multiple
+keywords assigned to the same value (i.e., allow_alias = true in the enum
+source) then the first one is returned.  ENUM-TYPE is the enum type name.
+DEFAULT is the value to use if INTEGER is not contained in the enum."))
 
-(deftype quoted-symbol () "(quote sym)" '(cons (eql quote) (cons symbol)))
-
-(defgeneric cl-protobufs:enum->numeral (enum keyword &optional default)
+(defgeneric enum-keyword-to-int (enum-type keyword &optional default)
   (:documentation
-   "Converts an ENUM keyword to a corresponding ENUM KEYWORD.
-ENUM is a Lisp symbol name of the ENUM.
-DEFAULT the default value if KEYWORD is a not contained in ENUM."))
+   "Converts a KEYWORD to its corresponding integer value.  ENUM-TYPE is the
+enum-type name.  DEFAULT is the value to use if KEYWORD is a not contained in
+the enum."))
 
-(defun make-enum<->numeral-forms (type enum-values)
-  "Generates forms for enum<->numeral conversion functions.
-TYPE is the enum type name.  ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs."
-  (let ((enum->numeral (fintern "~A->NUMERAL" type))
-        (numeral->enum (fintern "NUMERAL->~A" type)))
+(defun make-enum-conversion-forms (type value-descriptors)
+  "Generates forms for enum <-> integer conversion functions. TYPE is the enum
+type name.  VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
+  (let ((key2int (fintern "~A-KEYWORD-TO-INT" type))
+        (int2key (fintern "~A-INT-TO-KEYWORD" type)))
     `(progn
-       (defun ,enum->numeral (enum &optional default)
-         (declare (symbol enum))
-         (let ((numeral ,(%make-enum->numeral-table enum-values)))
-           (if numeral numeral default)))
+       (defun ,key2int (enum &optional default)
+         (declare (type keyword enum))
+         (let ((int (case enum
+                      ,@(loop for desc in value-descriptors
+                              collect `(,(enum-value-descriptor-name desc)
+                                        ,(enum-value-descriptor-value desc))))))
+           (or int default)))
 
-       (defun ,numeral->enum (numeral &optional default)
-         (declare (numeral numeral))
-         (let ((enum ,(%make-numeral->enum-table enum-values)))
-           (if enum enum default)))
+       (defun ,int2key (numeral &optional default)
+         (declare (type int32 numeral))
+         (let ((key (case numeral
+                      ,@(loop with mapped = (make-hash-table)
+                              for desc in value-descriptors
+                              for int = (enum-value-descriptor-value desc)
+                              for already-set-p = (gethash int mapped)
+                              do (setf (gethash int mapped) t)
+                              unless already-set-p
+                                collect `(,int ,(enum-value-descriptor-name desc))))))
+           (or key default)))
 
-       (setf (get ',type 'numeral->enum) ',numeral->enum)
-       (setf (get ',type 'enum->numeral) ',enum->numeral)
+       (setf (get ',type 'enum-int-to-keyword) ',int2key)
+       (setf (get ',type 'enum-keyword-to-int) ',key2int)
 
-       (defmethod cl-protobufs:enum->numeral
+       (defmethod cl-protobufs:enum-keyword-to-int
            ((e (eql ',type)) keyword &optional default)
-         (,enum->numeral keyword default))
-       (defmethod cl-protobufs:numeral->enum
+         (,key2int keyword default))
+       (defmethod cl-protobufs:enum-int-to-keyword
            ((e (eql ',type)) numeral &optional default)
-         (,numeral->enum numeral default)))))
+         (,int2key numeral default)))))
 
 (defgeneric enum-default-value (enum-type)
   (:documentation
@@ -307,13 +293,6 @@ TYPE is the enum type name.  ENUM-VALUES is a list of ENUM-VALUE-DESCRIPTORs."
   "If no default enum value function can be found for a specific ENUM-TYPE
 return nil."
   nil)
-
-(defun make-enum-default (type enum-values)
-  "Generate a function to return the default enum value for
-an enum of type TYPE. The default value should be the first
-enum in ENUM-VALUES."
-  `(defmethod enum-default-value ((e (eql ',type)))
-     ,(enum-value-descriptor-name (car enum-values))))
 
 (defun make-enum-constant-forms (type enum-values)
   "Generates forms for defining a constant for each enum value in ENUM-VALUES.
@@ -333,8 +312,8 @@ message, and of +<value_name>+ when the enum is defined at top-level."
        ,@constants
        (export ',(mapcar #'second constants)))))
 
-(defun enum-values (enum-type)
-  "Returns all keyword values that belong to the given ENUM-TYPE."
+(defun enum-keywords (enum-type)
+  "Returns all keywords that belong to the given ENUM-TYPE."
   (let ((expansion (type-expand enum-type)))
     (check-type expansion (cons (eql member) list))
     (rest expansion)))
@@ -403,9 +382,11 @@ Parameters:
                (collect-form `(deftype ,type () ',alias-for)))
               ((null alias-for)
                (collect-form `(deftype ,type () '(member ,@names)))
-               (collect-form (make-enum<->numeral-forms type value-descriptors))
+               (collect-form (make-enum-conversion-forms type value-descriptors))
                (collect-form (make-enum-constant-forms type value-descriptors))
-               (collect-form (make-enum-default type value-descriptors))))
+               ;; The default value is the keyword associated with the first element.
+               (collect-form `(defmethod enum-default-value ((e (eql ',type)))
+                                ,(enum-value-descriptor-name (car value-descriptors))))))
         (collect-form `(record-protobuf-object ',type ,enum :enum))
         ;; Register it by the full symbol name.
         (record-protobuf-object type enum :enum))

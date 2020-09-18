@@ -159,7 +159,7 @@ Parameters:
   "Print an enum VALUE of type TYPE to STREAM. If NUMERIC-ENUMS-P, then print the enums value
 rather than its name."
   (if numeric-enums-p
-      (format stream "~D" (enum->numeral type value))
+      (format stream "~D" (enum-keyword-to-int type value))
       (format stream "\"~A\"" (pi::enum-name->proto value))))
 
 (defun print-map-to-json (value map-descriptor indent stream camel-case-p numeric-enums-p)

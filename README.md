@@ -298,18 +298,17 @@ Each enum value is represented by a keyword symbol which is mapped to/from its
 numeric equivalent during serialization and deserialization.
 
 ```lisp
-(defun day-of-week->numeral (name) ...)
+(defun day-of-week-to-int (name) ...)
 ```
 
-Convert a keyword symbol to its numeric value. Example:
-`(day-of-week->numeral :mon) => 1`
+Convert a keyword symbol to its numeric value. Example: `(day-of-week-to-int
+:mon) => 1`
 
 ```lisp
-(defun numeral->day-of-week (num) ...)
+(defun int-to-day-of-week (num) ...)
 ```
 
-Convert a number to its symbolic name. Example: `(numeral->day-of-week 1)
-=> :mon`
+Convert a number to its symbolic name. Example: `(int-to-day-of-week 1) => :MON`
 
 ```lisp
 (defconstant +mon+ 1)
@@ -335,8 +334,8 @@ these definitions:
 
 ```lisp
 (deftype schedule.day-of-week '(member :day-undefined :mon :tue :wed ...))
-(schedule.day-of-week->numeral :mon) => 1
-(numeral->schedule.day-of-week 1) => :MON
+(schedule.day-of-week-to-int :mon) => 1
+(int-to-schedule.day-of-week 1) => :MON
 (defconstant +schedule.day-undefined+ 0)  ; may not need the DAY_ prefix now.
 (defconstant +schedule.mon+ 1)
 ...
