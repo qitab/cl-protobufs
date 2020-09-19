@@ -93,8 +93,11 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     messages_[i]->AddPackages(&packages);
   }
 
-  printer->Print("\n#+sbcl (cl:declaim (cl:optimize (cl:debug 0)"
-                 " (sb-c:store-coverage-data 0)))\n");
+  printer->Print("\n#+sbcl\n"
+                 "(cl:progn\n (cl:eval-when (:compile-toplevel)"
+                 " (sb-ext:restrict-compiler-policy 'cl:debug 0 1))\n"
+                 " (cl:declaim (cl:optimize (sb-c:store-coverage-data 0))))\n");
+
   for (const std::string& package : packages) {
     printer->Print(
         "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
