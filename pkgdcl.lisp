@@ -34,7 +34,6 @@
 
    ;; Enumerations
    #:enum-keywords
-   #:enum-ints
    #:enum-int-to-keyword
    #:enum-keyword-to-int
 
