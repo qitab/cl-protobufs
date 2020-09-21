@@ -87,5 +87,8 @@
 
 (deftest find-message-for-alias (alias-suite)
   (assert-true (proto:find-message 'my.dog.has.fleas::aliased-struct))
+  ;; Known bug with ABCL
+  ;; https://github.com/armedbear/abcl/issues/287
+  #-abcl
   (assert-eq (proto:find-message 'pb:aliased-message)
              (proto:find-message 'my.dog.has.fleas::aliased-struct)))
