@@ -116,7 +116,7 @@
 (deftest test-object-initialized (quick-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol)))
     (assert-true (not (proto-impl::object-initialized-p
-                  p (find-message 'cl-protobufs.protobuf-unittest:test-protocol))))
+                       p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol))))
     (setf (cl-protobufs.protobuf-unittest:test-protocol.zero p) "a"
           (cl-protobufs.protobuf-unittest:test-protocol.one p) "b"
           (cl-protobufs.protobuf-unittest:test-protocol.fixed-value p) 0
@@ -125,12 +125,12 @@
 
     ;; Initialized all of the required fields on the object.
     (assert-true (proto-impl::object-initialized-p
-             p (find-message 'cl-protobufs.protobuf-unittest:test-protocol)))
+             p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)))
 
     ;; Cleared one of the required fields.
     (cl-protobufs.protobuf-unittest:test-protocol.clear-one p)
     (assert-true (not (proto-impl::object-initialized-p
-                  p (find-message 'cl-protobufs.protobuf-unittest:test-protocol))))
+                  p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol))))
 
     ;; Add the required field on the top lovel object back.
     (setf (cl-protobufs.protobuf-unittest:test-protocol.one p) "b")
@@ -143,17 +143,17 @@
       ;; the top level object isn't initialized if one of it's
       ;; sub-objects is un-initialized.
       (assert-true (not (proto-impl::object-initialized-p
-                    p (find-message 'cl-protobufs.protobuf-unittest:test-protocol))))
+                    p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol))))
 
       ;; Set thirteen
       (setf (cl-protobufs.protobuf-unittest:thirteen.fourteen thirteen) :enum-whatever)
       (assert-true (proto-impl::object-initialized-p
-               p (find-message 'cl-protobufs.protobuf-unittest:test-protocol)))
+               p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)))
 
       ;; Clear fourteen and make sure the object is again not initialized.
       (cl-protobufs.protobuf-unittest:thirteen.clear-fourteen thirteen)
       (assert-true (not (proto-impl::object-initialized-p
-                    p (find-message 'cl-protobufs.protobuf-unittest:test-protocol)))))))
+                    p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)))))))
 
 (deftest test-proto-equivalent-p (quick-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol))
@@ -229,21 +229,21 @@
 (deftest test-make-qualified-name (quick-suite)
   (assert-true
       (string= (proto-impl::make-qualified-name
-                (find-message 'cl-protobufs.protobuf-unittest:test-protocol)
+                (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)
                 "bbaz")
                "protobuf_unittest.TestProtocol.bbaz"))
   (assert-true
       (string= (proto-impl::make-qualified-name
-                (find-schema 'cl-protobufs.protobuf-unittest:testproto2)
+                (find-file-descriptor 'cl-protobufs.protobuf-unittest:testproto2)
                 "bbaz")
                "protobuf_unittest.bbaz")))
 
 
-;;; Some tests for the mechanism that maps a field number to its metaobject.
+;;; Some tests for the mechanism that maps a field number to its descriptor.
 ;;; The need for such is that in deserializing a structure using the generic path,
 ;;; we want to lookup the structure's initialization argument given the field number.
 ;;; The obvious-but-slow way to do that is
-;;;   (keywordify (proto-name (find-field msg-descriptor field-number)))
+;;;   (keywordify (proto-name (find-field-descriptor msg-descriptor field-number)))
 ;;; It would be really nice if, in general, FIND-FIELD would use other than linear scan,
 ;;; however tackling that was more than I was willing to undertake at present.
 

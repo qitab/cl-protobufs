@@ -147,14 +147,15 @@
     (assert-equalp *expect* (proto:deserialize-object-from-bytes 'pb:example-parent octets)))
 
   ;; Produce the standard fast deserialization code for messages of kind EXAMPLE-PARENT.
-  (proto-impl::generate-deserializer (proto:find-message 'pb:example-parent))
+  (proto-impl::generate-deserializer
+   (proto:find-message-descriptor 'pb:example-parent))
 
   ;; Run the test again
   (let ((octets (proto:serialize-object-to-bytes *sending-test*)))
     (assert-equalp *expect* (proto:deserialize-object-from-bytes 'pb:example-parent octets)))
 
   ;; Produce the standard fast serialization code for messages of kind EXAMPLE-PARENT.
-  (proto-impl::generate-serializer (proto:find-message 'pb:example-parent))
+  (proto-impl::generate-serializer (proto:find-message-descriptor 'pb:example-parent))
 
   ;; Run the test again
   (let ((octets (proto:serialize-object-to-bytes *sending-test*)))

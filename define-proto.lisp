@@ -36,8 +36,8 @@ The lisp generated proto file should look like:
              :label (:optional) :typename "Metadata1"))
 
 (cl:setf (cl:gethash #P"third_party/lisp/cl_protobufs/tests/serialization.proto"
-                     proto-impl::*all-schemas*)
-         (proto:find-schema 'serialization-test))
+                     proto-impl::*file-descriptors*)
+         (proto:find-file-descriptor 'serialization-test))
 
 (export ...)
 -------------------------------
@@ -188,7 +188,7 @@ the oneof and its nested fields.
    already been loaded. FILE-DESCRIPTOR is the descriptor of the
    file doing the importing."
   (dolist (import (reverse imports))
-    (let* ((imported (proto:find-schema (if (stringp import) (pathname import) import))))
+    (let* ((imported (proto:find-file-descriptor (if (stringp import) (pathname import) import))))
       (unless imported
         (error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
@@ -214,27 +214,27 @@ the oneof and its nested fields.
                                    val))
                     "optimize_for"))
          (imports  (if (listp import) import (list import)))
-         (schema   (make-instance
-                    'file-descriptor
-                    :class    type
-                    :name     name
-                    ;; CCL requires syntax to be OR'd  with :proto2 or :proto3
-                    ;; in case syntax is NIL.
-                    :syntax   (or syntax :proto2 :proto3)
-                    :package  package
-                    :imports  imports
-                    :options  (if optimize
-                                  (append options
-                                          (list (make-option
-                                                 "optimize_for"
-                                                 (if (eq optimize :speed)
-                                                     "SPEED"
-                                                     "CODE_SIZE")
-                                                 'symbol)))
-                                  options))))
-    (record-schema schema)
-    (setf *current-file-descriptor* schema)
-    (validate-imports schema imports)))
+         (descriptor (make-instance
+                      'file-descriptor
+                      :class    type
+                      :name     name
+                      ;; CCL requires syntax to be OR'd  with :proto2 or :proto3
+                      ;; in case syntax is NIL.
+                      :syntax   (or syntax :proto2 :proto3)
+                      :package  package
+                      :imports  imports
+                      :options  (if optimize
+                                    (append options
+                                            (list (make-option
+                                                   "optimize_for"
+                                                   (if (eq optimize :speed)
+                                                       "SPEED"
+                                                       "CODE_SIZE")
+                                                   'symbol)))
+                                    options))))
+    (record-file-descriptor descriptor)
+    (setf *current-file-descriptor* descriptor)
+    (validate-imports descriptor imports)))
 
 (defgeneric enum-int-to-keyword (enum-type integer &optional default)
   (:documentation
@@ -1225,10 +1225,8 @@ function) then there is no guarantee on the serialize function working properly.
              (if (proto-lazy-p field)
                  (collect-lazy-field field)
                  (collect-non-lazy-field field))
-             (assert (not (find-field msg-desc (proto-index field))) ()
+             (assert (not (find-field-descriptor msg-desc (proto-index field))) ()
                      "The field ~S overlaps with another field in ~S"
-                     ;; TODO(cgay): this should probably refer to the external field name but I'll
-                     ;; wait since I've no idea if that slot is bound at this point.
                      (proto-internal-field-name field) (proto-class msg-desc))
              (when slot
                (collect-slot slot))
@@ -1310,10 +1308,10 @@ function) then there is no guarantee on the serialize function working properly.
 (defmacro define-extend (type (&key name conc-name options) &body fields &environment env)
   "Define an extension to the message named TYPE. See define-message for descriptions of the
    NAME, CONC-NAME, OPTIONS, and FIELDS parameters."
-  (let* ((name    (or name (class-name->proto type)))
+  (let* ((name (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
-         (message   (find-message type))
+         (message (find-message-descriptor type))
          (conc-name (or (conc-name-for-type type conc-name)
                         (and message (proto-conc-name message))))
          (alias-for (and message (proto-alias-for message)))
@@ -1596,7 +1594,7 @@ function) then there is no guarantee on the serialize function working properly.
              (if (proto-lazy-p field)
                  (collect-lazy-field field)
                  (collect-non-lazy-field field))
-             (assert (not (find-field message (proto-index field))) ()
+             (assert (not (find-field-descriptor message (proto-index field))) ()
                      "The field ~S overlaps with another field in ~S"
                      (proto-internal-field-name field) (proto-class message))
              (when slot

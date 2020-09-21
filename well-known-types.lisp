@@ -67,7 +67,7 @@ message is found, signal an error."
 Parameters:
   MESSAGE: The messag to pack.
   BASE-URL: The base part of the URL without the final '/'."
-  (let* ((m (proto:find-message (type-of message))))
+  (let* ((m (proto:find-message-descriptor (type-of message))))
     (cl-protobufs.google.protobuf:make-any
      ;; This should either use a URL library or manually deal with the trailing
      ;; slash correctly.

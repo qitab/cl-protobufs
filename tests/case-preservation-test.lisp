@@ -12,18 +12,20 @@
 
 (in-package #:cl-protobufs.test.case-preservation)
 
+
 (defsuite case-preservation-suite (cl-protobufs.test:root-suite))
 
 (defun run ()
   "Run all tests in the test suite."
   (cl-protobufs.test:run-suite 'case-preservation-suite))
 
+
 (deftest case-preservation-test (case-preservation-suite)
-  (let ((service (proto:find-service 'pb:case-preservation "QUUXService")))
+  (let ((service (proto:find-service-descriptor 'pb:case-preservation "QUUXService")))
     (assert-true service)
     ;; We're reaching into the implementation to verify the objects have
     ;; been properly constructed.
-    (let ((method (proto-impl::find-method service "QUUXMethod")))
+    (let ((method (proto:find-method-descriptor service "QUUXMethod")))
       (assert-true method)
       (assert-equal
           (proto-impl::proto-input-name method)

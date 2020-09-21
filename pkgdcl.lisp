@@ -48,6 +48,17 @@
    #:enum-descriptor
    #:enum-value-descriptor
 
+   ;; Descriptor lookup
+   #:find-message-descriptor
+   #:find-file-descriptor
+   #:find-service-descriptor
+   #:find-enum-descriptor
+   #:find-map-descriptor
+   #:find-field-descriptor
+   #:find-method-descriptor
+
+   #:find-option                        ; finds an option, not a descriptor
+
    ;; Conditions
    #:undefined-field-type
    #:undefined-input-type
@@ -58,11 +69,6 @@
    #:error-type-name
    #:error-field
    #:error-method
-
-   ;; Object lookup
-   #:find-message
-   #:find-schema
-   #:find-service
 
    ;; Code generation
    #:define-schema
@@ -108,20 +114,14 @@
    #:has-field
    #:proto-slot-value
    #:encoded-field
-
-   ;; Miscellany
-   #:find-option
    ))
 
 (defpackage protobufs-implementation
   (:nicknames :proto-impl)
-  (:use :common-lisp :protobufs)
+  (:use :common-lisp :cl-protobufs)
 
   (:import-from :alexandria
                 #:define-constant)
-
-  (:shadow
-   #:find-method)
 
   ;; TODO(cgay): These are in use outside of cl-protobufs and should be removed or moved to the
   ;; interface package, as appropriate.
@@ -129,10 +129,6 @@
    #:encode-double
    #:encode-string
    #:encode-uint32
-   #:find-enum
-   #:find-map-descriptor
-   #:find-field
-   #:find-method
    #:make-deserializer
    #:make-serializer
    #:make-tag

@@ -93,7 +93,7 @@
             (b (make-octet-buffer 100)))
         (if fast-function
             (funcall (the function fast-function) object b)
-            (serialize-object object (find-message type) b))
+            (serialize-object object (find-message-descriptor type) b))
         (let ((compact-buf (compactify-blocks b)))
           (concatenate-blocks compact-buf)))))
 
@@ -185,9 +185,9 @@ Parameters:
              (doseq (v value)
                (iincf size (serialize-scalar v type tag buffer)))
              size))
-          ((setq desc (find-message type))
+          ((setq desc (find-message-descriptor type))
            (emit-repeated-message-field desc value type field-num buffer))
-          ((setq desc (find-enum type))
+          ((setq desc (find-enum-descriptor type))
            (if packed-p
                (serialize-packed-enum value (enum-descriptor-values desc) field-num buffer)
                (let ((tag (make-wire-tag $wire-type-varint field-num))
@@ -260,9 +260,9 @@ Parameters:
   (let (desc)
     (cond ((scalarp type)
            (serialize-scalar value type (make-tag type field-num) buffer))
-          ((setq desc (find-message type))
+          ((setq desc (find-message-descriptor type))
            (emit-non-repeated-message-field desc value type field-num buffer))
-          ((setq desc (find-enum type))
+          ((setq desc (find-enum-descriptor type))
            (serialize-enum value (enum-descriptor-values desc)
                            (make-wire-tag $wire-type-varint field-num)
                            buffer))
@@ -384,7 +384,7 @@ Parameters:
     The return values are the object and the index at which deserialization stopped."))
 
 (defmethod %deserialize-object (type buffer start end &optional (end-tag 0))
-  (let ((message (find-message type)))
+  (let ((message (find-message-descriptor type)))
     (assert message ()
             "There is no Protobuf message having the type ~S" type)
     (%deserialize-object message buffer start end end-tag)))
@@ -754,7 +754,7 @@ Parameters:
               (deserialize-scalar type buffer index)
               (values (if repeated-p (cons data (car cell)) data)
                       new-index)))))
-    (t (let ((enum (find-enum type)))
+    (t (let ((enum (find-enum-descriptor type)))
          (if enum
              (cond ((length-encoded-tag-p tag)
                     (multiple-value-bind (data new-index)
@@ -767,7 +767,7 @@ Parameters:
                                         buffer index)
                       (values (if repeated-p (cons data (car cell)) data)
                               new-index))))
-             (let ((submessage (find-message type)))
+             (let ((submessage (find-message-descriptor type)))
                (assert submessage)
                (let* ((deserializer (custom-deserializer type))
                       (group-p (i= (logand tag 7) $wire-type-start-group))
@@ -820,8 +820,8 @@ Parameters:
   (let ((vval (gensym "VAL"))
         (iterator (if vector-p 'dovector 'dolist))
         (msg (and class (not (scalarp class))
-                  (or (find-message class)
-                      (find-enum class)
+                  (or (find-message-descriptor class)
+                      (find-enum-descriptor class)
                       (find-map-descriptor class)))))
     (cond ((and packed-p (packed-type-p class))
            `(iincf ,size (serialize-packed ,reader ,class ,index ,vbuf ,vector-p)))
@@ -875,8 +875,8 @@ Parameters:
   (declare (type field-number field-num))
   (let ((vval (gensym "VAL"))
         (msg (and class (not (scalarp class))
-                  (or (find-message class)
-                      (find-enum class)
+                  (or (find-message-descriptor class)
+                      (find-enum-descriptor class)
                       (find-map-descriptor class)))))
     (cond ((scalarp class)
            (let ((tag (make-tag class field-num)))
@@ -973,8 +973,8 @@ Parameters:
        ;; TODO(shaunm): class is duplicated
        (let* ((class (proto-class field))
               (msg (and class (not (scalarp class))
-                        (or (find-message class)
-                            (find-enum class))))
+                        (or (find-message-descriptor class)
+                            (find-enum-descriptor class))))
               (field-name (proto-external-field-name field))
               (reader (when field-name
                         `(,(proto-slot-function-name
@@ -993,7 +993,7 @@ Parameters:
   "Create the serializer for a message.
 Parameters:
   MESSAGE-NAME: The symbol-name of a message."
-  (generate-serializer (find-message message-name)))
+  (generate-serializer (find-message-descriptor message-name)))
 
 (defun generate-serializer (message)
   (let ((vobj (make-symbol "OBJ"))
@@ -1126,8 +1126,8 @@ Parameters:
   VIDX: The index of the buffer to read from & to update.
   DEST: The symbol name for the destination of deserialized data."
   (let ((msg (and class (not (scalarp class))
-                  (or (find-message class)
-                      (find-enum class)
+                  (or (find-message-descriptor class)
+                      (find-enum-descriptor class)
                       (find-map-descriptor class)))))
     (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
              (call-pseudo-method :deserialize msg vbuf start end end-tag)))
@@ -1222,8 +1222,8 @@ Parameters:
   VIDX: The index of the buffer to read from & to update.
   DEST: The symbol name for the destination of deserialized data."
   (let ((msg (and class (not (scalarp class))
-                  (or (find-message class)
-                      (find-enum class)
+                  (or (find-message-descriptor class)
+                      (find-enum-descriptor class)
                       (find-map-descriptor class)))))
     (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
              (call-pseudo-method :deserialize msg vbuf start end end-tag)))
@@ -1300,7 +1300,7 @@ slot-name as a symbol."
   "Create the deserializer for a message.
 Parameters:
   MESSAGE-NAME: The symbol-name of a message."
-  (generate-deserializer (find-message message-name)))
+  (generate-deserializer (find-message-descriptor message-name)))
 
 ;; Note well: keep this in sync with the main 'deserialize-object' method above
 (defun generate-deserializer (message &key (name message) constructor
@@ -1457,7 +1457,7 @@ Parameters:
   "Creates an instance of TYPE with BUFFER used as the pre-computed proto
    serialization bytes to return when deserializing.  Useful for passing an
    object through without ever needing to deserialize it."
-  (let* ((desc (find-message type))
+  (let* ((desc (find-message-descriptor type))
          (message-name (or (proto-alias-for desc) (proto-class desc)))
          (object #+sbcl (make-instance message-name)
                  #-sbcl (funcall (get-constructor-name message-name))))

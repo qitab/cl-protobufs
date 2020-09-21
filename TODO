@@ -6,11 +6,9 @@ TO DO
 - Get rid of any find-foo lookup at schema expansion/compilation time.
 
 - Get "namespaces" (i.e., nested classes) fully working
-[  - Messages and enums should have a 'fully-qualified-names' slot		]
-[    that records both symbols and strings, and in the correct package		]
 [  - Printers need to print qualified names, as needed				]
-[  - 'find-message' and 'find-enum' need to search namespaces			]
-[     if the quick compare against the name/class fails				]
+[  - 'find-message-descriptor' and 'find-enum-descriptor' need to search        ]
+[     namespaces if the quick compare against the name/class fails		]
 
 - Lose 'proto-class', replace it with 'proto-type';
     its type is (or null symbol)
@@ -39,7 +37,8 @@ TO DO
 [  - *all-protobufs* should record keyed by pathname, too			]
 [  - 'import' should not bother loading if the import is present,		]
 [    and should record the imported schema when it's done			]
-[  - 'find-message' and 'find-enum' should search imports, too			]
+[  - 'find-message-descriptor' and 'find-enum-descriptor' should search		]
+[    imports, too                                                               ]
 
 [- 'package'/'lisp_package' should create the package, if necessary.		]
 

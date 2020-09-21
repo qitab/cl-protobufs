@@ -22,7 +22,7 @@
   (cl-protobufs.test:run-suite 'lazy-suite))
 
 (deftest test-lazy-field-schema (lazy-suite)
-  (let* ((container-message (proto:find-message 'container))
+  (let* ((container-message (proto:find-message-descriptor 'container))
          (container-fields (proto-impl::proto-fields container-message))
          (inner-field (find 'inner container-fields
                             :key #'proto-impl::proto-external-field-name)))

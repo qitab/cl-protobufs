@@ -27,7 +27,7 @@ Parameters:
   PRETTY-PRINT: When true, generate line breaks and other human readable output
     in the text format. When false, replace line breaks with spaces."
   (let* ((type (type-of object))
-         (message (find-message type)))
+         (message (find-message-descriptor type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
     (let ((name (or name (proto-name message))))
@@ -96,8 +96,8 @@ Parameters:
        (doseq (v values)
          (print-scalar v type name stream
                        (and pretty-print indent))))
-      ((typep (setq desc (or (find-message type)
-                             (find-enum type)))
+      ((typep (setq desc (or (find-message-descriptor type)
+                             (find-enum-descriptor type)))
               'message-descriptor)
        (dolist (v values)
          (print-text-format v :indent (+ indent 2)
@@ -132,8 +132,8 @@ Parameters:
       ((scalarp type)
        (print-scalar value type name stream
                      (and pretty-print indent)))
-      ((typep (setq desc (or (find-message type)
-                             (find-enum type)
+      ((typep (setq desc (or (find-message-descriptor type)
+                             (find-enum-descriptor type)
                              (find-map-descriptor type)))
               'message-descriptor)
        (print-text-format value :indent (+ indent 2)
@@ -243,7 +243,7 @@ Parameters:
 
 (defmethod parse-text-format ((type symbol)
                               &key (stream *standard-input*) (parse-name t))
-  (let ((message (find-message type)))
+  (let ((message (find-message-descriptor type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
     (parse-text-format message :stream stream :parse-name parse-name)))
@@ -274,7 +274,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
                 (nreverse (proto-slot-value object slot))))
         (return-from parse-text-format object))
       (let* ((name  (parse-token stream))
-             (field (and name (find-field msg-desc name)))
+             (field (and name (find-field-descriptor msg-desc name)))
              (type  (and field (if (eq (proto-class field) 'boolean)
                                    :bool
                                    (proto-class field))))
@@ -305,8 +305,8 @@ attempt to parse the name of the message and match it against MSG-DESC."
   "Parse data of type TYPE from STREAM. This function returns
 the object parsed. If the parsing fails, the function will
 return T as a second value."
-  (let ((desc (or (find-message type)
-                  (find-enum type)
+  (let ((desc (or (find-message-descriptor type)
+                  (find-enum-descriptor type)
                   (find-map-descriptor type))))
     (cond ((scalarp type)
            (expect-char stream #\:)
@@ -325,7 +325,7 @@ return T as a second value."
           ((typep desc 'message-descriptor)
            (when (eql (peek-char nil stream nil) #\:)
              (read-char stream))
-           (parse-text-format (find-message type)
+           (parse-text-format (find-message-descriptor type)
                               :stream stream
                               :parse-name nil))
           ((typep desc 'enum-descriptor)

@@ -25,11 +25,11 @@ The definition of initialized is all required-fields are set."
           do (let ((lisp-type (proto-class field))
                    (field-value (slot-value object (proto-internal-field-name field))))
                (when (and (not (keywordp lisp-type))
-                          (find-message lisp-type))
+                          (find-message-descriptor lisp-type))
                  (doseq (msg (if (eq (proto-label field) :repeated)
                                  field-value
                                  (list field-value)))
-                   (unless (object-initialized-p msg (find-message lisp-type))
+                   (unless (object-initialized-p msg (find-message-descriptor lisp-type))
                      (return-from object-initialized-p nil))))))
   t)
 
@@ -37,7 +37,7 @@ The definition of initialized is all required-fields are set."
 (defun is-initialized (object)
   "Returns true if all of the fields of OBJECT are initialized."
   (let* ((class   (type-of object))
-         (message (find-message class)))
+         (message (find-message-descriptor class)))
     (assert message ()
             "There is no Protobufs message for the class ~S" class)
     (object-initialized-p object message)))
@@ -65,7 +65,7 @@ Parameters:
   EXACT: If true Consider the messages to be equal
 only if the same fields have been explicitly set."
   (let* ((class-1 (type-of message-1))
-         (message (find-message class-1)))
+         (message (find-message-descriptor class-1)))
     (unless (and message (eq (type-of message-2) class-1))
       (return-from proto-equal nil))
 
@@ -99,11 +99,11 @@ only if the same fields have been explicitly set."
           unless (equal (oneof-set-field slot-value-1)
                         (oneof-set-field slot-value-2))
             do (return-from proto-equal nil)
-          when (or (scalarp lisp-type) (find-enum lisp-type))
+          when (or (scalarp lisp-type) (find-enum-descriptor lisp-type))
             do (unless (scalar-field-equal (oneof-value slot-value-1)
                                            (oneof-value slot-value-2))
                  (return-from proto-equal nil))
-          when (find-message lisp-type)
+          when (find-message-descriptor lisp-type)
             do (unless (proto-equal (oneof-value slot-value-1)
                                     (oneof-value slot-value-2)
                                     :exact exact)
@@ -118,7 +118,7 @@ only if the same fields have been explicitly set."
             = (when slot-value-1
                 (slot-value message-2 (proto-internal-field-name field)))
           when (and (not (eq lisp-type :bool))
-                    (or (scalarp lisp-type) (find-enum lisp-type)))
+                    (or (scalarp lisp-type) (find-enum-descriptor lisp-type)))
             do (unless (scalar-field-equal slot-value-1 slot-value-2)
                  (return-from proto-equal nil))
           unless (and slot-value-1 slot-value-2)
@@ -127,7 +127,7 @@ only if the same fields have been explicitly set."
           when (and slot-value-1 (eq (proto-label field) :repeated))
             do (unless (= (length slot-value-1) (length slot-value-2))
                  (return-from proto-equal nil))
-          when (and slot-value-1 (find-message lisp-type))
+          when (and slot-value-1 (find-message-descriptor lisp-type))
             do (loop for x in
                            (if (eq (proto-label field) :repeated)
                                slot-value-1
@@ -178,7 +178,7 @@ Parameters:
 For repeated fields, returns a list of the encoded values, which may be NILs.")
   (:method ((object structure-object) slot)
     (let* ((class   (type-of object))
-           (message (find-message class))
+           (message (find-message-descriptor class))
            (field   (and (find slot (proto-fields message)
                                :key #'proto-external-field-name))))
       (assert message ()
@@ -190,7 +190,7 @@ For repeated fields, returns a list of the encoded values, which may be NILs.")
                                        lisp-package))))
           (assert lisp-package ()
                   "Lisp package is not found for message ~A" (proto-name message))
-          (setf field (find-field message lazy-slot))
+          (setf field (find-field-descriptor message lazy-slot))
           (when field
             (setf slot lazy-slot))))
       (assert field ()

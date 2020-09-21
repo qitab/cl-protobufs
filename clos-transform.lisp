@@ -47,7 +47,7 @@
   (let* ((type (if type-filter (funcall type-filter type) type))
          (list-of-list-of (list-of-list-of))
          (type-enum (when (symbolp type)
-                      (find-enum type)))
+                      (find-enum-descriptor type)))
          (expanded-type (type-expand type))
          ;; As of cl/94580268, aliased types each have a (deftype <aliased-type> t) form generated,
          ;; because the actual type is generally not available at the time that we compile the proto

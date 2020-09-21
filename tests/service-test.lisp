@@ -32,10 +32,10 @@
 
 (deftest test-camel-spitting-request (services-suite)
   (let* ((service
-          (proto:find-service
+          (proto:find-service-descriptor
            'cl-protobufs.protobuf-package-unittest1:package_test1
            'cl-protobufs.protobuf-package-unittest1:service-with-camel-spitting-input-output))
-         (method (proto-impl::find-method
+         (method (proto:find-method-descriptor
                   service
                   'cl-protobufs.protobuf-package-unittest1::record2f-lookup))
          (input (proto-impl::proto-input-name method))
@@ -45,9 +45,10 @@
     (assert-true (string= "protobuf_package_unittest1.Record2fLookupResponse" output))))
 
 (deftest test-method-options (services-suite)
-  (let* ((service (proto:find-service 'cl-protobufs.service-test-pb:service-test
-                                      'cl-protobufs.service-test-pb:foo-service))
-         (method (proto-impl::find-method service 'cl-protobufs.service-test-pb::bar-method)))
+  (let* ((service (proto:find-service-descriptor
+                   'cl-protobufs.service-test-pb:service-test
+                   'cl-protobufs.service-test-pb:foo-service))
+         (method (proto:find-method-descriptor service 'cl-protobufs.service-test-pb::bar-method)))
     (assert-true (eq :udp (proto-impl::find-option method "protocol")))
     (assert-true (eql 30.0d0 (proto-impl::find-option method "deadline")))
     (assert-true (eq t (proto-impl::find-option method "duplicate_suppression")))

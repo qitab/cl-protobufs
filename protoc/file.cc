@@ -180,8 +180,8 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   printer->Print(
       "\n\n"
       "(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
-      "(cl:setf (cl:gethash #P\"$file_name$\" proto-impl::*all-schemas*)\n"
-      "         (proto:find-schema '$schema_name$)))\n",
+      "(cl:setf (cl:gethash #P\"$file_name$\" proto-impl::*file-descriptors*)\n"
+      "         (proto:find-file-descriptor '$schema_name$)))\n",
       "file_name", file_->name(),
       "schema_name", schema_name_);
 
