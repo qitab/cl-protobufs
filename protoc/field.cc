@@ -36,19 +36,19 @@ const std::string FieldLispType(const FieldDescriptor* field) {
         type = "cl:float";
         break;
       case FieldDescriptor::TYPE_INT64:
-        type = "proto:int64";
+        type = "cl-protobufs:int64";
         break;
       case FieldDescriptor::TYPE_UINT64:
-        type = "proto:uint64";
+        type = "cl-protobufs:uint64";
         break;
       case FieldDescriptor::TYPE_INT32:
-        type = "proto:int32";
+        type = "cl-protobufs:int32";
         break;
       case FieldDescriptor::TYPE_FIXED64:
-        type = "proto:fixed64";
+        type = "cl-protobufs:fixed64";
         break;
       case FieldDescriptor::TYPE_FIXED32:
-        type = "proto:fixed32";
+        type = "cl-protobufs:fixed32";
         break;
       case FieldDescriptor::TYPE_BOOL:
         type = "cl:boolean";
@@ -60,25 +60,25 @@ const std::string FieldLispType(const FieldDescriptor* field) {
         type = QualifiedMessageLispName(field->message_type(), field->file());
         break;
       case FieldDescriptor::TYPE_BYTES:
-        type = "proto:byte-vector";
+        type = "cl-protobufs:byte-vector";
         break;
       case FieldDescriptor::TYPE_UINT32:
-        type = "proto:uint32";
+        type = "cl-protobufs:uint32";
         break;
       case FieldDescriptor::TYPE_ENUM:
         type = QualifiedEnumLispName(field->enum_type(), field->file());
         break;
       case FieldDescriptor::TYPE_SFIXED32:
-        type = "proto:sfixed32";
+        type = "cl-protobufs:sfixed32";
         break;
       case FieldDescriptor::TYPE_SFIXED64:
-        type = "proto:sfixed64";
+        type = "cl-protobufs:sfixed64";
         break;
       case FieldDescriptor::TYPE_SINT32:
-        type = "proto:sint32";
+        type = "cl-protobufs:sint32";
         break;
       case FieldDescriptor::TYPE_SINT64:
-        type = "proto:sint64";
+        type = "cl-protobufs:sint64";
         break;
       default:
         GOOGLE_LOG(FATAL) << "Unsupported FileDescriptorType: "
@@ -242,7 +242,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
     vars["val-type"] = FieldLispType(field->message_type()->field(1));
     vars["val-kind"] = FieldLispKind(field->message_type()->field(1));
     printer->Print(vars,
-                   "\n(proto:define-map $name$\n"
+                   "\n(proto-impl:define-map $name$\n"
                    "   :key-type $key-type$\n"
                    "   :val-type $val-type$\n"
                    "   :json-name \"$json-name$\"\n"
@@ -269,7 +269,7 @@ void GenerateExtension(io::Printer* printer,
                        const FieldDescriptor* extension,
                        const FileDescriptor* file) {
       printer->Print(
-          "\n(proto:define-extend $name$ ()",
+          "\n(proto-impl:define-extend $name$ ()",
           "name", QualifiedMessageLispName(extension->containing_type(), file));
       printer->Indent();
       GenerateField(printer, extension);

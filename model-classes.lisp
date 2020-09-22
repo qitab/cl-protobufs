@@ -18,6 +18,11 @@ Parameters:
   NAME: A string, symbol, or pathname."
   (values (gethash name *file-descriptors*)))
 
+(defun add-file-descriptor (pathname symbol)
+  "Register the file-descriptor named by SYMBOL under the key PATHNAME.
+   Intended for use by protoc-gen-lisp."
+  (setf (gethash pathname *file-descriptors*) (proto:find-file-descriptor symbol)))
+
 (defstruct message
   "All protobuf message objects are of this type."
   ;; %%skipped-bytes will contain all of the bytes we couldn't

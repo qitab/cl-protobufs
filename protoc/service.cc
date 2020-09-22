@@ -33,7 +33,7 @@ void PrintType(io::Printer* printer,
   const std::string qualified_lisp_name = QualifiedMessageLispName(type, file);
 
   // Try to imitate the CL-PROTOBUFS scope/naming rules.
-  // E.g.:  (proto:define-service quux-service
+  // E.g.:  (proto-impl:define-service quux-service
   //          (:name "QUUXService")
   //          (quux-method (
   //            (quux-request :name "QUUXRequest") =>
@@ -116,7 +116,7 @@ void GenerateMethodOptions(io::Printer* printer,
 
 void ServiceGenerator::Generate(io::Printer* printer) {
   // Forward-declare the stub type.
-  printer->Print("\n(proto:define-service $name$",
+  printer->Print("\n(proto-impl:define-service $name$",
                  "name", ToLispName(descriptor_->name()));
   printer->Annotate("name", ToLispName(descriptor_->name()));
 

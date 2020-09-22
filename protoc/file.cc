@@ -113,7 +113,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
 
   printer->Print(
       "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)"
-      "\n(proto:define-schema '$schema_name$\n",
+      "\n(proto-impl:define-schema '$schema_name$\n",
       "schema_name", schema_name_);
   printer->Indent();
   // Schema options.
@@ -180,8 +180,8 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   printer->Print(
       "\n\n"
       "(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
-      "(cl:setf (cl:gethash #P\"$file_name$\" proto-impl::*file-descriptors*)\n"
-      "         (proto:find-file-descriptor '$schema_name$)))\n",
+      "(proto-impl:add-file-descriptor #P\"$file_name$\" '$schema_name$)\n"
+      ")\n",
       "file_name", file_->name(),
       "schema_name", schema_name_);
 

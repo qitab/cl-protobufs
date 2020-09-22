@@ -31,17 +31,17 @@
 ;;; protobuf defintion.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (proto:define-schema 'symbol-imported-schema
+  (proto-impl:define-schema 'symbol-imported-schema
     :syntax :proto2
     :package 'proto_test)
-  (proto:define-message symbol-imported-message ()))
+  (proto-impl:define-message symbol-imported-message ()))
 ;; eval-when
 
-(proto:define-schema 'symbol-importer-schema
+(proto-impl:define-schema 'symbol-importer-schema
   :package 'proto_test
   :syntax :proto2
   :import 'symbol-imported-schema)
-(proto:define-message symbol-importer-message ()
+(proto-impl:define-message symbol-importer-message ()
   (imported-type-field :index 1 :type symbol-imported-message :kind :message
                        :label (:optional) :json-name "importedTypeField"))
 

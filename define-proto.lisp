@@ -19,10 +19,10 @@ The lisp generated proto file should look like:
 
 ;; In a package named "cl-protobufs.<the-proto-package-name>"
 
-(proto:define-message color-wheel1
+(proto-impl:define-message color-wheel1
     (:conc-name "")
   ;; Nested messages.
-  (proto:define-message color-wheel1.metadata1
+  (proto-impl:define-message color-wheel1.metadata1
       (:conc-name "")
     ;; Fields.
     (author  :index 1  :type cl:string :label (:optional) :typename "string")

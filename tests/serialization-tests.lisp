@@ -308,7 +308,7 @@
 
 (defpackage #:cl-protobufs.test.serialization-rpc (:use))
 
-(define-service buy-car ()
+(proto-impl:define-service buy-car ()
   (buy-car (buy-car-request => buy-car-response)
            :options (:deadline 1.0)))
 

@@ -70,17 +70,6 @@
    #:error-field
    #:error-method
 
-   ;; Code generation
-   #:define-schema
-   #:define-enum
-   #:define-map
-   #:define-oneof
-   #:define-message
-   #:define-extend
-   #:define-extension
-   #:define-group
-   #:define-service
-
    ;; Binary format
    #:serialize-object-to-file
    #:serialize-object-to-stream
@@ -123,9 +112,22 @@
   (:import-from :alexandria
                 #:define-constant)
 
-  ;; TODO(cgay): These are in use outside of cl-protobufs and should be removed or moved to the
-  ;; interface package, as appropriate.
   (:export
+   ;; Exported solely for use by generated code.
+   #:define-schema
+   #:define-enum
+   #:define-map
+   #:define-oneof
+   #:define-message
+   #:define-extend
+   #:define-extension
+   #:define-group
+   #:define-service
+
+   #:add-file-descriptor
+
+   ;; TODO(cgay): These should be removed or moved to the interface package, as
+   ;; appropriate.
    #:encode-double
    #:encode-string
    #:encode-uint32

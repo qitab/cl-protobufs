@@ -131,8 +131,8 @@
   (assert-eq :bah (proto:enum-int-to-keyword 'pb:outer-enum 1234 :bah)))
 
 (deftype orig-type () '(member :eins :zwei :drei))
-(proto:define-schema 'my-schema :package 'proto-test :syntax :proto2)
-(proto:define-enum alias-enum (:alias-for orig-type))
+(proto-impl:define-schema 'my-schema :package 'proto-test :syntax :proto2)
+(proto-impl:define-enum alias-enum (:alias-for orig-type))
 
 (deftest test-enum-keywords (enum-mapping-suite)
   (assert-equal '(:foo :bar :baz :foo-bar :zaphod) (proto:enum-keywords 'pb:my-message.my-enum))
