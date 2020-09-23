@@ -9,7 +9,7 @@
 ;;; TODO(cgay): A lot of these symbols should never be used by client code;
 ;;; stop exporting them. All the descriptor classes? All the definer macros.
 (defpackage :cl-protobufs
-  (:nicknames :proto :protobufs)
+  (:nicknames :proto)
   (:use)
 
   (:export
