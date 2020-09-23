@@ -11,6 +11,7 @@
         #:cl-protobufs.protobuf-package-unittest1-rpc
         #:cl-protobufs.service-test-pb
         #:cl-protobufs.service-test-pb-rpc)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.services)
@@ -38,8 +39,8 @@
          (method (proto:find-method-descriptor
                   service
                   'cl-protobufs.protobuf-package-unittest1::record2f-lookup))
-         (input (proto-impl::proto-input-name method))
-         (output (proto-impl::proto-output-name method)))
+         (input (pi::proto-input-name method))
+         (output (pi::proto-output-name method)))
     ;; Input/output names must be fully qualified.
     (assert-true (string= "protobuf_package_unittest1.Record2fLookupRequest" input))
     (assert-true (string= "protobuf_package_unittest1.Record2fLookupResponse" output))))
@@ -49,10 +50,10 @@
                    'cl-protobufs.service-test-pb:service-test
                    'cl-protobufs.service-test-pb:foo-service))
          (method (proto:find-method-descriptor service 'cl-protobufs.service-test-pb::bar-method)))
-    (assert-true (eq :udp (proto-impl::find-option method "protocol")))
-    (assert-true (eql 30.0d0 (proto-impl::find-option method "deadline")))
-    (assert-true (eq t (proto-impl::find-option method "duplicate_suppression")))
-    (assert-true (eql -123 (proto-impl::find-option method "client_logging")))
-    (assert-true (eq :privacy-and-integrity (proto-impl::find-option method "security_level")))
-    (assert-true (equal "admin" (proto-impl::find-option method "security_label")))
-    (assert-true (eql 42 (proto-impl::find-option method "legacy_client_initial_tokens")))))
+    (assert-true (eq :udp (pi::find-option method "protocol")))
+    (assert-true (eql 30.0d0 (pi::find-option method "deadline")))
+    (assert-true (eq t (pi::find-option method "duplicate_suppression")))
+    (assert-true (eql -123 (pi::find-option method "client_logging")))
+    (assert-true (eq :privacy-and-integrity (pi::find-option method "security_level")))
+    (assert-true (equal "admin" (pi::find-option method "security_label")))
+    (assert-true (eql 42 (pi::find-option method "legacy_client_initial_tokens")))))

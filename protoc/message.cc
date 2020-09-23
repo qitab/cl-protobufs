@@ -75,8 +75,8 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
     return;
   const bool group = tag >= 0;
   printer->Print("\n\n");
-  printer->Print((group ? "(proto-impl:define-group $name$" :
-                          "(proto-impl:define-message $name$"),
+  printer->Print((group ? "(pi:define-group $name$" :
+                          "(pi:define-message $name$"),
                  "name", lisp_name);
   printer->Annotate("name", descriptor_);
   printer->Indent();
@@ -145,10 +145,10 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
         const OneofDescriptor* oneof = descriptor_->oneof_decl(i);
         // Non-synthetic oneofs come first in the list.
         if (i < descriptor_->real_oneof_decl_count())
-          printer->Print("\n(proto-impl:define-oneof $name$ ()", "name",
+          printer->Print("\n(pi:define-oneof $name$ ()", "name",
                          ToLispName(oneof->name()));
         else
-          printer->Print("\n(proto-impl:define-oneof $name$ (:synthetic-p t)",
+          printer->Print("\n(pi:define-oneof $name$ (:synthetic-p t)",
                          "name", ToLispName(oneof->name()));
         printer->Indent();
         for (int j = 0; j < oneof->field_count(); ++j) {
@@ -201,7 +201,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
     for (int i = 0; i < descriptor_->extension_range_count(); ++i) {
       const Descriptor::ExtensionRange* range = descriptor_->extension_range(i);
       printer->Print(
-          "\n(proto-impl:define-extension $start$ $end$)", "start",
+          "\n(pi:define-extension $start$ $end$)", "start",
           StrCat(range->start),
           // The end is inclusive in cl_protobufs.
           // For some reason, the extension number is generated as

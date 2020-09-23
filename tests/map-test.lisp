@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs.map-test
         #:cl-protobufs)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.map)
@@ -107,16 +108,16 @@
 
 ;; Verify that optimized (de)serialization works.
 (deftest optimized-serialization-test (map-suite)
-  (proto-impl:make-serializer map-proto)
-  (proto-impl:make-serializer val-message)
-  (proto-impl:make-serializer map-message)
-  (proto-impl:make-serializer map-enum)
-  (proto-impl:make-serializer nested-map)
-  (proto-impl:make-deserializer map-proto)
-  (proto-impl:make-deserializer val-message)
-  (proto-impl:make-deserializer map-message)
-  (proto-impl:make-deserializer map-enum)
-  (proto-impl:make-deserializer nested-map)
+  (pi:make-serializer map-proto)
+  (pi:make-serializer val-message)
+  (pi:make-serializer map-message)
+  (pi:make-serializer map-enum)
+  (pi:make-serializer nested-map)
+  (pi:make-deserializer map-proto)
+  (pi:make-deserializer val-message)
+  (pi:make-deserializer map-message)
+  (pi:make-deserializer map-enum)
+  (pi:make-deserializer nested-map)
   (let* ((test1 (make-map-proto :strval "test" :intval 1))
          (submsg1 (make-val-message :strval "one"))
          (submsg2 (make-val-message :strval "two"))

@@ -7,7 +7,8 @@
 (defpackage #:cl-protobufs.test.alias
   (:use #:cl
         #:clunit)
-  (:local-nicknames (#:pb #:cl-protobufs.alias-test))
+  (:local-nicknames (#:pb #:cl-protobufs.alias-test)
+                    (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.alias)
@@ -22,7 +23,7 @@
 
 (defstruct aliased-struct i)
 
-(defconstant +TAG-I+ (proto-impl::make-tag :int32 1)
+(defconstant +TAG-I+ (pi::make-tag :int32 1)
   "The tag that should be used for Message.I and AliasedMessage.I")
 
 ;; Serialization of cl-protobufs-generated class (as opposed to using a lisp_alias FieldOption)
@@ -42,7 +43,7 @@
    BUF: The buffer to serialize to."
   (let ((i (aliased-struct-i msg))
         (size 0))
-    (incf size (proto-impl::serialize-scalar i :int32  +TAG-I+ buf))))
+    (incf size (pi::serialize-scalar i :int32  +TAG-I+ buf))))
 
 #+sbcl
 (defun (:protobuf :serialize pb:aliased-message)
@@ -65,10 +66,10 @@
   (let ((outer (pb:make-outer-message)))
     (expect-bytes nil (proto:serialize-object-to-bytes outer))))
 
-(defconstant +TAG-MESSAGE+ (proto-impl::make-tag :string 1)
+(defconstant +TAG-MESSAGE+ (pi::make-tag :string 1)
   "The tag that should be used for field OuterMessage.Message")
 
-(defconstant +TAG-ALIASED+ (proto-impl::make-tag :string 2)
+(defconstant +TAG-ALIASED+ (pi::make-tag :string 2)
   "The tag that should be used for field OuterMessage.Aliased")
 
 (deftest serialize-outer-containing-regular (alias-suite)

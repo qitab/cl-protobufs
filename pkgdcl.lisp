@@ -105,7 +105,7 @@
    #:encoded-field
    ))
 
-(defpackage protobufs-implementation
+(defpackage cl-protobufs.implementation
   (:nicknames :proto-impl)
   (:use :common-lisp :cl-protobufs)
 

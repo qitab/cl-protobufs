@@ -33,6 +33,7 @@
                 #:zig-zag-decode64
                 #:zig-zag-encode32
                 #:zig-zag-encode64)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.wire-format)
@@ -289,8 +290,8 @@ Paramaters:
 ;;---  encode/decode-single/double
 
 (deftest test-encode-double (wire-format-suite)
-  (verify-encode-decode #'proto-impl::encode-double
-                        #'proto-impl::decode-double
+  (verify-encode-decode #'pi::encode-double
+                        #'pi::decode-double
                         '((0.0d0 #(0 0 0 0 0 0 0 0))
                           (1.0d0 #(0 0 0 0 0 0 240 63))
                           (0.1d0 #(154 153 153 153 153 153 185 63)))))

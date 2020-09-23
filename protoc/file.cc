@@ -102,7 +102,9 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     printer->Print(
         "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
         "  (cl:unless (cl:find-package \"$package_name$\")\n"
-        "    (cl:defpackage \"$package_name$\" (:use))))\n",
+        "    (cl:defpackage \"$package_name$\" (:use)\n"
+        "                   (:local-nicknames (#:pi "
+        "#:cl-protobufs.implementation)))))\n",
         "package_name", package);
   }
 
@@ -113,7 +115,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
 
   printer->Print(
       "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)"
-      "\n(proto-impl:define-schema '$schema_name$\n",
+      "\n(pi:define-schema '$schema_name$\n",
       "schema_name", schema_name_);
   printer->Indent();
   // Schema options.
@@ -180,7 +182,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   printer->Print(
       "\n\n"
       "(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
-      "(proto-impl:add-file-descriptor #P\"$file_name$\" '$schema_name$)\n"
+      "(pi:add-file-descriptor #P\"$file_name$\" '$schema_name$)\n"
       ")\n",
       "file_name", file_->name(),
       "schema_name", schema_name_);

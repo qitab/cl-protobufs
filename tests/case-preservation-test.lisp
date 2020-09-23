@@ -7,7 +7,8 @@
 (defpackage #:cl-protobufs.test.case-preservation
   (:use #:cl
         #:clunit)
-  (:local-nicknames (#:pb #:cl-protobufs.protobuf-case-preservation-unittest))
+  (:local-nicknames (#:pb #:cl-protobufs.protobuf-case-preservation-unittest)
+                    (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.case-preservation)
@@ -28,8 +29,8 @@
     (let ((method (proto:find-method-descriptor service "QUUXMethod")))
       (assert-true method)
       (assert-equal
-          (proto-impl::proto-input-name method)
+          (pi::proto-input-name method)
           "protobuf_case_preservation_unittest.QUUXRequest")
       (assert-equal
-          (proto-impl::proto-output-name method)
+          (pi::proto-output-name method)
           "protobuf_case_preservation_unittest.QUUXResponse"))))

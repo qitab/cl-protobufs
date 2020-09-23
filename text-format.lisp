@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(in-package "PROTO-IMPL")
+(in-package #:cl-protobufs.implementation)
 
 ;;; This file implements the protobuf Text Format parser and printer.
 ;;; The exported symbols are parse-text-format and print-text-format.

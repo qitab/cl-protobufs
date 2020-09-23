@@ -8,9 +8,10 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs.third-party.lisp.cl-protobufs.tests)
-  (:import-from :proto-impl
+  (:import-from #:cl-protobufs.implementation
                 #:proto-%bytes
                 #:oneof-value)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.lazy)
@@ -23,18 +24,18 @@
 
 (deftest test-lazy-field-schema (lazy-suite)
   (let* ((container-message (proto:find-message-descriptor 'container))
-         (container-fields (proto-impl::proto-fields container-message))
+         (container-fields (pi::proto-fields container-message))
          (inner-field (find 'inner container-fields
-                            :key #'proto-impl::proto-external-field-name)))
-    (assert-true (proto-impl::proto-lazy-p inner-field))))
+                            :key #'pi::proto-external-field-name)))
+    (assert-true (pi::proto-lazy-p inner-field))))
 
 (deftest test-lazy-field-serialize (lazy-suite)
   (dolist (optimized '(nil t))
       (when optimized
-        (proto-impl::make-deserializer container)
-        (proto-impl::make-deserializer inner)
-        (proto-impl::make-serializer container)
-        (proto-impl::make-serializer inner))
+        (pi::make-deserializer container)
+        (pi::make-deserializer inner)
+        (pi::make-serializer container)
+        (pi::make-serializer inner))
     (let* ((proto (make-container
                    :value-before 10
                    :inner (make-inner :value 42)
@@ -64,7 +65,7 @@
       (let ((restored (proto:deserialize-object-from-bytes 'container bytes))
             (inner-slot 'cl-protobufs.third-party.lisp.cl-protobufs.tests::%inner))
         (setf (value (inner restored)) 43)
-        (assert-false (slot-value (slot-value restored inner-slot) 'proto-impl::%bytes))
+        (assert-false (slot-value (slot-value restored inner-slot) 'pi::%bytes))
         (let* ((reserialized (proto:serialize-object-to-bytes restored))
                (rerestored (proto:deserialize-object-from-bytes 'container reserialized)))
           (assert-true (= (value (inner rerestored)) 43))))
@@ -78,10 +79,10 @@
 (deftest test-lazy-oneof-serialize (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
-      (proto-impl::make-deserializer oneof-lazy)
-      (proto-impl::make-deserializer inner)
-      (proto-impl::make-serializer oneof-lazy)
-      (proto-impl::make-serializer inner))
+      (pi::make-deserializer oneof-lazy)
+      (pi::make-deserializer inner)
+      (pi::make-serializer oneof-lazy)
+      (pi::make-serializer inner))
     (let* ((proto (make-oneof-lazy
                    :value-before 10
                    :inner (make-inner :value 42)
@@ -114,10 +115,10 @@
 (deftest test-recursive-lazy (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
-      (proto-impl::make-deserializer recursively-lazy)
-      (proto-impl::make-deserializer container2)
-      (proto-impl::make-serializer recursively-lazy)
-      (proto-impl::make-serializer container2))
+      (pi::make-deserializer recursively-lazy)
+      (pi::make-deserializer container2)
+      (pi::make-serializer recursively-lazy)
+      (pi::make-serializer container2))
     (let* ((inner (make-inner :value 123))
            (rec-lazy (make-recursively-lazy :inner inner))
            (container2 (make-container2
@@ -133,10 +134,10 @@
 (deftest test-write-lazy-fields (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
-      (proto-impl::make-deserializer container)
-      (proto-impl::make-deserializer inner)
-      (proto-impl::make-serializer container)
-      (proto-impl::make-serializer inner))
+      (pi::make-deserializer container)
+      (pi::make-deserializer inner)
+      (pi::make-serializer container)
+      (pi::make-serializer inner))
     (let* ((proto (make-container
                    :value-before 10
                    :inner (make-inner :value 42)
@@ -166,10 +167,10 @@
 (deftest test-required-lazy (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
-      (proto-impl::make-serializer inner)
-      (proto-impl::make-serializer required-lazy)
-      (proto-impl::make-deserializer inner)
-      (proto-impl::make-deserializer required-lazy))
+      (pi::make-serializer inner)
+      (pi::make-serializer required-lazy)
+      (pi::make-deserializer inner)
+      (pi::make-deserializer required-lazy))
     (let* ((proto (make-required-lazy
                    :inner (make-inner :value 42)))
            (bytes (proto:serialize-object-to-bytes proto))
@@ -179,10 +180,10 @@
 (deftest test-repeated-lazy (lazy-suite)
   (dolist (optimized '(nil t))
     (when optimized
-      (proto-impl::make-serializer inner)
-      (proto-impl::make-serializer repeated-lazy)
-      (proto-impl::make-deserializer inner)
-      (proto-impl::make-deserializer repeated-lazy))
+      (pi::make-serializer inner)
+      (pi::make-serializer repeated-lazy)
+      (pi::make-deserializer inner)
+      (pi::make-deserializer repeated-lazy))
     (let* ((inners (loop for i from 0 below 5 collect (make-inner :value i)))
            (proto (make-repeated-lazy :inners inners))
            (bytes (proto:serialize-object-to-bytes proto))

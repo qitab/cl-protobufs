@@ -8,6 +8,7 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.quick)
@@ -106,16 +107,16 @@
 
 
 (deftest test-proto-slot-function-name (quick-suite)
-  (assert-true (eq (proto-impl::proto-slot-function-name 'a 'b :clear)
+  (assert-true (eq (pi::proto-slot-function-name 'a 'b :clear)
               'a.clear-b))
-  (assert-true (eq (proto-impl::proto-slot-function-name 'a 'b :has)
+  (assert-true (eq (pi::proto-slot-function-name 'a 'b :has)
               'a.has-b))
-  (assert-true (eq (proto-impl::proto-slot-function-name 'a 'b :get)
+  (assert-true (eq (pi::proto-slot-function-name 'a 'b :get)
               'a.b)))
 
 (deftest test-object-initialized (quick-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol)))
-    (assert-true (not (proto-impl::object-initialized-p
+    (assert-true (not (pi::object-initialized-p
                        p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol))))
     (setf (cl-protobufs.protobuf-unittest:test-protocol.zero p) "a"
           (cl-protobufs.protobuf-unittest:test-protocol.one p) "b"
@@ -124,12 +125,12 @@
           (cl-protobufs.protobuf-unittest:test-protocol.string-with-default p) "c")
 
     ;; Initialized all of the required fields on the object.
-    (assert-true (proto-impl::object-initialized-p
+    (assert-true (pi::object-initialized-p
              p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)))
 
     ;; Cleared one of the required fields.
     (cl-protobufs.protobuf-unittest:test-protocol.clear-one p)
-    (assert-true (not (proto-impl::object-initialized-p
+    (assert-true (not (pi::object-initialized-p
                   p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol))))
 
     ;; Add the required field on the top lovel object back.
@@ -142,17 +143,17 @@
       ;; Thirteen is missing fourteen which is required,
       ;; the top level object isn't initialized if one of it's
       ;; sub-objects is un-initialized.
-      (assert-true (not (proto-impl::object-initialized-p
+      (assert-true (not (pi::object-initialized-p
                     p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol))))
 
       ;; Set thirteen
       (setf (cl-protobufs.protobuf-unittest:thirteen.fourteen thirteen) :enum-whatever)
-      (assert-true (proto-impl::object-initialized-p
+      (assert-true (pi::object-initialized-p
                p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)))
 
       ;; Clear fourteen and make sure the object is again not initialized.
       (cl-protobufs.protobuf-unittest:thirteen.clear-fourteen thirteen)
-      (assert-true (not (proto-impl::object-initialized-p
+      (assert-true (not (pi::object-initialized-p
                     p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)))))))
 
 (deftest test-proto-equivalent-p (quick-suite)
@@ -160,31 +161,31 @@
          (q (cl-protobufs.protobuf-unittest:make-test-protocol))
          (z (cl-protobufs.protobuf-unittest:make-time-protocol)))
     ;; Basic just initialized test
-    (assert-true (proto-impl::proto-equal p q))
-    (assert-true (not (proto-impl::proto-equal p z)))
+    (assert-true (pi::proto-equal p q))
+    (assert-true (not (pi::proto-equal p z)))
 
-    (assert-true (proto-impl::proto-equal p q :exact t))
-    (assert-true (not (proto-impl::proto-equal p z :exact t)))
+    (assert-true (pi::proto-equal p q :exact t))
+    (assert-true (not (pi::proto-equal p z :exact t)))
 
     ;; one has a value set, the other has a non-default value.
     (setf (cl-protobufs.protobuf-unittest:test-protocol.zero p) "a")
-    (assert-true (not (proto-impl::proto-equal p q)))
-    (assert-true (not (proto-impl::proto-equal p q :exact t)))
+    (assert-true (not (pi::proto-equal p q)))
+    (assert-true (not (pi::proto-equal p q :exact t)))
 
     (setf (cl-protobufs.protobuf-unittest:test-protocol.zero q) "a")
     (setf (cl-protobufs.protobuf-unittest:test-protocol.string-with-default q) "salmon")
-    (assert-true (not (proto-impl::proto-equal p q)))
-    (assert-true (not (proto-impl::proto-equal p q :exact t)))
+    (assert-true (not (pi::proto-equal p q)))
+    (assert-true (not (pi::proto-equal p q :exact t)))
 
     ;; q has string-with-default set to it's default, with different case.
     (setf (cl-protobufs.protobuf-unittest:test-protocol.string-with-default q) "Fish")
-    (assert-true (not (proto-impl::proto-equal p q)))
-    (assert-true (not (proto-impl::proto-equal p q :exact t)))
+    (assert-true (not (pi::proto-equal p q)))
+    (assert-true (not (pi::proto-equal p q :exact t)))
 
     ;; q has string-with-default set to it's default, so eq it should be.
     (setf (cl-protobufs.protobuf-unittest:test-protocol.string-with-default q) "fish")
-    (assert-true (proto-impl::proto-equal p q))
-    (assert-false (proto-impl::proto-equal p q :exact t))
+    (assert-true (pi::proto-equal p q))
+    (assert-false (pi::proto-equal p q :exact t))
 
     ;; Verify that proto-equal works for repeated message fields
     (let* ((time1 (cl-protobufs.protobuf-unittest:make-time-protocol :debug-string (list "test1")))
@@ -192,48 +193,48 @@
            (proto1 (cl-protobufs.protobuf-unittest:make-test-protocol :tp2 (list time1 time2)))
            (proto2 (cl-protobufs.protobuf-unittest:make-test-protocol :tp2 (list time1))))
       ;; proto-equal is asymmetric, so both sides must be checked.
-      (assert-false (proto-impl::proto-equal proto1 proto2))
-      (assert-false (proto-impl::proto-equal proto2 proto1)))
+      (assert-false (pi::proto-equal proto1 proto2))
+      (assert-false (pi::proto-equal proto2 proto1)))
 
     ;; With a sub-object
     (let ((thirteen-1 (cl-protobufs.protobuf-unittest:make-thirteen))
           (thirteen-2 (cl-protobufs.protobuf-unittest:make-thirteen)))
       ;; sanity assert-true
-      (assert-true (proto-impl::proto-equal thirteen-1 thirteen-2))
-      (assert-true (proto-impl::proto-equal thirteen-1 thirteen-2 :exact t))
+      (assert-true (pi::proto-equal thirteen-1 thirteen-2))
+      (assert-true (pi::proto-equal thirteen-1 thirteen-2 :exact t))
 
       ;; One has a submessage.
       (setf (cl-protobufs.protobuf-unittest:test-protocol.thirteen p) thirteen-1)
-      (assert-true (not (proto-impl::proto-equal p q)))
-      (assert-true (not (proto-impl::proto-equal p q :exact t)))
+      (assert-true (not (pi::proto-equal p q)))
+      (assert-true (not (pi::proto-equal p q :exact t)))
 
       (setf (cl-protobufs.protobuf-unittest:test-protocol.thirteen q) thirteen-2)
-      (assert-true (proto-impl::proto-equal p q))
-      (assert-false (proto-impl::proto-equal p q :exact t))
+      (assert-true (pi::proto-equal p q))
+      (assert-false (pi::proto-equal p q :exact t))
 
       ;; enum-whatever is the default so still equivalent
       (setf (cl-protobufs.protobuf-unittest:thirteen.fourteen thirteen-2) :enum-whatever)
-      (assert-true (proto-impl::proto-equal p q))))
+      (assert-true (pi::proto-equal p q))))
 
   (let* ((g-1 (cl-protobufs.protobuf-unittest:make-g :v1 1))
          (g-2 (cl-protobufs.protobuf-unittest:make-g))
          (p (cl-protobufs.protobuf-unittest:make-time-protocol :g (list g-1)))
          (q (cl-protobufs.protobuf-unittest:make-time-protocol :g (list g-2))))
-    (assert-true (not (proto-impl::proto-equal p q)))
-    (assert-false (proto-impl::proto-equal p q :exact t))
+    (assert-true (not (pi::proto-equal p q)))
+    (assert-false (pi::proto-equal p q :exact t))
 
     (setf (cl-protobufs.protobuf-unittest:g.v1 g-2) 1)
-    (assert-true (proto-impl::proto-equal p q))
-    (assert-true (proto-impl::proto-equal p q :exact t))))
+    (assert-true (pi::proto-equal p q))
+    (assert-true (pi::proto-equal p q :exact t))))
 
 (deftest test-make-qualified-name (quick-suite)
   (assert-true
-      (string= (proto-impl::make-qualified-name
+      (string= (pi::make-qualified-name
                 (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)
                 "bbaz")
                "protobuf_unittest.TestProtocol.bbaz"))
   (assert-true
-      (string= (proto-impl::make-qualified-name
+      (string= (pi::make-qualified-name
                 (find-file-descriptor 'cl-protobufs.protobuf-unittest:testproto2)
                 "bbaz")
                "protobuf_unittest.bbaz")))
@@ -263,7 +264,7 @@
                    (when (= n howmany)
                      (return (mapcar (lambda (x)
                                        (make-instance
-                                        'proto-impl::field-descriptor
+                                        'pi::field-descriptor
                                         :index x
                                         :class 'proto:int32
                                         :internal-field-name 'foo
@@ -275,15 +276,15 @@
          (loop repeat 10
                do
             (let* ((fields (make-random-fields n-fields))
-                   (field-map (proto-impl::make-field-map fields)))
+                   (field-map (pi::make-field-map fields)))
               ;; look up every field of FIELDS by its index,
               ;; ensuring that it maps to itself.
               (dolist (x fields)
                 (let* ((brief-field
-                        (proto-impl::find-in-field-map
-                         (proto-impl::proto-index x) field-map))
+                        (pi::find-in-field-map
+                         (pi::proto-index x) field-map))
                        (full-field
-                        (and brief-field (proto-impl::field-complex-field brief-field))))
+                        (and brief-field (pi::field-complex-field brief-field))))
                   (assert (eq full-field x))))
               (loop for bin across field-map
                     when (consp bin)
@@ -296,9 +297,9 @@
 ;;; message being deserialized.
 
 (defun mapify (list)
-  (proto-impl::make-field-map
+  (pi::make-field-map
    (mapcar (lambda (x)
-             (make-instance 'proto-impl::field-descriptor
+             (make-instance 'pi::field-descriptor
                             :index (first x)
                             :class 'boolean
                             :internal-field-name (second x)
@@ -330,14 +331,14 @@
            (let ((*package* (find-package :cl-user)))
              (write-to-string x :right-margin 1000))))
     (multiple-value-bind (cell plist)
-        (proto-impl::get-field-cell 6 '() map)
+        (pi::get-field-cell 6 '() map)
       ;; after the preceding bind, CELL = (#<6:DELTA NIL) and PLIST = (#<6:DELTA> NIL)
       (rplaca (cdr cell) 'data6)        ; change the cell's data
       ;; Assert something about the contents after we write the data in
       (assert-true (string= (to-string plist) "(#<6:DELTA> CL-PROTOBUFS.TEST.QUICK::DATA6)"))
 
       ;; Insert in the front
-      (multiple-value-setq (cell plist) (proto-impl::get-field-cell 10 plist map))
+      (multiple-value-setq (cell plist) (pi::get-field-cell 10 plist map))
       ;; after the preceding setq,
       ;;  PLIST = (#<10:GOLF> NIL #<6:DELTA> data6)
       ;;  CELL = (#<10:GOLF> NIL . ...)
@@ -348,7 +349,7 @@
                                 CL-PROTOBUFS.TEST.QUICK::DATA6)")))
 
       ;; Insert in the middle
-      (multiple-value-setq (cell plist) (proto-impl::get-field-cell 7 plist map))
+      (multiple-value-setq (cell plist) (pi::get-field-cell 7 plist map))
       ;; after the preceding setq,
       ;;  PLIST = (#<10:GOLF> data10 #<7:ECHO> NIL #<6:DELTA> data6)
       ;;  CELL = (#<7:ECHO> NIL . ...)
@@ -360,7 +361,7 @@
                                  CL-PROTOBUFS.TEST.QUICK::DATA6)")))
 
       ;; Insert at the end
-      (multiple-value-setq (cell plist) (proto-impl::get-field-cell 3 plist map))
+      (multiple-value-setq (cell plist) (pi::get-field-cell 3 plist map))
       ;; after the precding setq,
       ;;  PLIST = (#<10:GOLF> data10 #<7:ECHO> data7 #<6:DELTA> data6 #<3:BRAVO> NIL)
       ;;  CELL = (#<3:BRAVO> NIL)
@@ -374,7 +375,7 @@
 
       ;; Now suppose that field 7 appears in the message again but is not specified
       ;; as a repeatable field. The deserializer code will just do another rplaca on the cell.
-      (multiple-value-setq (cell plist) (proto-impl::get-field-cell 7 plist map))
+      (multiple-value-setq (cell plist) (pi::get-field-cell 7 plist map))
       (rplaca (cdr cell) 'data7new)
       (assert-true
           (string= (to-string plist)

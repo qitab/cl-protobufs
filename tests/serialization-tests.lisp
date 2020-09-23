@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs
         #:cl-protobufs.serialization-test)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.serialization)
@@ -41,8 +42,8 @@
                         basic-test5 basic-test6 basic-test7 subgroups))
          (let ((message (proto:find-message-descriptor class)))
            (handler-bind ((style-warning #'muffle-warning))
-             (eval (proto-impl::generate-deserializer message))
-             (eval (proto-impl::generate-serializer message))))))
+             (eval (pi::generate-deserializer message))
+             (eval (pi::generate-serializer message))))))
      (let* ((test1  (make-basic-test1 :intval 150))
             (test1b (make-basic-test1 :intval -150))
             (test2  (make-basic-test2 :strval "testing"))
@@ -83,8 +84,8 @@
          (assert-true (equalp tser6 *tser6-bytes*))
          (assert-true (equalp tser7 *tser7-bytes*))
          (macrolet ((slots-equalp (obj1 obj2 &rest slots)
-                      (proto-impl::with-gensyms (vobj1 vobj2)
-                        (proto-impl::with-collectors ((forms collect-form))
+                      (pi::with-gensyms (vobj1 vobj2)
+                        (pi::with-collectors ((forms collect-form))
                           (dolist (slot slots)
                             (collect-form
                              `(assert-true
@@ -150,8 +151,8 @@
           (tser5  (serialize-object-to-bytes test5 'basic-test5))
           (tser6  (serialize-object-to-bytes test6 'basic-test6)))
       (macrolet ((slots-equalp (obj1 obj2 &rest slots)
-                   (proto-impl::with-gensyms (vobj1 vobj2)
-                     (proto-impl::with-collectors ((forms collect-form))
+                   (pi::with-gensyms (vobj1 vobj2)
+                     (pi::with-collectors ((forms collect-form))
                        (dolist (slot slots)
                          (collect-form
                           `(assert-true (equalp
@@ -308,7 +309,7 @@
 
 (defpackage #:cl-protobufs.test.serialization-rpc (:use))
 
-(proto-impl:define-service buy-car ()
+(pi:define-service buy-car ()
   (buy-car (buy-car-request => buy-car-response)
            :options (:deadline 1.0)))
 
@@ -374,10 +375,10 @@
                     9)))
       ; this tests the optimized serializer's ability to serialize messages
       ; which have nested messages which have group fields.
-      (proto-impl::make-serializer metadata)
-      (proto-impl::make-serializer color2)
-      (proto-impl::make-serializer color-wheel2)
-      (proto-impl::make-serializer color-wheel2-wrap)
+      (pi::make-serializer metadata)
+      (pi::make-serializer color2)
+      (pi::make-serializer color-wheel2)
+      (pi::make-serializer color-wheel2-wrap)
       (let* ((ser3 (serialize-object-to-bytes rqst3 'color-wheel2-wrap))
              (res3 (deserialize-object-from-bytes 'color-wheel2-wrap ser3)))
         (assert-true (proto-equal res3 rqst3))))))
@@ -411,8 +412,8 @@
       (dolist (class '(proto-on-wire proto-different-than-wire))
         (let ((message (proto:find-message-descriptor class)))
           (handler-bind ((style-warning #'muffle-warning))
-            (eval (proto-impl::generate-deserializer message))
-            (eval (proto-impl::generate-serializer message))))))
+            (eval (pi::generate-deserializer message))
+            (eval (pi::generate-serializer message))))))
 
     (let* ((proto-on-wire (make-proto-on-wire
                            :beginning "char"

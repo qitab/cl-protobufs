@@ -7,7 +7,8 @@
 (defpackage #:cl-protobufs.test.import
   (:use #:cl
         #:clunit)
-  (:local-nicknames (#:pb #:cl-protobufs.third-party.lisp.cl-protobufs.tests))
+  (:local-nicknames (#:pb #:cl-protobufs.third-party.lisp.cl-protobufs.tests)
+                    (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.import)
@@ -22,7 +23,7 @@
 
 (deftest test-all-imports-are-included (import-suite)
   (let* ((descriptor (proto:find-file-descriptor 'pb:import-proto))
-         (imports (proto-impl::proto-imports descriptor)))
+         (imports (pi::proto-imports descriptor)))
     (assert-true (= (length imports) 2))
     (assert-true (string= (first imports)
                           "import-test-import-1.proto"))

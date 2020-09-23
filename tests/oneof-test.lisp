@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs.oneof-test
         #:cl-protobufs)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.oneof)
@@ -79,8 +80,8 @@
              (dolist (class '(oneof-proto nested-oneof oneof-test.int-list oneof-test))
                (let ((message (proto:find-message-descriptor class)))
                  (handler-bind ((style-warning #'muffle-warning))
-                   (eval (proto-impl::generate-serializer message))
-                   (eval (proto-impl::generate-deserializer message))))))
+                   (eval (pi::generate-serializer message))
+                   (eval (pi::generate-deserializer message))))))
            (let* ((test1 (make-oneof-proto :outside 1 :strval "red" :after 2))
                   (test2 (make-nested-oneof :outside 2 :nested test1))
                   (intlist (make-oneof-test.int-list :ints (list 1 2 3 4 5)))
@@ -106,7 +107,7 @@
                               :element-type '(unsigned-byte 8)))
         (bytes2 (make-array 6 :initial-contents '(16 4 26 2 104 105)
                               :element-type '(unsigned-byte 8))))
-    (proto-impl::make-deserializer oneof-proto)
+    (pi::make-deserializer oneof-proto)
     (loop :for optimized :in '(nil)
           :do (let (msg1 msg2)
                 (if optimized
@@ -116,9 +117,9 @@
                       (setf msg2 (deserialize-object-from-bytes
                                   'oneof-proto bytes2)))
                     (progn
-                      (setf msg1 (proto-impl::%deserialize-object
+                      (setf msg1 (pi::%deserialize-object
                                   'oneof-proto bytes1 0 (length bytes1)))
-                      (setf msg2 (proto-impl::%deserialize-object
+                      (setf msg2 (pi::%deserialize-object
                                   'oneof-proto bytes2 0 (length bytes2)))))
                 (assert-true (eq (oneof-proto.my-oneof-case msg1) 'intval))
                 (assert-true (= (oneof-proto.intval msg1) 4))

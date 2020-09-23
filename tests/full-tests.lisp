@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs
         #:alexandria)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.full)
@@ -180,7 +181,7 @@
       (assert (field-equal (second (funcall accessor m)) v1)))))
 
 (defun read-message (class-name file-name)
-  (let ((message (proto-impl::deserialize-object-from-file class-name file-name)))
+  (let ((message (pi::deserialize-object-from-file class-name file-name)))
     message))
 
 (defun test-parse-from-file ()
@@ -223,9 +224,9 @@
   ;; optional and default fields
   (let ((field-info *optional-field-info*))
     (loop for (field . values) in field-info
-          for accessor = (proto-impl::proto-slot-function-name
+          for accessor = (pi::proto-slot-function-name
                               (type-of m) field :get)
-          for has-function = (proto-impl::proto-slot-function-name
+          for has-function = (pi::proto-slot-function-name
                               (type-of m) field :has)
 
           for default-value = (first values)
@@ -236,7 +237,7 @@
 
   (let ((field-info *default-field-info*))
     (loop for (field . values) in field-info do
-      (let* ((accessor (proto-impl::proto-slot-function-name
+      (let* ((accessor (pi::proto-slot-function-name
                               (type-of m) field :get))
              (default-value (first values)))
         (assert (field-equal (funcall accessor m)
@@ -245,7 +246,7 @@
   ;; repeated fields
   (let ((field-info *repeated-field-info*))
     (loop for (field . nil) in field-info do
-      (let* ((accessor (proto-impl::proto-slot-function-name
+      (let* ((accessor (pi::proto-slot-function-name
                               (type-of m) field :get)))
         (assert (zerop (length (funcall accessor m))))))))
 

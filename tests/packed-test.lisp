@@ -10,6 +10,7 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs.protobuf-unittest) ; from unittest.proto
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.packed)
@@ -21,9 +22,9 @@
   (cl-protobufs.test:run-suite 'packed-suite))
 
 (deftest packed-tag-test (packed-suite)
-  (assert-true (= #b1010 (proto-impl::packed-tag 1)))
-  (assert-true (= #b10010 (proto-impl::packed-tag 2)))
-  (assert-true (= #b11010 (proto-impl::packed-tag 3))))
+  (assert-true (= #b1010 (pi::packed-tag 1)))
+  (assert-true (= #b10010 (pi::packed-tag 2)))
+  (assert-true (= #b11010 (pi::packed-tag 3))))
 
 (deftest packed-encoding-test (packed-suite)
   (let ((m1 (make-test-packed-types)))
@@ -100,7 +101,7 @@
 (deftest inner-packed-fast-function-test (packed-suite)
   (dolist (class '(test-packed-inner test-packed-outer))
     ;; Generate fast serializers for the interesting messages
-    (eval (proto-impl::generate-serializer (proto:find-message-descriptor class))))
+    (eval (pi::generate-serializer (proto:find-message-descriptor class))))
 
   (let* ((packed (make-test-packed-inner))
          (outer1 (make-test-packed-outer :packed packed)))
@@ -119,8 +120,8 @@
 (deftest inner-packed-enum-fast-function-test (packed-suite)
   (dolist (class '(test-packed-inner test-packed-outer))
     ;; Generate fast serializers for the interesting messages
-    (eval (proto-impl::generate-serializer (proto:find-message-descriptor class)))
-    (eval (proto-impl::generate-deserializer (proto:find-message-descriptor class))))
+    (eval (pi::generate-serializer (proto:find-message-descriptor class)))
+    (eval (pi::generate-deserializer (proto:find-message-descriptor class))))
 
   (let* ((packed (make-test-packed-inner))
          (outer1 (make-test-packed-outer :packed packed)))

@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(in-package "PROTO-IMPL")
+(in-package #:cl-protobufs.implementation)
 
 
 ;;; Protocol buffer defining macros
@@ -18,11 +18,12 @@ The lisp generated proto file should look like:
 -------------------------------
 
 ;; In a package named "cl-protobufs.<the-proto-package-name>"
+;; With a local-nickname pi for cl-protobufs.implementation
 
-(proto-impl:define-message color-wheel1
+(pi:define-message color-wheel1
     (:conc-name "")
   ;; Nested messages.
-  (proto-impl:define-message color-wheel1.metadata1
+  (pi:define-message color-wheel1.metadata1
       (:conc-name "")
     ;; Fields.
     (author  :index 1  :type cl:string :label (:optional) :typename "string")
@@ -36,7 +37,7 @@ The lisp generated proto file should look like:
              :label (:optional) :typename "Metadata1"))
 
 (cl:setf (cl:gethash #P"third_party/lisp/cl_protobufs/tests/serialization.proto"
-                     proto-impl::*file-descriptors*)
+                     pi::*file-descriptors*)
          (proto:find-file-descriptor 'serialization-test))
 
 (export ...)

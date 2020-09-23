@@ -7,11 +7,11 @@
 (defpackage #:cl-protobufs.json
   (:use #:cl
         #:cl-protobufs
-        #:proto-impl)
+        #:cl-protobufs.implementation)
   (:export #:print-json
            #:parse-json)
   (:local-nicknames
-   (#:pi #:proto-impl)
+   (#:pi #:cl-protobufs.implementation)
    (#:google #:cl-protobufs.google.protobuf)
    (#:wkt #:cl-protobufs.well-known-types)))
 

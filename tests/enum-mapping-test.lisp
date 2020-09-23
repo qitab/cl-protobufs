@@ -8,7 +8,8 @@
   (:use #:cl
 
         #:clunit)
-  (:local-nicknames (#:pb #:cl-protobufs.enum-mapping-test))
+  (:local-nicknames (#:pb #:cl-protobufs.enum-mapping-test)
+                    (#:pi #:cl-protobufs.implementation))
   (:import-from #:cl-protobufs
                 #:enum-int-to-keyword
                 #:enum-keyword-to-int)
@@ -131,8 +132,8 @@
   (assert-eq :bah (proto:enum-int-to-keyword 'pb:outer-enum 1234 :bah)))
 
 (deftype orig-type () '(member :eins :zwei :drei))
-(proto-impl:define-schema 'my-schema :package 'proto-test :syntax :proto2)
-(proto-impl:define-enum alias-enum (:alias-for orig-type))
+(pi:define-schema 'my-schema :package 'proto-test :syntax :proto2)
+(pi:define-enum alias-enum (:alias-for orig-type))
 
 (deftest test-enum-keywords (enum-mapping-suite)
   (assert-equal '(:foo :bar :baz :foo-bar :zaphod) (proto:enum-keywords 'pb:my-message.my-enum))

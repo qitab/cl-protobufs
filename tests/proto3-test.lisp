@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs.proto3-test
         #:cl-protobufs)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.proto3)
@@ -25,10 +26,10 @@
 (deftest test-singular-defaults (proto3-suite)
   (dolist (optimized '(nil t))
     (when optimized
-      (proto-impl::make-serializer test-message)
-      (proto-impl::make-serializer all-singular)
-      (proto-impl::make-deserializer test-message)
-      (proto-impl::make-deserializer all-singular))
+      (pi::make-serializer test-message)
+      (pi::make-serializer all-singular)
+      (pi::make-deserializer test-message)
+      (pi::make-deserializer all-singular))
     (let* ((msg (make-all-singular
                  :int32-value 0
                  :int64-value 0
@@ -62,10 +63,10 @@
 (deftest singular-serialization (proto3-suite)
   (dolist (optimized '(nil t))
     (when optimized
-      (proto-impl::make-serializer test-message)
-      (proto-impl::make-serializer all-singular)
-      (proto-impl::make-deserializer test-message)
-      (proto-impl::make-deserializer all-singular))
+      (pi::make-serializer test-message)
+      (pi::make-serializer all-singular)
+      (pi::make-deserializer test-message)
+      (pi::make-deserializer all-singular))
     (let* ((nested (make-test-message :value 2))
            (msg (make-all-singular
                  :int32-value 1
@@ -89,7 +90,7 @@
            (serialized (serialize-object-to-bytes msg)))
       (assert-true (equalp serialized *expected-bytes*))
       (let ((deserialized (deserialize-object-from-bytes 'all-singular serialized)))
-        (assert-true (proto-impl::proto-equal deserialized msg))))))
+        (assert-true (pi::proto-equal deserialized msg))))))
 
 (deftest optional-test (proto3-suite)
   (let ((msg (make-optional-test)))

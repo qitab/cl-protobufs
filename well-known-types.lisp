@@ -9,6 +9,7 @@
 (defpackage #:cl-protobufs.well-known-types
   (:use #:cl
         #:cl-protobufs)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export #:unpack-any
            #:pack-any))
 
@@ -49,7 +50,7 @@ message is found, signal an error."
   (assert (find #\/ type-url :from-end t) ()
           "Could not find / inside of type-url.")
   (let* ((type-part-of-url (subseq type-url (1+ (position #\/ type-url :from-end t))))
-         (type (proto-impl::find-message-by-qualified-name type-part-of-url)))
+         (type (pi::find-message-by-qualified-name type-part-of-url)))
     (assert type ()
             "Could not find class for type: ~S." type-part-of-url)
     type))
@@ -71,7 +72,7 @@ Parameters:
     (cl-protobufs.google.protobuf:make-any
      ;; This should either use a URL library or manually deal with the trailing
      ;; slash correctly.
-     :type-url (proto-impl::strcat base-url
+     :type-url (pi::strcat base-url
                                    "/"
-                                   (proto-impl::proto-qualified-name m))
+                                   (pi::proto-qualified-name m))
      :value (serialize-object-to-bytes message))))

@@ -7,6 +7,7 @@
 (defpackage #:cl-protobufs.test.symbol-import
   (:use #:cl
         #:clunit)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   ;; These are here because they are exported from the symbol-importer
   ;; schema below and not having them causes a build error.
   (:export #:cl-protobufs.test.symbol-import-test
@@ -31,17 +32,17 @@
 ;;; protobuf defintion.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (proto-impl:define-schema 'symbol-imported-schema
+  (pi:define-schema 'symbol-imported-schema
     :syntax :proto2
     :package 'proto_test)
-  (proto-impl:define-message symbol-imported-message ()))
+  (pi:define-message symbol-imported-message ()))
 ;; eval-when
 
-(proto-impl:define-schema 'symbol-importer-schema
+(pi:define-schema 'symbol-importer-schema
   :package 'proto_test
   :syntax :proto2
   :import 'symbol-imported-schema)
-(proto-impl:define-message symbol-importer-message ()
+(pi:define-message symbol-importer-message ()
   (imported-type-field :index 1 :type symbol-imported-message :kind :message
                        :label (:optional) :json-name "importedTypeField"))
 

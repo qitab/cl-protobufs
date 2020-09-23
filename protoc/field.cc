@@ -242,7 +242,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
     vars["val-type"] = FieldLispType(field->message_type()->field(1));
     vars["val-kind"] = FieldLispKind(field->message_type()->field(1));
     printer->Print(vars,
-                   "\n(proto-impl:define-map $name$\n"
+                   "\n(pi:define-map $name$\n"
                    "   :key-type $key-type$\n"
                    "   :val-type $val-type$\n"
                    "   :json-name \"$json-name$\"\n"
@@ -269,7 +269,7 @@ void GenerateExtension(io::Printer* printer,
                        const FieldDescriptor* extension,
                        const FileDescriptor* file) {
       printer->Print(
-          "\n(proto-impl:define-extend $name$ ()",
+          "\n(pi:define-extend $name$ ()",
           "name", QualifiedMessageLispName(extension->containing_type(), file));
       printer->Indent();
       GenerateField(printer, extension);

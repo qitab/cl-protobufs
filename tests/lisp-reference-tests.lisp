@@ -19,6 +19,7 @@
                 #:proto-extended-fields
                 #:proto-class
                 #:proto-internal-field-name)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.reference)
@@ -30,8 +31,8 @@
   (cl-protobufs.test:run-suite 'reference-suite))
 
 (defun find-message-with-string (message name)
-  (proto:find-message-descriptor (intern (nstring-upcase (proto-impl::uncamel-case name))
-                                         (symbol-package (proto-impl::proto-class message)))))
+  (proto:find-message-descriptor (intern (nstring-upcase (pi::uncamel-case name))
+                                         (symbol-package (pi::proto-class message)))))
 
 (deftest cross-package-reference-test (reference-suite)
   (flet ((find-by-name (name proto-object)

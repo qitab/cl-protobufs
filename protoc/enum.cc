@@ -22,7 +22,7 @@ EnumGenerator::EnumGenerator(const EnumDescriptor* descriptor) :
 EnumGenerator::~EnumGenerator() {}
 
 void EnumGenerator::Generate(io::Printer* printer) {
-  printer->Print("\n\n(proto-impl:define-enum $name$", "name", lisp_name_);
+  printer->Print("\n\n(pi:define-enum $name$", "name", lisp_name_);
   printer->Annotate("name", descriptor_);
   printer->Indent();
 

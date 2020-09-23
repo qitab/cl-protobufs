@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(in-package "PROTO-IMPL")
+(in-package #:cl-protobufs.implementation)
 
 ;;; This file provides a stream-like abstraction, a BUFFER, that Protobuf serialization
 ;;; logic can use to perform a one-pass traversal of the input object tree such that
