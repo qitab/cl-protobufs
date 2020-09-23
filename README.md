@@ -170,13 +170,12 @@ package abc;
 The generated Lisp package for the above is `cl-protobufs.abc`. The prefix
 "cl-protobufs." is added in order to avoid conflicts with another Lisp package
 named "abc". If you prefer to use a shorter package name we recommend using
-[ace.core.package:defpackage\*](https://github.com/cybersurf/ace.core/blob/master/package.lisp)
-to import the package with a local nickname. Example:
+`:local-nicknames` as we do in many files in this library. Example:
 
 ```lisp
-(ace.core.package:defpackage* #:my.project
+(defpackage #:my.project
   (:use #:common-lisp)
-  (:use-alias #:cl-protobufs.abc))  ; Referenced as abc:
+  (:local-nicknames (#:abc #:cl-protobufs.abc)))  ; Referenced as abc:
 ```
 
 You may have multiple `.proto` files use the same package if desired. The
