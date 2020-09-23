@@ -34,7 +34,7 @@
 (deftest serialize-regular (alias-suite)
   (let ((obj (pb:make-message :i 99)))
     (expect-bytes (list +TAG-I+ 99)
-                  (proto:serialize-object-to-bytes obj))))
+                  (proto:serialize-to-bytes obj))))
 
 ;; Serialization of the aliased (explicit) message
 (defun internal-serialize-message (msg buf)
@@ -58,13 +58,13 @@
 (deftest serialize-aliased (alias-suite)
   (let ((struct (make-aliased-struct :i 99)))
     (expect-bytes (list +TAG-I+ 99)
-                  (proto:serialize-object-to-bytes struct 'pb:aliased-message))))
+                  (proto:serialize-to-bytes struct 'pb:aliased-message))))
 
 ;;  Serialization of OuterMessage
 
 (deftest serialize-empty-outer (alias-suite)
   (let ((outer (pb:make-outer-message)))
-    (expect-bytes nil (proto:serialize-object-to-bytes outer))))
+    (expect-bytes nil (proto:serialize-to-bytes outer))))
 
 (defconstant +TAG-MESSAGE+ (pi::make-tag :string 1)
   "The tag that should be used for field OuterMessage.Message")
@@ -76,13 +76,13 @@
   (let ((outer (pb:make-outer-message
                 :message (pb:make-message :i 99))))
     (expect-bytes (list +TAG-MESSAGE+ 2 +TAG-I+ 99)
-                  (proto:serialize-object-to-bytes outer))))
+                  (proto:serialize-to-bytes outer))))
 
 (deftest serialize-outer-containing-aliased (alias-suite)
   (let ((outer (pb:make-outer-message
                 :aliased (make-aliased-struct :i 99))))
     (expect-bytes (list +TAG-ALIASED+ 2 +TAG-I+ 99)
-                  (proto:serialize-object-to-bytes outer))))
+                  (proto:serialize-to-bytes outer))))
 
 ;; cl-protobufs message metadata
 

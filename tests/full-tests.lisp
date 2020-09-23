@@ -181,7 +181,7 @@
       (assert (field-equal (second (funcall accessor m)) v1)))))
 
 (defun read-message (class-name file-name)
-  (let ((message (pi::deserialize-object-from-file class-name file-name)))
+  (let ((message (pi::deserialize-from-file class-name file-name)))
     message))
 
 (defun test-parse-from-file ()
@@ -215,9 +215,9 @@
   (let ((m1 (cl-protobufs.protobuf-unittest:make-test-all-types)))
     (set-all-fields m1)
     (expect-all-fields-set m1)
-    (let* ((bytes (serialize-object-to-bytes m1))
-           (m2 (proto:deserialize-object 'cl-protobufs.protobuf-unittest:test-all-types
-                                         bytes 0 (length bytes))))
+    (let* ((bytes (serialize-to-bytes m1))
+           (m2 (proto:deserialize 'cl-protobufs.protobuf-unittest:test-all-types
+                                  bytes 0 (length bytes))))
       (expect-all-fields-set m2))))
 
 (defun expect-clear (m)

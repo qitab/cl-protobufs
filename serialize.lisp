@@ -63,10 +63,10 @@
 
 ;;; Serialization
 
-(defun serialize-object-to-stream (stream object &optional (type (type-of object)))
+(defun serialize-to-stream (stream object &optional (type (type-of object)))
   "Serialize OBJECT of type TYPE onto the STREAM using wire format.
-   OBJECT and TYPE are as described in SERIALIZE-OBJECT-TO-BYTES."
-  (let ((buffer (serialize-object-to-bytes object type)))
+   OBJECT and TYPE are as described in SERIALIZE-TO-BYTES."
+  (let ((buffer (serialize-to-bytes object type)))
     ;; Todo: serialization to a stream can skip the compactification step.
     ;; Instead use CALL-WITH-EACH-CHUNK on the uncompactified buffer
     ;; which will iterate over ranges of octets that contain no intervening
@@ -74,16 +74,17 @@
     (write-sequence buffer stream)
     buffer))
 
-(defun serialize-object-to-file (filename object &optional (type (type-of object)))
+(defun serialize-to-file (filename object &optional (type (type-of object)))
   "Serialize OBJECT of type TYPE into FILENAME using wire format.
-   OBJECT and TYPE are as described in SERIALIZE-OBJECT-TO-BYTES."
+   OBJECT and TYPE are as described in SERIALIZE-TO-BYTES."
   (with-open-file (stream filename
                    :direction :output
                    :element-type '(unsigned-byte 8))
-    (serialize-object-to-stream stream object type)))
+    (serialize-to-stream stream object type)))
 
-(defun serialize-object-to-bytes (object &optional (type (type-of object)))
-  "Serializes OBJECT into a new vector of (unsigned-byte 8) using wire format."
+(defun serialize-to-bytes (object &optional (type (type-of object)))
+  "Serializes OBJECT into a new vector of (unsigned-byte 8) using wire format.
+   TYPE is a symbol naming the message."
   (or (and (slot-exists-p object '%bytes)
            (proto-%bytes object))
       (let ((fast-function
@@ -93,7 +94,7 @@
             (b (make-octet-buffer 100)))
         (if fast-function
             (funcall (the function fast-function) object b)
-            (serialize-object object (find-message-descriptor type) b))
+            (serialize object (find-message-descriptor type) b))
         (let ((compact-buf (compactify-blocks b)))
           (concatenate-blocks compact-buf)))))
 
@@ -113,7 +114,7 @@
       0))
 
 ;; The default function uses metadata from the message descriptor.
-(defun serialize-object (object msg-desc buffer)
+(defun serialize (object msg-desc buffer)
   "Serialize OBJECT with message descriptor MSG-DESC into BUFFER using wire format.
    The value returned is the number of octets written to BUFFER."
   (declare (buffer buffer)
@@ -243,7 +244,7 @@ Parameters:
                              (funcall custom-serializer msg buffer)))
                       (t
                        (setq submessage-size
-                             (serialize-object msg msg-desc buffer))))
+                             (serialize msg msg-desc buffer))))
                 (iincf size (+ (backpatch submessage-size) submessage-size)))))))
     size))
 
@@ -322,27 +323,27 @@ Parameters:
                           (funcall custom-serializer msg buffer)))
                    (t
                     (setq submessage-size
-                          (serialize-object msg msg-desc buffer))))
+                          (serialize msg msg-desc buffer))))
              (+ tag-size (backpatch submessage-size) submessage-size))))))
 
 ;;; Deserialization
 
-(defun deserialize-object-from-file (type filename)
+(defun deserialize-from-file (type filename)
   "Deserialize an object of type TYPE (a symbol naming a message class)
    from FILENAME."
   (with-open-file (stream filename
-                   :direction :input
-                   :element-type '(unsigned-byte 8))
-    (deserialize-object-from-stream type :stream stream)))
+                          :direction :input
+                          :element-type '(unsigned-byte 8))
+    (deserialize-from-stream type :stream stream)))
 
-(defun deserialize-object-from-stream (type &key (stream *standard-input*))
+(defun deserialize-from-stream (type &key (stream *standard-input*))
   "Deserialize an object of type TYPE from STREAM."
   (let* ((size    (file-length stream))
          (buffer  (make-byte-vector size)))
     (read-sequence buffer stream)
-    (deserialize-object-from-bytes type buffer)))
+    (deserialize-from-bytes type buffer)))
 
-(defun deserialize-object-from-bytes (type buffer &optional (start 0) (end (length buffer)))
+(defun deserialize-from-bytes (type buffer &optional (start 0) (end (length buffer)))
   "Deserialize an object of type TYPE from BUFFER, which is a simple
    array of (unsigned-byte 8).
 
@@ -352,30 +353,29 @@ Parameters:
    Returns two values: the new object and the final index into BUFFER."
   (assert (symbolp type))
   (let ((fast-function
-          #-sbcl (get type :deserialize)
-          #+sbcl (handler-case (fdefinition `(:protobuf :deserialize ,type))
-                   (undefined-function () nil))))
+         #-sbcl (get type :deserialize)
+         #+sbcl (handler-case (fdefinition `(:protobuf :deserialize ,type))
+                  (undefined-function () nil))))
     (if fast-function
         (funcall (the function fast-function) buffer start end)
-        (%deserialize-object type buffer start end))))
+        (%deserialize type buffer start end))))
 
-;; DESERIALIZE-OBJECT-FROM-BYTES should be sole user-facing API,
-;; because that is the interface which decides whether to call a fast function
-;; or the introspection-based stuff. The DESERIALIZE-OBJECT methods are supposed
-;; to be a hidden internal detail, with sophisticated applications being permitted
-;; to override them. Furthermore, consistency with the fast auto-generated functions,
-;; demands that the START and END bounding indices not be optional.
-;; Sadly, much code exists calling DESERIALIZE-OBJECT directly when really
-;; DESERIALIZE-OBJECT-FROM-BYTES was meant.
-;; To that end, I am "hiding" the methods as %DESERIALIZE-OBJECT
-;; and allowing DESERIALIZE-OBJECT to be called as it was before.
+;; DESERIALIZE-FROM-BYTES should be sole user-facing API, because that is the
+;; interface which decides whether to call a fast function or the
+;; introspection-based stuff. The DESERIALIZE methods are supposed to be a
+;; hidden internal detail, with sophisticated applications being permitted to
+;; override them. Furthermore, consistency with the fast auto-generated
+;; functions, demands that the START and END bounding indices not be optional.
+;; Sadly, much code exists calling DESERIALIZE directly when really
+;; DESERIALIZE-FROM-BYTES was meant.  To that end, I am "hiding" the methods as
+;; %DESERIALIZE and allowing DESERIALIZE to be called as it was before.
 
-(defun-inline deserialize-object (type buffer &optional (start 0) (end (length buffer)))
-  (deserialize-object-from-bytes type buffer start end))
+(defun-inline deserialize (type buffer &optional (start 0) (end (length buffer)))
+  (deserialize-from-bytes type buffer start end))
 
-;; Allow clients to add their own methods
-;; This is you might preserve object identity, e.g.
-(defgeneric %deserialize-object (type buffer start end &optional end-tag)
+;; Allow clients to add their own methods.
+;; For example, you might want to preserve object identity.
+(defgeneric %deserialize (type buffer start end &optional end-tag)
   (:documentation
    "Deserialize an object of type TYPE from BUFFER between indices START and END.
     TYPE is the Lisp name of a Protobufs message (usually the name of a
@@ -383,17 +383,17 @@ Parameters:
     END-TAG is used internally to handle the (deprecated) \"group\" feature.
     The return values are the object and the index at which deserialization stopped."))
 
-(defmethod %deserialize-object (type buffer start end &optional (end-tag 0))
+(defmethod %deserialize (type buffer start end &optional (end-tag 0))
   (let ((message (find-message-descriptor type)))
     (assert message ()
             "There is no Protobuf message having the type ~S" type)
-    (%deserialize-object message buffer start end end-tag)))
+    (%deserialize message buffer start end end-tag)))
 
 ;; The default method uses metadata from the message descriptor.
-(defmethod %deserialize-object ((msg-desc message-descriptor) buffer start end
-                                &optional (end-tag 0))
+(defmethod %deserialize ((msg-desc message-descriptor) buffer start end
+                         &optional (end-tag 0))
   (let* ((class-name
-           (or (proto-alias-for msg-desc) (proto-class msg-desc)))
+          (or (proto-alias-for msg-desc) (proto-class msg-desc)))
          (class (find-class class-name)))
     (deserialize-structure-object
      msg-desc buffer start end end-tag class)))
@@ -470,7 +470,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
                                    append (coerce (oneof-descriptor-fields oneof) 'list)))))))
 
 ;; The generic deserializer collects all fields' values before applying the
-;; object constructor. This is identical to the the way that the
+;; constructor. This is identical to the the way that the
 ;; optimized-for-speed deserializers work.  We collect the fields into an
 ;; ordered list with higher indices at the front, so that if the next field
 ;; index exceeds the index at the front of the list, it is known not to have
@@ -781,7 +781,7 @@ Parameters:
                                 (funcall deserializer buffer index
                                          nil end-tag))
                                (t
-                                (%deserialize-object
+                                (%deserialize
                                  submessage buffer index nil end-tag)))
                        (values (if repeated-p (cons obj (car cell)) obj)
                                end))
@@ -797,7 +797,7 @@ Parameters:
                                        (funcall deserializer buffer
                                                 start end end-tag))
                                       (t
-                                       (%deserialize-object
+                                       (%deserialize
                                         submessage buffer
                                         start end end-tag)))))
                          (values (if repeated-p (cons obj (car cell)) obj)
@@ -947,17 +947,17 @@ Parameters:
                 (packed-p (proto-packed field)))
             (or (generate-repeated-field-serializer
                  class field-num boundp reader vbuf size vector-p packed-p)
-                (undefined-field-type "While generating 'serialize-object' for ~S,"
+                (undefined-field-type "While generating 'serialize' for ~S,"
                                       msg class field)))
 
           (or (generate-non-repeated-field-serializer
                class field-num boundp reader vbuf size)
-              (undefined-field-type "While generating 'serialize-object' for ~S,"
+              (undefined-field-type "While generating 'serialize' for ~S,"
                                     msg class field))))))
 
-;; Note well: keep this in sync with the main 'serialize-object' method above
+;; Note well: keep this in sync with the main 'serialize' method above
 (defun generate-serializer-body (message vobj vbuf size)
-  "Generate the body of a 'serialize-object' method for the given message.
+  "Generate the body of a 'serialize' method for the given message.
 
 Parameters:
   MESSAGE: The message-descriptor to generate a serializer for.
@@ -992,7 +992,7 @@ Parameters:
 (defmacro make-serializer (message-name)
   "Create the serializer for a message.
 Parameters:
-  MESSAGE-NAME: The symbol-name of a message."
+  MESSAGE-NAME: The symbol name of a message."
   (generate-serializer (find-message-descriptor message-name)))
 
 (defun generate-serializer (message)
@@ -1047,7 +1047,7 @@ Parameters:
                    `((,offset) ,(or (generate-non-repeated-field-serializer
                                      class field-num t 'value vbuf size)
                                     (undefined-field-type
-                                     "While generating 'serialize-object' for ~S,"
+                                     "While generating 'serialize' for ~S,"
                                      message class field)))))
          ((nil) nil)))))
 
@@ -1079,7 +1079,7 @@ Parameters:
                      (return-from generate-field-deserializer
                        (values (list tag) (list deserializer)
                                non-repeated-slot repeated-slot)))
-                 (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                 (undefined-field-type "While generating 'deserialize' for ~S,"
                                        message class field))))
           ;; If this field is contained in a oneof, we need to put the value in the
           ;; proper slot in the one-of data struct.
@@ -1097,7 +1097,7 @@ Parameters:
                             (setf (oneof-set-field ,temp) ,oneof-offset))))
                  (return-from generate-field-deserializer
                    (values (list tag) (list deserializer) nil nil temp)))
-               (undefined-field-type "While generating 'deserialize-object' for ~S,"
+               (undefined-field-type "While generating 'deserialize' for ~S,"
                                      message class field))))
           ;; Non-repeated field.
           (t
@@ -1109,7 +1109,7 @@ Parameters:
                  (return-from generate-field-deserializer
                    (values (list tag) (list deserializer)
                            non-repeated-slot repeated-slot))
-                 (undefined-field-type "While generating 'deserialize-object' for ~S,"
+                 (undefined-field-type "While generating 'deserialize' for ~S,"
                                        message class field)))))))
 
 (defun generate-repeated-field-deserializer
@@ -1287,8 +1287,7 @@ Parameters:
             (t nil)))))
 
 (defun slot-value-to-slot-name-symbol (slot-value)
-  "Given the SLOT-VALUE of a proto field return the
-slot-name as a symbol."
+  "Given the SLOT-VALUE of a proto field return the slot name as a symbol."
   (when slot-value
     (if (symbol-package slot-value)
         (intern (subseq (symbol-name slot-value) 1)
@@ -1302,12 +1301,12 @@ Parameters:
   MESSAGE-NAME: The symbol-name of a message."
   (generate-deserializer (find-message-descriptor message-name)))
 
-;; Note well: keep this in sync with the main 'deserialize-object' method above
+;; Note well: keep this in sync with the main 'deserialize' method above
 (defun generate-deserializer (message &key (name message) constructor
                                       (missing-value :%unset)
                                       (skip-fields nil)
                                       (include-fields :all))
-  "Generate a 'deserialize-object' method for the given message.
+  "Generate a 'deserialize' method for the given message.
 Parameters:
   MESSAGE: The message model class to make a deserializer for.
   NAME: The name to make a deserializer for.

@@ -22,15 +22,15 @@
 
 (deftest test-make-message-with-bytes (deserialize-suite)
   (let* ((msg (pb:make-message :i 100))
-         (msg-bytes (proto:serialize-object-to-bytes msg)))
+         (msg-bytes (proto:serialize-to-bytes msg)))
     ;; make a new msg using msg's proto serialization bytes
     (let* ((msg-clone (proto:make-message-with-bytes 'pb:message msg-bytes)))
       (assert-false (pb:message.has-i msg-clone))
-      (assert-equalp msg-bytes (proto:serialize-object-to-bytes msg-clone))
+      (assert-equalp msg-bytes (proto:serialize-to-bytes msg-clone))
       ;; modify msg-clone
       (setf (pb:i msg-clone) 1000)
       ;; re-serialize msg-clone; it should still remember the bytes we gave it
-      (assert-equalp msg-bytes (proto:serialize-object-to-bytes msg-clone))
+      (assert-equalp msg-bytes (proto:serialize-to-bytes msg-clone))
       ;; sanity check: the bytes should not be equal if we actually serialize a message with
       ;; different content
       (let* ((new-msg-bytes (pb:make-message :i 1000)))
@@ -38,10 +38,10 @@
 
 (deftest bytes-in-embedded-obj (deserialize-suite)
   (let* ((msg (pb:make-message :i 100))
-         (msg-bytes (proto:serialize-object-to-bytes msg))
+         (msg-bytes (proto:serialize-to-bytes msg))
          (msg-clone (proto:make-message-with-bytes 'pb:message msg-bytes))
          (outer-with-native (pb:make-outer-message :message msg))
          (outer-with-clone (pb:make-outer-message :message msg-clone))
-         (outer-with-native-bytes (proto:serialize-object-to-bytes outer-with-native))
-         (outer-with-clone-bytes (proto:serialize-object-to-bytes outer-with-clone)))
+         (outer-with-native-bytes (proto:serialize-to-bytes outer-with-native))
+         (outer-with-clone-bytes (proto:serialize-to-bytes outer-with-clone)))
     (assert-equalp outer-with-native-bytes outer-with-clone-bytes outer-with-native-bytes)))

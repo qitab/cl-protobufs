@@ -49,6 +49,5 @@
       ;; Finally deserialize the response and assert its field
       ;; is the same as when we started.
       (let ((round-trip-response
-             (deserialize-object 'add-numbers-response
-                                 serialized-response)))
+             (deserialize 'add-numbers-response serialized-response)))
         (expect (= 1 (add-numbers-response.response round-trip-response)))))))

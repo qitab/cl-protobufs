@@ -32,12 +32,12 @@
     (push 20 (packed-int32 m1))
     (push 30 (packed-int32 m1))
     (assert-true (= 3 (length (packed-int32 m1))))
-    (let* ((bytes (cl-protobufs:serialize-object-to-bytes m1))
-           (m2 (cl-protobufs:deserialize-object 'test-packed-types bytes))
+    (let* ((bytes (cl-protobufs:serialize-to-bytes m1))
+           (m2 (cl-protobufs:deserialize 'test-packed-types bytes))
            ;; Because the proto layouts are the same, we should be able to read the bytes as a
            ;; test-unpacked-types, even though the packed-int32 field is packed
            ;; see: go/protobuf-encoding?cl=head#packed
-           (unpacked (cl-protobufs:deserialize-object 'test-unpacked-types bytes)))
+           (unpacked (cl-protobufs:deserialize 'test-unpacked-types bytes)))
       ;; (format t "~A~%" bytes) ; =>
       ;; #(210 5 3 30 20 10)
       (assert-true (= 6 (length bytes)))
@@ -50,12 +50,12 @@
     (push 20 (unpacked-int32 m1))
     (push 30 (unpacked-int32 m1))
     (assert-true (= 3 (length (unpacked-int32 m1))))
-    (let* ((bytes (cl-protobufs:serialize-object-to-bytes m1))
-           (m2 (cl-protobufs:deserialize-object 'test-unpacked-types bytes))
+    (let* ((bytes (cl-protobufs:serialize-to-bytes m1))
+           (m2 (cl-protobufs:deserialize 'test-unpacked-types bytes))
            ;; Because the proto layouts are the same, we should be able to read the bytes as a
            ;; test-packed-types, even though the unpacked-int32 field is unpacked
            ;; see: go/protobuf-encoding?cl=head#packed
-           (packed (cl-protobufs:deserialize-object 'test-packed-types bytes)))
+           (packed (cl-protobufs:deserialize 'test-packed-types bytes)))
       ;; (format t "~A~%" bytes) ; =>
       ;; #(208 5 30 208 5 20 208 5 10)
       (assert-true (= 9 (length bytes)))
@@ -68,12 +68,12 @@
     (push :foreign-bar (packed-enum m1))
     (push :foreign-baz (packed-enum m1))
     (assert-true (= 3 (length (packed-enum m1))))
-    (let* ((bytes (cl-protobufs:serialize-object-to-bytes m1))
-           (m2 (cl-protobufs:deserialize-object 'test-packed-types bytes))
+    (let* ((bytes (cl-protobufs:serialize-to-bytes m1))
+           (m2 (cl-protobufs:deserialize 'test-packed-types bytes))
            ;; Because the proto layouts are the same, we should be able to read the bytes as a
            ;; test-unpacked-types, even though the packed-enum field is packed
            ;; see: go/protobuf-encoding?cl=head#packed
-           (unpacked (cl-protobufs:deserialize-object 'test-unpacked-types bytes)))
+           (unpacked (cl-protobufs:deserialize 'test-unpacked-types bytes)))
       ;; (format t "~A~%" bytes) ; =>
       ;; #(186 6 3 6 5 4)
       (assert-true (= 6 (length bytes)))
@@ -86,12 +86,12 @@
     (push :foreign-bar (unpacked-enum m1))
     (push :foreign-baz (unpacked-enum m1))
     (assert-true (= 3 (length (unpacked-enum m1))))
-    (let* ((bytes (cl-protobufs:serialize-object-to-bytes m1))
-           (m2 (cl-protobufs:deserialize-object 'test-unpacked-types bytes))
+    (let* ((bytes (cl-protobufs:serialize-to-bytes m1))
+           (m2 (cl-protobufs:deserialize 'test-unpacked-types bytes))
            ;; Because the proto layouts are the same, we should be able to read the bytes as a
            ;; test-packed-types, even though the unpacked-enum field is unpacked
            ;; see: go/protobuf-encoding?cl=head#packed
-           (packed (cl-protobufs:deserialize-object 'test-packed-types bytes)))
+           (packed (cl-protobufs:deserialize 'test-packed-types bytes)))
       ;; (format t "~A~%" bytes) ; =>
       ;; #(184 6 6 184 6 5 184 6 4)
       (assert-true (= 9 (length bytes)))
@@ -108,8 +108,8 @@
     (push 10 (packed-int32 packed))
     (push 20 (packed-int32 packed))
     (push 30 (packed-int32 packed))
-    (let* ((bytes (cl-protobufs:serialize-object-to-bytes outer1))
-           (outer2 (cl-protobufs:deserialize-object 'test-packed-outer bytes)))
+    (let* ((bytes (cl-protobufs:serialize-to-bytes outer1))
+           (outer2 (cl-protobufs:deserialize 'test-packed-outer bytes)))
       ;; 10: tag  6: length of the inner message.
       ;; 210 5 3 30 20 10: content of the inner message.
       ;; The tag is (210 5), here, rather than (208 5), because it's packed, so the 0 in the lower 3
@@ -128,8 +128,8 @@
     (push :foreign-foo (packed-enum packed))
     (push :foreign-bar (packed-enum packed))
     (push :foreign-baz (packed-enum packed))
-    (let* ((bytes (cl-protobufs:serialize-object-to-bytes outer1))
-           (outer2 (cl-protobufs:deserialize-object 'test-packed-outer bytes)))
+    (let* ((bytes (cl-protobufs:serialize-to-bytes outer1))
+           (outer2 (cl-protobufs:deserialize 'test-packed-outer bytes)))
       ;; 10: tag  6: length of the inner message.
       ;; 210 5 3 30 20 10: content of the inner message.
       ;; The tag is (186 6), here, rather than (184 6), because it's packed, so the 0 in the lower 3
@@ -145,5 +145,5 @@ deserialize it.
 This tests deserialization without relying on the lisp serialization code being correct."
   (let* ((bytes (make-array 11 :element-type '(unsigned-byte 8)
                                :initial-contents '(10 9 208 5 30 208 5 20 208 5 10)))
-         (outer (cl-protobufs:deserialize-object 'test-packed-outer bytes)))
+         (outer (cl-protobufs:deserialize 'test-packed-outer bytes)))
     (assert-true (equalp '(30 20 10) (packed-int32 (packed outer))))))

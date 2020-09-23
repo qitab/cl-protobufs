@@ -141,23 +141,23 @@
   "Protobuf message used to test outcome of custom sending.")
 
 (deftest test-custom-method (custom-proto-suite)
-  (let ((octets (proto:serialize-object-to-bytes *sending-test*)))
+  (let ((octets (proto:serialize-to-bytes *sending-test*)))
     ;; assert that the outer method's generic serializer called the custom inner serializer
     (assert-true (plusp *callcount-serialize*))
     ;; now assert that decoding works as expected
-    (assert-equalp *expect* (proto:deserialize-object-from-bytes 'pb:example-parent octets)))
+    (assert-equalp *expect* (proto:deserialize-from-bytes 'pb:example-parent octets)))
 
   ;; Produce the standard fast deserialization code for messages of kind EXAMPLE-PARENT.
   (pi::generate-deserializer
    (proto:find-message-descriptor 'pb:example-parent))
 
   ;; Run the test again
-  (let ((octets (proto:serialize-object-to-bytes *sending-test*)))
-    (assert-equalp *expect* (proto:deserialize-object-from-bytes 'pb:example-parent octets)))
+  (let ((octets (proto:serialize-to-bytes *sending-test*)))
+    (assert-equalp *expect* (proto:deserialize-from-bytes 'pb:example-parent octets)))
 
   ;; Produce the standard fast serialization code for messages of kind EXAMPLE-PARENT.
   (pi::generate-serializer (proto:find-message-descriptor 'pb:example-parent))
 
   ;; Run the test again
-  (let ((octets (proto:serialize-object-to-bytes *sending-test*)))
-    (assert-equalp *expect* (proto:deserialize-object-from-bytes 'pb:example-parent octets))))
+  (let ((octets (proto:serialize-to-bytes *sending-test*)))
+    (assert-equalp *expect* (proto:deserialize-from-bytes 'pb:example-parent octets))))

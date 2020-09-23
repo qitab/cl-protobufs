@@ -102,12 +102,10 @@
           (cl-protobufs.protobuf-package-unittest2:foo extended2) 123)
 
 
-    (let* ((bytes1 (serialize-object-to-bytes orig1 'message-with-cross-package-reference))
-           (bytes2 (serialize-object-to-bytes orig2 'message-with-cross-package-extension))
-           (new1 (deserialize-object 'message-with-cross-package-reference
-                                     bytes1))
-           (new2 (deserialize-object 'message-with-cross-package-extension
-                                     bytes2)))
+    (let* ((bytes1 (serialize-to-bytes orig1 'message-with-cross-package-reference))
+           (bytes2 (serialize-to-bytes orig2 'message-with-cross-package-extension))
+           (new1 (deserialize 'message-with-cross-package-reference bytes1))
+           (new2 (deserialize 'message-with-cross-package-extension bytes2)))
       (assert-true (typep (baz new1)
                           'cl-protobufs.protobuf-package-unittest2:message-in-other-package))
       (assert-true (equal 123
@@ -171,11 +169,11 @@
           (cl-protobufs.protobuf-forward-reference-unittest::baz foo) 123)
 
     (let* ((bytes
-            (serialize-object-to-bytes
+            (serialize-to-bytes
              orig
              'cl-protobufs.protobuf-forward-reference-unittest:message-with-forward-reference))
            (new
-            (deserialize-object
+            (deserialize
              'cl-protobufs.protobuf-forward-reference-unittest:message-with-forward-reference bytes)))
       (assert-true (typep (cl-protobufs.protobuf-forward-reference-unittest::foo new)
                      'cl-protobufs.protobuf-forward-reference-unittest::msg-w-overridden-lisp-class))

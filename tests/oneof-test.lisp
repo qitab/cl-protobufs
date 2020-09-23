@@ -87,14 +87,14 @@
                   (intlist (make-oneof-test.int-list :ints (list 1 2 3 4 5)))
                   (test3 (make-oneof-test :list-of-ints intlist))
                   (test4 (make-oneof-proto :outside 1)))
-             (let* ((tser1 (serialize-object-to-bytes test1 'oneof-proto))
-                    (tser2 (serialize-object-to-bytes test2 'nested-oneof))
-                    (tser3 (serialize-object-to-bytes test3 'oneof-test))
-                    (tser4 (serialize-object-to-bytes test4 'oneof-proto))
-                    (t1res (deserialize-object-from-bytes 'oneof-proto tser1))
-                    (t2res (deserialize-object-from-bytes 'nested-oneof tser2))
-                    (t3res (deserialize-object-from-bytes 'oneof-test tser3))
-                    (t4res (deserialize-object-from-bytes 'oneof-proto tser4)))
+             (let* ((tser1 (serialize-to-bytes test1 'oneof-proto))
+                    (tser2 (serialize-to-bytes test2 'nested-oneof))
+                    (tser3 (serialize-to-bytes test3 'oneof-test))
+                    (tser4 (serialize-to-bytes test4 'oneof-proto))
+                    (t1res (deserialize-from-bytes 'oneof-proto tser1))
+                    (t2res (deserialize-from-bytes 'nested-oneof tser2))
+                    (t3res (deserialize-from-bytes 'oneof-test tser3))
+                    (t4res (deserialize-from-bytes 'oneof-proto tser4)))
                (assert-true (proto:proto-equal test1 t1res))
                (assert-true (proto:proto-equal test2 t2res))
                (assert-true (proto:proto-equal test3 t3res))
@@ -112,14 +112,12 @@
           :do (let (msg1 msg2)
                 (if optimized
                     (progn
-                      (setf msg1 (deserialize-object-from-bytes
-                                  'oneof-proto bytes1))
-                      (setf msg2 (deserialize-object-from-bytes
-                                  'oneof-proto bytes2)))
+                      (setf msg1 (deserialize-from-bytes 'oneof-proto bytes1))
+                      (setf msg2 (deserialize-from-bytes 'oneof-proto bytes2)))
                     (progn
-                      (setf msg1 (pi::%deserialize-object
+                      (setf msg1 (pi::%deserialize
                                   'oneof-proto bytes1 0 (length bytes1)))
-                      (setf msg2 (pi::%deserialize-object
+                      (setf msg2 (pi::%deserialize
                                   'oneof-proto bytes2 0 (length bytes2)))))
                 (assert-true (eq (oneof-proto.my-oneof-case msg1) 'intval))
                 (assert-true (= (oneof-proto.intval msg1) 4))

@@ -47,7 +47,7 @@
                  :double-value 0.0d0
                  :float-value 0.0
                  :enum-value :default))
-           (serialized (serialize-object-to-bytes msg))
+           (serialized (serialize-to-bytes msg))
            (text (with-output-to-string (s) (print-text-format msg :stream s)))
            (json (with-output-to-string (s) (print-json msg :stream s))))
       (assert-true (string= (format nil "AllSingular {~%}~%") text))
@@ -87,9 +87,9 @@
                  :float-value 3.1
                  :enum-value :other
                  :msg-value nested))
-           (serialized (serialize-object-to-bytes msg)))
+           (serialized (serialize-to-bytes msg)))
       (assert-true (equalp serialized *expected-bytes*))
-      (let ((deserialized (deserialize-object-from-bytes 'all-singular serialized)))
+      (let ((deserialized (deserialize-from-bytes 'all-singular serialized)))
         (assert-true (pi::proto-equal deserialized msg))))))
 
 (deftest optional-test (proto3-suite)

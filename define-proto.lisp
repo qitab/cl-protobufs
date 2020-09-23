@@ -765,8 +765,8 @@ Paramters:
                                      (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
                                 (if ,bytes
                                     (setf (oneof-value (,hidden-accessor-name ,obj))
-                                          (%deserialize-object ',(proto-class field)
-                                                               ,bytes nil nil))))
+                                          (%deserialize ',(proto-class field)
+                                                        ,bytes nil nil))))
                              `(oneof-value (,hidden-accessor-name ,obj)))
                         ,default-form))
 
@@ -907,24 +907,24 @@ function) then there is no guarantee on the serialize function working properly.
                        (setf (,hidden-accessor-name ,obj)
                              ;; Re-create the field object by deserializing its %bytes
                              ;; field.
-                             (%deserialize-object ',(proto-class field) ,bytes nil nil))
+                             (%deserialize ',(proto-class field) ,bytes nil nil))
                        ,field-obj))
                 `(let ((,field-obj (,hidden-accessor-name ,obj)))
                    (if (notany #'proto-%bytes ,field-obj)
                        ,field-obj
-                       ,(with-gensyms (maybe-deserialize-object field-element)
-                          `(flet ((,maybe-deserialize-object (,field-element)
+                       ,(with-gensyms (maybe-deserialize field-element)
+                          `(flet ((,maybe-deserialize (,field-element)
                                     (let ((,bytes (proto-%bytes ,field-element)))
                                       (if ,bytes
                                           ;; Re-create the field object by deserializing
                                           ;; its %bytes field.
-                                          (%deserialize-object ',(proto-class field) ,bytes nil nil)
+                                          (%deserialize ',(proto-class field) ,bytes nil nil)
                                           ,field-element))))
                              (setf (,hidden-accessor-name ,obj)
                                    ,(if vectorp
-                                        `(map 'vector #',maybe-deserialize-object
+                                        `(map 'vector #',maybe-deserialize
                                               (the vector ,field-obj))
-                                        `(mapcar #',maybe-deserialize-object ,field-obj))))))))))
+                                        `(mapcar #',maybe-deserialize ,field-obj))))))))))
         ,@(make-common-forms-for-structure-class proto-type public-slot-name slot-name field)))))
 
 (defun make-structure-class-forms-non-lazy (proto-type field public-slot-name)

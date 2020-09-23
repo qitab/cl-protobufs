@@ -134,8 +134,8 @@
     (setf (repeated-list-proto.repeated-string list-proto)
           (nreverse (repeated-list-proto.repeated-string list-proto)))
 
-    (let ((vector-serialized (serialize-object-to-bytes vector-proto 'repeated-proto))
-          (list-serialized (serialize-object-to-bytes list-proto 'repeated-list-proto)))
+    (let ((vector-serialized (serialize-to-bytes vector-proto 'repeated-proto))
+          (list-serialized (serialize-to-bytes list-proto 'repeated-list-proto)))
       (assert-equalp vector-serialized list-serialized))))
 
 
