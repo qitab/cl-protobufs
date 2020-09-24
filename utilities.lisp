@@ -495,7 +495,7 @@ Parameters:
                                   (1- first-upcase-position))))))
     (when add-cl-protobufs
       (setf package (concatenate 'string "CL-PROTOBUFS." package)))
-    (proto-impl::proto->class-name name package)))
+    (proto->class-name name package)))
 
 ;; "ClassName" -> 'class-name
 ;; "cl-user.ClassName" -> 'cl-user::class-name

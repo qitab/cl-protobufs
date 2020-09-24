@@ -8,7 +8,7 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs)
-  (:import-from #:proto-impl
+  (:import-from #:cl-protobufs.implementation
                 #:make-octet-buffer
                 #:concatenate-blocks
                 #:compactify-blocks

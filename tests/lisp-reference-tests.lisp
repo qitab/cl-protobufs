@@ -9,7 +9,7 @@
         #:clunit
         #:cl-protobufs
         #:cl-protobufs.protobuf-package-unittest1)
-  (:import-from #:proto-impl
+  (:import-from #:cl-protobufs.implementation
                 #:proto-name
                 #:proto-fields
                 #:proto-services

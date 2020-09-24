@@ -112,7 +112,6 @@
    ))
 
 (defpackage cl-protobufs.implementation
-  (:nicknames :proto-impl)
   (:use :common-lisp :cl-protobufs)
 
   (:import-from :alexandria
