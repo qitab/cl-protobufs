@@ -27,7 +27,8 @@
   (:use #:cl
         #:clunit)
   (:local-nicknames (#:pb #:cl-protobufs.custom-proto)
-                    (#:pi #:cl-protobufs.implementation))
+                    (#:pi #:cl-protobufs.implementation)
+                    (#:proto #:cl-protobufs))
   (:export :run))
 
 (in-package #:cl-protobufs.test.custom-proto)

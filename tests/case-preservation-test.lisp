@@ -8,7 +8,8 @@
   (:use #:cl
         #:clunit)
   (:local-nicknames (#:pb #:cl-protobufs.protobuf-case-preservation-unittest)
-                    (#:pi #:cl-protobufs.implementation))
+                    (#:pi #:cl-protobufs.implementation)
+                    (#:proto #:cl-protobufs))
   (:export :run))
 
 (in-package #:cl-protobufs.test.case-preservation)

@@ -22,7 +22,7 @@
 
 
 (deftest test-all-imports-are-included (import-suite)
-  (let* ((descriptor (proto:find-file-descriptor 'pb:import-proto))
+  (let* ((descriptor (cl-protobufs:find-file-descriptor 'pb:import-proto))
          (imports (pi::proto-imports descriptor)))
     (assert-true (= (length imports) 2))
     (assert-true (string= (first imports)

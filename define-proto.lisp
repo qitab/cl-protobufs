@@ -31,14 +31,14 @@ The lisp generated proto file should look like:
     (date  :index 3  :type cl:string :label (:optional) :typename "string"))
   ;; Fields.
   (name  :index 1  :type cl:string :label (:required) :typename "string")
-  (colors  :index 2  :type (proto:list-of color1) :label (:repeated :list)
+  (colors  :index 2  :type (list-of color1) :label (:repeated :list)
            :typename "Color1")
   (metadata  :index 3  :type (cl:or cl:null color-wheel1.metadata1)
              :label (:optional) :typename "Metadata1"))
 
-(cl:setf (cl:gethash #P"third_party/lisp/cl_protobufs/tests/serialization.proto"
-                     pi::*file-descriptors*)
-         (proto:find-file-descriptor 'serialization-test))
+(cl:eval-when (:compile-toplevel :load-toplevel :execute)
+(pi:add-file-descriptor #P"third_party/lisp/cl_protobufs/tests/serialization.proto"
+                        pi::*file-descriptors*))
 
 (export ...)
 -------------------------------
@@ -189,7 +189,7 @@ the oneof and its nested fields.
    already been loaded. FILE-DESCRIPTOR is the descriptor of the
    file doing the importing."
   (dolist (import (reverse imports))
-    (let* ((imported (proto:find-file-descriptor (if (stringp import) (pathname import) import))))
+    (let* ((imported (find-file-descriptor (if (stringp import) (pathname import) import))))
       (unless imported
         (error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
@@ -594,7 +594,7 @@ Parameters:
                      (:vector `(not (= (length ,cur-value) 0)))
                      (:list `(and ,cur-value t))
                      (t (case (proto-type field)
-                          ((proto:byte-vector cl:string) `(not (= (length ,cur-value) 0)))
+                          ((byte-vector cl:string) `(not (= (length ,cur-value) 0)))
                           ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
                           ;; Otherwise, the type is integral. EQ suffices to check equality.
                           (t `(not (eq ,cur-value ,default-form)))))))))
@@ -1508,7 +1508,7 @@ function) then there is no guarantee on the serialize function working properly.
                      (case label
                        (:required (list 'cl:or 'cl:null `,type))
                        (:optional (list 'cl:or 'cl:null `,type))
-                       (:repeated (list 'proto:list-of `,type)))
+                       (:repeated (list 'list-of `,type)))
                      :initform nil
                      :accessor reader
                      :container (when (eq label :repeated) :list)
@@ -1699,9 +1699,9 @@ function) then there is no guarantee on the serialize function working properly.
                            :external-slot-name slot
                            :type
                            (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
-                                  (list 'proto:vector-of `,type))
+                                  (list 'vector-of `,type))
                                  ((and (eq label :repeated) (eq repeated-storage-type :list))
-                                  (list 'proto:list-of `,type))
+                                  (list 'list-of `,type))
                                  ((member kind '(:message :group))
                                   (list 'cl:or 'cl:null `,type))
                                  (t `,type))

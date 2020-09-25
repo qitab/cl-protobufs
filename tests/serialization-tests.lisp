@@ -40,7 +40,7 @@
      (when optimized
        (dolist (class '(basic-test1 basic-test2 basic-test3 basic-test4
                         basic-test5 basic-test6 basic-test7 subgroups))
-         (let ((message (proto:find-message-descriptor class)))
+         (let ((message (find-message-descriptor class)))
            (handler-bind ((style-warning #'muffle-warning))
              (eval (pi::generate-deserializer message))
              (eval (pi::generate-serializer message))))))
@@ -410,7 +410,7 @@
     (print optimized)
     (when optimized
       (dolist (class '(proto-on-wire proto-different-than-wire))
-        (let ((message (proto:find-message-descriptor class)))
+        (let ((message (find-message-descriptor class)))
           (handler-bind ((style-warning #'muffle-warning))
             (eval (pi::generate-deserializer message))
             (eval (pi::generate-serializer message))))))

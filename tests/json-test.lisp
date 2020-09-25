@@ -9,7 +9,8 @@
         #:clunit)
   (:local-nicknames (#:google #:cl-protobufs.google.protobuf)
                     (#:pb #:cl-protobufs.test-proto)
-                    (#:wkt #:cl-protobufs.well-known-types))
+                    (#:wkt #:cl-protobufs.well-known-types)
+                    (#:proto #:cl-protobufs))
   (:export :run))
 
 (in-package :cl-protobufs.test.json)

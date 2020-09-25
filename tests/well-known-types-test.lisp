@@ -27,11 +27,11 @@
   (let* ((protocol (unittest-pb:make-test-protocol :zero "red" :one "fish" :two 6))
          (any (wkt:pack-any protocol :base-url "http://fish.com"))
          (ret (wkt:unpack-any any)))
-    (assert-true (proto:proto-equal protocol ret :exact t))
+    (assert-true (cl-protobufs:proto-equal protocol ret :exact t))
     (assert-equal "http://fish.com/protobuf_unittest.TestProtocol" (google-pb:any.type-url any)))
   (let* ((msg (alias-pb:make-outer-message :message (alias-pb:make-message :i 1)))
          (any (wkt:pack-any msg))
          (ret (wkt:unpack-any any)))
-    (assert-true (proto:proto-equal msg ret :exact t))
+    (assert-true (cl-protobufs:proto-equal msg ret :exact t))
     (assert-equal
         "type.googleapis.com/alias_test.OuterMessage" (google-pb:any.type-url any))))

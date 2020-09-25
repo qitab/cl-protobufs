@@ -125,7 +125,7 @@
       (serialize-to-bytes population (type-of population)))
     (let* ((buffer (serialize-to-bytes population (type-of population)))
            (result (deserialize-from-bytes (type-of population) buffer)))
-      (assert-true (proto:proto-equal population result :exact t))
+      (assert-true (proto-equal population result :exact t))
 
       (print "Proto3 Performance Test Deserialization")
       (benchmark:with-timing (1000)
@@ -136,7 +136,7 @@
       (serialize-to-bytes population (type-of population)))
     (let* ((buffer (serialize-to-bytes population (type-of population)))
            (result (deserialize-from-bytes (type-of population) buffer)))
-      (assert-true (proto:proto-equal population result :exact t))
+      (assert-true (proto-equal population result :exact t))
 
       (print "Proto3 Performance Test Deserialization Optimized")
       (benchmark:with-timing (1000)
@@ -182,7 +182,7 @@
       (serialize-to-bytes population (type-of population)))
     (let* ((buffer (serialize-to-bytes population (type-of population)))
            (result (deserialize-from-bytes (type-of population) buffer)))
-      (assert-true (proto:proto-equal population result :exact t))
+      (assert-true (proto-equal population result :exact t))
 
       (print "Proto3 Performance Test Deserialization")
       (benchmark:with-timing (1000)
@@ -193,7 +193,7 @@
       (serialize-to-bytes population (type-of population)))
     (let* ((buffer (serialize-to-bytes population (type-of population)))
            (result (deserialize-from-bytes (type-of population) buffer)))
-      (assert-true (proto:proto-equal population result :exact t))
+      (assert-true (proto-equal population result :exact t))
 
       (print "Proto3 Performance Test Deserialization Optimized")
       (benchmark:with-timing (1000)

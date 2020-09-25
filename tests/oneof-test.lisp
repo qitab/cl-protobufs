@@ -49,7 +49,7 @@
     (assert-true (string= (oneof-proto.strval msg) "test")
     (assert-false (oneof-proto.has-intval msg))
     (assert-true (oneof-proto.has-strval msg))
-    (proto:clear msg)
+    (clear msg)
     (assert-true (eq (oneof-proto.my-oneof-case msg) nil))
     (assert-false (oneof-proto.has-intval msg))
     (assert-false (oneof-proto.has-strval msg)))))
@@ -78,7 +78,7 @@
         :do
            (when optimized
              (dolist (class '(oneof-proto nested-oneof oneof-test.int-list oneof-test))
-               (let ((message (proto:find-message-descriptor class)))
+               (let ((message (find-message-descriptor class)))
                  (handler-bind ((style-warning #'muffle-warning))
                    (eval (pi::generate-serializer message))
                    (eval (pi::generate-deserializer message))))))
@@ -95,10 +95,10 @@
                     (t2res (deserialize-from-bytes 'nested-oneof tser2))
                     (t3res (deserialize-from-bytes 'oneof-test tser3))
                     (t4res (deserialize-from-bytes 'oneof-proto tser4)))
-               (assert-true (proto:proto-equal test1 t1res))
-               (assert-true (proto:proto-equal test2 t2res))
-               (assert-true (proto:proto-equal test3 t3res))
-               (assert-true (proto:proto-equal test4 t4res))))))
+               (assert-true (proto-equal test1 t1res))
+               (assert-true (proto-equal test2 t2res))
+               (assert-true (proto-equal test3 t3res))
+               (assert-true (proto-equal test4 t4res))))))
 
 ;; Protobuf specifies that if multiple members of a oneof appear on the wire,
 ;; then only the last one on the wire is saved.
@@ -137,7 +137,7 @@
                            (print-text-format message :stream s))))
                (with-input-from-string (s text)
                  (parse-text-format (type-of message) :stream s)))))
-      (assert-true (proto:proto-equal test1 (round-trip test1)))
-      (assert-true (proto:proto-equal test2 (round-trip test2)))
-      (assert-true (proto:proto-equal test3 (round-trip test3)))
-      (assert-true (proto:proto-equal test4 (round-trip test4))))))
+      (assert-true (proto-equal test1 (round-trip test1)))
+      (assert-true (proto-equal test2 (round-trip test2)))
+      (assert-true (proto-equal test3 (round-trip test3)))
+      (assert-true (proto-equal test4 (round-trip test4))))))

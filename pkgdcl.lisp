@@ -6,10 +6,8 @@
 
 (in-package "CL-USER")
 
-(defpackage :cl-protobufs
-  (:nicknames :proto)
+(defpackage #:cl-protobufs
   (:use)
-
   (:export
    ;; Base type for all message instances.
    #:message
@@ -106,15 +104,11 @@
    #:clear
    #:has-field
    #:proto-slot-value
-   #:encoded-field
-   ))
+   #:encoded-field))
 
-(defpackage cl-protobufs.implementation
+(defpackage #:cl-protobufs.implementation
   (:use :common-lisp :cl-protobufs)
-
-  (:import-from :alexandria
-                #:define-constant)
-
+  (:import-from :alexandria #:define-constant)
   (:export
    ;; Exported solely for use by generated code.
    #:define-schema

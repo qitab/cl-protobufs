@@ -10,7 +10,8 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs.protobuf-unittest) ; from unittest.proto
-  (:local-nicknames (#:pi #:cl-protobufs.implementation))
+  (:local-nicknames (#:pi #:cl-protobufs.implementation)
+                    (#:proto #:cl-protobufs))
   (:export :run))
 
 (in-package #:cl-protobufs.test.packed)

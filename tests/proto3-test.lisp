@@ -109,6 +109,6 @@
     (setf (second-opt msg) 5)
     (assert-true (mixed-test.has-first-opt msg))
     (assert-true (mixed-test.has-second-opt msg))
-    (proto:clear msg)
+    (clear msg)
     (assert-false (mixed-test.has-first-opt msg))
     (assert-false (mixed-test.has-second-opt msg))))

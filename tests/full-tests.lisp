@@ -216,8 +216,8 @@
     (set-all-fields m1)
     (expect-all-fields-set m1)
     (let* ((bytes (serialize-to-bytes m1))
-           (m2 (proto:deserialize 'cl-protobufs.protobuf-unittest:test-all-types
-                                  bytes 0 (length bytes))))
+           (m2 (deserialize 'cl-protobufs.protobuf-unittest:test-all-types
+                            bytes 0 (length bytes))))
       (expect-all-fields-set m2))))
 
 (defun expect-clear (m)
@@ -225,7 +225,7 @@
   (let ((field-info *optional-field-info*))
     (loop for (field . values) in field-info
           for accessor = (pi::proto-slot-function-name
-                              (type-of m) field :get)
+                          (type-of m) field :get)
           for has-function = (pi::proto-slot-function-name
                               (type-of m) field :has)
 
@@ -238,7 +238,7 @@
   (let ((field-info *default-field-info*))
     (loop for (field . values) in field-info do
       (let* ((accessor (pi::proto-slot-function-name
-                              (type-of m) field :get))
+                        (type-of m) field :get))
              (default-value (first values)))
         (assert (field-equal (funcall accessor m)
                              default-value)))))
@@ -247,7 +247,7 @@
   (let ((field-info *repeated-field-info*))
     (loop for (field . nil) in field-info do
       (let* ((accessor (pi::proto-slot-function-name
-                              (type-of m) field :get)))
+                        (type-of m) field :get)))
         (assert (zerop (length (funcall accessor m))))))))
 
 (defun modify-repeated-fields (m)
@@ -278,7 +278,7 @@
     (expect-all-fields-set m)
     (modify-repeated-fields m)
     (expect-repeated-fields-modified m)
-    (proto:clear m)
+    (clear m)
     (expect-clear m)))
 
 (deftest test-enum-default (full-suite)

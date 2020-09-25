@@ -11,7 +11,8 @@
   (:import-from #:cl-protobufs.implementation
                 #:proto-%bytes
                 #:oneof-value)
-  (:local-nicknames (#:pi #:cl-protobufs.implementation))
+  (:local-nicknames (#:pi #:cl-protobufs.implementation)
+                    (#:proto #:cl-protobufs))
   (:export :run))
 
 (in-package #:cl-protobufs.test.lazy)

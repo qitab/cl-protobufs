@@ -21,7 +21,7 @@ Parameters:
 (defun add-file-descriptor (pathname symbol)
   "Register the file-descriptor named by SYMBOL under the key PATHNAME.
    Intended for use by protoc-gen-lisp."
-  (setf (gethash pathname *file-descriptors*) (proto:find-file-descriptor symbol)))
+  (setf (gethash pathname *file-descriptors*) (find-file-descriptor symbol)))
 
 (defstruct message
   "All protobuf message objects are of this type."
@@ -43,7 +43,7 @@ Parameters:
 ;; that makes writing the protobuf parser a good deal more complicated.
 (defclass descriptor (abstract-descriptor)
   ;; The Lisp name for the type of this object. For messages and groups it's
-  ;; the name of a struct. For proto scalar types it's PROTO:INT32, STRING,
+  ;; the name of a struct. For proto scalar types it's INT32, STRING,
   ;; etc.
   ((class :type symbol
           :accessor proto-class

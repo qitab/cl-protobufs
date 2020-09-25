@@ -7,7 +7,8 @@
 (defpackage #:cl-protobufs.test.text-format
   (:use #:cl
         #:clunit)
-  (:local-nicknames (#:test-pb #:cl-protobufs.test-proto))
+  (:local-nicknames (#:test-pb #:cl-protobufs.test-proto)
+                    (#:proto #:cl-protobufs))
   (:export :run))
 
 (in-package :cl-protobufs.test.text-format)

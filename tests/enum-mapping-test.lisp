@@ -6,13 +6,10 @@
 
 (defpackage #:cl-protobufs.test.enum-mapping
   (:use #:cl
-
         #:clunit)
   (:local-nicknames (#:pb #:cl-protobufs.enum-mapping-test)
-                    (#:pi #:cl-protobufs.implementation))
-  (:import-from #:cl-protobufs
-                #:enum-int-to-keyword
-                #:enum-keyword-to-int)
+                    (#:pi #:cl-protobufs.implementation)
+                    (#:proto #:cl-protobufs))
   (:export :run))
 
 (in-package #:cl-protobufs.test.enum-mapping)

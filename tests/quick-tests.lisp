@@ -26,7 +26,7 @@
 
     (setf (cl-protobufs.protobuf-unittest:zero p) "x")
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:zero p) "x"))
-    (proto:clear p)
+    (clear p)
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:zero)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:one)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:fixed-value)))
@@ -40,10 +40,10 @@
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:opt-string p) "opt"))
     (setf (cl-protobufs.protobuf-unittest:opt-string p) "x")
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:opt-string p) "x"))
-    (proto:clear p)
+    (clear p)
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:opt-string p) "opt"))
     (setf (cl-protobufs.protobuf-unittest:opt-string p) "x")
-    (proto:clear p)
+    (clear p)
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:opt-string p) "opt"))
     (setf (cl-protobufs.protobuf-unittest:opt-string p) "x")
     (cl-protobufs.protobuf-unittest:test-protocol.clear-opt-string p)
@@ -266,7 +266,7 @@
                                        (make-instance
                                         'pi::field-descriptor
                                         :index x
-                                        :class 'proto:int32
+                                        :class 'int32
                                         :internal-field-name 'foo
                                         :field-offset n))
                                      list)))))))))

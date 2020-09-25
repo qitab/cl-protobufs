@@ -31,8 +31,8 @@
   (cl-protobufs.test:run-suite 'reference-suite))
 
 (defun find-message-with-string (message name)
-  (proto:find-message-descriptor (intern (nstring-upcase (pi::uncamel-case name))
-                                         (symbol-package (pi::proto-class message)))))
+  (find-message-descriptor (intern (nstring-upcase (pi::uncamel-case name))
+                                   (symbol-package (pi::proto-class message)))))
 
 (deftest cross-package-reference-test (reference-suite)
   (flet ((find-by-name (name proto-object)

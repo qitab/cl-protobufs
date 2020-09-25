@@ -7,7 +7,8 @@
 (defpackage #:cl-protobufs.test.deserialize
   (:use #:cl
         #:clunit)
-  (:local-nicknames (#:pb #:cl-protobufs.alias-test))
+  (:local-nicknames (#:pb #:cl-protobufs.alias-test)
+                    (#:proto #:cl-protobufs))
   (:export :run))
 
 (in-package #:cl-protobufs.test.deserialize)

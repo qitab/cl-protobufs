@@ -11,7 +11,8 @@
         #:cl-protobufs.protobuf-package-unittest1-rpc
         #:cl-protobufs.service-test-pb
         #:cl-protobufs.service-test-pb-rpc)
-  (:local-nicknames (#:pi #:cl-protobufs.implementation))
+  (:local-nicknames (#:pi #:cl-protobufs.implementation)
+                    (#:proto #:cl-protobufs))
   (:export :run))
 
 (in-package #:cl-protobufs.test.services)
