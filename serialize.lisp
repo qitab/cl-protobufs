@@ -63,6 +63,9 @@
 
 ;;; Serialization
 
+;;; TODO(cgay): this arglist and deserialize-from-stream should be at least a
+;;; little bit symmetrical. I suggest the stream always be the first argument
+;;; for both, or be a keyword arg for both. Kill &optional with fire. :)
 (defun serialize-to-stream (stream object &optional (type (type-of object)))
   "Serialize OBJECT of type TYPE onto the STREAM using wire format.
    OBJECT and TYPE are as described in SERIALIZE-TO-BYTES."
@@ -73,14 +76,6 @@
     ;; deletion markers.
     (write-sequence buffer stream)
     buffer))
-
-(defun serialize-to-file (filename object &optional (type (type-of object)))
-  "Serialize OBJECT of type TYPE into FILENAME using wire format.
-   OBJECT and TYPE are as described in SERIALIZE-TO-BYTES."
-  (with-open-file (stream filename
-                   :direction :output
-                   :element-type '(unsigned-byte 8))
-    (serialize-to-stream stream object type)))
 
 (defun serialize-to-bytes (object &optional (type (type-of object)))
   "Serializes OBJECT into a new vector of (unsigned-byte 8) using wire format.
@@ -327,14 +322,6 @@ Parameters:
              (+ tag-size (backpatch submessage-size) submessage-size))))))
 
 ;;; Deserialization
-
-(defun deserialize-from-file (type filename)
-  "Deserialize an object of type TYPE (a symbol naming a message class)
-   from FILENAME."
-  (with-open-file (stream filename
-                          :direction :input
-                          :element-type '(unsigned-byte 8))
-    (deserialize-from-stream type :stream stream)))
 
 (defun deserialize-from-stream (type &key (stream *standard-input*))
   "Deserialize an object of type TYPE from STREAM."

@@ -181,8 +181,8 @@
       (assert (field-equal (second (funcall accessor m)) v1)))))
 
 (defun read-message (class-name file-name)
-  (let ((message (pi::deserialize-from-file class-name file-name)))
-    message))
+  (with-open-file (stream file-name :direction :input :element-type '(unsigned-byte 8))
+    (pi::deserialize-from-stream class-name :stream stream)))
 
 (defun test-parse-from-file ()
   (let ((message (read-message 'cl-protobufs.protobuf-unittest:test-all-types

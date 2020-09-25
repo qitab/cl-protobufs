@@ -38,11 +38,9 @@
    ;; Serialization to/from various formats
 
    ;; Binary format
-   #:serialize-to-file
    #:serialize-to-stream
    #:serialize-to-bytes
    #:serialize
-   #:deserialize-from-file
    #:deserialize-from-stream
    #:deserialize-from-bytes
    #:deserialize

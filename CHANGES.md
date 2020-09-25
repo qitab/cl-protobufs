@@ -39,6 +39,11 @@ change) and for internal code quality improvements.
     -   `serialize-object-to-bytes` is now `serialize-to-bytes`
     -   `serialize-object-to-stream` is now `serialize-to-stream`
 
+    Also `serialize-object-to-file` and `deserialize-object-from-file` have been
+    removed. These functions didn't give access to all file-opening options and
+    are trivial to implement by calling `with-open-file` and
+    `serialize-to-stream`.
+
 *   These definitions previously exported from `cl-protobufs` have been removed:
 
     -   `merge-from-array`
