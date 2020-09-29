@@ -4,22 +4,19 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(in-package "PROTO-IMPL")
+(in-package #:cl-protobufs.implementation)
 
 ;;; Text parsing utilities
 
-(declaim (inline proto-whitespace-char-p))
-(defun proto-whitespace-char-p (ch)
+(defun-inline proto-whitespace-char-p (ch)
   (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\space #\tab #\return #\newline))))
 
-(declaim (inline proto-eol-char-p))
-(defun proto-eol-char-p (ch)
+(defun-inline proto-eol-char-p (ch)
   (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\return #\newline))))
 
-(declaim (inline proto-token-char-p))
-(defun proto-token-char-p (ch)
+(defun-inline proto-token-char-p (ch)
   (declare #.*optimize-fast-unsafe*)
   (and ch (or (alpha-char-p ch)
               (digit-char-p ch)

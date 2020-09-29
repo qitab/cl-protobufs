@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs.oneof-test
         #:cl-protobufs)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.oneof)
@@ -48,7 +49,7 @@
     (assert-true (string= (oneof-proto.strval msg) "test")
     (assert-false (oneof-proto.has-intval msg))
     (assert-true (oneof-proto.has-strval msg))
-    (proto:clear msg)
+    (clear msg)
     (assert-true (eq (oneof-proto.my-oneof-case msg) nil))
     (assert-false (oneof-proto.has-intval msg))
     (assert-false (oneof-proto.has-strval msg)))))
@@ -77,27 +78,27 @@
         :do
            (when optimized
              (dolist (class '(oneof-proto nested-oneof oneof-test.int-list oneof-test))
-               (let ((message (proto:find-message-for-class class)))
+               (let ((message (find-message-descriptor class)))
                  (handler-bind ((style-warning #'muffle-warning))
-                   (eval (proto-impl::generate-serializer message))
-                   (eval (proto-impl::generate-deserializer message))))))
+                   (eval (pi::generate-serializer message))
+                   (eval (pi::generate-deserializer message))))))
            (let* ((test1 (make-oneof-proto :outside 1 :strval "red" :after 2))
                   (test2 (make-nested-oneof :outside 2 :nested test1))
                   (intlist (make-oneof-test.int-list :ints (list 1 2 3 4 5)))
                   (test3 (make-oneof-test :list-of-ints intlist))
                   (test4 (make-oneof-proto :outside 1)))
-             (let* ((tser1 (serialize-object-to-bytes test1 'oneof-proto))
-                    (tser2 (serialize-object-to-bytes test2 'nested-oneof))
-                    (tser3 (serialize-object-to-bytes test3 'oneof-test))
-                    (tser4 (serialize-object-to-bytes test4 'oneof-proto))
-                    (t1res (deserialize-object-from-bytes 'oneof-proto tser1))
-                    (t2res (deserialize-object-from-bytes 'nested-oneof tser2))
-                    (t3res (deserialize-object-from-bytes 'oneof-test tser3))
-                    (t4res (deserialize-object-from-bytes 'oneof-proto tser4)))
-               (assert-true (proto:proto-equal test1 t1res))
-               (assert-true (proto:proto-equal test2 t2res))
-               (assert-true (proto:proto-equal test3 t3res))
-               (assert-true (proto:proto-equal test4 t4res))))))
+             (let* ((tser1 (serialize-to-bytes test1 'oneof-proto))
+                    (tser2 (serialize-to-bytes test2 'nested-oneof))
+                    (tser3 (serialize-to-bytes test3 'oneof-test))
+                    (tser4 (serialize-to-bytes test4 'oneof-proto))
+                    (t1res (deserialize-from-bytes 'oneof-proto tser1))
+                    (t2res (deserialize-from-bytes 'nested-oneof tser2))
+                    (t3res (deserialize-from-bytes 'oneof-test tser3))
+                    (t4res (deserialize-from-bytes 'oneof-proto tser4)))
+               (assert-true (proto-equal test1 t1res))
+               (assert-true (proto-equal test2 t2res))
+               (assert-true (proto-equal test3 t3res))
+               (assert-true (proto-equal test4 t4res))))))
 
 ;; Protobuf specifies that if multiple members of a oneof appear on the wire,
 ;; then only the last one on the wire is saved.
@@ -106,19 +107,17 @@
                               :element-type '(unsigned-byte 8)))
         (bytes2 (make-array 6 :initial-contents '(16 4 26 2 104 105)
                               :element-type '(unsigned-byte 8))))
-    (proto-impl::make-deserializer oneof-proto)
+    (pi::make-deserializer oneof-proto)
     (loop :for optimized :in '(nil)
           :do (let (msg1 msg2)
                 (if optimized
                     (progn
-                      (setf msg1 (deserialize-object-from-bytes
-                                  'oneof-proto bytes1))
-                      (setf msg2 (deserialize-object-from-bytes
-                                  'oneof-proto bytes2)))
+                      (setf msg1 (deserialize-from-bytes 'oneof-proto bytes1))
+                      (setf msg2 (deserialize-from-bytes 'oneof-proto bytes2)))
                     (progn
-                      (setf msg1 (proto-impl::%deserialize-object
+                      (setf msg1 (pi::%deserialize
                                   'oneof-proto bytes1 0 (length bytes1)))
-                      (setf msg2 (proto-impl::%deserialize-object
+                      (setf msg2 (pi::%deserialize
                                   'oneof-proto bytes2 0 (length bytes2)))))
                 (assert-true (eq (oneof-proto.my-oneof-case msg1) 'intval))
                 (assert-true (= (oneof-proto.intval msg1) 4))
@@ -138,7 +137,7 @@
                            (print-text-format message :stream s))))
                (with-input-from-string (s text)
                  (parse-text-format (type-of message) :stream s)))))
-      (assert-true (proto:proto-equal test1 (round-trip test1)))
-      (assert-true (proto:proto-equal test2 (round-trip test2)))
-      (assert-true (proto:proto-equal test3 (round-trip test3)))
-      (assert-true (proto:proto-equal test4 (round-trip test4))))))
+      (assert-true (proto-equal test1 (round-trip test1)))
+      (assert-true (proto-equal test2 (round-trip test2)))
+      (assert-true (proto-equal test3 (round-trip test3)))
+      (assert-true (proto-equal test4 (round-trip test4))))))

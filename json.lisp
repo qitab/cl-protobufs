@@ -7,13 +7,11 @@
 (defpackage #:cl-protobufs.json
   (:use #:cl
         #:cl-protobufs
-        #:proto-impl)
-  (:shadow
-   #:find-method)
+        #:cl-protobufs.implementation)
   (:export #:print-json
            #:parse-json)
   (:local-nicknames
-   (#:pi #:proto-impl)
+   (#:pi #:cl-protobufs.implementation)
    (#:google #:cl-protobufs.google.protobuf)
    (#:wkt #:cl-protobufs.well-known-types)))
 
@@ -36,7 +34,7 @@ Parameters:
   SPLICED-P: If true, print this object inside of an existing JSON object
     in the stream. This means that no open bracket is printed."
   (let* ((type (type-of object))
-         (message (find-message-for-class type)))
+         (message (find-message-descriptor type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
     ;; If TYPE has a special JSON mapping, use that.
@@ -51,7 +49,7 @@ Parameters:
     ;; a field has been already printed, so always print a comma.
     (let ((field-printed spliced-p))
       (dolist (field (proto-fields message))
-        (when (if (eq (slot-value field 'pi::message-type) :extends)
+        (when (if (eq (slot-value field 'pi::kind) :extends)
                   (has-extension object (slot-value field 'internal-field-name))
                   (has-field object (slot-value field 'pi::external-field-name)))
           (let* ((name (if camel-case-p
@@ -59,7 +57,7 @@ Parameters:
                            (proto-name field)))
                  (type (proto-class field))
                  (value
-                   (if (eq (slot-value field 'pi::message-type) :extends)
+                   (if (eq (slot-value field 'pi::kind) :extends)
                        (get-extension object (slot-value field 'pi::external-field-name))
                        (proto-slot-value object (slot-value field 'pi::external-field-name)))))
             (if field-printed
@@ -115,8 +113,8 @@ Parameters:
   STREAM: The stream to print to.
   CAMEL-CASE-P: Passed recursively to PRINT-JSON.
   NUMERIC-ENUMS-P: Passed recursively to PRINT-ENUM-TO-JSON and PRINT-JSON."
-  (let ((descriptor (or (find-message type)
-                        (find-enum type)
+  (let ((descriptor (or (find-message-descriptor type)
+                        (find-enum-descriptor type)
                         (find-map-descriptor type))))
     (cond
       ((pi::scalarp type)
@@ -162,7 +160,7 @@ rather than its name."
     (format stream "null")
     (return-from print-enum-to-json))
   (if numeric-enums-p
-      (format stream "~D" (enum->numeral type value))
+      (format stream "~D" (enum-keyword-to-int type value))
       (format stream "\"~A\"" (pi::enum-name->proto value))))
 
 (defun print-map-to-json (value map-descriptor indent stream camel-case-p numeric-enums-p)
@@ -201,7 +199,7 @@ to parse an opening bracket."))
 
 (defmethod parse-json ((type symbol)
                        &key (stream *standard-input*) ignore-unknown-fields-p spliced-p)
-  (let ((message (find-message-for-class type)))
+  (let ((message (find-message-descriptor type)))
     (assert message ()
             "There is no protobuf message having the type ~S" type)
     (parse-json message :stream stream :spliced-p spliced-p
@@ -214,8 +212,8 @@ is true, then skip fields which are not defined in MSG-DESC. Otherwise, throw an
 SPLICED-P is true, then do not attempt to parse an opening bracket."
   (let ((object #+sbcl (make-instance (or (pi::proto-alias-for msg-desc)
                                           (proto-class msg-desc)))
-                #-sbcl (funcall (get-constructor-name
-                                 (or (proto-alias-for msg-desc)
+                #-sbcl (funcall (pi::get-constructor-name
+                                 (or (pi::proto-alias-for msg-desc)
                                      (proto-class msg-desc)))))
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
@@ -227,8 +225,8 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
       (pi::expect-char stream #\{))
     (loop
       (let* ((name  (pi::parse-string stream))
-             (field (or (find-field msg-desc name)
-                        (find-field-by-json-name msg-desc name)))
+             (field (or (find-field-descriptor msg-desc name)
+                        (find-field-descriptor-by-json-name msg-desc name)))
              (type  (and field (if (eq (proto-class field) 'boolean)
                                    :bool
                                    (proto-class field))))
@@ -270,7 +268,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
                  (undefined-field-type "While parsing ~S from JSON format,"
                                        msg-desc type field)
                  (return-from parse-json))
-                ((eq (pi::proto-set-type field) :map)
+                ((eq (pi::proto-kind field) :map)
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
                          (cdr pair))))
@@ -291,8 +289,8 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
 (defun parse-value-from-json (type &key (stream *standard-input*) ignore-unknown-fields-p)
   "Parse a single JSON value of type TYPE from STREAM. IGNORE-UNKNOWN-FIELDS-P is passed
 to recursive calls to PARSE-JSON."
-  (let ((desc (or (find-message type)
-                  (find-enum type)
+  (let ((desc (or (find-message-descriptor type)
+                  (find-enum-descriptor type)
                   (find-map-descriptor type))))
     (cond ((pi::scalarp type)
            (case type
@@ -387,14 +385,13 @@ be either an array, object, or primitive."
   (pi::skip-whitespace stream)
   (pi::expect-char stream #\}))
 
-(defun find-field-by-json-name (msg-desc name)
+(defun find-field-descriptor-by-json-name (msg-desc name)
   "Return the field-descriptor with json-name NAME in MSG-DESC."
-  (or
-   (find name (proto-fields msg-desc) :key #'pi::proto-json-name :test #'string=)
-   (loop for oneof in (pi::proto-oneofs msg-desc)
-           thereis (find name (pi::oneof-descriptor-fields oneof)
-                         :key #'pi::proto-json-name
-                         :test #'string=))))
+  (or (find name (proto-fields msg-desc) :key #'pi::proto-json-name :test #'string=)
+      (loop for oneof in (pi::proto-oneofs msg-desc)
+              thereis (find name (pi::oneof-descriptor-fields oneof)
+                            :key #'pi::proto-json-name
+                            :test #'string=))))
 
 ;; Special JSON mappings for well known types below
 
@@ -643,7 +640,7 @@ calls to PARSE-JSON."
 
     ;; Otherwise, the well known type is a wrapper type.
     (t (let ((object #+sbcl (make-instance type)
-                     #-sbcl (funcall (get-constructor-name type)))
+                     #-sbcl (funcall (pi::get-constructor-name type)))
              (value (parse-value-from-json (wrapper-message->type type) :stream stream)))
          (setf (google:value object) value)
          object))))

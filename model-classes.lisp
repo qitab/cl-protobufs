@@ -4,53 +4,32 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(in-package "PROTO-IMPL")
+(in-package #:cl-protobufs.implementation)
 
 ;;; Classes to represent the objects in a .proto file.
 
 
-(defvar *all-schemas* (make-hash-table :test #'equal)
+(defvar *file-descriptors* (make-hash-table :test #'equal)
   "A global table mapping names to file-descriptor objects.")
 
-;; TODO(cgay): this should be find-file-descriptor now
-(defun find-schema (name)
+(defun find-file-descriptor (name)
   "Find a file-descriptor for the given name. Returns nil if not found.
 Parameters:
   NAME: A string, symbol, or pathname."
-  (values (gethash name *all-schemas*)))
+  (values (gethash name *file-descriptors*)))
 
-;; Type for structure messages.
-(defstruct base-message
-  "Base structure that all protobuf message structs inherit from.")
+(defun add-file-descriptor (pathname symbol)
+  "Register the file-descriptor named by SYMBOL under the key PATHNAME.
+   Intended for use by protoc-gen-lisp."
+  (setf (gethash pathname *file-descriptors*) (find-file-descriptor symbol)))
 
-;;; "Thread-local" variables
-
-;;; These two variables are defined here, rather than in define-proto.lisp,
-;;; because they're needed by parser.lisp, which doesn't depend on
-;;; define-proto.lisp. Once the parser is deleted they can be moved.
-(defvar *current-file-descriptor* nil
-  "The file-descriptor for the file currently being loaded.")
-
-(defvar *current-message-descriptor* nil
-  "The message-descriptor for the message or group currently being loaded.")
-
-(defvar *protobuf-conc-name* nil
-  "Bound to a conc-name to use for all the messages in the schema being defined.
-   This controls the name of the accessors the fields of each message.
-   When it's nil, there is no \"global\" conc-name.
-   When it's t, each message will use the message name as the conc-name.
-   When it's a string, that string will be used as the conc-name for each message.
-   'parse-schema-from-file' defaults conc-name to \"\", meaning that each field in
-   every message has an accessor whose name is the name of the field.")
-
-(defvar *protobuf-pathname* nil
-  "Bound to he name of the file from where the .proto file is being parsed.")
-
-(defvar *protobuf-search-path* ()
-  "Bound to the search-path to use to resolve any relative pathnames.")
-
-(defvar *protobuf-output-path* ()
-  "Bound to the path to use to direct output during imports, etc.")
+(defstruct message
+  "All protobuf message objects are of this type."
+  ;; %%skipped-bytes will contain all of the bytes we couldn't
+  ;; identify when we tried to deserialize a proto but will
+  ;; add to the serialized bytes for the proto if we serialize it.
+  ;; See https://developers.google.com/protocol-buffers/docs/overview#updating
+  (%%skipped-bytes nil :type (or null byte-vector)))
 
 
 ;;; Descriptor classes -- These classes taken together represent the contents of a .proto file.
@@ -63,8 +42,10 @@ Parameters:
 ;; It would be nice if most of the slots had only reader functions, but
 ;; that makes writing the protobuf parser a good deal more complicated.
 (defclass descriptor (abstract-descriptor)
-  ;; The Lisp name for this object. For messages and groups this is the name of a struct.
-  ((class :type (or null symbol)
+  ;; The Lisp name for the type of this object. For messages and groups it's
+  ;; the name of a struct. For proto scalar types it's INT32, STRING,
+  ;; etc.
+  ((class :type symbol
           :accessor proto-class
           :initarg :class
           :initform nil)
@@ -124,42 +105,26 @@ Parameters:
   (with-slots (class) file-desc
     (multiple-value-bind (constructor initializer)
         (make-load-form-saving-slots file-desc :environment environment)
-      (values `(or (gethash ',class *all-schemas*) ,constructor)
-              `(unless (gethash ',class *all-schemas*)
-                 (record-schema ,file-desc :symbol ',class)
+      (values `(or (gethash ',class *file-descriptors*) ,constructor)
+              `(unless (gethash ',class *file-descriptors*)
+                 (record-file-descriptor ,file-desc :symbol ',class)
                  ,initializer)))))
 
-(defun record-schema (schema &key symbol)
-  "Record all the names by which the Protobufs schema might be known.
-Parameters:
-  SCHEMA: The schema to record.
-  SYMBOL: The symbol to map from in *all-schemas*."
-  (let ((symbol (or symbol (proto-class schema))))
-    (when symbol
-      (setf (gethash symbol *all-schemas*) schema))
-    (let ((pathname
-           (or *protobuf-pathname*
-               ;; Try to find the pathname under which a schema matching on CLASS
-               ;; was previously recorded. Remap that pathname onto this schema.
-               (block nil
-                 (maphash (lambda (key existing-schema)
-                            (when (and (pathnamep key)
-                                       (eq (proto-class existing-schema) symbol))
-                              (return key)))
-                          *all-schemas*)))))
-      (when pathname
-        ;; Record the file from which the Protobufs schema came
-        (setf (gethash pathname *all-schemas*) schema)))))
+(defun record-file-descriptor (descriptor &key symbol)
+  "Record DESCRIPTOR in the global schema hash table under the key SYMBOL.
+   The generated code also stores the schema in this hash table using the
+   file pathname as the key."
+  (declare (type file-descriptor descriptor))
+  (let ((symbol (or symbol (proto-class descriptor))))
+    (setf (gethash symbol *file-descriptors*) descriptor)))
 
 (defmethod print-object ((file-desc file-descriptor) stream)
   (if *print-escape*
       (print-unreadable-object (file-desc stream :type t :identity t)
         (format stream "~@[~S~]~@[ (package ~A)~]"
-                (and (slot-boundp file-desc 'class)
-                     (proto-class file-desc))
+                (proto-class file-desc)
                 (proto-package file-desc)))
-      (format stream "~S" (and (slot-boundp file-desc 'class)
-                               (proto-class file-desc)))))
+      (format stream "~S" (proto-class file-desc))))
 
 ;; find-* functions for finding different proto meta-objects
 
@@ -169,69 +134,51 @@ Parameters:
 message-descriptor.")
 
 (defvar *qualified-messages* (make-hash-table :test 'equal)
-  "Map from the qualified-name to the protobuf-message
-class symbol.
-For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message.")
+  "Map from the proto-qualified-name of a message (a string) to its Lisp type symbol.")
 
-;; TODO(cgay): Rename to find-message-descriptor
-(declaim (inline find-message))
-(defun find-message (type)
-  "Return the message-descriptor instance either named by TYPE (a symbol)
-or that's named by the class-name of TYPE."
-  ;; TODO(cgay): I suspect this is left over from before the switch to structs.
-  (gethash (if (typep type 'standard-object)
-               (class-name type)
-               type)
-           *messages*))
+(defun-inline find-message-descriptor (type)
+  "Return the message-descriptor named by TYPE (a symbol), or nil."
+  (gethash type *messages*))
 
-(declaim (inline find-message))
-(defun find-message-by-qualified-name (qualified-name)
+(defun-inline find-message-by-qualified-name (qualified-name)
   "Return the protobuf-message symbol named by qualified-name.
    Parameters:
      QUALIFIED-NAME: The qualified name of a protobuf message.
        For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message."
   (gethash qualified-name *qualified-messages*))
 
-(defun find-message-for-class (class)
-  "Find a message for class.
-Parameters:
-  CLASS: Either a symbol naming the class or a class."
-  (find-message (if (typep class 'symbol)
-                    class
-                    (class-name class))))
-
-(defvar *maps* (make-hash-table :test 'eq)
+(defvar *map-descriptors* (make-hash-table :test 'eq)
   "Maps map names (symbols) to map-descriptor instances.")
 
-(declaim (inline find-map-descriptor))
-(defun find-map-descriptor (type)
+(defun-inline find-map-descriptor (type)
   "Return a map-descriptor instance named by TYPE (a symbol)."
-  (gethash type *maps*))
+  (gethash type *map-descriptors*))
 
-(defvar *enums* (make-hash-table :test 'eq)
+(defvar *enum-descriptors* (make-hash-table :test 'eq)
   "Maps enum names (symbols) to enum-descriptor instances.")
 
-(declaim (inline find-enum))
-(defun find-enum (type)
+(defun-inline find-enum-descriptor (type)
   "Return a enum-descriptor instance named by TYPE (a symbol)."
-  (gethash type *enums*))
+  (gethash type *enum-descriptors*))
 
-(defgeneric find-service (protobuf name)
+(defgeneric find-service-descriptor (file-descriptor name)
   (:documentation
-   "Given a Protobufs schema,returns the Protobufs service of the given name."))
+   "Given a protobuf file-descriptor, returns the service-descriptor with the given NAME.
+    FILE-DESCRIPTOR may be the 'schema name' (a symbol derived from the
+    basename of the file) or the file pathname.  NAME is the service name (a
+    symbol) or the service qualified name (a string)."))
 
-(defmethod find-service ((file-desc file-descriptor) (name symbol))
+(defmethod find-service-descriptor ((file-desc file-descriptor) (name symbol))
   (find name (proto-services file-desc) :key #'proto-class))
 
-(defmethod find-service ((file-desc file-descriptor) (name string))
+(defmethod find-service-descriptor ((file-desc file-descriptor) (name string))
   (find-qualified-name name (proto-services file-desc)))
 
-;; Convenience function that accepts a schema name
-(defmethod find-service (schema-name name)
-  (let ((schema (find-schema schema-name)))
-    (assert schema ()
-            "There is no schema named ~A" schema-name)
-    (find-service schema name)))
+(defmethod find-service-descriptor (file-desc name)
+  (let ((descriptor (find-file-descriptor file-desc)))
+    (assert descriptor ()
+            "There is no file-descriptor named ~A" file-desc)
+    (find-service-descriptor descriptor name)))
 
 ;; We accept and store any option, but only act on a few: default, packed,
 ;; optimize_for, lisp_name, lisp_alias
@@ -309,7 +256,8 @@ Parameters:
   (key-class nil :type symbol) ;; the :class of the key
   (val-class nil :type symbol) ;; the :class of the value
   (key-type nil)  ;; the lisp type of the key.
-  (val-type nil)) ;; the lisp type of the value.
+  (val-type nil)  ;; the lisp type of the value.
+  (val-kind nil :type (member :scalar :message :group :enum)))
 
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
@@ -333,6 +281,8 @@ Parameters:
 (defstruct enum-value-descriptor
   "The model class that represents a protobuf enum key/value pair."
   ;; The keyword symbol corresponding to the enum value key.
+  ;; Note that the API uses "keyword-to-int" and "int-to-keyword".
+  ;; Let's make this match that at some point.
   (name nil :type keyword)
   (value nil :type sfixed32))
 
@@ -402,37 +352,36 @@ Parameters:
                    msg-desc))
               initializer))))
 
-(defun record-protobuf-object (symbol message type)
-  "Record the protobuf-metaobject MESSAGE with named by SYMBOL and
-in the hash-table indicated by TYPE. Also sets the default constructor
-on the symbol if we are not in SBCL."
+(defun record-protobuf-object (symbol descriptor type)
+  "Record the protobuf-metaobject DESCRIPTOR named by SYMBOL in the
+hash-table indicated by TYPE. Also sets the default constructor on the symbol
+if we are not in SBCL."
   ;; No need to record an extension, it's already been recorded
   (ecase type
-    (:enum (setf (gethash symbol *enums*) message))
+    (:enum (setf (gethash symbol *enum-descriptors*) descriptor))
     (:message
-     (setf (gethash symbol *messages*) message)
+     (setf (gethash symbol *messages*) descriptor)
      #-sbcl
      (setf (get symbol :default-constructor)
            (intern (nstring-upcase (format nil "%MAKE-~A" symbol))
                    (symbol-package symbol)))
-     (when (and (slot-boundp message 'qual-name) (proto-qualified-name message))
-       (setf (gethash (proto-qualified-name message) *qualified-messages*)
-             (proto-class message))))
-    (:map (setf (gethash symbol *maps*) message))))
+     (when (and (slot-boundp descriptor 'qual-name) (proto-qualified-name descriptor))
+       (setf (gethash (proto-qualified-name descriptor) *qualified-messages*)
+             (proto-class descriptor))))
+    (:map (setf (gethash symbol *map-descriptors*) descriptor))))
 
 (defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*
     (print-unreadable-object (msg-desc stream :type t :identity t)
       (format stream "~S~@[ (alias for ~S)~]~@[ (group~*)~]~@[ (extended~*)~]"
-              (and (slot-boundp msg-desc 'class)
-                   (proto-class msg-desc))
+              (proto-class msg-desc)
               (and (slot-boundp msg-desc 'alias)
                    (proto-alias-for msg-desc))
               (and (slot-boundp msg-desc 'message-type)
                    (eq (proto-message-type msg-desc) :group))
               (and (slot-boundp msg-desc 'message-type)
                    (eq (proto-message-type msg-desc) :extends))))
-    (format stream "~S" (and (slot-boundp msg-desc 'class) (proto-class msg-desc)))))
+    (format stream "~S" (proto-class msg-desc))))
 
 ;; Extensions protocol
 (defgeneric get-extension (object slot)
@@ -458,21 +407,16 @@ on the symbol if we are not in SBCL."
 
 (defconstant $empty-default 'empty-default
   "The marker used in 'proto-default' used to indicate that there is no default value.")
-(defconstant $empty-list    'empty-list)
-(defconstant $empty-vector  'empty-vector)
 
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
 (defclass field-descriptor (descriptor)
-  ((type :type string                           ; The name of the Protobuf type for the field
+  ((kind :type (member :message :group :extends :enum :map :scalar nil)
+         :accessor proto-kind
+         :initarg :kind)
+   (type :type (or null symbol)
          :accessor proto-type
          :initarg :type)
-   (lisp-type :type (or null string)            ; Override the name of the Lisp type for the field
-              :accessor proto-lisp-type
-              :initarg :lisp-type
-              :initform nil)
-   (set-type  :accessor proto-set-type          ; The type obtained directly
-              :initarg :set-type)               ; from the protobuf schema.
    (label :type (member :required :optional :repeated)
           :accessor proto-label
           :initarg :label)
@@ -518,6 +462,10 @@ on the symbol if we are not in SBCL."
            :accessor proto-packed
            :initarg :packed
            :initform nil)
+   (container :accessor proto-container         ; If the field is repeated, this specifies the
+              :type (member nil :vector :list)  ; container type. If not, this field is nil.
+              :initarg :container
+              :initform nil)
    (lazy :type boolean                          ; Lazy, pulled out of the options
          :accessor proto-lazy-p
          :initarg :lazy
@@ -525,12 +473,7 @@ on the symbol if we are not in SBCL."
    (bool-index :type (or null integer)      ; For non-repeated boolean fields only, the
                :accessor proto-bool-index   ; index into the bit-vector of boolean field values.
                :initarg :bool-index
-               :initform nil)
-   ;; Copied from 'proto-message-type' of the field
-   (message-type :type (member :message :group :extends)
-                 :accessor proto-message-type
-                 :initarg :message-type
-                 :initform :message))
+               :initform nil))
   (:documentation
    "The model class that represents one field within a Protobufs message."))
 
@@ -549,10 +492,10 @@ on the symbol if we are not in SBCL."
       (print-unreadable-object (f stream :type t :identity t)
         (format stream "~S :: ~S = ~D~@[ (group~*)~]~@[ (extended~*)~]"
                 (proto-internal-field-name f)
-                (and (slot-boundp f 'class) (proto-class f))
+                (proto-class f)
                 (proto-index f)
-                (eq (proto-message-type f) :group)
-                (eq (proto-message-type f) :extends)))
+                (eq (proto-kind f) :group)
+                (eq (proto-kind f) :extends)))
       (format stream "~S" (proto-internal-field-name f))))
 
 (defmethod proto-slot ((field field-descriptor))
@@ -567,23 +510,9 @@ on the symbol if we are not in SBCL."
   (:method ((field field-descriptor))
     (let ((default (proto-default field)))
       (or (eq default $empty-default)
-          (eq default $empty-list)
-          (eq default $empty-vector)
           ;; Special handling for imported CLOS classes
           (and (not (eq (proto-label field) :optional))
                (or (null default) (equalp default #())))))))
-
-(defgeneric vector-field-p (field)
-  (:documentation
-   "Returns true if the storage for a 'repeated' field is a vector,
-    returns false if the storage is a list.")
-  (:method ((field field-descriptor))
-    ;; NB: the FieldOption (lisp_container) attempts to generalize whether a repeated field is a
-    ;; list or a vector, but for now the only indication that a field-descriptor wants to be a
-    ;; vector is what its default is.
-    (let ((default (proto-default field)))
-      (or (eq default $empty-vector)
-          (and (vectorp default) (not (stringp default)))))))
 
 (defclass extension-descriptor (abstract-descriptor)
   ;; The start of the extension range.
@@ -597,16 +526,18 @@ on the symbol if we are not in SBCL."
   (:documentation
    "The model class that represents an extension range within a protobuf message."))
 
-(defvar *all-extensions* nil)
+;;; TODO(cgay): this is unused. Were there plans for it?
+(defvar *extension-descriptors* nil "Extension descriptors.")
+
 (defmethod make-load-form ((e extension-descriptor) &optional environment)
   (declare (ignore environment))
   (let ((from (and (slot-boundp e 'from) (proto-extension-from e)))
         (to (and (slot-boundp e 'to) (proto-extension-to e))))
-    `(or (cdr (assoc '(,from . ,to) *all-extensions* :test #'equal))
+    `(or (cdr (assoc '(,from . ,to) *extension-descriptors* :test #'equal))
          (let ((obj (make-instance 'extension-descriptor
                                    ,@(and from `(:from ,from))
                                    ,@(and to `(:to ,to)))))
-           (push (cons '(,from . ,to) obj) *all-extensions*)
+           (push (cons '(,from . ,to) obj) *extension-descriptors*)
            obj))))
 
 (defmethod print-object ((e extension-descriptor) stream)
@@ -636,18 +567,18 @@ on the symbol if we are not in SBCL."
         (format stream "~S" (proto-name s)))
       (format stream "~S" (proto-name s))))
 
-(defgeneric find-method (service name)
+(defgeneric find-method-descriptor (service name)
   (:documentation
-   "Given a Protobufs service and a method name,
-    returns the Protobufs method having that name."))
+   "Given a protobuf service-descriptor and a method name,
+    returns the protobuf method having that name."))
 
-(defmethod find-method ((service service-descriptor) (name symbol))
+(defmethod find-method-descriptor ((service service-descriptor) (name symbol))
   (find name (proto-methods service) :key #'proto-class))
 
-(defmethod find-method ((service service-descriptor) (name string))
+(defmethod find-method-descriptor ((service service-descriptor) (name string))
   (find-qualified-name name (proto-methods service)))
 
-(defmethod find-method ((service service-descriptor) (index integer))
+(defmethod find-method-descriptor ((service service-descriptor) (index integer))
   (find index (proto-methods service) :key #'proto-index))
 
 
@@ -740,34 +671,37 @@ on the symbol if we are not in SBCL."
 (defmethod make-load-form ((o oneof-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
 
-(defgeneric find-field (message name &optional relative-to)
+;;; TODO(cgay): looks like relative-to is for searching relative to a current
+;;; namespace and isn't implemented yet.
+(defgeneric find-field-descriptor (desc id &optional relative-to)
   (:documentation
-   "Given a Protobufs message and a slot name, field name or index,
-    returns the Protobufs field having that name."))
+   "Given a message-descriptor DESC and a field ID, returns the
+   field-descriptor having that ID. ID may be a symbol naming the defstruct
+   slot, the field name (string), or the field number."))
 
-(defmethod find-field ((msg-desc message-descriptor) (name symbol) &optional relative-to)
+(defmethod find-field-descriptor ((desc message-descriptor) (name symbol)
+                                  &optional relative-to)
   (declare (ignore relative-to))
-  (or
-   (find name (proto-fields msg-desc) :key #'proto-internal-field-name)
-   (loop for oneof in (proto-oneofs msg-desc)
-           thereis (find name (oneof-descriptor-fields oneof)
-                         :key #'proto-internal-field-name))))
+  (or (find name (proto-fields desc) :key #'proto-internal-field-name)
+      (loop for oneof in (proto-oneofs desc)
+              thereis (find name (oneof-descriptor-fields oneof)
+                            :key #'proto-internal-field-name))))
 
-(defmethod find-field ((msg-desc message-descriptor) (name string) &optional relative-to)
-  (or
-   (find-qualified-name name (proto-fields msg-desc)
-                        :relative-to (or relative-to msg-desc))
-   (loop for oneof in (proto-oneofs msg-desc)
-           thereis (find-qualified-name name (oneof-descriptor-fields oneof)
-                                        :relative-to (or relative-to msg-desc)))))
+(defmethod find-field-descriptor ((desc message-descriptor) (name string)
+                                  &optional relative-to)
+  (or (find-qualified-name name (proto-fields desc)
+                           :relative-to (or relative-to desc))
+      (loop for oneof in (proto-oneofs desc)
+              thereis (find-qualified-name name (oneof-descriptor-fields oneof)
+                                           :relative-to (or relative-to desc)))))
 
-(defmethod find-field ((msg-desc message-descriptor) (index integer) &optional relative-to)
+(defmethod find-field-descriptor ((desc message-descriptor) (index integer)
+                                  &optional relative-to)
   (declare (ignore relative-to))
-  (or
-   (find index (proto-fields msg-desc) :key #'proto-index)
-   (loop for oneof in (proto-oneofs msg-desc)
-           thereis (find index (oneof-descriptor-fields oneof)
-                         :key #'proto-index))))
+  (or (find index (proto-fields desc) :key #'proto-index)
+      (loop for oneof in (proto-oneofs desc)
+              thereis (find index (oneof-descriptor-fields oneof)
+                            :key #'proto-index))))
 
 (defgeneric set-method-do-not-deserialize-input (method)
   (:documentation

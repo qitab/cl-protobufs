@@ -93,13 +93,18 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     messages_[i]->AddPackages(&packages);
   }
 
-  printer->Print("\n#+sbcl (cl:declaim (cl:optimize (cl:debug 0)"
-                 " (sb-c:store-coverage-data 0)))\n");
+  printer->Print("\n#+sbcl\n"
+                 "(cl:progn\n (cl:eval-when (:compile-toplevel)"
+                 " (sb-ext:restrict-compiler-policy 'cl:debug 0 1))\n"
+                 " (cl:declaim (cl:optimize (sb-c:store-coverage-data 0))))\n");
+
   for (const std::string& package : packages) {
     printer->Print(
         "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
         "  (cl:unless (cl:find-package \"$package_name$\")\n"
-        "    (cl:defpackage \"$package_name$\" (:use))))\n",
+        "    (cl:defpackage \"$package_name$\" (:use)\n"
+        "                   (:local-nicknames (#:pi "
+        "#:cl-protobufs.implementation)))))\n",
         "package_name", package);
   }
 
@@ -110,7 +115,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
 
   printer->Print(
       "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)"
-      "\n(proto:define-schema '$schema_name$\n",
+      "\n(pi:define-schema '$schema_name$\n",
       "schema_name", schema_name_);
   printer->Indent();
   // Schema options.
@@ -131,15 +136,16 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     printer->Print(")"); sep = "\n ";
   }
   // END schema options
-  printer->Print("))\n");
+  printer->Print(")\n");
   printer->Outdent();
   printer->Outdent();
+  printer->Print(")\n");
 
   std::vector<std::string> exports;
   exports.push_back(schema_name_);
 
   if (file_->enum_type_count() > 0) {
-    printer->Print("\n;; Top-Level enums.");
+    printer->Print("\n\n;;; Top-Level enums");
     for (int i = 0; i < file_->enum_type_count(); ++i) {
       enums_[i]->Generate(printer);
       enums_[i]->AddExports(&exports);
@@ -147,7 +153,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   }
 
   if (file_->message_type_count() > 0) {
-    printer->Print("\n;; Top-Level messages.");
+    printer->Print("\n\n;;; Top-Level messages");
     for (int i = 0; i < file_->message_type_count(); ++i) {
       messages_[i]->Generate(printer);
       messages_[i]->AddExports(&exports);
@@ -155,7 +161,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   }
 
   if (file_->extension_count() > 0) {
-    printer->Print("\n;; Top-Level extensions.");
+    printer->Print("\n\n;;; Top-Level extensions");
     for (int i = 0; i < file_->extension_count(); ++i) {
       GenerateExtension(printer, file_->extension(i), file_);
     }
@@ -163,7 +169,7 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
 
   std::vector<std::string> rpc_exports;
   if (file_->service_count() > 0) {
-    printer->Print("\n;; Services.");
+    printer->Print("\n\n;;; Services");
     for (int i = 0; i < file_->service_count(); ++i) {
       services_[i]->Generate(printer);
       services_[i]->AddExports(&exports);
@@ -176,14 +182,17 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   printer->Print(
       "\n\n"
       "(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
-      "(cl:setf (cl:gethash #P\"$file_name$\" proto-impl::*all-schemas*)\n"
-      "         (proto:find-schema '$schema_name$)))\n",
+      "(pi:add-file-descriptor #P\"$file_name$\" '$schema_name$)\n"
+      ")\n",
       "file_name", file_->name(),
       "schema_name", schema_name_);
 
   if (!lisp_package_name_.empty()) {
     // Export symbols.
     if (!exports.empty()) {
+      std::sort(exports.begin(), exports.end());
+      auto last = std::unique(exports.begin(), exports.end());
+      exports.erase(last, exports.end());
       sep = "(";
       printer->Print("\n(cl:export '");
       for (const std::string& e : exports) {

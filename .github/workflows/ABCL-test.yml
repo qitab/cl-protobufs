@@ -27,8 +27,8 @@ jobs:
 
       - name: Install quicklisp
         run: |
-          ./abcl/abcl --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
-          ./abcl/abcl --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
+          ./abcl/abcl --batch --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
+          ./abcl/abcl --batch --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
 
       - name: Download repo
         uses: actions/checkout@v2
@@ -47,7 +47,8 @@ jobs:
       - name: Load and run tests
         run: |
           export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
-          ./abcl/abcl --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
+          ./abcl/abcl --batch --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
           test -f report
+          cat report
           ! grep -q "not ok" report
           grep -q "ok" report

@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs
         #:alexandria)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.full)
@@ -180,8 +181,8 @@
       (assert (field-equal (second (funcall accessor m)) v1)))))
 
 (defun read-message (class-name file-name)
-  (let ((message (proto-impl::deserialize-object-from-file class-name file-name)))
-    message))
+  (with-open-file (stream file-name :direction :input :element-type '(unsigned-byte 8))
+    (pi::deserialize-from-stream class-name :stream stream)))
 
 (defun test-parse-from-file ()
   (let ((message (read-message 'cl-protobufs.protobuf-unittest:test-all-types
@@ -214,18 +215,18 @@
   (let ((m1 (cl-protobufs.protobuf-unittest:make-test-all-types)))
     (set-all-fields m1)
     (expect-all-fields-set m1)
-    (let* ((bytes (serialize-object-to-bytes m1))
-           (m2 (proto:deserialize-object 'cl-protobufs.protobuf-unittest:test-all-types
-                                         bytes 0 (length bytes))))
+    (let* ((bytes (serialize-to-bytes m1))
+           (m2 (deserialize 'cl-protobufs.protobuf-unittest:test-all-types
+                            bytes 0 (length bytes))))
       (expect-all-fields-set m2))))
 
 (defun expect-clear (m)
   ;; optional and default fields
   (let ((field-info *optional-field-info*))
     (loop for (field . values) in field-info
-          for accessor = (proto-impl::proto-slot-function-name
-                              (type-of m) field :get)
-          for has-function = (proto-impl::proto-slot-function-name
+          for accessor = (pi::proto-slot-function-name
+                          (type-of m) field :get)
+          for has-function = (pi::proto-slot-function-name
                               (type-of m) field :has)
 
           for default-value = (first values)
@@ -236,8 +237,8 @@
 
   (let ((field-info *default-field-info*))
     (loop for (field . values) in field-info do
-      (let* ((accessor (proto-impl::proto-slot-function-name
-                              (type-of m) field :get))
+      (let* ((accessor (pi::proto-slot-function-name
+                        (type-of m) field :get))
              (default-value (first values)))
         (assert (field-equal (funcall accessor m)
                              default-value)))))
@@ -245,8 +246,8 @@
   ;; repeated fields
   (let ((field-info *repeated-field-info*))
     (loop for (field . nil) in field-info do
-      (let* ((accessor (proto-impl::proto-slot-function-name
-                              (type-of m) field :get)))
+      (let* ((accessor (pi::proto-slot-function-name
+                        (type-of m) field :get)))
         (assert (zerop (length (funcall accessor m))))))))
 
 (defun modify-repeated-fields (m)
@@ -277,7 +278,7 @@
     (expect-all-fields-set m)
     (modify-repeated-fields m)
     (expect-repeated-fields-modified m)
-    (proto:clear m)
+    (clear m)
     (expect-clear m)))
 
 (deftest test-enum-default (full-suite)

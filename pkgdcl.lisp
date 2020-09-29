@@ -6,13 +6,12 @@
 
 (in-package "CL-USER")
 
-;;; TODO(cgay): A lot of these symbols should never be used by client code;
-;;; stop exporting them. All the descriptor classes? All the definer macros.
-(defpackage :cl-protobufs
-  (:nicknames :proto :protobufs)
+(defpackage #:cl-protobufs
   (:use)
-
   (:export
+   ;; Base type for all message instances.
+   #:message
+
    ;; Message field types and related definitions.
    #:int32
    #:int64
@@ -29,8 +28,36 @@
    #:byte-vector
    #:make-byte-vector
 
-   ;; Base class for all message instances.
-   #:base-message
+   ;; Enumerations
+   #:enum-keywords
+   #:enum-int-to-keyword
+   #:enum-keyword-to-int
+
+   ;; Serialization to/from various formats
+
+   ;; Binary format
+   #:serialize-to-stream
+   #:serialize-to-bytes
+   #:serialize
+   #:deserialize-from-stream
+   #:deserialize-from-bytes
+   #:deserialize
+   #:make-message-with-bytes
+   #:set-method-do-not-deserialize-input
+
+   ;; JSON
+   #:parse-json
+   #:print-json
+
+   ;; Text format - not well specified, prefer json or binary
+   #:parse-text-format
+   #:print-text-format
+
+   ;; Descriptors -- descriptors contain all the information parsed from .proto
+   ;; files and may be looked up by the symbol naming a protobuf message, enum,
+   ;; etc. For most use cases you won't need to deal with descriptors directly;
+   ;; just access the protos through the generated code APIs and a few other
+   ;; generic APIs above.
 
    ;; Descriptor types
    #:extension-descriptor
@@ -43,6 +70,17 @@
    #:enum-descriptor
    #:enum-value-descriptor
 
+   ;; Descriptor lookup
+   #:find-message-descriptor
+   #:find-file-descriptor
+   #:find-service-descriptor
+   #:find-enum-descriptor
+   #:find-map-descriptor
+   #:find-field-descriptor
+   #:find-method-descriptor
+
+   #:find-option                        ; finds an option, not a descriptor
+
    ;; Conditions
    #:undefined-field-type
    #:undefined-input-type
@@ -53,47 +91,6 @@
    #:error-type-name
    #:error-field
    #:error-method
-
-   ;; Object lookup
-   #:find-message
-   #:find-message-for-class
-   #:find-schema
-   #:find-service
-
-   ;; Parser
-   #:parse-schema-from-file
-   #:parse-schema-from-stream
-
-   ;; Code generation
-   #:define-schema
-   #:define-enum
-   #:define-map
-   #:define-oneof
-   #:define-message
-   #:define-extend
-   #:define-extension
-   #:define-group
-   #:define-service
-
-   ;; Binary format
-   #:serialize-object-to-file
-   #:serialize-object-to-stream
-   #:serialize-object-to-bytes
-   #:serialize-object
-   #:deserialize-object-from-file
-   #:deserialize-object-from-stream
-   #:deserialize-object-from-bytes
-   #:deserialize-object
-   #:make-message-with-bytes
-   #:set-method-do-not-deserialize-input
-
-   ;; Text format
-   #:parse-text-format
-   #:print-text-format
-
-   ;; JSON
-   #:parse-json
-   #:print-json
 
    ;; Extensions
    #:get-extension
@@ -107,45 +104,37 @@
    #:clear
    #:has-field
    #:proto-slot-value
-   #:encoded-field
-   #:merge-from-array
-   #:merge-from-message
+   #:encoded-field))
 
-   ;; Generic functions to convert between numerals and keywords.
-   #:numeral->enum
-   #:enum->numeral
-
-   ;; Miscellany
-   #:enum-values
-   #:find-option
-   ))
-
-(defpackage protobufs-implementation
-  (:nicknames :proto-impl)
-  (:use :common-lisp :protobufs)
-
-  (:import-from :alexandria
-                #:define-constant)
-
-  (:shadow
-   #:find-method)
-
-  ;; TODO(cgay): These are in use outside of cl-protobufs and should be removed or moved to the
-  ;; interface package, as appropriate.
+(defpackage #:cl-protobufs.implementation
+  (:use :common-lisp :cl-protobufs)
+  (:import-from :alexandria #:define-constant)
   (:export
+   ;; Exported solely for use by generated code.
+   #:define-schema
+   #:define-enum
+   #:define-map
+   #:define-oneof
+   #:define-message
+   #:define-extend
+   #:define-extension
+   #:define-group
+   #:define-service
+
+   #:add-file-descriptor
+
+   ;; TODO(cgay): These should be removed or moved to the interface package, as
+   ;; appropriate.
    #:encode-double
    #:encode-string
    #:encode-uint32
-   #:find-enum
-   #:find-map-descriptor
-   #:find-field
-   #:find-method
    #:make-deserializer
    #:make-serializer
    #:make-tag
    #:proto-class
    #:proto-external-field-name
    #:proto-default
+   #:proto-container
    #:proto-fields
    #:proto-index
    #:proto-input-name

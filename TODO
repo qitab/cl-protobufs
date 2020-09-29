@@ -6,16 +6,9 @@ TO DO
 - Get rid of any find-foo lookup at schema expansion/compilation time.
 
 - Get "namespaces" (i.e., nested classes) fully working
-[  - Messages and enums should have a 'fully-qualified-names' slot		]
-[    that records both symbols and strings, and in the correct package		]
 [  - Printers need to print qualified names, as needed				]
-[  - 'find-message' and 'find-enum' need to search namespaces			]
-[     if the quick compare against the name/class fails				]
-
-- Get 'merge-from-message' fully working
-  - See the place in 'deserialize-object' that needs to merge, too
-  - Maybe this isn't so useful in Lisp, where I'd prefer to encourage
-    a more function style
+[  - 'find-message-descriptor' and 'find-enum-descriptor' need to search        ]
+[     namespaces if the quick compare against the name/class fails		]
 
 - Lose 'proto-class', replace it with 'proto-type';
     its type is (or null symbol)
@@ -44,7 +37,8 @@ TO DO
 [  - *all-protobufs* should record keyed by pathname, too			]
 [  - 'import' should not bother loading if the import is present,		]
 [    and should record the imported schema when it's done			]
-[  - 'find-message' and 'find-enum' should search imports, too			]
+[  - 'find-message-descriptor' and 'find-enum-descriptor' should search		]
+[    imports, too                                                               ]
 
 [- 'package'/'lisp_package' should create the package, if necessary.		]
 
@@ -86,29 +80,6 @@ TO DO
 [         (declare (type (or integer null) val)					]
 [         (setq an-int val))))							]
 [  - Handle "extends" in the parser, too					]
-
-[- Support "deprecated" groups. Sigh.						]
-[  - Need 'proto:define-group', which is like 'define-message'			]
-[  - Need to parse 'group' things						]
-[    - "option group Locator = 1 { ... }"					]
-[      means create a submessage (and class!) called "Locator"			]
-[      whose field is named "locator" (note lower case)				]
-[      then just treat it like a message					]
-[  - Make 'proto-extension-p' be 'proto-message-type',				]
-[    which is one of :message, :extends or :group				]
-[  - (De)serialization of groups uses a start and end tag,			]
-[    and the end tag counts as part of the group length				]
-[    - Serialization uses the start-group wire type,				]
-[      then serializes the message,						]
-[      then writes the end-group tag						]
-[    - Deserialization works the usual way,					]
-[      except that it stops at a matching end-group tag				]
-[      (i.e., has the same field number as the start tag)			]
-[      - Add new 'end-tag' argument to 'serialize-object' and			]
-[        the 'serialize' internal function, it's the expected			]
-[        end tag value to indicate end-of-group; if the default			]
-[        value for this is 0, then the (i= tag 0) test can be			]
-[        changed to (i= tag end-tag) (sweet!)					]
 
 [- Speed up 'list-of' by shadowing the Quux version,				]
 [    and don't do any type-checking (!)						]

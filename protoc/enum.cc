@@ -22,7 +22,7 @@ EnumGenerator::EnumGenerator(const EnumDescriptor* descriptor) :
 EnumGenerator::~EnumGenerator() {}
 
 void EnumGenerator::Generate(io::Printer* printer) {
-  printer->Print("\n(proto:define-enum $name$", "name", lisp_name_);
+  printer->Print("\n\n(pi:define-enum $name$", "name", lisp_name_);
   printer->Annotate("name", descriptor_);
   printer->Indent();
 
@@ -52,9 +52,9 @@ void EnumGenerator::Generate(io::Printer* printer) {
 
 void EnumGenerator::AddExports(std::vector<std::string>* exports) {
   exports->push_back(lisp_name_);
-  // enum-value <-> numeral conversion functions.
-  exports->push_back(lisp_name_ + "->numeral");
-  exports->push_back("numeral->" + lisp_name_);
+  // enum keyword to integer conversion functions.
+  exports->push_back(lisp_name_ + "-keyword-to-int");
+  exports->push_back(lisp_name_ + "-int-to-keyword");
 }
 
 }  // namespace cl_protobufs

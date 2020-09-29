@@ -4,7 +4,7 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-(in-package "PROTO-IMPL")
+(in-package #:cl-protobufs.implementation)
 
 
 
@@ -19,6 +19,12 @@
   "Compiler optimization settings for fast, unsafe, hard-to-debug code.")
 
 ) ; eval-when
+
+
+(defmacro defun-inline (name arglist &body body)
+  "Define an inline function with NAME, ARGLIST, and BODY."
+  `(progn (declaim (inline ,name))
+          (defun ,name ,arglist ,@body)))
 
 
 (defmacro i+ (&rest fixnums)
@@ -254,14 +260,19 @@ Arguments:
                  This can also be :map-get or :map-rem for the special map functions.
                  Finally, it can be :case for the special oneof function."
   (declare (type symbol proto-type slot)
-           (type (member :has :get :clear :map-get :map-rem :case) function-type))
+           (type (member :has :get :clear :map-get :map-rem :case :push
+                              :length-of :nth)
+                 function-type))
   (let ((f-symbol (ecase function-type
                     (:has 'has)
                     (:clear 'clear)
                     (:get nil)
                     (:map-get 'gethash)
                     (:map-rem 'remhash)
-                    (:case 'case))))
+                    (:case 'case)
+                    (:push 'push)
+                    (:length-of 'length-of)
+                    (:nth 'nth))))
     (cond ((member f-symbol '(gethash remhash case))
            (intern (nstring-upcase (format nil "~a.~a-~a"
                                            (symbol-name proto-type)
@@ -315,17 +326,10 @@ Arguments:
 (defmacro dovector ((var vector &optional result) &body body)
   "Like DOLIST, but iterates over VECTOR binding VAR to each successive element.
    Returns RESULT."
-  (with-gensyms (vidx vlen vvec)
-    `(let* ((,vvec ,vector)
-            ;; TODO(shaunm): Added by me - the name of the function should change if it is goint to
-            ;; accept nil
-            (,vlen (if ,vvec (length (the vector ,vvec))
-                       0)))
-       ;; TODO(shaunm): Why isn't this just (loop across)?
-       (loop for ,vidx fixnum from 0 below ,vlen
-             as ,var = (aref ,vvec ,vidx)
-             do (progn ,@body)
-             finally (return ,result)))))
+  `(when ,vector
+     (loop for ,var across ,vector
+           do (progn ,@body)
+           finally (return ,result))))
 
 (defmacro doseq ((var sequence &optional result) &body body)
   "Iterates over SEQUENCE, binding VAR to each element in turn. Uses DOLIST or DOVECTOR depending on
@@ -491,7 +495,7 @@ Parameters:
                                   (1- first-upcase-position))))))
     (when add-cl-protobufs
       (setf package (concatenate 'string "CL-PROTOBUFS." package)))
-    (proto-impl::proto->class-name name package)))
+    (proto->class-name name package)))
 
 ;; "ClassName" -> 'class-name
 ;; "cl-user.ClassName" -> 'cl-user::class-name

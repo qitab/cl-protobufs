@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs
         #:cl-protobufs.serialization-test)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.serialization)
@@ -39,10 +40,10 @@
      (when optimized
        (dolist (class '(basic-test1 basic-test2 basic-test3 basic-test4
                         basic-test5 basic-test6 basic-test7 subgroups))
-         (let ((message (proto:find-message-for-class class)))
+         (let ((message (find-message-descriptor class)))
            (handler-bind ((style-warning #'muffle-warning))
-             (eval (proto-impl::generate-deserializer message))
-             (eval (proto-impl::generate-serializer message))))))
+             (eval (pi::generate-deserializer message))
+             (eval (pi::generate-serializer message))))))
      (let* ((test1  (make-basic-test1 :intval 150))
             (test1b (make-basic-test1 :intval -150))
             (test2  (make-basic-test2 :strval "testing"))
@@ -66,14 +67,14 @@
                      :intvals '(2 27)
                      :subgroups (list group1  group2)
                      :strval2 "two")))
-       (let ((tser1  (serialize-object-to-bytes test1 'basic-test1))
-             (tser1b (serialize-object-to-bytes test1b 'basic-test1))
-             (tser2  (serialize-object-to-bytes test2 'basic-test2))
-             (tser3  (serialize-object-to-bytes test3 'basic-test3))
-             (tser4  (serialize-object-to-bytes test4 'basic-test4))
-             (tser5  (serialize-object-to-bytes test5 'basic-test5))
-             (tser6  (serialize-object-to-bytes test6 'basic-test6))
-             (tser7  (serialize-object-to-bytes test7 'basic-test7)))
+       (let ((tser1  (serialize-to-bytes test1 'basic-test1))
+             (tser1b (serialize-to-bytes test1b 'basic-test1))
+             (tser2  (serialize-to-bytes test2 'basic-test2))
+             (tser3  (serialize-to-bytes test3 'basic-test3))
+             (tser4  (serialize-to-bytes test4 'basic-test4))
+             (tser5  (serialize-to-bytes test5 'basic-test5))
+             (tser6  (serialize-to-bytes test6 'basic-test6))
+             (tser7  (serialize-to-bytes test7 'basic-test7)))
          (assert-true (equalp tser1 #(#x08 #x96 #x01)))
          (assert-true (equalp tser1b #(#x08 #xEA #xFE #xFF #xFF #x0F)))
          (assert-true (equalp tser2 #(#x12 #x07 #x74 #x65 #x73 #x74 #x69 #x6E #x67)))
@@ -83,8 +84,8 @@
          (assert-true (equalp tser6 *tser6-bytes*))
          (assert-true (equalp tser7 *tser7-bytes*))
          (macrolet ((slots-equalp (obj1 obj2 &rest slots)
-                      (proto-impl::with-gensyms (vobj1 vobj2)
-                        (proto-impl::with-collectors ((forms collect-form))
+                      (pi::with-gensyms (vobj1 vobj2)
+                        (pi::with-collectors ((forms collect-form))
                           (dolist (slot slots)
                             (collect-form
                              `(assert-true
@@ -93,39 +94,39 @@
                           `(let ((,vobj1 ,obj1)
                                  (,vobj2 ,obj2))
                              ,@forms)))))
-           (slots-equalp test1 (deserialize-object 'basic-test1 tser1)
+           (slots-equalp test1 (deserialize 'basic-test1 tser1)
                          intval)
-           (slots-equalp test1b (deserialize-object 'basic-test1 tser1b)
+           (slots-equalp test1b (deserialize 'basic-test1 tser1b)
                          intval)
-           (slots-equalp test2 (deserialize-object 'basic-test2 tser2)
+           (slots-equalp test2 (deserialize 'basic-test2 tser2)
                          intval strval)
-           (slots-equalp test3 (deserialize-object 'basic-test3 tser3)
+           (slots-equalp test3 (deserialize 'basic-test3 tser3)
                          intval strval)
            (slots-equalp (recval test3)
-                         (recval (deserialize-object 'basic-test3 tser3))
+                         (recval (deserialize 'basic-test3 tser3))
                          intval)
-           (slots-equalp test4 (deserialize-object 'basic-test4 tser4)
+           (slots-equalp test4 (deserialize 'basic-test4 tser4)
                          intval strval)
            (slots-equalp (recval test4)
-                         (recval (deserialize-object 'basic-test4 tser4))
+                         (recval (deserialize 'basic-test4 tser4))
                          intval strval)
-           (slots-equalp test5 (deserialize-object 'basic-test5 tser5)
+           (slots-equalp test5 (deserialize 'basic-test5 tser5)
                          color intvals strvals)
-           (slots-equalp test6 (deserialize-object 'basic-test6 tser6)
+           (slots-equalp test6 (deserialize 'basic-test6 tser6)
                          intvals strvals)
            (slots-equalp (first (recvals test6))
-                         (first (recvals (deserialize-object 'basic-test6 tser6)))
+                         (first (recvals (deserialize 'basic-test6 tser6)))
                          strval)
            (slots-equalp (second (recvals test6))
-                         (second (recvals (deserialize-object 'basic-test6 tser6)))
+                         (second (recvals (deserialize 'basic-test6 tser6)))
                          strval)
-           (slots-equalp test7 (deserialize-object 'basic-test7 tser7)
+           (slots-equalp test7 (deserialize 'basic-test7 tser7)
                          strval1 intvals strval2)
            (slots-equalp (first (subgroups test7))
-                         (first (subgroups (deserialize-object 'basic-test7 tser7)))
+                         (first (subgroups (deserialize 'basic-test7 tser7)))
                          strval intvals)
            (slots-equalp (second (subgroups test7))
-                         (second (subgroups (deserialize-object 'basic-test7 tser7)))
+                         (second (subgroups (deserialize 'basic-test7 tser7)))
                          strval intvals))))))
 
 (deftest text-serialization (serialization-suite)
@@ -142,16 +143,16 @@
                   :intvals '(2 3 5 7)
                   :strvals '("two" "three" "five" "seven")
                   :recvals (list test2 test2b))))
-    (let ((tser1  (serialize-object-to-bytes test1 'basic-test1))
-          (tser1b (serialize-object-to-bytes test1b 'basic-test1))
-          (tser2  (serialize-object-to-bytes test2 'basic-test2))
-          (tser3  (serialize-object-to-bytes test3 'basic-test3))
-          (tser4  (serialize-object-to-bytes test4 'basic-test4))
-          (tser5  (serialize-object-to-bytes test5 'basic-test5))
-          (tser6  (serialize-object-to-bytes test6 'basic-test6)))
+    (let ((tser1  (serialize-to-bytes test1 'basic-test1))
+          (tser1b (serialize-to-bytes test1b 'basic-test1))
+          (tser2  (serialize-to-bytes test2 'basic-test2))
+          (tser3  (serialize-to-bytes test3 'basic-test3))
+          (tser4  (serialize-to-bytes test4 'basic-test4))
+          (tser5  (serialize-to-bytes test5 'basic-test5))
+          (tser6  (serialize-to-bytes test6 'basic-test6)))
       (macrolet ((slots-equalp (obj1 obj2 &rest slots)
-                   (proto-impl::with-gensyms (vobj1 vobj2)
-                     (proto-impl::with-collectors ((forms collect-form))
+                   (pi::with-gensyms (vobj1 vobj2)
+                     (pi::with-collectors ((forms collect-form))
                        (dolist (slot slots)
                          (collect-form
                           `(assert-true (equalp
@@ -166,7 +167,7 @@
                       (print-text-format test1 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize-object 'basic-test1 tser1)
+                                        (deserialize 'basic-test1 tser1)
                                         :stream s))))
           (slots-equalp test1 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test1 :stream s))
@@ -175,7 +176,7 @@
                       (print-text-format test1b :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize-object 'basic-test1 tser1b)
+                                        (deserialize 'basic-test1 tser1b)
                                         :stream s))))
           (slots-equalp test1b (with-input-from-string (s text)
                                  (parse-text-format 'basic-test1 :stream s))
@@ -184,7 +185,7 @@
                       (print-text-format test2 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize-object 'basic-test2 tser2)
+                                        (deserialize 'basic-test2 tser2)
                                         :stream s))))
           (slots-equalp test2 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test2 :stream s))
@@ -193,7 +194,7 @@
                       (print-text-format test3 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize-object 'basic-test3 tser3)
+                                        (deserialize 'basic-test3 tser3)
                                         :stream s))))
           (slots-equalp test3 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test3 :stream s))
@@ -206,7 +207,7 @@
                       (print-text-format test4 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize-object 'basic-test4 tser4)
+                                        (deserialize 'basic-test4 tser4)
                                         :stream s))))
           (slots-equalp test4 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test4 :stream s))
@@ -219,7 +220,7 @@
                       (print-text-format test5 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize-object 'basic-test5 tser5)
+                                        (deserialize 'basic-test5 tser5)
                                         :stream s))))
           (slots-equalp test5 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test5 :stream s))
@@ -228,7 +229,7 @@
                       (print-text-format test6 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize-object 'basic-test6 tser6)
+                                        (deserialize 'basic-test6 tser6)
                                         :stream s))))
           (slots-equalp test6 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test6 :stream s))
@@ -247,9 +248,9 @@
 (deftest serialization-integrity (serialization-suite)
   (flet ((do-test (message)
            (let* ((type (type-of message))
-                  (buf (serialize-object-to-bytes message type))
-                  (new (deserialize-object type buf))
-                  (newbuf (serialize-object-to-bytes new type)))
+                  (buf (serialize-to-bytes message type))
+                  (new (deserialize type buf))
+                  (newbuf (serialize-to-bytes new type)))
              (assert-true (equalp (length buf) (length newbuf)))
              (assert-true (equalp buf newbuf))
              (assert-true (string= (with-output-to-string (s)
@@ -278,12 +279,12 @@
     (setf (foo space1) space0)
     (push speed0 (foo speed2))
     (push space0 (foo space2))
-    (let ((ser-speed0 (serialize-object-to-bytes speed0 (type-of speed0)))
-          (ser-speed1 (serialize-object-to-bytes speed1 (type-of speed1)))
-          (ser-speed2 (serialize-object-to-bytes speed2 (type-of speed2)))
-          (ser-space0 (serialize-object-to-bytes space0 (type-of space0)))
-          (ser-space1 (serialize-object-to-bytes space1 (type-of space1)))
-          (ser-space2 (serialize-object-to-bytes space2 (type-of space2))))
+    (let ((ser-speed0 (serialize-to-bytes speed0 (type-of speed0)))
+          (ser-speed1 (serialize-to-bytes speed1 (type-of speed1)))
+          (ser-speed2 (serialize-to-bytes speed2 (type-of speed2)))
+          (ser-space0 (serialize-to-bytes space0 (type-of space0)))
+          (ser-space1 (serialize-to-bytes space1 (type-of space1)))
+          (ser-space2 (serialize-to-bytes space2 (type-of space2))))
       (assert-true (equalp ser-speed0 #()))
       (assert-true (equalp ser-speed1 #(#x0A #x00)))
       (assert-true (equalp ser-speed2 #(#x0A #x00)))
@@ -308,7 +309,7 @@
 
 (defpackage #:cl-protobufs.test.serialization-rpc (:use))
 
-(define-service buy-car ()
+(pi:define-service buy-car ()
   (buy-car (buy-car-request => buy-car-response)
            :options (:deadline 1.0)))
 
@@ -320,19 +321,19 @@
          (car2   (make-automobile :model "Audi" :color color2))
          (rqst2  (make-buy-car-request :auto car2)))
     (setf (paint-type color2) :metallic)
-    (let ((ser1 (serialize-object-to-bytes rqst1 'buy-car-request))
-          (ser2 (serialize-object-to-bytes rqst2 'buy-car-request)))
+    (let ((ser1 (serialize-to-bytes rqst1 'buy-car-request))
+          (ser2 (serialize-to-bytes rqst2 'buy-car-request)))
       (assert-false (equal ser1 ser2))
       (assert-true (string= (with-output-to-string (s)
                               (print-text-format rqst1 :stream s))
                             (with-output-to-string (s)
                               (print-text-format
-                               (deserialize-object 'buy-car-request ser1) :stream s))))
+                               (deserialize 'buy-car-request ser1) :stream s))))
       (assert-true (string= (with-output-to-string (s)
                               (print-text-format rqst2 :stream s))
                             (with-output-to-string (s)
                               (print-text-format
-                               (deserialize-object 'buy-car-request ser2) :stream s)))))
+                               (deserialize 'buy-car-request ser2) :stream s)))))
     (let ((str1 (with-output-to-string (s)
                   (print-text-format rqst1 :stream s)))
           (str2 (with-output-to-string (s)
@@ -351,8 +352,8 @@
          (color2 (make-color2 :r-value 100 :g-value 0 :b-value 100))
          (rqst2  (make-add-color2 :wheel wheel2 :color color2))
          (rqst3  (make-color-wheel2-wrap :id 9001 :wheel wheel2 :metaname "meta")))
-    (let ((ser1 (serialize-object-to-bytes rqst1 'add-color1))
-          (ser2 (serialize-object-to-bytes rqst2 'add-color2)))
+    (let ((ser1 (serialize-to-bytes rqst1 'add-color1))
+          (ser2 (serialize-to-bytes rqst2 'add-color2)))
       (assert-true (string= (subseq
                              (with-output-to-string (s)
                                (print-text-format rqst1 :stream s))
@@ -365,22 +366,35 @@
           (string= (subseq
                     (with-output-to-string (s)
                       (print-text-format
-                       (deserialize-object 'add-color1 ser1) :stream s))
+                       (deserialize 'add-color1 ser1) :stream s))
                     9)
                    (subseq
                     (with-output-to-string (s)
                       (print-text-format
-                       (deserialize-object 'add-color2 ser2) :stream s))
+                       (deserialize 'add-color2 ser2) :stream s))
                     9)))
       ; this tests the optimized serializer's ability to serialize messages
       ; which have nested messages which have group fields.
-      (proto-impl::make-serializer metadata)
-      (proto-impl::make-serializer color2)
-      (proto-impl::make-serializer color-wheel2)
-      (proto-impl::make-serializer color-wheel2-wrap)
-      (let* ((ser3 (serialize-object-to-bytes rqst3 'color-wheel2-wrap))
-             (res3 (deserialize-object-from-bytes 'color-wheel2-wrap ser3)))
+      (pi::make-serializer metadata)
+      (pi::make-serializer color2)
+      (pi::make-serializer color-wheel2)
+      (pi::make-serializer color-wheel2-wrap)
+      (let* ((ser3 (serialize-to-bytes rqst3 'color-wheel2-wrap))
+             (res3 (deserialize-from-bytes 'color-wheel2-wrap ser3)))
         (assert-true (proto-equal res3 rqst3))))))
+
+(defun clear-serialization-functions (proto-name)
+  #-sbcl
+  (setf (get `,proto-name :serialize) nil
+        (get `,proto-name :deserialize) nil)
+  #+sbcl (fmakunbound (list :protobuf :serialize proto-name))
+  #+sbcl (fmakunbound (list :protobuf :deserialize proto-name)))
+
+(defun clear-test-proto-backwards-compatibility ()
+  (loop for message in '(proto-on-wire
+                         proto-different-than-wire)
+        do
+     (clear-serialization-functions message)))
 
 ;;; We make two protos: ProtoOnWire and ProtoDifferentThanWire.
 ;;; The difference is that ProtoOnWire contains a superset of the
@@ -389,19 +403,32 @@
 ;;; We create a ProtoOnWire, serialize, and then deserialize
 ;;; using the ProtoOnWire's bytes to a ProtoDifferentThanWire
 ;;;
-;;; This aims to test updateing a protocol buffer and deserializing
+;;; This aims to test updating a protocol buffer and deserializing
 ;;; on a binary containing the previous version.
 (deftest test-proto-backwards-compatibility (serialization-suite)
-  (let* ((proto-on-wire (make-proto-on-wire
-                         :beginning "char"
-                         :always "pika-pal"
-                         :end (list "mander")))
-         (proto-on-wire-octet-bytes (serialize-object-to-bytes proto-on-wire))
-         (my-deserialized-proto
-          (deserialize-object 'proto-different-than-wire
-                              proto-on-wire-octet-bytes))
-         (proto-different-than-wire (make-proto-different-than-wire
-                                     :beginning "char"
-                                     :always "pika-pal")))
-    (assert-true my-deserialized-proto)
-    (assert-true (proto-equal my-deserialized-proto proto-different-than-wire))))
+  (loop :for optimized :in '(nil t) :do
+    (print optimized)
+    (when optimized
+      (dolist (class '(proto-on-wire proto-different-than-wire))
+        (let ((message (find-message-descriptor class)))
+          (handler-bind ((style-warning #'muffle-warning))
+            (eval (pi::generate-deserializer message))
+            (eval (pi::generate-serializer message))))))
+
+    (let* ((proto-on-wire (make-proto-on-wire
+                           :beginning "char"
+                           :always "pika-pal"
+                           :end (list "mander")))
+           (proto-on-wire-octet-bytes (serialize-to-bytes proto-on-wire))
+           (my-deserialized-proto
+            (deserialize 'proto-different-than-wire
+                         proto-on-wire-octet-bytes))
+           (proto-different-than-wire (make-proto-different-than-wire
+                                       :beginning "char"
+                                       :always "pika-pal")))
+      (assert-true my-deserialized-proto)
+      (assert-true (proto-equal my-deserialized-proto proto-different-than-wire))
+      (let* ((reserialized-proto-octets (serialize-to-bytes my-deserialized-proto))
+             (should-be-original-proto
+              (deserialize 'proto-on-wire reserialized-proto-octets)))
+        (assert-true (proto-equal should-be-original-proto proto-on-wire))))))

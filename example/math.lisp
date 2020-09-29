@@ -28,7 +28,7 @@
    Parameters:
      RESPONSE: An add-numers-response protobuf message.
    Returns: A cl-protobufs:byte-vector."
-  (serialize-object-to-bytes response))
+  (serialize-to-bytes response))
 
 (defun deserialize-add-numbers-request (buffer)
   "Parses the cl-protobufs:byte-vector in BUFFER into an add-numbers-request
@@ -37,4 +37,4 @@
      BUFFER: A cl-protobufs:byte-vector containing the serialized
        add-numbers-request.
    Returns: The deserialized add-numbers-request protobuf message."
-  (deserialize-object (find-message 'add-numbers-request) buffer))
+  (deserialize (find-message-descriptor 'add-numbers-request) buffer))

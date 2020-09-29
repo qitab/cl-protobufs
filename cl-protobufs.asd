@@ -212,13 +212,13 @@
     :serial t
     :pathname ""
     :components ((:protobuf-source-file "custom-proto")
-                 (:file "custom-methods")))
+                 (:file "custom-methods-test")))
 
-   (:module "deserialize-object-to-bytes-test"
+   (:module "deserialize-test"
     :serial t
     :pathname ""
     :depends-on ("lisp-alias")
-    :components ((:file "deserialize-object-to-bytes-test")))
+    :components ((:file "deserialize-test")))
 
    (:module "enum-mapping-test"
     :serial t
@@ -317,6 +317,13 @@
     :pathname ""
     :components ((:protobuf-source-file "proto3")
                  (:protobuf-source-file "serialization")
-                 (:file "timing-tests"))))
+                 (:file "timing-tests")))
+   (:module "vector-tests"
+    :serial t
+    :pathname ""
+    :depends-on ("descriptor-extensions")
+    :components ((:protobuf-source-file "vector-proto"
+                  :proto-search-path ("../" "../google/protobuf/"))
+                 (:file "vector-test"))))
   :perform (test-op (o c)
                     (uiop:symbol-call '#:cl-protobufs.test '#:run-all)))

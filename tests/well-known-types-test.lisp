@@ -6,12 +6,15 @@
 
 (defpackage #:cl-protobufs.test.well-known-types
   (:use #:cl
-        #:clunit
-        #:cl-protobufs.well-known-types
-        #:cl-protobufs.test-proto)
+        #:clunit)
+  (:local-nicknames (#:alias-pb #:cl-protobufs.alias-test)
+                    (#:google-pb #:cl-protobufs.google.protobuf)
+                    (#:unittest-pb #:cl-protobufs.protobuf-unittest)
+                    (#:wkt #:cl-protobufs.well-known-types))
   (:export :run))
 
 (in-package #:cl-protobufs.test.well-known-types)
+
 
 (defsuite well-known-types-suite (cl-protobufs.test:root-suite))
 
@@ -19,18 +22,16 @@
   "Run the text-format-suite."
   (cl-protobufs.test:run-suite 'well-known-types-suite))
 
+
 (deftest test-any (well-known-types-suite)
-  (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol :zero "red" :one "fish"
-                                :two 6))
-         (any (pack-any p :base-url "http://fish.com"))
-         (ret (unpack-any any)))
-    (assert-true (proto-impl::proto-equal p ret :exact t))
-    (assert-true (string= "http://fish.com/protobuf_unittest.TestProtocol"
-                     (cl-protobufs.google.protobuf:any.type-url any))))
-  (let* ((p (make-outer-message :message
-                                (make-message :i 1)))
-         (any (pack-any p))
-         (ret (unpack-any any)))
-    (assert-true (proto-impl::proto-equal p ret :exact t))
-    (assert-true (string= "type.googleapis.com/test_proto.OuterMessage"
-                     (cl-protobufs.google.protobuf:any.type-url any)))))
+  (let* ((protocol (unittest-pb:make-test-protocol :zero "red" :one "fish" :two 6))
+         (any (wkt:pack-any protocol :base-url "http://fish.com"))
+         (ret (wkt:unpack-any any)))
+    (assert-true (cl-protobufs:proto-equal protocol ret :exact t))
+    (assert-equal "http://fish.com/protobuf_unittest.TestProtocol" (google-pb:any.type-url any)))
+  (let* ((msg (alias-pb:make-outer-message :message (alias-pb:make-message :i 1)))
+         (any (wkt:pack-any msg))
+         (ret (wkt:unpack-any any)))
+    (assert-true (cl-protobufs:proto-equal msg ret :exact t))
+    (assert-equal
+        "type.googleapis.com/alias_test.OuterMessage" (google-pb:any.type-url any))))

@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs.proto3-test
         #:cl-protobufs)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.proto3)
@@ -25,10 +26,10 @@
 (deftest test-singular-defaults (proto3-suite)
   (dolist (optimized '(nil t))
     (when optimized
-      (proto-impl::make-serializer test-message)
-      (proto-impl::make-serializer all-singular)
-      (proto-impl::make-deserializer test-message)
-      (proto-impl::make-deserializer all-singular))
+      (pi::make-serializer test-message)
+      (pi::make-serializer all-singular)
+      (pi::make-deserializer test-message)
+      (pi::make-deserializer all-singular))
     (let* ((msg (make-all-singular
                  :int32-value 0
                  :int64-value 0
@@ -46,7 +47,7 @@
                  :double-value 0.0d0
                  :float-value 0.0
                  :enum-value :default))
-           (serialized (serialize-object-to-bytes msg))
+           (serialized (serialize-to-bytes msg))
            (text (with-output-to-string (s) (print-text-format msg :stream s)))
            (json (with-output-to-string (s) (print-json msg :stream s))))
       (assert-true (string= (format nil "AllSingular {~%}~%") text))
@@ -62,10 +63,10 @@
 (deftest singular-serialization (proto3-suite)
   (dolist (optimized '(nil t))
     (when optimized
-      (proto-impl::make-serializer test-message)
-      (proto-impl::make-serializer all-singular)
-      (proto-impl::make-deserializer test-message)
-      (proto-impl::make-deserializer all-singular))
+      (pi::make-serializer test-message)
+      (pi::make-serializer all-singular)
+      (pi::make-deserializer test-message)
+      (pi::make-deserializer all-singular))
     (let* ((nested (make-test-message :value 2))
            (msg (make-all-singular
                  :int32-value 1
@@ -86,10 +87,10 @@
                  :float-value 3.1
                  :enum-value :other
                  :msg-value nested))
-           (serialized (serialize-object-to-bytes msg)))
+           (serialized (serialize-to-bytes msg)))
       (assert-true (equalp serialized *expected-bytes*))
-      (let ((deserialized (deserialize-object-from-bytes 'all-singular serialized)))
-        (assert-true (proto-impl::proto-equal deserialized msg))))))
+      (let ((deserialized (deserialize-from-bytes 'all-singular serialized)))
+        (assert-true (pi::proto-equal deserialized msg))))))
 
 (deftest optional-test (proto3-suite)
   (let ((msg (make-optional-test)))
@@ -108,6 +109,6 @@
     (setf (second-opt msg) 5)
     (assert-true (mixed-test.has-first-opt msg))
     (assert-true (mixed-test.has-second-opt msg))
-    (proto:clear msg)
+    (clear msg)
     (assert-false (mixed-test.has-first-opt msg))
     (assert-false (mixed-test.has-second-opt msg))))
