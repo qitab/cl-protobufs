@@ -19,9 +19,13 @@
 
 (defsuite lazy-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'lazy-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'lazy-suite :use-debugger use-debugger
+                                :signal-condition-on-fail t))
+
 
 (deftest test-lazy-field-schema (lazy-suite)
   (let* ((container-message (proto:find-message-descriptor 'container))

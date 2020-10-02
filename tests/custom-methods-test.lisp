@@ -33,12 +33,14 @@
 
 (in-package #:cl-protobufs.test.custom-proto)
 
-
 (defsuite custom-proto-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'custom-proto-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'custom-proto-suite :use-debugger use-debugger
+                                        :signal-condition-on-fail t))
 
 
 ;; Helper to ensure the deserializer reconstructs this slot

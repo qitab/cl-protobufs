@@ -17,10 +17,12 @@
 
 (defsuite alias-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'alias-suite))
-
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'alias-suite :use-debugger use-debugger
+                                 :signal-condition-on-fail t))
 
 (defstruct aliased-struct i)
 

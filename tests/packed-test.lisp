@@ -18,9 +18,12 @@
 
 (defsuite packed-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'packed-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'packed-suite :use-debugger use-debugger
+                                  :signal-condition-on-fail t))
 
 (deftest packed-tag-test (packed-suite)
   (assert-true (= #b1010 (pi::packed-tag 1)))

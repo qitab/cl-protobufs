@@ -16,9 +16,12 @@
 
 (defsuite oneof-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'oneof-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'oneof-suite :use-debugger use-debugger
+                                 :signal-condition-on-fail t))
 
 ;; Test that normal accessors for fields in a oneof work.
 (deftest accessor-check (oneof-suite)

@@ -24,9 +24,12 @@
 
 (defsuite symbol-import-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'symbol-import-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'symbol-import-suite :use-debugger use-debugger
+                                         :signal-condition-on-fail t))
 
 ;;; Make sure we can import a schema by symbol name in a pure-lisp
 ;;; protobuf defintion.
