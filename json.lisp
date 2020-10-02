@@ -183,7 +183,7 @@ Parameters:
                  (format stream "~&~V,0T\"~A\": " (+ indent 2) k)
                  (format stream "\"~A\":"  (write-to-string k)))
              (print-field-to-json v (pi::map-descriptor-val-class map-descriptor)
-                                  (and indent (+ indent 4)) stream camel-case-p numeric-enums-p)))
+                                  (and indent (+ indent 2)) stream camel-case-p numeric-enums-p)))
     (if indent
         (format stream "~&~V,0T}" indent)
         (format stream "}")))
@@ -474,7 +474,7 @@ for any types."
                                             (pi::camel-case-but-one name '(#\_)))
                                               paths))))
     ((google:struct)
-     (let ((field (first (proto-fields (find-message type)))))
+     (let ((field (first (proto-fields (find-message-descriptor type)))))
        (print-map-to-json (google:fields object) (find-map-descriptor (proto-class field))
                           indent stream camel-case-p numeric-enums-p)))
     ((google:list-value)
@@ -482,7 +482,7 @@ for any types."
      (loop for print-comma-p = nil then t
            for value in (google:values object)
            do (when print-comma-p (format stream ","))
-              (when indent (format stream "~&~V,0T" (+ indent 2)))
+              (when indent (format stream "~&~V,0T" (+ 2 indent)))
               (print-field-to-json value 'google:value (and indent (+ indent 2))
                                    stream camel-case-p numeric-enums-p))
      (if indent
@@ -492,7 +492,7 @@ for any types."
      (let* ((oneof-data (slot-value object 'google::%kind))
             ;; The wkt Value consists of a single oneof, so the first oneof in the
             ;; descriptor's list is the one we are looking for.
-            (oneof-desc (first (pi::proto-oneofs (find-message type))))
+            (oneof-desc (first (pi::proto-oneofs (find-message-descriptor type))))
             (field (aref (pi::oneof-descriptor-fields oneof-desc)
                          (pi::oneof-set-field oneof-data)))
             (value (pi::oneof-value oneof-data)))
@@ -508,10 +508,15 @@ for any types."
 (defun parse-special-json (type stream ignore-unknown-fields-p)
   "Parse a well known type TYPE from STREAM. IGNORE-UNKNOWN-FIELDS-P is passed to recursive
 calls to PARSE-JSON."
-  ;; If the stream starts with 'n', then the data is NULL. In which case, return NIL.
+  ;; If the stream starts with 'n', then the data is NULL. In all cases except the `Value`
+  ;; well-known-type, we return NIL. However, if TYPE is GOOGLE:VALUE, then we return the
+  ;; wrapper enum that represents null.
   (when (eql (peek-char nil stream nil) #\n)
     (assert (string= (pi::parse-token stream) "null"))
-    (return-from parse-special-json nil))
+    (return-from parse-special-json
+      (if (eql type 'google:value)
+          (google:make-value :null-value :null-value)
+          nil)))
   (case type
     ((google:any)
      (pi::expect-char stream #\{)
@@ -594,9 +599,7 @@ calls to PARSE-JSON."
            for key = (pi::parse-string stream)
            do (pi::expect-char stream #\:)
               (setf (google:struct.fields-gethash key ret)
-                    (parse-value-from-json 'google:value
-                                           :stream stream
-                                           :ignore-unknown-fields-p ignore-unknown-fields-p))
+                    (parse-special-json 'google:value stream ignore-unknown-fields-p))
               (if (eql (peek-char nil stream nil) #\,)
                   (pi::expect-char stream #\,)
                   (progn
@@ -608,7 +611,7 @@ calls to PARSE-JSON."
      (loop with ret = (google:make-list-value)
            do (multiple-value-bind (data err)
                   (parse-value-from-json 'google:value
-                                         :type stream
+                                         :stream stream
                                          :ignore-unknown-fields-p ignore-unknown-fields-p)
                 (if err
                     (error "Error while parsing well known type VALUE from JSON format.")
@@ -616,7 +619,7 @@ calls to PARSE-JSON."
               (if (eql (peek-char nil stream nil) #\,)
                   (pi::expect-char stream #\,)
                   (progn
-                    (expect-char stream #\])
+                    (pi::expect-char stream #\])
                     (return ret)))))
 
     ((google:value)
@@ -626,9 +629,6 @@ calls to PARSE-JSON."
        ((#\[) (google:make-value
                :list-value (parse-special-json 'google:list-value stream ignore-unknown-fields-p)))
        ((#\") (google:make-value :string-value (pi::parse-string stream)))
-       ((#\n)
-        (assert (string= (pi::parse-token stream) "null"))
-        (google:make-value :null-value :null-value))
        ((#\t)
         (assert (string= (pi::parse-token stream) "true"))
         (google:make-value :bool-value t))
