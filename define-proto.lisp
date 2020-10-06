@@ -1007,8 +1007,7 @@ function) then there is no guarantee on the serialize function working properly.
         ((or possible-default
              (eq type 'cl:boolean))
          possible-default)
-        ((enum-default-value `,type)
-         (enum-default-value `,type))
+        ((enum-default-value `,type))
         (t
          `(enum-default-value ',type))))))
 
