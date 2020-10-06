@@ -166,7 +166,7 @@
                       (uncamel (rest chars) 'dot
                                (cons #\. result)))
                      (t
-                      (error "Invalid name character: ~A" ch))))))
+                      (protobuf-error "Invalid name character: ~S" ch))))))
     (strcat (nreverse (uncamel (concatenate 'list name) nil ())))))
 
 (defun split-string (line &key (start 0) (end (length line)) (separators '(#\-)))

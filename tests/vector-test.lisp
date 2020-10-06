@@ -198,5 +198,5 @@ Parameters
        (assert-eq (repeated-list-proto.nth-repeated-int32 (- 9 i) list-proto) i))
     (handler-case
         (outer-proto.push-repeated-proto 10 outer-proto)
-        (error nil)
-        (:no-error (assert-fail)))))
+      (error nil)
+      (:no-error (assert-fail)))))

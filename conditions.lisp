@@ -14,6 +14,12 @@
     As a subtype of simple-error this accepts :format-control and
     :format-argumens init keywords."))
 
+(defun protobuf-error (format-control &rest format-arguments)
+  "Signal a protobuf-error using FORMAT-CONTROL and FORMAT-ARGUMENTS to
+   construct the error message."
+  (error 'protobuf-error
+         :format-control format-control
+         :format-arguments format-arguments))
 
 (define-condition unknown-type (protobuf-error)
   ()

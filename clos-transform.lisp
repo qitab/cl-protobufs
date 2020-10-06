@@ -98,7 +98,7 @@
                                   nil           ;don't pack enums
                                   (if enum-filter (funcall enum-filter values) values))))
                        (t
-                        (error "The MEMBER type ~S is too complicated" type))))))
+                        (protobuf-error "The MEMBER type ~S is too complicated" type))))))
             ((list-of vector-of)
              (multiple-value-bind (type class)
                  (lisp-type-to-protobuf-type (first tail))

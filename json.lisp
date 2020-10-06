@@ -235,7 +235,9 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
             ;; have FIELD, and continue,
             (if ignore-unknown-fields-p
                 (skip-json-value stream)
-                (error "Unknown field ~S encountered in message ~S" name msg-desc))
+                (error 'unknown-field-type
+                       :format-control "unknown field ~S encountered in message ~S"
+                       :format-arguments (list name msg-desc)))
             (let (val error-p null-p)
               (cond
                 ((eql (peek-char nil stream nil) #\n)

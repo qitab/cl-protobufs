@@ -191,7 +191,7 @@ the oneof and its nested fields.
   (dolist (import (reverse imports))
     (let* ((imported (find-file-descriptor (if (stringp import) (pathname import) import))))
       (unless imported
-        (error "Could not find file ~S imported by ~S" import file-descriptor)))))
+        (protobuf-error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
 (defun define-schema (type &key name syntax package import
                            optimize options)
@@ -680,8 +680,8 @@ Parameters:
           (the ,field-type
                (let ((length (length (,public-accessor-name ,obj))))
                  (when (i< length ,n)
-                   (error (format nil "Repeated field ~a is length ~d but asked for element ~d."
-                                  ',public-slot-name length ,n)))
+                   (protobuf-error "Repeated field ~S is length ~D but element ~D was requested."
+                                   ',public-slot-name length ,n))
                  ,(if (eq (proto-container field) :vector)
                       `(aref (,public-accessor-name ,obj) ,n)
                       `(nth ,n (,public-accessor-name ,obj))))))

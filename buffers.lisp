@@ -387,7 +387,7 @@
                    (ilogior (ash (i+ abs-pos count) 2) gap))
              (incf (octet-buffer-n-gap-bytes buffer) gap)))
           ((> count 4)
-           (error "Backpatch failure on ~S" buffer)))
+           (protobuf-error "Backpatch failure on ~S" buffer)))
     count))
 
 ;; Execute BODY, capturing the state of BUFFER at the start, and *unless* a nonlocal
@@ -564,7 +564,7 @@
           (go top))
         ;; now we must be at a deletion point
         (unless (and (= input-position deletion-point) (plusp deletion-length))
-          (error "Octet buffer compaction bug"))
+          (protobuf-error "Octet buffer compaction bug"))
         (let ((remaining-length (- block-length input-index)))
           (if (>= remaining-length deletion-length)
               (incf input-index deletion-length) ; easy case
@@ -754,7 +754,7 @@ and rewind BUFFER so that it is empty."
   (buffer nil :type octet-buffer))
 
 (defun protocol-error (stream)
-  (error "Octet stream protocol error on ~S" stream))
+  (protobuf-error "Octet stream protocol error on ~S" stream))
 
 (defun octet-stream-char-out (stream character)
   ;; A streamified BUFFER accept only ASCII characters (for now).

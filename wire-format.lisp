@@ -265,7 +265,9 @@ and a buffer which encodes the value to the buffer."
                                          &optional (vectorp nil vectorp-supplied-p))
   (if vectorp-supplied-p
       (let ((encode (or (get-scalar-encoder-form type 'val buffer)
-                        (error "No scalar encoder for ~S" type))))
+                        (error 'unknown-type
+                               :format-control "No scalar encoder for ~S"
+                               :format-arguments (list type)))))
         ;; FIXME: probably should have ONCE-ONLY for BUFFER
         ;; [Same goes for a lot of the compiler macros]
         `(locally (declare #.$optimize-serialization)
