@@ -262,8 +262,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
               (cond
                 (null-p nil)
                 (error-p
-                 (undefined-field-type "While parsing ~S from JSON format,"
-                                       msg-desc type field)
+                 (unknown-field-type type field msg-desc)
                  (return-from parse-json))
                 ((eq (pi::proto-kind field) :map)
                  (dolist (pair val)

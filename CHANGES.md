@@ -48,10 +48,27 @@ change) and for internal code quality improvements.
 
     -   `merge-from-array`
     -   `merge-from-message`
+    -   `undefined-field-type`
+    -   `undefined-input-type`
+    -   `undefined-output-type`
+    -   `undefined-stream-type`
+    -   `undefined-type`
+    -   `unknown-enum-error`
+    -   `error-type-name`
+    -   `error-field`
+    -   `error-method`
 
 *   The descriptor defining macros, `define-enum`, `define-message`, etc. have
     been moved to the implementation package. These macros are only intended to
     be called by the generated code.
+
+*   The condition hierarchy has been simplified. A new type, `protobuf-error` is
+    exported from `cl-protobufs`, along with two subtypes: `unknown-type` and
+    `unknown-field-type`. The latter are signaled during
+    serialization/deserialization, parsing, and printing when a non-protobuf
+    type is encountered. For example if you accidentally store a non-protobuf
+    type in a repeated field and `cl-protobufs` can't figure out how to
+    serialize it.
 
 *   Type declarations have been added to field accessor functions to improve
     speed.

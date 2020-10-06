@@ -110,7 +110,10 @@ Parameters:
          (print-enum v desc name stream (and pretty-print indent))))
       ;; This case only happens when the user specifies a custom type and
       ;; doesn't support it above.
-      (t (undefined-type type "While printing ~S to text format," values)))))
+      (t
+       (error 'unknown-type
+              :format-control "unknown type ~S, while printing repeated field ~S"
+              :format-arguments (list type name))))))
 
 (defun print-non-repeated-field
     (value type name &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
@@ -160,7 +163,10 @@ Parameters:
                     (format stream "~%")))))
       ;; This case only happens when the user specifies a custom type and
       ;; doesn't support it above.
-      (t (undefined-type type "While printing ~S to text format," value)))))
+      (t
+       (error 'unknown-type
+              :format-control "unknown type ~S, while printing non-repeated field ~S"
+              :format-arguments (list type name))))))
 
 (defun print-scalar (val type name stream indent)
   "Print scalar value to stream
@@ -285,8 +291,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
                 (parse-field type :stream stream)
               (cond
                 (error-p
-                 (undefined-field-type "While parsing ~S from text format,"
-                                       msg-desc type field))
+                 (unknown-field-type type field msg-desc))
                 ((eq (proto-label field) :repeated)
                  ;; If slot is NIL, then this field doesn't exist in the message
                  ;; so we skip it.

@@ -154,11 +154,9 @@ Parameters:
                          (t (proto-slot-value object (slot-value field 'external-field-name))))))
       (if (eq (proto-label field) :repeated)
           (or (emit-repeated-field value type (proto-packed field) field-num buffer)
-              (undefined-field-type "While serializing ~S,"
-                                    object type field))
+              (unknown-field-type type field object))
           (or (emit-non-repeated-field value type field-num buffer)
-              (undefined-field-type "While serializing ~S,"
-                                    object type field))))))
+              (unknown-field-type type field object))))))
 
 (defun emit-repeated-field (value type packed-p field-num buffer)
   "Serialize a repeated field to buffer. Return nil on failure.
@@ -934,13 +932,10 @@ Parameters:
                 (packed-p (proto-packed field)))
             (or (generate-repeated-field-serializer
                  class field-num boundp reader vbuf size vector-p packed-p)
-                (undefined-field-type "While generating 'serialize' for ~S,"
-                                      msg class field)))
-
+                (unknown-field-type class field msg)))
           (or (generate-non-repeated-field-serializer
                class field-num boundp reader vbuf size)
-              (undefined-field-type "While generating 'serialize' for ~S,"
-                                    msg class field))))))
+              (unknown-field-type class field msg))))))
 
 ;; Note well: keep this in sync with the main 'serialize' method above
 (defun generate-serializer-body (message vobj vbuf size)
@@ -1031,11 +1026,10 @@ Parameters:
                    ;; The BOUNDP argument is T here, since if we get to this point
                    ;; then the slot must be bound, as SET-FIELD indicates that a
                    ;; field is set.
-                   `((,offset) ,(or (generate-non-repeated-field-serializer
-                                     class field-num t 'value vbuf size)
-                                    (undefined-field-type
-                                     "While generating 'serialize' for ~S,"
-                                     message class field)))))
+                   `((,offset)
+                     ,(or (generate-non-repeated-field-serializer
+                           class field-num t 'value vbuf size)
+                          (unknown-field-type class field message)))))
          ((nil) nil)))))
 
 (defun generate-field-deserializer (message field vbuf vidx)
@@ -1066,8 +1060,7 @@ Parameters:
                      (return-from generate-field-deserializer
                        (values (list tag) (list deserializer)
                                non-repeated-slot repeated-slot)))
-                 (undefined-field-type "While generating 'deserialize' for ~S,"
-                                       message class field))))
+                 (unknown-field-type class field message))))
           ;; If this field is contained in a oneof, we need to put the value in the
           ;; proper slot in the one-of data struct.
           (oneof-offset
@@ -1084,8 +1077,7 @@ Parameters:
                             (setf (oneof-set-field ,temp) ,oneof-offset))))
                  (return-from generate-field-deserializer
                    (values (list tag) (list deserializer) nil nil temp)))
-               (undefined-field-type "While generating 'deserialize' for ~S,"
-                                     message class field))))
+               (unknown-field-type class field message))))
           ;; Non-repeated field.
           (t
            (setf non-repeated-slot temp)
@@ -1096,8 +1088,7 @@ Parameters:
                  (return-from generate-field-deserializer
                    (values (list tag) (list deserializer)
                            non-repeated-slot repeated-slot))
-                 (undefined-field-type "While generating 'deserialize' for ~S,"
-                                       message class field)))))))
+                 (unknown-field-type class field message)))))))
 
 (defun generate-repeated-field-deserializer
     (class index lazy-p vbuf vidx dest)

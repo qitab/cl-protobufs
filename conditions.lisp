@@ -7,86 +7,31 @@
 (in-package #:cl-protobufs.implementation)
 
 
-;;; Protocol buffers conditions
-
-(define-condition undefined-type (simple-error)
-  ((type-name :type string
-              :reader error-type-name
-              :initarg :type-name))
-  (:documentation "Indicates that a schema references a type which has not been defined.")
-  (:default-initargs :format-control "Undefined type:")
-  (:report (lambda (condition stream)
-             (format stream "~? ~S"
-                     (simple-condition-format-control condition)
-                     (simple-condition-format-arguments condition)
-                     (error-type-name condition)))))
-
-(define-condition undefined-field-type (undefined-type)
-  ((field :type field-descriptor
-          :reader error-field
-          :initarg :field))
-  (:documentation "Indicates that a schema contains a message with a field whose type is not a
-                   scalar type and is not a known message (or extend) or enum.")
-  (:report (lambda (condition stream)
-             (format stream "~? Qualified Field ~A has unknown type ~A"
-                     (simple-condition-format-control condition)
-                     (simple-condition-format-arguments condition)
-                     ;; I don't know the message but I do know the
-                     ;; field's qualified name.
-                     (proto-qualified-name (error-field condition))
-                     (error-type-name condition)))))
-
-;; The serializers use this a lot, so wrap it up
-(defun undefined-field-type (format-control object type field)
-  (error 'undefined-field-type
-         :format-control format-control
-         :format-arguments (list object)
-         :type-name (prin1-to-string type)
-         :field field))
-
-;; This is used when the field-descriptor is not accessible.
-(defun undefined-type (type format-control &rest format-args)
-  "Signal an undefined type error for TYPE. The error is reported with format string
-FORMAT-CONTROL which takes arguments FORMAT-ARGS."
-  (error 'undefined-type
-         :format-control format-control
-         :format-arguments format-args
-         :type-name (prin1-to-string type)
-         :type-name type))
-
-(define-condition undefined-method-type (undefined-type)
-  ((method :type method-descriptor
-           :reader error-method
-           :initarg :method)
-   (where :type string
-          :reader error-where
-          :initarg :where
-          :documentation "Description of which type referenced by the method is undefined."))
+(define-condition protobuf-error (simple-error)
+  ()
   (:documentation
-   "Superclass for `undefined-type' errors related to a `method-descriptor'. Indicates
-    that a schema contains a service with a method whose input, output, or stream
-    type is not a known message (or extend).")
-  (:report (lambda (condition stream)
-             (format stream "~? ~A type for RPC ~A in service ~S has unknown type ~A"
-                     (simple-condition-format-control condition)
-                     (simple-condition-format-arguments condition)
-                     (error-where condition)
-                     (error-method condition)
-                     (proto-service-name (error-method condition))
-                     (error-type-name condition)))))
+   "Supertype of all errors explicitly signaled by cl-protobufs.
+    As a subtype of simple-error this accepts :format-control and
+    :format-argumens init keywords."))
 
-(define-condition undefined-input-type (undefined-method-type)
-  ()
-  (:default-initargs :where "Input"))
 
-(define-condition undefined-output-type (undefined-method-type)
+(define-condition unknown-type (protobuf-error)
   ()
-  (:default-initargs :where "Output"))
+  (:documentation
+   "Indicates that a non-protobuf object was encountered where a protobuf type
+    (message,enum, scalar etc.) was expected."))
 
-(define-condition undefined-stream-type (undefined-method-type)
+(define-condition unknown-field-type (unknown-type)
   ()
-  (:default-initargs :where "Stream"))
+  (:documentation
+   "Indicates that an object that isn't a protocol buffer type was encountered
+    while printing, parsing, serializing, or otherwise processing a protocol
+    buffer object."))
 
-(define-condition unknown-enum-error (simple-error)
-  ()
-  (:documentation "Signaled when no mapping between an enum value and an integer is found."))
+(defun unknown-field-type (type field object)
+  "Signal an unknown-field-type error for TYPE in relation to FIELD. OBJECT
+   is usually the protobuf message being printed or serialized, or the descriptor
+   being parsed."
+  (error 'unknown-field-type
+         :format-control "unknown field type ~S for field ~S in ~S"
+         :format-arguments (list type field object)))
