@@ -183,13 +183,6 @@
             collect piece
           until (i>= next end))))
 
-(defun split-last (string)
-  "Split STRING at the last dot (#\.). If STRING does not contain a dot an error is signaled."
-  (let* ((dot-pos (position #\. string :from-end t)))
-    (assert dot-pos (string) "SPLIT-LAST called on string with no dot.")
-    (list (subseq string 0 dot-pos)
-          (subseq string (1+ dot-pos)))))
-
 ;;; Managing symbols
 
 (defmacro with-gensyms ((&rest bindings) &body body)

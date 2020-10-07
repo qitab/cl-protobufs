@@ -192,7 +192,7 @@
   (nth-value 1 (lisp-type-to-protobuf-type type)))
 
 (defun scalarp (type)
-  "Returns true if the given Protobufs type TYPE is a scalar type. Scalar
+  "Returns true if the given protobuf type TYPE is a scalar type. Scalar
 types are defined by the protobuf documentation. The cl-protobufs specific
 type :symbol is included as a scalar type, as it is treated as a synonym
 to the :string type. This is because symbol types are identified by their
@@ -204,8 +204,8 @@ https://developers.google.com/protocol-buffers/docs/proto#scalar "
                  :bool :string :bytes :symbol)))
 
 (defun packed-type-p (type)
-  "Returns true if the given Protobufs type can use a packed field."
-  (assert (symbolp type))
+  "Returns true if the given protobuf type can use a packed field."
+  (check-type type symbol)
   (not (null (member type '(:int32 :int64 :uint32 :uint64 :sint32 :sint64
                             :fixed32 :fixed64 :sfixed32 :sfixed64
                             :bool :float :double)))))

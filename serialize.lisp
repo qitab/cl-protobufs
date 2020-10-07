@@ -336,7 +336,7 @@ Parameters:
    START is the first byte.
    END is the last byte plus one.
    Returns two values: the new object and the final index into BUFFER."
-  (assert (symbolp type))
+  (check-type type symbol)
   (let ((fast-function
          #-sbcl (get type :deserialize)
          #+sbcl (handler-case (fdefinition `(:protobuf :deserialize ,type))
@@ -369,9 +369,7 @@ Parameters:
     The return values are the object and the index at which deserialization stopped."))
 
 (defmethod %deserialize (type buffer start end &optional (end-tag 0))
-  (let ((message (find-message-descriptor type)))
-    (assert message ()
-            "There is no Protobuf message having the type ~S" type)
+  (let ((message (find-message-descriptor type :error-p t)))
     (%deserialize message buffer start end end-tag)))
 
 ;; The default method uses metadata from the message descriptor.
@@ -752,41 +750,40 @@ Parameters:
                                         buffer index)
                       (values (if repeated-p (cons data (car cell)) data)
                               new-index))))
-             (let ((submessage (find-message-descriptor type)))
-               (assert submessage)
-               (let* ((deserializer (custom-deserializer type))
-                      (group-p (i= (logand tag 7) $wire-type-start-group))
-                      (end-tag (if group-p
-                                   (ilogior $wire-type-end-group
-                                            (logand #xfFFFFFF8 tag))
-                                   0)))
-                 (if group-p
-                     (multiple-value-bind (obj end)
-                         (cond (deserializer
-                                (funcall deserializer buffer index
-                                         nil end-tag))
-                               (t
-                                (%deserialize
-                                 submessage buffer index nil end-tag)))
+             (let* ((submessage (find-message-descriptor type :error-p t))
+                    (deserializer (custom-deserializer type))
+                    (group-p (i= (logand tag 7) $wire-type-start-group))
+                    (end-tag (if group-p
+                                 (ilogior $wire-type-end-group
+                                          (logand #xfFFFFFF8 tag))
+                                 0)))
+               (if group-p
+                   (multiple-value-bind (obj end)
+                       (cond (deserializer
+                              (funcall deserializer buffer index
+                                       nil end-tag))
+                             (t
+                              (%deserialize
+                               submessage buffer index nil end-tag)))
+                     (values (if repeated-p (cons obj (car cell)) obj)
+                             end))
+                   (multiple-value-bind (embedded-msg-len start)
+                       (decode-uint32 buffer index)
+                     (let* ((end (+ start embedded-msg-len))
+                            (deserializer (custom-deserializer type))
+                            (obj
+                             (cond (lazy-p
+                                    ;; For lazy fields, just store bytes in the %bytes field.
+                                    (make-message-with-bytes type (subseq buffer start end)))
+                                   (deserializer
+                                    (funcall deserializer buffer
+                                             start end end-tag))
+                                   (t
+                                    (%deserialize
+                                     submessage buffer
+                                     start end end-tag)))))
                        (values (if repeated-p (cons obj (car cell)) obj)
-                               end))
-                     (multiple-value-bind (embedded-msg-len start)
-                         (decode-uint32 buffer index)
-                       (let* ((end (+ start embedded-msg-len))
-                              (deserializer (custom-deserializer type))
-                              (obj
-                                (cond (lazy-p
-                                       ;; For lazy fields, just store bytes in the %bytes field.
-                                       (make-message-with-bytes type (subseq buffer start end)))
-                                      (deserializer
-                                       (funcall deserializer buffer
-                                                start end end-tag))
-                                      (t
-                                       (%deserialize
-                                        submessage buffer
-                                        start end end-tag)))))
-                         (values (if repeated-p (cons obj (car cell)) obj)
-                                 end)))))))))))
+                               end))))))))))
 
 
 (defun generate-repeated-field-serializer
@@ -1434,7 +1431,7 @@ Parameters:
   "Creates an instance of TYPE with BUFFER used as the pre-computed proto
    serialization bytes to return when deserializing.  Useful for passing an
    object through without ever needing to deserialize it."
-  (let* ((desc (find-message-descriptor type))
+  (let* ((desc (find-message-descriptor type :error-p t))
          (message-name (or (proto-alias-for desc) (proto-class desc)))
          (object #+sbcl (make-instance message-name)
                  #-sbcl (funcall (get-constructor-name message-name))))

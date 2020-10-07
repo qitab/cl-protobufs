@@ -27,9 +27,7 @@ Parameters:
   PRETTY-PRINT: When true, generate line breaks and other human readable output
     in the text format. When false, replace line breaks with spaces."
   (let* ((type (type-of object))
-         (message (find-message-descriptor type)))
-    (assert message ()
-            "There is no protobuf message having the type ~S" type)
+         (message (find-message-descriptor type :error-p t)))
     (let ((name (or name (proto-name message))))
       (if print-name
           (if pretty-print
@@ -249,10 +247,11 @@ Parameters:
 
 (defmethod parse-text-format ((type symbol)
                               &key (stream *standard-input*) (parse-name t))
-  (let ((message (find-message-descriptor type)))
-    (assert message ()
-            "There is no protobuf message having the type ~S" type)
+  (let ((message (find-message-descriptor type :error-p t)))
     (parse-text-format message :stream stream :parse-name parse-name)))
+
+;;; TODO(cgay): replace all assertions here with something that signals a
+;;; subtype of protobuf-error and shows current stream position.
 
 (defmethod parse-text-format ((msg-desc message-descriptor)
                               &key (stream *standard-input*) (parse-name t))

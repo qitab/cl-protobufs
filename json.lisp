@@ -34,9 +34,7 @@ Parameters:
   SPLICED-P: If true, print this object inside of an existing JSON object
     in the stream. This means that no open bracket is printed."
   (let* ((type (type-of object))
-         (message (find-message-descriptor type)))
-    (assert message ()
-            "There is no protobuf message having the type ~S" type)
+         (message (find-message-descriptor type :error-p t)))
     ;; If TYPE has a special JSON mapping, use that.
     (when (special-json-p type)
       (print-special-json object type stream indent camel-case-p numeric-enums-p)
@@ -187,6 +185,9 @@ Parameters:
 
 ;;; Parse objects that were serialized using JSON format.
 
+;;; TODO(cgay): replace all assertions here with something that signals a
+;;; subtype of protobuf-error and shows current stream position.
+
 (defgeneric parse-json (type &key stream ignore-unknown-fields-p spliced-p)
   (:documentation
    "Parses an object message of type TYPE from the stream STREAM using JSON.
@@ -196,9 +197,7 @@ to parse an opening bracket."))
 
 (defmethod parse-json ((type symbol)
                        &key (stream *standard-input*) ignore-unknown-fields-p spliced-p)
-  (let ((message (find-message-descriptor type)))
-    (assert message ()
-            "There is no protobuf message having the type ~S" type)
+  (let ((message (find-message-descriptor type :error-p t)))
     (parse-json message :stream stream :spliced-p spliced-p
                         :ignore-unknown-fields-p ignore-unknown-fields-p)))
 

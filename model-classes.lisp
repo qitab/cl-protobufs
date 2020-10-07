@@ -136,16 +136,20 @@ message-descriptor.")
 (defvar *qualified-messages* (make-hash-table :test 'equal)
   "Map from the proto-qualified-name of a message (a string) to its Lisp type symbol.")
 
-(defun-inline find-message-descriptor (type)
-  "Return the message-descriptor named by TYPE (a symbol), or nil."
-  (gethash type *messages*))
+(defun-inline find-message-descriptor (type &key error-p)
+  "Return the message-descriptor named by TYPE (a symbol), or nil. If ERROR-P
+   is true then signal protobuf-error instead of returning nil."
+  (or (gethash type *messages*)
+      (when error-p
+        (protobuf-error "~S does not name a protobuf message type" type))))
 
-(defun-inline find-message-by-qualified-name (qualified-name)
-  "Return the protobuf-message symbol named by qualified-name.
-   Parameters:
-     QUALIFIED-NAME: The qualified name of a protobuf message.
-       For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message."
-  (gethash qualified-name *qualified-messages*))
+(defun-inline find-message-by-qualified-name (qualified-name &key error-p)
+  "Return the protobuf message symbol named by QUALIFIED-NAME, or nil. For
+   definition of QUALIFIED-NAME see qual-name slot on message-descriptor.
+   If ERROR-P is true then signal protobuf-error instead of returning nil."
+  (or (gethash qualified-name *qualified-messages*)
+      (when error-p
+        (protobuf-error "~S does not name a protobuf message type" qualified-name))))
 
 (defvar *map-descriptors* (make-hash-table :test 'eq)
   "Maps map names (symbols) to map-descriptor instances.")
@@ -175,9 +179,8 @@ message-descriptor.")
   (find-qualified-name name (proto-services file-desc)))
 
 (defmethod find-service-descriptor (file-desc name)
-  (let ((descriptor (find-file-descriptor file-desc)))
-    (assert descriptor ()
-            "There is no file-descriptor named ~A" file-desc)
+  (let ((descriptor (or (find-file-descriptor file-desc)
+                        (protobuf-error "There is no file-descriptor named ~A" file-desc))))
     (find-service-descriptor descriptor name)))
 
 ;; We accept and store any option, but only act on a few: default, packed,
@@ -479,10 +482,10 @@ if we are not in SBCL."
 
 (defmethod initialize-instance :after ((field field-descriptor) &rest initargs)
   (declare (ignore initargs))
-  (when (slot-boundp field 'index)
-    (assert (and (plusp (proto-index field))
-                 (not (<= 19000 (proto-index field) 19999))) ()
-            "Protobuf field indexes must be positive and not between 19000 and 19999 (inclusive)")))
+  (unless (and (plusp (proto-index field))
+               (not (<= 19000 (proto-index field) 19999)))
+    (protobuf-error
+     "Protobuf field indexes must be positive and not between 19000 and 19999 (inclusive)")))
 
 (defmethod make-load-form ((f field-descriptor) &optional environment)
   (make-load-form-saving-slots f :environment environment))

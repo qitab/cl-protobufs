@@ -49,11 +49,8 @@
 message is found, signal an error."
   (assert (find #\/ type-url :from-end t) ()
           "Could not find / inside of type-url.")
-  (let* ((type-part-of-url (subseq type-url (1+ (position #\/ type-url :from-end t))))
-         (type (pi::find-message-by-qualified-name type-part-of-url)))
-    (assert type ()
-            "Could not find class for type: ~S." type-part-of-url)
-    type))
+  (let* ((type-part-of-url (subseq type-url (1+ (position #\/ type-url :from-end t)))))
+    (pi::find-message-by-qualified-name type-part-of-url :error-p t)))
 
 (defun unpack-any (any-message)
   "Given an Any message decode the contained message and return it.
