@@ -43,8 +43,7 @@ Parameters:
 ;; that makes writing the protobuf parser a good deal more complicated.
 (defclass descriptor (abstract-descriptor)
   ;; The Lisp name for the type of this object. For messages and groups it's
-  ;; the name of a struct. For proto scalar types it's INT32, STRING,
-  ;; etc.
+  ;; the name of a struct. For scalar types it's INT32, STRING, etc.
   ((class :type symbol
           :accessor proto-class
           :initarg :class
@@ -147,6 +146,34 @@ message-descriptor.")
       (when error-p
         (protobuf-error "~S does not name a protobuf message type" qualified-name))))
 
+(defstruct (map-descriptor (:conc-name map-))
+  "Describes a protobuf map."
+  ;; The Lisp type of the map.
+  (class nil :type symbol)
+  ;; The protobuf name of the map.
+  (name nil :type string)
+  ;; A keyword specifying the type of the keys. e.g., :int32.
+  ;; These may only be scalar types.
+  (key-class nil :type symbol)
+  ;; Specifies the type of the values. Either a keyword like :int32 or a symbol
+  ;; naming a protobuf message.
+  (value-class nil :type symbol)
+
+  ;; TODO(cgay): It looks like the *-class slots above contain keywords like
+  ;; :int32 for scalar types and non-keyword symbols for message types, whereas
+  ;; the *-type slots below contain the actual CL types for scalars, like
+  ;; int32, string, boolean.  I think these can be consolidated if we stop
+  ;; using the keywords, like Ben did in his PR 156 that never got merged.
+
+  ;; The Lisp type of the key.
+  (key-type nil)
+  ;; The Lisp type of the value.
+  (value-type nil)
+  (value-kind nil :type (member :scalar :message :group :enum)))
+
+(defmethod make-load-form ((m map-descriptor) &optional environment)
+  (make-load-form-saving-slots m :environment environment))
+
 (defvar *map-descriptors* (make-hash-table :test 'eq)
   "Maps map names (symbols) to map-descriptor instances.")
 
@@ -247,19 +274,6 @@ message-descriptor.")
          (end1   (if (eql (char name1 0) #\() (- (length name1) 1) (length name1)))
          (end2   (if (eql (char name2 0) #\() (- (length name2) 1) (length name2))))
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
-
-(defstruct map-descriptor
-  "The meta-object for a protobuf map"
-  (class     nil :type symbol)
-  (name      nil :type string)
-  (key-class nil :type symbol) ;; the :class of the key
-  (val-class nil :type symbol) ;; the :class of the value
-  (key-type nil)  ;; the lisp type of the key.
-  (val-type nil)  ;; the lisp type of the value.
-  (val-kind nil :type (member :scalar :message :group :enum)))
-
-(defmethod make-load-form ((m map-descriptor) &optional environment)
-  (make-load-form-saving-slots m :environment environment))
 
 (defstruct enum-descriptor
   "Describes a protobuf enum."

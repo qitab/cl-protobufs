@@ -400,69 +400,69 @@ Parameters:
         (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
-(defmacro define-map (type-name &key key-type val-type json-name index val-kind)
-"Define a lisp type given the data for a protobuf map type.
+(defmacro define-map (type-name &key key-type value-type json-name index value-kind)
+  "Define a lisp type given the data for a protobuf map type.
 
-Parameters:
-  TYPE-NAME: Map type name.
-  KEY-TYPE: The lisp type of the map's keys.
-  VAL-TYPE: The lisp type of the map's values.
-  JSON-NAME: The string to use as a JSON name for the field.
-  VAL-KIND: The protobuf kind of the map value type.
-  INDEX: Index of this map type in the field."
+ Parameters:
+  TYPE-NAME: Lisp type of the map itself.
+  KEY-TYPE: Lisp type of the map's keys.
+  VALUE-TYPE: Lisp type of the map's values.
+  JSON-NAME: String to use as a JSON name for the field.
+  VALUE-KIND: Category of the value type: :scalar, :message, :enum, etc.
+  INDEX: Message field number of this map type."
   (assert json-name)
-  (assert val-kind)
+  (assert value-kind)
   (check-type index integer)
-  (let* ((slot      type-name)
-         (name      (class-name->proto type-name))
-         (reader    (let ((msg-conc (proto-conc-name *current-message-descriptor*)))
-                      (and msg-conc
-                           (fintern "~A~A" msg-conc slot))))
+  (let* ((slot type-name)
+         (name (class-name->proto type-name))
+         (reader (let ((prefix (proto-conc-name *current-message-descriptor*)))
+                   (and prefix
+                        (fintern "~A~A" prefix slot))))
          (internal-slot-name (fintern "%~A" slot))
          (qual-name (make-qualified-name *current-message-descriptor* (slot-name->proto slot)))
          (class (fintern (uncamel-case qual-name)))
-         (mslot  (make-field-data
-                  :internal-slot-name internal-slot-name
-                  :external-slot-name slot
-                  :type 'hash-table
-                  :initform (if (eql key-type 'cl:string)
-                                '(make-hash-table :test #'equal)
-                                '(make-hash-table :test #'eq))
-                  :accessor reader))
+         (mdata (make-field-data
+                 :internal-slot-name internal-slot-name
+                 :external-slot-name slot
+                 :type 'hash-table
+                 :initform (if (eql key-type 'cl:string)
+                               '(make-hash-table :test #'equal)
+                               '(make-hash-table :test #'eq))
+                 :accessor reader))
          (mfield (make-instance 'field-descriptor
-                  :name (slot-name->proto slot)
-                  :class class
-                  :qualified-name qual-name
-                  :label :optional
-                  :index index
-                  :internal-field-name internal-slot-name
-                  :external-field-name slot
-                  :json-name json-name
-                  :reader reader
-                  :type 'cl:hash-table
-                  :kind :map))
+                                :name (slot-name->proto slot)
+                                :class class
+                                :qualified-name qual-name
+                                :label :optional
+                                :index index
+                                :internal-field-name internal-slot-name
+                                :external-field-name slot
+                                :json-name json-name
+                                :reader reader
+                                :type 'cl:hash-table
+                                :kind :map))
          (map-desc (make-map-descriptor
                     :class class
                     :name name
-                    :key-class (lisp-type-to-protobuf-class key-type)
-                    ;; If the value type is a message, then VAL-TYPE will take the form
-                    ;; (cl:or cl:null message). In this case, set VAL-CLASS to be 'message'
+                    :key-class (lisp-type-to-protobuf-class key-type) ; a keyword like :intt32
+                    ;; If the value type is a message, then VALUE-TYPE will take the form
+                    ;; (cl:or cl:null message). In this case, set VALUE-CLASS to be 'message'
                     ;; as that is the class of the value type.
-                    :val-class (if (listp val-type)
-                                   (destructuring-bind (a b msg-type) val-type
-                                     (assert (and (eq a 'or) (eq b 'null)))
-                                     msg-type)
-                                   (lisp-type-to-protobuf-class val-type))
+                    :value-class (if (listp value-type)
+                                     (destructuring-bind (a b msg-type) value-type
+                                       (assert (and (eq a 'or) (eq b 'null)))
+                                       msg-type)
+                                     (lisp-type-to-protobuf-class value-type))
                     :key-type key-type
-                    :val-type val-type
-                    :val-kind val-kind)))
+                    :value-type value-type
+                    :value-kind value-kind)))
     (record-protobuf-object class map-desc :map)
     `(progn
-       define-map ;; the type of this model
-       map-desc   ;; the model data.
-       ((record-protobuf-object ',class ,map-desc :map)) ;; forms necessary for defining the map
-       ,mfield    ;; the extra field-data object created by this macro
-       ,mslot)))  ;; the extra field-descriptor object created by this macro.
+       define-map
+       map-desc
+       ((record-protobuf-object ',class ,map-desc :map))
+       ,mfield
+       ,mdata)))
 
 (defmacro define-oneof (name (&key synthetic-p) &body fields)
   "Creates a oneof descriptor and the defining forms for its fields.
@@ -814,10 +814,10 @@ function) then there is no guarantee on the serialize function working properly.
          (method-remove-name (fintern "~A-remhash" public-slot-name))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
          (map-descriptor (find-map-descriptor (proto-class field)))
-         (key-type (map-descriptor-key-type map-descriptor))
-         (val-type (map-descriptor-val-type map-descriptor))
-         (val-kind (map-descriptor-val-kind map-descriptor))
-         (val-default-form (get-default-form val-type $empty-default nil val-kind))
+         (key-type (map-key-type map-descriptor))
+         (value-type (map-value-type map-descriptor))
+         (value-kind (map-value-kind map-descriptor))
+         (val-default-form (get-default-form value-type $empty-default nil value-kind))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
 
@@ -825,16 +825,16 @@ function) then there is no guarantee on the serialize function working properly.
       `(
         (defun-inline (setf ,public-accessor-name) (,new-val ,new-key ,obj)
           (declare (type ,key-type ,new-key)
-                   (type ,val-type ,new-val))
+                   (type ,value-type ,new-val))
           (setf (bit (,is-set-accessor ,obj) ,index) 1)
           (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
 
         ;; If the map's value type is a message, then the default value returned
         ;; should be nil. However, we do not want to allow the user to insert nil
         ;; into the map, so this binding only applies to get function.
-        ,@(let ((val-type (if (member val-kind '(:message :group :extends))
-                              (list 'or 'null val-type)
-                              val-type)))
+        ,@(let ((val-type (if (member value-kind '(:message :group :extends))
+                              (list 'or 'null value-type)
+                              value-type)))
 
             `((defun-inline ,public-accessor-name (,new-key ,obj)
                 (declare (type ,key-type ,new-key))

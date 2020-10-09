@@ -104,7 +104,7 @@ Parameters:
 (defun print-field-to-json (value type indent stream camel-case-p numeric-enums-p)
   "Print a field to JSON format.
 
-Parameters:
+ Parameters:
   VALUE: The value held by the field
   TYPE: The proto-class slot of the field.
   INDENT: If non-nil, the amount to indent when pretty-printing.
@@ -177,7 +177,7 @@ Parameters:
              (if indent
                  (format stream "~&~V,0T\"~A\": " (+ indent 2) (write-to-string k))
                  (format stream "\"~A\":"  (write-to-string k)))
-             (print-field-to-json v (pi::map-descriptor-val-class map-descriptor)
+             (print-field-to-json v (pi::map-value-class map-descriptor)
                                   (and indent (+ indent 4)) stream camel-case-p numeric-enums-p)))
     (if indent
         (format stream "~&~V,0T}" indent)
@@ -329,8 +329,8 @@ to recursive calls to PARSE-JSON."
           ;; In the case of maps, return a list of key-value pairs.
           ((typep desc 'pi::map-descriptor)
            (pi::expect-char stream #\{)
-           (let ((key-type (pi::map-descriptor-key-class desc))
-                 (val-type (pi::map-descriptor-val-class desc)))
+           (let ((key-type (pi::map-key-class desc))
+                 (val-type (pi::map-value-class desc)))
              (loop with pairs = ()
                    for pair = (cons nil nil)
                    do (if (eql key-type :string)

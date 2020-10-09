@@ -262,8 +262,8 @@ Parameters:
                            buffer))
           ((setq desc (find-map-descriptor type))
            (let* ((tag (make-wire-tag $wire-type-string field-num))
-                  (key-class (map-descriptor-key-class desc))
-                  (val-class (map-descriptor-val-class desc)))
+                  (key-class (map-key-class desc))
+                  (val-class (map-value-class desc)))
              (flet ((serialize-pair (k v)
                       (let ((ret-len (encode-uint32 tag buffer))
                             (map-len 0))
@@ -677,8 +677,8 @@ Parameters:
                     (progn
                       (unless (car cell)
                         (setf (car cell) (make-hash-table)))
-                      (let ((key-class (map-descriptor-key-class map-desc))
-                            (val-class (map-descriptor-val-class map-desc))
+                      (let ((key-class (map-key-class map-desc))
+                            (val-class (map-value-class map-desc))
                             map-tag map-len key-data start (val-data nil))
                         (multiple-value-setq (map-len index)
                           (decode-uint32 buffer index))
@@ -890,8 +890,8 @@ Parameters:
                                 ,tag ,vbuf))))))
           ((typep msg 'map-descriptor)
            (let* ((tag      (make-wire-tag $wire-type-string field-num))
-                  (key-class (map-descriptor-key-class msg))
-                  (val-class (map-descriptor-val-class msg)))
+                  (key-class (map-key-class msg))
+                  (val-class (map-value-class msg)))
              `(when ,boundp
                 (let ((,vval ,reader))
                   (flet ((serialize-pair (k v)
@@ -1187,9 +1187,9 @@ Parameters:
 (defun generate-non-repeated-field-deserializer
     (class index lazy-p vbuf vidx dest)
   "Returns two values: The first is lisp code that deserializes the specified object
-to dest and updates vidx to the new index. The second is the tag of this field.
+   to dest and updates vidx to the new index. The second is the tag of this field.
 
-Parameters:
+ Parameters:
   CLASS: The :class field of this field.
   INDEX: The field index of the field.
   LAZY-P: True if and only if the field is lazy.
@@ -1234,8 +1234,8 @@ Parameters:
                  (deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
               (make-wire-tag $wire-type-varint index)))
             ((typep msg 'map-descriptor)
-             (let* ((key-class (map-descriptor-key-class msg))
-                    (val-class (map-descriptor-val-class msg)))
+             (let* ((key-class (map-key-class msg))
+                    (val-class (map-value-class msg)))
                (values
                 `(progn
                    ;; If ,dest points to the "unset" placeholder, make a new hash-table.
