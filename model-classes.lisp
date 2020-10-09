@@ -86,10 +86,6 @@ Parameters:
             :accessor proto-package
             :initarg :package
             :initform nil)
-   (alias-packages :type list           ; list of (non-proto) packages forward referenced
-                                        ; by aliases in this schema
-                   :accessor proto-alias-packages
-                   :initform nil)
    (imports :type (list-of string)      ; the names of schemas to be imported
             :accessor proto-imports
             :initarg :imports
