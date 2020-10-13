@@ -192,25 +192,25 @@ Parameters:
     (:float    `(encode-single ,val ,buffer))
     (:double   `(encode-double ,val ,buffer))))
 
-(defun get-scalar-encoder-lambda (type)
+(defun get-scalar-encoder-function (type)
   "Given a type TYPE, return a function that takes a value of type TYPE
-and a buffer which encodes the value to the buffer."
+   and a buffer which encodes the value to the buffer."
   (ecase type
-    (:uint32   (lambda (val b) (encode-uint32 val b)))
-    (:uint64   (lambda (val b) (encode-uint64 val b)))
+    (:uint32   #'encode-uint32)
+    (:uint64   #'encode-uint64)
     (:int32    (lambda (val b) (encode-uint32 (ldb (byte 32 0) val) b)))
-    (:int64    (lambda (val b) (encode-int64 val b)))
+    (:int64    #'encode-int64)
     ;; FIXME: should bury the zigzag algorithm into a specialized encoder.
     ;; Now we're consing bignums to pass to encode-uint64.
     (:sint32   (lambda (val b) (encode-uint32 (zig-zag-encode32 val) b)))
     (:sint64   (lambda (val b) (encode-uint64 (zig-zag-encode64 val) b)))
-    (:fixed32  (lambda (val b) (encode-fixed32 val b)))
-    (:sfixed32 (lambda (val b) (encode-sfixed32 val b)))
-    (:fixed64  (lambda (val b) (encode-fixed64 val b)))
-    (:sfixed64 (lambda (val b) (encode-sfixed64 val b)))
+    (:fixed32  #'encode-fixed32)
+    (:sfixed32 #'encode-sfixed32)
+    (:fixed64  #'encode-fixed64)
+    (:sfixed64 #'encode-sfixed64)
     (:bool     (lambda (val b) (encode-uint32 (if val 1 0) b)))
-    (:float    (lambda (val b) (encode-single val b)))
-    (:double   (lambda (val b) (encode-double val b)))))
+    (:float    #'encode-single)
+    (:double   #'encode-double)))
 
 (define-compiler-macro serialize-scalar (&whole form val type tag buffer)
   (let ((encoder (get-scalar-encoder-form type val buffer)))
@@ -239,7 +239,7 @@ and a buffer which encodes the value to the buffer."
     ;; Of course, we *could* dispatch on both the sequence type and the
     ;; scalar wire type, to create 22 (= 11 x 2) cases,
     ;; but I'm too lazy to hand-roll that, or even think of a macroish way.
-    (let* ((encoder (get-scalar-encoder-lambda type))
+    (let* ((encoder (get-scalar-encoder-function type))
            (tag-len (encode-uint32 (packed-tag index) buffer))
            (payload-len (packed-size values type))
            (prefix-len (encode-uint32 payload-len buffer))
