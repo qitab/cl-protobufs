@@ -17,9 +17,14 @@
 
 (defsuite extend-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'extend-suite))
+
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'extend-suite :use-debugger use-debugger
+                                  :signal-condition-on-fail t))
+
 
 (deftest test-local-bar (extend-suite)
   (let ((a (make-foo)))

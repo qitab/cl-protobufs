@@ -16,9 +16,12 @@
 
 (defsuite proto3-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'proto3-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'proto3-suite :use-debugger use-debugger
+                                  :signal-condition-on-fail t))
 
 
 ;; Test that setting a singular value to the default results in nothing

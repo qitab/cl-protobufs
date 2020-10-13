@@ -34,9 +34,7 @@ Parameters:
   SPLICED-P: If true, print this object inside of an existing JSON object
     in the stream. This means that no open bracket is printed."
   (let* ((type (type-of object))
-         (message (find-message-descriptor type)))
-    (assert message ()
-            "There is no protobuf message having the type ~S" type)
+         (message (find-message-descriptor type :error-p t)))
     ;; If TYPE has a special JSON mapping, use that.
     (when (special-json-p type)
       (print-special-json object type stream indent camel-case-p numeric-enums-p)
@@ -106,7 +104,7 @@ Parameters:
 (defun print-field-to-json (value type indent stream camel-case-p numeric-enums-p)
   "Print a field to JSON format.
 
-Parameters:
+ Parameters:
   VALUE: The value held by the field
   TYPE: The proto-class slot of the field.
   INDENT: If non-nil, the amount to indent when pretty-printing.
@@ -182,13 +180,16 @@ Parameters:
              (if indent
                  (format stream "~&~V,0T\"~A\": " (+ indent 2) k)
                  (format stream "\"~A\":"  (write-to-string k)))
-             (print-field-to-json v (pi::map-descriptor-val-class map-descriptor)
+             (print-field-to-json v (pi::map-value-class map-descriptor)
                                   (and indent (+ indent 2)) stream camel-case-p numeric-enums-p)))
     (if indent
         (format stream "~&~V,0T}" indent)
         (format stream "}")))
 
 ;;; Parse objects that were serialized using JSON format.
+
+;;; TODO(cgay): replace all assertions here with something that signals a
+;;; subtype of protobuf-error and shows current stream position.
 
 (defgeneric parse-json (type &key stream ignore-unknown-fields-p spliced-p)
   (:documentation
@@ -199,9 +200,7 @@ to parse an opening bracket."))
 
 (defmethod parse-json ((type symbol)
                        &key (stream *standard-input*) ignore-unknown-fields-p spliced-p)
-  (let ((message (find-message-descriptor type)))
-    (assert message ()
-            "There is no protobuf message having the type ~S" type)
+  (let ((message (find-message-descriptor type :error-p t)))
     (parse-json message :stream stream :spliced-p spliced-p
                         :ignore-unknown-fields-p ignore-unknown-fields-p)))
 
@@ -238,7 +237,9 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
             ;; have FIELD, and continue,
             (if ignore-unknown-fields-p
                 (skip-json-value stream)
-                (error "Unknown field ~S encountered in message ~S" name msg-desc))
+                (error 'unknown-field-type
+                       :format-control "unknown field ~S encountered in message ~S"
+                       :format-arguments (list name msg-desc)))
             (let (val error-p null-p)
               (cond
                 ((eql (peek-char nil stream nil) #\n)
@@ -264,8 +265,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
               (cond
                 (null-p nil)
                 (error-p
-                 (undefined-field-type "While parsing ~S from JSON format,"
-                                       msg-desc type field)
+                 (unknown-field-type type field msg-desc)
                  (return-from parse-json))
                 ((eq (pi::proto-kind field) :map)
                  (dolist (pair val)
@@ -337,8 +337,8 @@ to recursive calls to PARSE-JSON."
           ;; In the case of maps, return a list of key-value pairs.
           ((typep desc 'pi::map-descriptor)
            (pi::expect-char stream #\{)
-           (let ((key-type (pi::map-descriptor-key-class desc))
-                 (val-type (pi::map-descriptor-val-class desc)))
+           (let ((key-type (pi::map-key-class desc))
+                 (val-type (pi::map-value-class desc)))
              (loop with pairs = ()
                    for pair = (cons nil nil)
                    do (if (eql key-type :string)

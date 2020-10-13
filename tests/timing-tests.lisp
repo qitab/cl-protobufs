@@ -20,9 +20,12 @@
 
 (defsuite timing-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'timing-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'timing-suite :use-debugger use-debugger
+                                  :signal-condition-on-fail t))
 
 (deftest basic-function-times (timing-suite)
   (print "Optional Field Test")

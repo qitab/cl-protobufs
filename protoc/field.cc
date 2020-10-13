@@ -244,9 +244,9 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
     printer->Print(vars,
                    "\n(pi:define-map $name$\n"
                    "   :key-type $key-type$\n"
-                   "   :val-type $val-type$\n"
+                   "   :value-type $val-type$\n"
                    "   :json-name \"$json-name$\"\n"
-                   "   :val-kind $val-kind$\n"
+                   "   :value-kind $val-kind$\n"
                    "   :index $tag$)");
   } else {
     vars["type"] = FieldLispType(field);

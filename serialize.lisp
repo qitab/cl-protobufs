@@ -154,11 +154,9 @@ Parameters:
                          (t (proto-slot-value object (slot-value field 'external-field-name))))))
       (if (eq (proto-label field) :repeated)
           (or (emit-repeated-field value type (proto-packed field) field-num buffer)
-              (undefined-field-type "While serializing ~S,"
-                                    object type field))
+              (unknown-field-type type field object))
           (or (emit-non-repeated-field value type field-num buffer)
-              (undefined-field-type "While serializing ~S,"
-                                    object type field))))))
+              (unknown-field-type type field object))))))
 
 (defun emit-repeated-field (value type packed-p field-num buffer)
   "Serialize a repeated field to buffer. Return nil on failure.
@@ -264,8 +262,8 @@ Parameters:
                            buffer))
           ((setq desc (find-map-descriptor type))
            (let* ((tag (make-wire-tag $wire-type-string field-num))
-                  (key-class (map-descriptor-key-class desc))
-                  (val-class (map-descriptor-val-class desc)))
+                  (key-class (map-key-class desc))
+                  (val-class (map-value-class desc)))
              (flet ((serialize-pair (k v)
                       (let ((ret-len (encode-uint32 tag buffer))
                             (map-len 0))
@@ -338,7 +336,7 @@ Parameters:
    START is the first byte.
    END is the last byte plus one.
    Returns two values: the new object and the final index into BUFFER."
-  (assert (symbolp type))
+  (check-type type symbol)
   (let ((fast-function
          #-sbcl (get type :deserialize)
          #+sbcl (handler-case (fdefinition `(:protobuf :deserialize ,type))
@@ -371,9 +369,7 @@ Parameters:
     The return values are the object and the index at which deserialization stopped."))
 
 (defmethod %deserialize (type buffer start end &optional (end-tag 0))
-  (let ((message (find-message-descriptor type)))
-    (assert message ()
-            "There is no Protobuf message having the type ~S" type)
+  (let ((message (find-message-descriptor type :error-p t)))
     (%deserialize message buffer start end end-tag)))
 
 ;; The default method uses metadata from the message descriptor.
@@ -681,8 +677,8 @@ Parameters:
                     (progn
                       (unless (car cell)
                         (setf (car cell) (make-hash-table)))
-                      (let ((key-class (map-descriptor-key-class map-desc))
-                            (val-class (map-descriptor-val-class map-desc))
+                      (let ((key-class (map-key-class map-desc))
+                            (val-class (map-value-class map-desc))
                             map-tag map-len key-data start (val-data nil))
                         (multiple-value-setq (map-len index)
                           (decode-uint32 buffer index))
@@ -754,41 +750,40 @@ Parameters:
                                         buffer index)
                       (values (if repeated-p (cons data (car cell)) data)
                               new-index))))
-             (let ((submessage (find-message-descriptor type)))
-               (assert submessage)
-               (let* ((deserializer (custom-deserializer type))
-                      (group-p (i= (logand tag 7) $wire-type-start-group))
-                      (end-tag (if group-p
-                                   (ilogior $wire-type-end-group
-                                            (logand #xfFFFFFF8 tag))
-                                   0)))
-                 (if group-p
-                     (multiple-value-bind (obj end)
-                         (cond (deserializer
-                                (funcall deserializer buffer index
-                                         nil end-tag))
-                               (t
-                                (%deserialize
-                                 submessage buffer index nil end-tag)))
+             (let* ((submessage (find-message-descriptor type :error-p t))
+                    (deserializer (custom-deserializer type))
+                    (group-p (i= (logand tag 7) $wire-type-start-group))
+                    (end-tag (if group-p
+                                 (ilogior $wire-type-end-group
+                                          (logand #xfFFFFFF8 tag))
+                                 0)))
+               (if group-p
+                   (multiple-value-bind (obj end)
+                       (cond (deserializer
+                              (funcall deserializer buffer index
+                                       nil end-tag))
+                             (t
+                              (%deserialize
+                               submessage buffer index nil end-tag)))
+                     (values (if repeated-p (cons obj (car cell)) obj)
+                             end))
+                   (multiple-value-bind (embedded-msg-len start)
+                       (decode-uint32 buffer index)
+                     (let* ((end (+ start embedded-msg-len))
+                            (deserializer (custom-deserializer type))
+                            (obj
+                             (cond (lazy-p
+                                    ;; For lazy fields, just store bytes in the %bytes field.
+                                    (make-message-with-bytes type (subseq buffer start end)))
+                                   (deserializer
+                                    (funcall deserializer buffer
+                                             start end end-tag))
+                                   (t
+                                    (%deserialize
+                                     submessage buffer
+                                     start end end-tag)))))
                        (values (if repeated-p (cons obj (car cell)) obj)
-                               end))
-                     (multiple-value-bind (embedded-msg-len start)
-                         (decode-uint32 buffer index)
-                       (let* ((end (+ start embedded-msg-len))
-                              (deserializer (custom-deserializer type))
-                              (obj
-                                (cond (lazy-p
-                                       ;; For lazy fields, just store bytes in the %bytes field.
-                                       (make-message-with-bytes type (subseq buffer start end)))
-                                      (deserializer
-                                       (funcall deserializer buffer
-                                                start end end-tag))
-                                      (t
-                                       (%deserialize
-                                        submessage buffer
-                                        start end end-tag)))))
-                         (values (if repeated-p (cons obj (car cell)) obj)
-                                 end)))))))))))
+                               end))))))))))
 
 
 (defun generate-repeated-field-serializer
@@ -895,8 +890,8 @@ Parameters:
                                 ,tag ,vbuf))))))
           ((typep msg 'map-descriptor)
            (let* ((tag      (make-wire-tag $wire-type-string field-num))
-                  (key-class (map-descriptor-key-class msg))
-                  (val-class (map-descriptor-val-class msg)))
+                  (key-class (map-key-class msg))
+                  (val-class (map-value-class msg)))
              `(when ,boundp
                 (let ((,vval ,reader))
                   (flet ((serialize-pair (k v)
@@ -934,13 +929,10 @@ Parameters:
                 (packed-p (proto-packed field)))
             (or (generate-repeated-field-serializer
                  class field-num boundp reader vbuf size vector-p packed-p)
-                (undefined-field-type "While generating 'serialize' for ~S,"
-                                      msg class field)))
-
+                (unknown-field-type class field msg)))
           (or (generate-non-repeated-field-serializer
                class field-num boundp reader vbuf size)
-              (undefined-field-type "While generating 'serialize' for ~S,"
-                                    msg class field))))))
+              (unknown-field-type class field msg))))))
 
 ;; Note well: keep this in sync with the main 'serialize' method above
 (defun generate-serializer-body (message vobj vbuf size)
@@ -1031,11 +1023,10 @@ Parameters:
                    ;; The BOUNDP argument is T here, since if we get to this point
                    ;; then the slot must be bound, as SET-FIELD indicates that a
                    ;; field is set.
-                   `((,offset) ,(or (generate-non-repeated-field-serializer
-                                     class field-num t 'value vbuf size)
-                                    (undefined-field-type
-                                     "While generating 'serialize' for ~S,"
-                                     message class field)))))
+                   `((,offset)
+                     ,(or (generate-non-repeated-field-serializer
+                           class field-num t 'value vbuf size)
+                          (unknown-field-type class field message)))))
          ((nil) nil)))))
 
 (defun generate-field-deserializer (message field vbuf vidx)
@@ -1066,8 +1057,7 @@ Parameters:
                      (return-from generate-field-deserializer
                        (values (list tag) (list deserializer)
                                non-repeated-slot repeated-slot)))
-                 (undefined-field-type "While generating 'deserialize' for ~S,"
-                                       message class field))))
+                 (unknown-field-type class field message))))
           ;; If this field is contained in a oneof, we need to put the value in the
           ;; proper slot in the one-of data struct.
           (oneof-offset
@@ -1084,8 +1074,7 @@ Parameters:
                             (setf (oneof-set-field ,temp) ,oneof-offset))))
                  (return-from generate-field-deserializer
                    (values (list tag) (list deserializer) nil nil temp)))
-               (undefined-field-type "While generating 'deserialize' for ~S,"
-                                     message class field))))
+               (unknown-field-type class field message))))
           ;; Non-repeated field.
           (t
            (setf non-repeated-slot temp)
@@ -1096,8 +1085,7 @@ Parameters:
                  (return-from generate-field-deserializer
                    (values (list tag) (list deserializer)
                            non-repeated-slot repeated-slot))
-                 (undefined-field-type "While generating 'deserialize' for ~S,"
-                                       message class field)))))))
+                 (unknown-field-type class field message)))))))
 
 (defun generate-repeated-field-deserializer
     (class index lazy-p vbuf vidx dest)
@@ -1199,9 +1187,9 @@ Parameters:
 (defun generate-non-repeated-field-deserializer
     (class index lazy-p vbuf vidx dest)
   "Returns two values: The first is lisp code that deserializes the specified object
-to dest and updates vidx to the new index. The second is the tag of this field.
+   to dest and updates vidx to the new index. The second is the tag of this field.
 
-Parameters:
+ Parameters:
   CLASS: The :class field of this field.
   INDEX: The field index of the field.
   LAZY-P: True if and only if the field is lazy.
@@ -1246,8 +1234,8 @@ Parameters:
                  (deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
               (make-wire-tag $wire-type-varint index)))
             ((typep msg 'map-descriptor)
-             (let* ((key-class (map-descriptor-key-class msg))
-                    (val-class (map-descriptor-val-class msg)))
+             (let* ((key-class (map-key-class msg))
+                    (val-class (map-value-class msg)))
                (values
                 `(progn
                    ;; If ,dest points to the "unset" placeholder, make a new hash-table.
@@ -1443,7 +1431,7 @@ Parameters:
   "Creates an instance of TYPE with BUFFER used as the pre-computed proto
    serialization bytes to return when deserializing.  Useful for passing an
    object through without ever needing to deserialize it."
-  (let* ((desc (find-message-descriptor type))
+  (let* ((desc (find-message-descriptor type :error-p t))
          (message-name (or (proto-alias-for desc) (proto-class desc)))
          (object #+sbcl (make-instance message-name)
                  #-sbcl (funcall (get-constructor-name message-name))))

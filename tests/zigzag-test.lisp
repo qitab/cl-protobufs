@@ -17,9 +17,12 @@
 
 (defsuite zigzag-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'zigzag-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'zigzag-suite :use-debugger use-debugger
+                                  :signal-condition-on-fail t))
 
 (defun expect-bytes (list array)
   (assert-true (equal (coerce list 'list) (coerce array 'list))))

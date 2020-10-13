@@ -19,9 +19,12 @@
 
 (defsuite services-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'services-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'services-suite :use-debugger use-debugger
+                                    :signal-condition-on-fail t))
 
 (deftest test-service-name-is-exported (services-suite)
   (assert-true 'cl-protobufs.protobuf-package-unittest1:service-with-cross-package-input-output))

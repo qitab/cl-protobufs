@@ -37,9 +37,7 @@ The definition of initialized is all required-fields are set."
 (defun is-initialized (object)
   "Returns true if all of the fields of OBJECT are initialized."
   (let* ((class   (type-of object))
-         (message (find-message-descriptor class)))
-    (assert message ()
-            "There is no Protobufs message for the class ~S" class)
+         (message (find-message-descriptor class :error-p t)))
     (object-initialized-p object message)))
 
 (defun scalar-field-equal (object-1 object-2)
@@ -177,24 +175,20 @@ Parameters:
    "Returns the encoded value of the field 'slot', or NIL if does not exist.
 For repeated fields, returns a list of the encoded values, which may be NILs.")
   (:method ((object structure-object) slot)
-    (let* ((class   (type-of object))
-           (message (find-message-descriptor class))
-           (field   (and (find slot (proto-fields message)
-                               :key #'proto-external-field-name))))
-      (assert message ()
-              "There is no Protobufs message for the class ~S" class)
+    (let* ((class (type-of object))
+           (message (find-message-descriptor class :error-p t))
+           (field (find slot (proto-fields message) :key #'proto-external-field-name)))
       (unless field
-        (let* ((lisp-package (symbol-package class))
-               (lazy-slot (and lisp-package
-                               (intern (nstring-upcase (format nil "%~A" slot))
-                                       lisp-package))))
-          (assert lisp-package ()
-                  "Lisp package is not found for message ~A" (proto-name message))
+        (let* ((lisp-package (or (symbol-package class)
+                                 (protobuf-error "Lisp package not found for message ~A"
+                                                 (proto-name message))))
+               (lazy-slot (intern (nstring-upcase (format nil "%~A" slot))
+                                  lisp-package)))
           (setf field (find-field-descriptor message lazy-slot))
           (when field
             (setf slot lazy-slot))))
-      (assert field ()
-              "There is no Protobufs field with the name ~S" slot)
+      (unless field
+        (protobuf-error "There is no protobuf field with the name ~S" slot))
       (let ((value (slot-value object (proto-internal-field-name field))))
         (if (eq (proto-label field) :repeated)
             (map 'list #'proto-%bytes value)

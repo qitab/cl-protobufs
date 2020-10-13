@@ -16,9 +16,12 @@
 
 (defsuite serialization-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'serialization-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'serialization-suite :use-debugger use-debugger
+                                         :signal-condition-on-fail t))
 
 (defvar *tser5-bytes* #(8 1 16 2 16 3 16 5 16 7 26 3 116 119
                         111 26 5 116 104 114 101 101 26 4 102

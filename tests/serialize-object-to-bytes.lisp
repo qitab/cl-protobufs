@@ -17,9 +17,12 @@
 
 (defsuite serialize-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'serialize-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'serialize-suite :use-debugger use-debugger
+                                     :signal-condition-on-fail t))
 
 (deftest test-optional-serialization (serialize-suite)
   (let* ((msg (make-optional-message))

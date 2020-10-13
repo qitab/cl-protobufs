@@ -15,9 +15,12 @@
 
 (defsuite text-format-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run the text-format-suite."
-  (cl-protobufs.test:run-suite 'text-format-suite))
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'text-format-suite :use-debugger use-debugger
+                                       :signal-condition-on-fail t))
 
 (defparameter *text-format-msg*
 "TextFormatTest {

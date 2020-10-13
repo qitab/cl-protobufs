@@ -16,10 +16,12 @@
 
 (defsuite import-suite (cl-protobufs.test:root-suite))
 
-(defun run ()
-  "Run all tests in the test suite."
-  (cl-protobufs.test:run-suite 'import-suite))
-
+(defun run (&key use-debugger)
+  "Run all tests in the test suite.
+Parameters
+  USE-DEBUGGER: On assert failure bring up the debugger."
+  (clunit:run-suite 'import-suite :use-debugger use-debugger
+                                  :signal-condition-on-fail t))
 
 (deftest test-all-imports-are-included (import-suite)
   (let* ((descriptor (cl-protobufs:find-file-descriptor 'pb:import-proto))

@@ -34,11 +34,11 @@
    The return value is the character that was eaten."
   (let (ch)
     (if (if (listp char)
-          (member (peek-char nil stream nil) char)
-          (eql (peek-char nil stream nil) char))
-      (setq ch (read-char stream))
-      (error "No '~C' found~@[ within '~A'~] at position ~D"
-             char within (file-position stream)))
+            (member (peek-char nil stream nil) char)
+            (eql (peek-char nil stream nil) char))
+        (setq ch (read-char stream))
+        (protobuf-error "No ~S found~@[ within '~A'~] at position ~D"
+                        char within (file-position stream)))
     (maybe-skip-chars stream chars)
     ch))
 
@@ -70,7 +70,7 @@
    then skip any following whitespace."
   (loop
     (let ((ch (peek-char nil stream nil)))
-      (when (or (null ch) (not (eql ch #\/)))
+      (unless (eql ch #\/)
         (return-from maybe-skip-comments))
       (read-char stream)
       (case (peek-char nil stream nil)
@@ -82,8 +82,8 @@
          (skip-whitespace stream)
          (return-from maybe-skip-comments))
         (otherwise
-         (error "Found a '~C' at position ~D to start a comment, but no following '~C' or '~C'"
-                #\/ (file-position stream) #\/ #\*))))))
+         (protobuf-error "Found '/' at position ~D to start a comment, but no following '/' or '*'"
+                         (file-position stream)))))))
 
 (defun skip-line-comment (stream)
   "Skip to the end of a line comment, that is, to the end of the line.
@@ -97,7 +97,7 @@
    Then skip any following whitespace."
   (loop for ch = (read-char stream nil)
         do (cond ((null ch)
-                  (error "Premature end of file while skipping block comment"))
+                  (protobuf-error "Premature end of file while skipping block comment"))
                  ((and (eql ch #\*)
                        (eql (peek-char nil stream nil) #\/))
                   (read-char stream nil)

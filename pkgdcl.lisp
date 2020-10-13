@@ -70,6 +70,15 @@
    #:enum-descriptor
    #:enum-value-descriptor
 
+   ;; Descriptor accessors
+   #:map-class
+   #:map-name
+   #:map-key-class
+   #:map-value-class
+   #:map-key-type
+   #:map-value-type
+   #:map-value-kind
+
    ;; Descriptor lookup
    #:find-message-descriptor
    #:find-file-descriptor
@@ -82,15 +91,9 @@
    #:find-option                        ; finds an option, not a descriptor
 
    ;; Conditions
-   #:undefined-field-type
-   #:undefined-input-type
-   #:undefined-output-type
-   #:undefined-stream-type
-   #:undefined-type
-   #:unknown-enum-error
-   #:error-type-name
-   #:error-field
-   #:error-method
+   #:protobuf-error
+   #:unknown-type
+   #:unknown-field-type
 
    ;; Extensions
    #:get-extension

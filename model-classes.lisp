@@ -43,8 +43,7 @@ Parameters:
 ;; that makes writing the protobuf parser a good deal more complicated.
 (defclass descriptor (abstract-descriptor)
   ;; The Lisp name for the type of this object. For messages and groups it's
-  ;; the name of a struct. For proto scalar types it's INT32, STRING,
-  ;; etc.
+  ;; the name of a struct. For scalar types it's INT32, STRING, etc.
   ((class :type symbol
           :accessor proto-class
           :initarg :class
@@ -86,10 +85,6 @@ Parameters:
             :accessor proto-package
             :initarg :package
             :initform nil)
-   (alias-packages :type list           ; list of (non-proto) packages forward referenced
-                                        ; by aliases in this schema
-                   :accessor proto-alias-packages
-                   :initform nil)
    (imports :type (list-of string)      ; the names of schemas to be imported
             :accessor proto-imports
             :initarg :imports
@@ -136,16 +131,48 @@ message-descriptor.")
 (defvar *qualified-messages* (make-hash-table :test 'equal)
   "Map from the proto-qualified-name of a message (a string) to its Lisp type symbol.")
 
-(defun-inline find-message-descriptor (type)
-  "Return the message-descriptor named by TYPE (a symbol), or nil."
-  (gethash type *messages*))
+(defun-inline find-message-descriptor (type &key error-p)
+  "Return the message-descriptor named by TYPE (a symbol), or nil. If ERROR-P
+   is true then signal protobuf-error instead of returning nil."
+  (or (gethash type *messages*)
+      (when error-p
+        (protobuf-error "~S does not name a protobuf message type" type))))
 
-(defun-inline find-message-by-qualified-name (qualified-name)
-  "Return the protobuf-message symbol named by qualified-name.
-   Parameters:
-     QUALIFIED-NAME: The qualified name of a protobuf message.
-       For definition of QUALIFIED-NAME see qual-name slot on the protobuf-message."
-  (gethash qualified-name *qualified-messages*))
+(defun-inline find-message-by-qualified-name (qualified-name &key error-p)
+  "Return the protobuf message symbol named by QUALIFIED-NAME, or nil. For
+   definition of QUALIFIED-NAME see qual-name slot on message-descriptor.
+   If ERROR-P is true then signal protobuf-error instead of returning nil."
+  (or (gethash qualified-name *qualified-messages*)
+      (when error-p
+        (protobuf-error "~S does not name a protobuf message type" qualified-name))))
+
+(defstruct (map-descriptor (:conc-name map-))
+  "Describes a protobuf map."
+  ;; The Lisp type of the map.
+  (class nil :type symbol)
+  ;; The protobuf name of the map.
+  (name nil :type string)
+  ;; A keyword specifying the type of the keys. e.g., :int32.
+  ;; These may only be scalar types.
+  (key-class nil :type symbol)
+  ;; Specifies the type of the values. Either a keyword like :int32 or a symbol
+  ;; naming a protobuf message.
+  (value-class nil :type symbol)
+
+  ;; TODO(cgay): It looks like the *-class slots above contain keywords like
+  ;; :int32 for scalar types and non-keyword symbols for message types, whereas
+  ;; the *-type slots below contain the actual CL types for scalars, like
+  ;; int32, string, boolean.  I think these can be consolidated if we stop
+  ;; using the keywords, like Ben did in his PR 156 that never got merged.
+
+  ;; The Lisp type of the key.
+  (key-type nil)
+  ;; The Lisp type of the value.
+  (value-type nil)
+  (value-kind nil :type (member :scalar :message :group :enum)))
+
+(defmethod make-load-form ((m map-descriptor) &optional environment)
+  (make-load-form-saving-slots m :environment environment))
 
 (defvar *map-descriptors* (make-hash-table :test 'eq)
   "Maps map names (symbols) to map-descriptor instances.")
@@ -175,9 +202,8 @@ message-descriptor.")
   (find-qualified-name name (proto-services file-desc)))
 
 (defmethod find-service-descriptor (file-desc name)
-  (let ((descriptor (find-file-descriptor file-desc)))
-    (assert descriptor ()
-            "There is no file-descriptor named ~A" file-desc)
+  (let ((descriptor (or (find-file-descriptor file-desc)
+                        (protobuf-error "There is no file-descriptor named ~A" file-desc))))
     (find-service-descriptor descriptor name)))
 
 ;; We accept and store any option, but only act on a few: default, packed,
@@ -248,19 +274,6 @@ message-descriptor.")
          (end1   (if (eql (char name1 0) #\() (- (length name1) 1) (length name1)))
          (end2   (if (eql (char name2 0) #\() (- (length name2) 1) (length name2))))
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
-
-(defstruct map-descriptor
-  "The meta-object for a protobuf map"
-  (class     nil :type symbol)
-  (name      nil :type string)
-  (key-class nil :type symbol) ;; the :class of the key
-  (val-class nil :type symbol) ;; the :class of the value
-  (key-type nil)  ;; the lisp type of the key.
-  (val-type nil)  ;; the lisp type of the value.
-  (val-kind nil :type (member :scalar :message :group :enum)))
-
-(defmethod make-load-form ((m map-descriptor) &optional environment)
-  (make-load-form-saving-slots m :environment environment))
 
 (defstruct enum-descriptor
   "Describes a protobuf enum."
@@ -479,10 +492,10 @@ if we are not in SBCL."
 
 (defmethod initialize-instance :after ((field field-descriptor) &rest initargs)
   (declare (ignore initargs))
-  (when (slot-boundp field 'index)
-    (assert (and (plusp (proto-index field))
-                 (not (<= 19000 (proto-index field) 19999))) ()
-            "Protobuf field indexes must be positive and not between 19000 and 19999 (inclusive)")))
+  (unless (and (plusp (proto-index field))
+               (not (<= 19000 (proto-index field) 19999)))
+    (protobuf-error
+     "Protobuf field indexes must be positive and not between 19000 and 19999 (inclusive)")))
 
 (defmethod make-load-form ((f field-descriptor) &optional environment)
   (make-load-form-saving-slots f :environment environment))

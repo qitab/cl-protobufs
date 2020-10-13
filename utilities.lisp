@@ -166,7 +166,7 @@
                       (uncamel (rest chars) 'dot
                                (cons #\. result)))
                      (t
-                      (error "Invalid name character: ~A" ch))))))
+                      (protobuf-error "Invalid name character: ~S" ch))))))
     (strcat (nreverse (uncamel (concatenate 'list name) nil ())))))
 
 (defun split-string (line &key (start 0) (end (length line)) (separators '(#\-)))
@@ -182,13 +182,6 @@
           when (not (i= (length piece) 0))
             collect piece
           until (i>= next end))))
-
-(defun split-last (string)
-  "Split STRING at the last dot (#\.). If STRING does not contain a dot an error is signaled."
-  (let* ((dot-pos (position #\. string :from-end t)))
-    (assert dot-pos (string) "SPLIT-LAST called on string with no dot.")
-    (list (subseq string 0 dot-pos)
-          (subseq string (1+ dot-pos)))))
 
 ;;; Managing symbols
 

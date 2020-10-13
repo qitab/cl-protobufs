@@ -27,9 +27,7 @@ Parameters:
   PRETTY-PRINT: When true, generate line breaks and other human readable output
     in the text format. When false, replace line breaks with spaces."
   (let* ((type (type-of object))
-         (message (find-message-descriptor type)))
-    (assert message ()
-            "There is no protobuf message having the type ~S" type)
+         (message (find-message-descriptor type :error-p t)))
     (let ((name (or name (proto-name message))))
       (if print-name
           (if pretty-print
@@ -110,7 +108,10 @@ Parameters:
          (print-enum v desc name stream (and pretty-print indent))))
       ;; This case only happens when the user specifies a custom type and
       ;; doesn't support it above.
-      (t (undefined-type type "While printing ~S to text format," values)))))
+      (t
+       (error 'unknown-type
+              :format-control "unknown type ~S, while printing repeated field ~S"
+              :format-arguments (list type name))))))
 
 (defun print-non-repeated-field
     (value type name &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
@@ -144,8 +145,8 @@ Parameters:
       ((typep desc 'enum-descriptor)
        (print-enum value desc name stream (and pretty-print indent)))
       ((typep desc 'map-descriptor)
-       (let ((key-type (map-descriptor-key-class desc))
-             (val-type (map-descriptor-val-class desc)))
+       (let ((key-type (map-key-class desc))
+             (val-type (map-value-class desc)))
          (loop for k being the hash-keys of value using (hash-value v)
                do (if pretty-print
                       (format stream "~&~V,0T~A { " (+ indent 2) name)
@@ -160,7 +161,10 @@ Parameters:
                     (format stream "~%")))))
       ;; This case only happens when the user specifies a custom type and
       ;; doesn't support it above.
-      (t (undefined-type type "While printing ~S to text format," value)))))
+      (t
+       (error 'unknown-type
+              :format-control "unknown type ~S, while printing non-repeated field ~S"
+              :format-arguments (list type name))))))
 
 (defun print-scalar (val type name stream indent)
   "Print scalar value to stream
@@ -243,10 +247,11 @@ Parameters:
 
 (defmethod parse-text-format ((type symbol)
                               &key (stream *standard-input*) (parse-name t))
-  (let ((message (find-message-descriptor type)))
-    (assert message ()
-            "There is no protobuf message having the type ~S" type)
+  (let ((message (find-message-descriptor type :error-p t)))
     (parse-text-format message :stream stream :parse-name parse-name)))
+
+;;; TODO(cgay): replace all assertions here with something that signals a
+;;; subtype of protobuf-error and shows current stream position.
 
 (defmethod parse-text-format ((msg-desc message-descriptor)
                               &key (stream *standard-input*) (parse-name t))
@@ -285,8 +290,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
                 (parse-field type :stream stream)
               (cond
                 (error-p
-                 (undefined-field-type "While parsing ~S from text format,"
-                                       msg-desc type field))
+                 (unknown-field-type type field msg-desc))
                 ((eq (proto-label field) :repeated)
                  ;; If slot is NIL, then this field doesn't exist in the message
                  ;; so we skip it.
@@ -335,8 +339,8 @@ return T as a second value."
                               :key #'enum-value-descriptor-name)))
              (and enum (enum-value-descriptor-name enum))))
           ((typep desc 'map-descriptor)
-           (let ((key-type (map-descriptor-key-class desc))
-                 (val-type (map-descriptor-val-class desc)))
+           (let ((key-type (map-key-class desc))
+                 (val-type (map-value-class desc)))
              (flet ((parse-map-entry (key-type val-type stream)
                       (let (key val)
                         (expect-char stream #\{)
