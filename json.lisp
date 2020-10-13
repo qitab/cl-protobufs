@@ -494,11 +494,14 @@ for any types."
             ;; The wkt Value consists of a single oneof, so the first oneof in the
             ;; descriptor's list is the one we are looking for.
             (oneof-desc (first (pi::proto-oneofs (find-message-descriptor type))))
-            (field (aref (pi::oneof-descriptor-fields oneof-desc)
-                         (pi::oneof-set-field oneof-data)))
-            (value (pi::oneof-value oneof-data)))
-       (print-field-to-json value (proto-class field)
-                            indent stream camel-case-p numeric-enums-p)))
+            (set-field (pi::oneof-set-field oneof-data)))
+       (assert set-field ()
+               "Message ~S must have a set 'kind' oneof as it has well-known-type 'Value'." object)
+       (let* ((field (aref (pi::oneof-descriptor-fields oneof-desc)
+                           (pi::oneof-set-field oneof-data)))
+              (value (pi::oneof-value oneof-data)))
+         (print-field-to-json value (proto-class field)
+                              indent stream camel-case-p numeric-enums-p))))
     ;; Otherwise, TYPE is a wrapper type.
     (t (if object
            (print-scalar-to-json (google:value object)
