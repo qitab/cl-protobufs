@@ -1305,18 +1305,6 @@ Parameters:
                                              'list))))
         (save-skipped-bytes-p (or constructor skip-fields
                                   (not (eq include-fields :all)))))
-    (when (null fields)
-      (return-from generate-deserializer
-        (def-pseudo-method :deserialize name
-          `(,vbuf ,vidx ,vlim &optional (,vendtag 0))
-          `((declare #.$optimize-serialization)
-            (declare (ignore ,vbuf ,vlim ,vendtag ,old-index))
-            (values #+sbcl (make-instance ',(or (proto-alias-for message)
-                                                (proto-class message)))
-                    #-sbcl (funcall (get-constructor-name
-                                     ',(or (proto-alias-for message)
-                                           (proto-class message)))))
-            ,vidx))))
     (with-collectors ((deserializers collect-deserializer)
                       ;; Nonrepeating slots
                       (nslots collect-nslot)

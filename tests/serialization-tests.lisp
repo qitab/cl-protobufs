@@ -23,6 +23,19 @@ Parameters
   (clunit:run-suite 'serialization-suite :use-debugger use-debugger
                                          :signal-condition-on-fail t))
 
+(deftest deserialize-message-with-no-fields (serialization-suite)
+  (let* ((msg (make-no-fields))
+         (bytes (serialize-to-bytes msg)))
+    (assert-equalp msg (deserialize-from-bytes 'no-fields bytes)))
+
+  (let* ((msg (make-no-fields-with-submessage))
+         (bytes (serialize-to-bytes msg)))
+    (assert-equalp msg (deserialize-from-bytes 'no-fields-with-submessage bytes)))
+
+  (let* ((msg (make-no-fields-with-enum))
+         (bytes (serialize-to-bytes msg)))
+    (assert-equalp msg (deserialize-from-bytes 'no-fields-with-enum bytes))))
+
 (defvar *tser5-bytes* #(8 1 16 2 16 3 16 5 16 7 26 3 116 119
                         111 26 5 116 104 114 101 101 26 4 102
                         105 118 101 26 5 115 101 118 101 110))

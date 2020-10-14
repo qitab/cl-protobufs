@@ -11,6 +11,19 @@ syntax = "proto2";
 
 package serialization_test;
 
+message NoFields {}
+
+message NoFieldsWithSubmessage {
+  message SubNoFields {}
+}
+
+message NoFieldsWithEnum {
+  enum Size {
+    small = 0;
+    large = 1;
+  }
+}
+
 message OptionalMessage {
   optional int32 optional_no_default = 1;
   optional int32 optional_with_default = 2 [default = 2];
