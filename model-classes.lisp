@@ -148,16 +148,10 @@ message-descriptor.")
 
 (defstruct (map-descriptor (:conc-name map-))
   "Describes a protobuf map."
-  ;; The Lisp type of the map.
-  (class nil :type symbol)
-  ;; The protobuf name of the map.
-  (name nil :type string)
-  ;; A keyword specifying the type of the keys. e.g., :int32.
-  ;; These may only be scalar types.
-  (key-class nil :type symbol)
-  ;; Specifies the type of the values. Either a keyword like :int32 or a symbol
-  ;; naming a protobuf message.
-  (value-class nil :type symbol)
+  (class nil :type symbol)              ; Lisp type of the map
+  (name nil :type string)               ; Protobuf name of the map
+  (key-class nil :type symbol)          ; Lisp type of the keys
+  (value-class nil :type symbol)        ; Lisp type of the values
 
   ;; TODO(cgay): It looks like the *-class slots above contain keywords like
   ;; :int32 for scalar types and non-keyword symbols for message types, whereas

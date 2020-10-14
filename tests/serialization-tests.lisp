@@ -38,6 +38,11 @@ Parameters
                         27 10 2 103 50 28 34 3 116 119 111))
 
 (deftest basic-serialization (serialization-suite)
+  ;; clunit2:deftest does very strange things with its &body, which makes
+  ;; debugging more difficult, so let's not give it that chance.
+  (do-basic-serialization))
+
+(defun do-basic-serialization ()
   (loop :for optimized :in '(nil t)
         :do
      (when optimized

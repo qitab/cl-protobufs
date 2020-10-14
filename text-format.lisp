@@ -127,7 +127,7 @@ Parameters:
   PRETTY-PRINT: When true, print newlines and indentation."
   (let (desc)
     ;; If VALUE is NIL and the type is not boolean, there is nothing to do.
-    (unless (or value (eq type :bool))
+    (unless (or value (eq type 'boolean))
       (return-from print-non-repeated-field nil))
     (cond
       ((scalarp type)
@@ -168,7 +168,7 @@ Parameters:
 
 (defun print-scalar (val type name stream indent)
   "Print scalar value to stream
-Parameters:
+ Parameters:
   VAL: The data for the value to print.
   TYPE: The type of val.
   NAME: The name to print before the value. If nil, then no
@@ -180,31 +180,30 @@ Parameters:
             the end.
           - If indent is nil, then do not indent and
             do not write a newline."
-  (when (or val (eq type :bool))
+  (when (or val (eq type 'boolean))
     (when indent
       (format stream "~&~V,0T" (+ indent 2)))
     (when name
       (format stream "~A: " name))
     (ecase type
-      ((:int32 :uint32 :int64 :uint64 :sint32 :sint64
-        :fixed32 :sfixed32 :fixed64 :sfixed64)
+      ((int32 uint32 int64 uint64 sint32 sint64 fixed32 sfixed32 fixed64 sfixed64)
        (format stream "~D" val))
-      ((:string)
+      ((string)
        ;; TODO(cgay): This should be the inverse of parse-string.
        (format stream "\"~A\"" val))
-      ((:bytes)
+      ((byte-vector)
        (format stream "~S" val))
-      ((:bool)
+      ((boolean)
        (format stream "~A" (if val "true" "false")))
-      ((:float :double)
+      ((float double-float)
        (format stream "~D" val))
       ;; A few of our homegrown types
-      ((:symbol)
+      ((symbol)
        (let ((val (if (keywordp val)
                       (string val)
                       (format nil "~A:~A" (package-name (symbol-package val)) (symbol-name val)))))
          (format stream "\"~A\"" val)))
-      ((:date :time :datetime :timestamp)
+      ((date time datetime timestamp)
        (format stream "~D" val)))
     (if indent
         (format stream "~%")
@@ -280,9 +279,7 @@ attempt to parse the name of the message and match it against MSG-DESC."
         (return-from parse-text-format object))
       (let* ((name  (parse-token stream))
              (field (and name (find-field-descriptor msg-desc name)))
-             (type  (and field (if (eq (proto-class field) 'boolean)
-                                   :bool
-                                   (proto-class field))))
+             (type  (and field (proto-class field)))
              (slot  (and field (proto-external-field-name field))))
         (if (null field)
             (skip-field stream)
@@ -315,10 +312,10 @@ return T as a second value."
     (cond ((scalarp type)
            (expect-char stream #\:)
            (case type
-             ((:float) (parse-float stream))
-             ((:double) (parse-double stream))
-             ((:string) (parse-string stream))
-             ((:bool)   (let ((token (parse-token stream)))
+             ((float) (parse-float stream))
+             ((double-float) (parse-double stream))
+             ((string) (parse-string stream))
+             ((boolean) (let ((token (parse-token stream)))
                           (cond ((string= token "true") t)
                                 ((string= token "false") nil)
                                 ;; Parsing failed, so return T as

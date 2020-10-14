@@ -1717,7 +1717,7 @@ function) then there is no guarantee on the serialize function working properly.
                                  ((and (not default-p)
                                           (eq label :optional)
                                           ;; Use unbound for booleans only
-                                          (not (eq pclass :bool)))
+                                          (not (eq pclass 'boolean)))
                                   nil)
                                  (default-p `,default)))))
                  (field (make-instance

@@ -18,7 +18,7 @@
 
 (defun run (&key use-debugger)
   "Run all tests in the test suite.
-Parameters
+ Parameters
   USE-DEBUGGER: On assert failure bring up the debugger."
   (clunit:run-suite 'map-suite :use-debugger use-debugger
                                :signal-condition-on-fail t))

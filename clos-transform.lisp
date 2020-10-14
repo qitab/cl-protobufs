@@ -31,7 +31,7 @@
                      (let* ((typestring (subseq name #.(length "LIST-OF-") (- (length name) 2)))
                             (type (ignore-errors
                                     (with-standard-io-syntax
-                                        (let ((*package* (find-package :cl)))
+                                        (let ((*package* (find-package :common-lisp)))
                                           (read-from-string typestring))))))
                          (and (typep type 'symbol) type))))))))
 
@@ -80,17 +80,17 @@
             ((member)                           ;maybe generate an enum type
              (if (or (equal type '(member t nil))
                      (equal type '(member nil t)))
-               (values "bool" :bool)
+               (values "bool" 'boolean)
                (let ((values (if enum-filter (funcall enum-filter tail) tail)))
                  (cond ((every #'(lambda (x)
                                    (or (null x) (characterp x) (stringp x))) values)
-                        (values "string" :string))
+                        (values "string" 'string))
                        ((every #'(lambda (x)
                                    (or (null x) (and (integerp x) (>= x 0)))) values)
-                        (values "uint32" :uint32))
+                        (values "uint32" 'uint32))
                        ((every #'(lambda (x)
                                    (or (null x) (integerp x))) values)
-                        (values "int32" :int32))
+                        (values "int32" 'int32))
                        ((every #'(lambda (x) (symbolp x)) values)
                         (let ((values (remove-if #'null values)))
                           (values (class-name->proto (format nil "~A" type))
@@ -108,25 +108,25 @@
                    (hi (or (second tail) '*)))
                (if (or (eq lo '*) (< lo 0))
                  (if (eq hi '*)
-                   (values "int64" :int64)
+                   (values "int64" 'int64)
                    (if (<= (integer-length hi) 32)
-                     (values "int32" :int32)
-                     (values "int64" :int64)))
+                     (values "int32" 'int32)
+                     (values "int64" 'int64)))
                  (if (eq hi '*)
-                   (values "uint64" :uint64)
+                   (values "uint64" 'uint64)
                    (if (<= (integer-length hi) 32)
-                     (values "uint32" :uint32)
-                     (values "uint64" :uint64))))))
+                     (values "uint32" 'uint32)
+                     (values "uint64" 'uint64))))))
             ((signed-byte)
              (let ((len (first tail)))
                (if (<= len 32)
-                 (values "int32" :int32)
-                 (values "int64" :int64))))
+                 (values "int32" 'int32)
+                 (values "int64" 'int64))))
             ((unsigned-byte)
              (let ((len (first tail)))
                (if (<= len 32)
-                 (values "uint32" :uint32)
-                 (values "uint64" :uint64))))
+                 (values "uint32" 'uint32)
+                 (values "uint64" 'uint64))))
             ((float single-float double-float)
              (lisp-type-to-protobuf-type head))
             (otherwise
@@ -155,35 +155,36 @@
            (lisp-type-to-protobuf-type type)
          (values pb-type scalar-type nil nil type))))))
 
+;;; This is almost a no-op now...
 (defun lisp-type-to-protobuf-type (type)
   (case type
-    ((int32)    (values "int32" :int32))
-    ((int64)    (values "int64" :int64))
-    ((uint32)   (values "uint32" :uint32))
-    ((uint64)   (values "uint64" :uint64))
-    ((sint32)   (values "sint32" :sint32))
-    ((sint64)   (values "sint64" :sint64))
-    ((fixed32)  (values "fixed32" :fixed32))
-    ((fixed64)  (values "fixed64" :fixed64))
-    ((sfixed32) (values "sfixed32" :sfixed32))
-    ((sfixed64) (values "sfixed64" :sfixed64))
-    ((integer)  (values "int64" :int64))
+    ((int32)    (values "int32" 'int32))
+    ((int64)    (values "int64" 'int64))
+    ((uint32)   (values "uint32" 'uint32))
+    ((uint64)   (values "uint64" 'uint64))
+    ((sint32)   (values "sint32" 'sint32))
+    ((sint64)   (values "sint64" 'sint64))
+    ((fixed32)  (values "fixed32" 'fixed32))
+    ((fixed64)  (values "fixed64" 'fixed64))
+    ((sfixed32) (values "sfixed32" 'sfixed32))
+    ((sfixed64) (values "sfixed64" 'sfixed64))
+    ((integer)  (values "int64" 'int64))
     ((single-float float)
-     (values "float" :float))
+     (values "float" 'float))
     ((double-float)
-     (values "double" :double))
+     (values "double" 'double-float))
     ((boolean)
-     (values "bool" :bool))
+     (values "bool" 'boolean))
     ((symbol keyword)
-     (values "string" :symbol))
+     (values "string" 'symbol))
     (otherwise
      (cond ((ignore-errors
              (or (eql type 'symbol)
                  (subtypep type '(or string character))))
-            (values "string" :string))
+            (values "string" 'string))
            ((ignore-errors
              (subtypep type 'byte-vector))
-            (values "bytes" :bytes))
+            (values "bytes" 'byte-vector))
            (t
             (values (class-name->proto type) type))))))
 
@@ -193,19 +194,19 @@
 
 (defun scalarp (type)
   "Returns true if the given protobuf type TYPE is a scalar type. Scalar
-types are defined by the protobuf documentation. The cl-protobufs specific
-type :symbol is included as a scalar type, as it is treated as a synonym
-to the :string type. This is because symbol types are identified by their
-names in cl-protobufs.
+   types are defined by the protobuf documentation. The cl-protobufs specific
+   type `symbol' is included as a scalar type, as it is treated as a synonym
+   to the `string' type. This is because symbol types are identified by their
+   names in cl-protobufs.
 
-https://developers.google.com/protocol-buffers/docs/proto#scalar "
-  (member type '(:double :float :int32 :int64 :uint32 :uint64 :sint32
-                 :sint32 :sint64 :fixed32 :fixed64 :sfixed32 :sfixed64
-                 :bool :string :bytes :symbol)))
+   https://developers.google.com/protocol-buffers/docs/proto#scalar "
+  (member type '(double-float float int32 int64 uint32 uint64 sint32
+                 sint32 sint64 fixed32 fixed64 sfixed32 sfixed64
+                 boolean string byte-vector symbol)))
 
 (defun packed-type-p (type)
   "Returns true if the given protobuf type can use a packed field."
   (check-type type symbol)
-  (not (null (member type '(:int32 :int64 :uint32 :uint64 :sint32 :sint64
-                            :fixed32 :fixed64 :sfixed32 :sfixed64
-                            :bool :float :double)))))
+  (not (null (member type '(int32 int64 uint32 uint64 sint32 sint64
+                            fixed32 fixed64 sfixed32 sfixed64
+                            boolean float double-float)))))

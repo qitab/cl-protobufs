@@ -65,12 +65,12 @@ Parameters
   (incf *callcount-serialize*)
   (let ((val (slot-value obj 'pb::%code)))
     (when val
-      (pi::iincf size (pi::serialize-scalar val :string 10 buf))))
+      (pi::iincf size (pi::serialize-scalar val 'string 10 buf))))
   ;; skip the FANCYTHING slot
   (let ((val (slot-value obj 'pb::%othercode)))
     (when val
       (pi::iincf
-       size (pi::serialize-scalar val :string 26 buf))))
+       size (pi::serialize-scalar val 'string 26 buf))))
   size)
 
 #+sbcl
@@ -107,12 +107,10 @@ Parameters
                   index)))
       (case pi::tag
         ((10) (multiple-value-setq (code index)
-                (pi::deserialize-scalar
-                 :string buffer index)))
+                (pi::deserialize-scalar 'string buffer index)))
         ((26) (multiple-value-setq (othercode index)
-                (pi::deserialize-scalar :string buffer index)))
-        (otherwise (setq index (pi::skip-element
-                                buffer index pi::tag)))))))
+                (pi::deserialize-scalar 'string buffer index)))
+        (otherwise (setq index (pi::skip-element buffer index pi::tag)))))))
 
 #+sbcl
 (defun (:protobuf :deserialize pb:submessage)

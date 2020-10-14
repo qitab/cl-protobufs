@@ -27,9 +27,9 @@ Parameters
 (defun expect-bytes (list array)
   (assert-true (equal (coerce list 'list) (coerce array 'list))))
 
-(defconstant +TAG-S+ (pi::make-tag :int32 1))
-(defconstant +TAG-U+ (pi::make-tag :int32 2))
-(defconstant +TAG-I+ (pi::make-tag :int32 3))
+(defconstant +TAG-S+ (pi::make-tag 'int32 1))
+(defconstant +TAG-U+ (pi::make-tag 'int32 2))
+(defconstant +TAG-I+ (pi::make-tag 'int32 3))
 
 (define-constant +equal-loop-list+ '(cl-protobufs.zigzag-test::%s
                                      cl-protobufs.zigzag-test::%u

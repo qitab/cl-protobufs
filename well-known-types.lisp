@@ -69,7 +69,5 @@ Parameters:
     (cl-protobufs.google.protobuf:make-any
      ;; This should either use a URL library or manually deal with the trailing
      ;; slash correctly.
-     :type-url (pi::strcat base-url
-                                   "/"
-                                   (pi::proto-qualified-name m))
+     :type-url (pi::strcat base-url "/" (pi::proto-qualified-name m))
      :value (serialize-to-bytes message))))

@@ -132,24 +132,23 @@ Parameters:
 (defun print-scalar-to-json (value type stream)
   "Print scalar VALUE of type TYPE to STREAM."
   (ecase type
-    ((:int32 :fixed32 :uint32 :sfixed32 :sint32)
+    ((int32 fixed32 uint32 sfixed32 sint32)
      (format stream "~D" value))
-    ((:int64 :fixed64 :uint64 :sfixed64 :sint64)
+    ((int64 fixed64 uint64 sfixed64 sint64)
      (format stream "\"~D\"" value))
-    ((:float :double)
+    ((float double-float)
      (format stream "~F" value))
-    ((:string)
+    ((string)
      (format stream "\"~A\"" value))
-    ((:bool)
+    ((boolean)
      (format stream "~A" (if value "true" "false")))
-    ((:bytes)
+    ((byte-vector)
      (format stream "\"~A\"" (cl-base64:usb8-array-to-base64-string value)))
-    ((:symbol :keyword)
-     (let ((val (if (keywordp value)
-                    (string value)
-                    (format nil "~A:~A" (package-name (symbol-package value))
-                                        (symbol-name value)))))
-       (format stream "\"~A\"" val)))))
+    ((keyword)
+     (format stream "\"~A\"" value))
+    ((symbol)
+     (let ((*package* (find-package "COMMON-LISP")))
+       (format stream "\"~S\"" value)))))
 
 (defun print-enum-to-json (value type stream numeric-enums-p)
   "Print an enum VALUE of type TYPE to STREAM. If NUMERIC-ENUMS-P, then print the enums value
@@ -223,9 +222,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
       (let* ((name  (pi::parse-string stream))
              (field (or (find-field-descriptor msg-desc name)
                         (find-field-descriptor-by-json-name msg-desc name)))
-             (type  (and field (if (eq (proto-class field) 'boolean)
-                                   :bool
-                                   (proto-class field))))
+             (type  (and field (proto-class field)))
              (slot  (and field (pi::proto-external-field-name field))))
         (pi::expect-char stream #\:)
         (if (null field)
@@ -285,23 +282,23 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
 
 (defun parse-value-from-json (type &key (stream *standard-input*) ignore-unknown-fields-p)
   "Parse a single JSON value of type TYPE from STREAM. IGNORE-UNKNOWN-FIELDS-P is passed
-to recursive calls to PARSE-JSON."
+   to recursive calls to PARSE-JSON."
   (let ((desc (or (find-message-descriptor type)
                   (find-enum-descriptor type)
                   (find-map-descriptor type))))
     (cond ((pi::scalarp type)
            (case type
-             ((:float) (pi::parse-float stream))
-             ((:double) (pi::parse-double stream :append-d0 t))
-             ((:string) (pi::parse-string stream))
-             ((:bool)
+             ((float) (pi::parse-float stream))
+             ((double-float) (pi::parse-double stream :append-d0 t))
+             ((string) (pi::parse-string stream))
+             ((boolean)
               (let ((token (pi::parse-token stream)))
                 (cond ((string= token "true") t)
                       ((string= token "false") nil)
                       ;; Parsing failed, return T as a second
                       ;; value to indicate a failure.
                       (t (values nil t)))))
-             ((:bytes)
+             ((byte-vector)
               (cl-base64:base64-string-to-usb8-array (pi::parse-string stream)))
              (otherwise
               (if (eql (peek-char nil stream nil) #\")
@@ -333,7 +330,7 @@ to recursive calls to PARSE-JSON."
                  (val-type (pi::map-value-class desc)))
              (loop with pairs = ()
                    for pair = (cons nil nil)
-                   do (if (eql key-type :string)
+                   do (if (eql key-type 'string)
                           (setf (car pair) (pi::parse-string stream))
                           (setf (car pair) (parse-integer
                                             (pi::parse-string stream))))
@@ -410,15 +407,15 @@ be either an array, object, or primitive."
 (defun wrapper-message->type (type)
   "For a well known wrapper type TYPE, return the type being wrapped."
   (ecase type
-    ((google:bool-value) :bool)
-    ((google:string-value) :string)
-    ((google:bytes-value) :bytes)
-    ((google:double-value) :double)
-    ((google:float-value) :float)
-    ((google:int32-value) :int32)
-    ((google:int64-value) :int64)
-    ((google:u-int32-value) :uint32)
-    ((google:u-int64-value) :uint64)))
+    ((google:bool-value) 'boolean)
+    ((google:string-value) 'string)
+    ((google:bytes-value) 'byte-vector)
+    ((google:double-value) 'double-float)
+    ((google:float-value) 'float)
+    ((google:int32-value) 'int32)
+    ((google:int64-value) 'int64)
+    ((google:u-int32-value) 'uint32)
+    ((google:u-int64-value) 'uint64)))
 
 (defun print-special-json (object type stream indent camel-case-p numeric-enums-p)
   "For an OBJECT whose TYPE is a well-known type, print the object's special JSON mapping

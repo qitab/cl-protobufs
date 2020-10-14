@@ -110,12 +110,12 @@ only if the same fields have been explicitly set."
     (loop for field in (proto-fields message)
           for lisp-type = (proto-class field)
           for slot-value-1
-            = (unless (eq lisp-type :bool)
+            = (unless (eq lisp-type 'boolean)
                 (slot-value message-1 (proto-internal-field-name field)))
           for slot-value-2
             = (when slot-value-1
                 (slot-value message-2 (proto-internal-field-name field)))
-          when (and (not (eq lisp-type :bool))
+          when (and (not (eq lisp-type 'boolean))
                     (or (scalarp lisp-type) (find-enum-descriptor lisp-type)))
             do (unless (scalar-field-equal slot-value-1 slot-value-2)
                  (return-from proto-equal nil))

@@ -79,7 +79,7 @@
 
 (defun serialize-to-bytes (object &optional (type (type-of object)))
   "Serializes OBJECT into a new vector of (unsigned-byte 8) using wire format.
-   TYPE is a symbol naming the message."
+   TYPE is a symbol naming a protobuf descriptor class."
   (or (and (slot-exists-p object '%bytes)
            (proto-%bytes object))
       (let ((fast-function
@@ -161,7 +161,7 @@ Parameters:
 (defun emit-repeated-field (value type packed-p field-num buffer)
   "Serialize a repeated field to buffer. Return nil on failure.
 
-Parameters:
+ Parameters:
   VALUE: The data to serialize, e.g. the data resulting from calling read-slot on a field.
   TYPE: The proto-class of the field.
   PACKED-P: Whether or not the field in question is packed.
@@ -790,7 +790,7 @@ Parameters:
     (class index boundp reader vbuf size vector-p &optional (packed-p nil))
   "Generate the field serializer for a repeated field
 
-Parameters:
+ Parameters:
   CLASS: The class of the field.
   INDEX: The index of the field
   BOUNDP: Symbol naming a variable that evaluates to T if this field is set.
@@ -806,12 +806,12 @@ Parameters:
                       (find-enum-descriptor class)
                       (find-map-descriptor class)))))
     (cond ((and packed-p (packed-type-p class))
-           `(iincf ,size (serialize-packed ,reader ,class ,index ,vbuf ,vector-p)))
+           `(iincf ,size (serialize-packed ,reader ',class ,index ,vbuf ,vector-p)))
           ((scalarp class)
            (let ((tag (make-tag class index)))
              `(when ,boundp
                 (,iterator (,vval ,reader)
-                           (iincf ,size (serialize-scalar ,vval ,class ,tag ,vbuf))))))
+                           (iincf ,size (serialize-scalar ,vval ',class ,tag ,vbuf))))))
           ((typep msg 'message-descriptor)
            (if (eq (proto-message-type msg) :group)
                ;; The end tag for a group is the field index shifted and
@@ -847,7 +847,7 @@ Parameters:
 (defun generate-non-repeated-field-serializer (class field-num boundp reader vbuf size)
   "Generate the field serializer for a non-repeated field
 
-Parameters:
+ Parameters:
   CLASS: The class of the field.
   FIELD-NUM: The field number.
   BOUNDP: Symbol naming a variable that evaluates to T if this field is set.
@@ -856,7 +856,8 @@ Parameters:
   SIZE: Symbol naming the variable which keeps track of the serialized length."
   (declare (type field-number field-num))
   (let ((vval (gensym "VAL"))
-        (msg (and class (not (scalarp class))
+        (msg (and class
+                  (not (scalarp class))
                   (or (find-message-descriptor class)
                       (find-enum-descriptor class)
                       (find-map-descriptor class)))))
@@ -864,7 +865,7 @@ Parameters:
            (let ((tag (make-tag class field-num)))
              `(when ,boundp
                 (let ((,vval ,reader))
-                  (iincf ,size (serialize-scalar ,vval ,class ,tag ,vbuf))))))
+                  (iincf ,size (serialize-scalar ,vval ',class ,tag ,vbuf))))))
           ((typep msg 'message-descriptor)
            (if (eq (proto-message-type msg) :group)
                (let ((tag1 (make-wire-tag $wire-type-start-group field-num))
@@ -898,11 +899,11 @@ Parameters:
                            (let ((ret-len (encode-uint32 ,tag ,vbuf))
                                  (map-len 0))
                              (with-placeholder (,vbuf)
-                               (iincf map-len (serialize-scalar k ,key-class
-                                                                ,(make-tag key-class 1)
+                               (iincf map-len (serialize-scalar k ',key-class
+                                                                ,(make-tag `,key-class 1)
                                                                 ,vbuf))
                                ,(generate-non-repeated-field-serializer
-                                 val-class 2 'v 'v vbuf 'map-len)
+                                 `,val-class 2 'v 'v vbuf 'map-len)
                                (i+ ret-len (i+ map-len (backpatch map-len)))))))
                     (iincf ,size (loop for k being the hash-keys of ,vval using (hash-value v)
                                        sum (serialize-pair k v))))))))
@@ -927,11 +928,10 @@ Parameters:
       (if (eq (proto-label field) :repeated)
           (let ((vector-p (eq :vector (proto-container field)))
                 (packed-p (proto-packed field)))
-            (or (generate-repeated-field-serializer
-                 class field-num boundp reader vbuf size vector-p packed-p)
+            (or (generate-repeated-field-serializer class field-num boundp reader vbuf size
+                                                    vector-p packed-p)
                 (unknown-field-type class field msg)))
-          (or (generate-non-repeated-field-serializer
-               class field-num boundp reader vbuf size)
+          (or (generate-non-repeated-field-serializer class field-num boundp reader vbuf size)
               (unknown-field-type class field msg))))))
 
 ;; Note well: keep this in sync with the main 'serialize' method above
@@ -1100,7 +1100,8 @@ Parameters:
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
   DEST: The symbol name for the destination of deserialized data."
-  (let ((msg (and class (not (scalarp class))
+  (let ((msg (and class
+                  (not (scalarp class))
                   (or (find-message-descriptor class)
                       (find-enum-descriptor class)
                       (find-map-descriptor class)))))
@@ -1111,11 +1112,11 @@ Parameters:
                     (packed-tag (when (packed-type-p class)
                                   (packed-tag index)))
                     (non-packed-form `(multiple-value-bind (val next-index)
-                                          (deserialize-scalar ,class ,vbuf ,vidx)
+                                          (deserialize-scalar ',class ,vbuf ,vidx)
                                         (setq ,vidx next-index)
                                         (push val ,dest)))
                     (packed-form `(multiple-value-bind (x idx)
-                                      (deserialize-packed ,class ,vbuf ,vidx)
+                                      (deserialize-packed ',class ,vbuf ,vidx)
                                     (setq ,vidx idx)
                                     ;; The reason for nreversing here is that a field that
                                     ;; is repeated+packed may be transmitted as several
@@ -1137,7 +1138,7 @@ Parameters:
                        (tag2 (make-wire-tag $wire-type-end-group index)))
                    (values `(multiple-value-bind (obj end)
                                 ,(call-deserializer
-                                  msg vbuf vidx most-positive-fixnum tag2)
+                                  msg vbuf vidx (- array-dimension-limit 2) tag2)
                               (setq ,vidx end)
                               (push obj ,dest))
                            tag1))
@@ -1191,12 +1192,13 @@ Parameters:
 
  Parameters:
   CLASS: The :class field of this field.
-  INDEX: The field index of the field.
+  INDEX: The field number of the field.
   LAZY-P: True if and only if the field is lazy.
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
   DEST: The symbol name for the destination of deserialized data."
-  (let ((msg (and class (not (scalarp class))
+  (let ((msg (and class
+                  (not (scalarp class))
                   (or (find-message-descriptor class)
                       (find-enum-descriptor class)
                       (find-map-descriptor class)))))
@@ -1205,7 +1207,7 @@ Parameters:
       (cond ((scalarp class)
              (values
               `(multiple-value-setq (,dest ,vidx)
-                 (deserialize-scalar ,class ,vbuf ,vidx))
+                 (deserialize-scalar ',class ,vbuf ,vidx))
               (make-tag class index)))
             ((typep msg 'message-descriptor)
              (if (eq (proto-message-type msg) :group)
@@ -1214,7 +1216,7 @@ Parameters:
                    (values
                     `(multiple-value-setq (,dest ,vidx)
                        ,(call-deserializer
-                         msg vbuf vidx most-positive-fixnum tag2))
+                         msg vbuf vidx (- array-dimension-limit 2) tag2))
                     tag1))
                  (values
                   `(multiple-value-bind (payload-len payload-start)
@@ -1281,9 +1283,9 @@ Parameters:
                                       (missing-value :%unset)
                                       (skip-fields nil)
                                       (include-fields :all))
-  "Generate a 'deserialize' method for the given message.
-Parameters:
-  MESSAGE: The message model class to make a deserializer for.
+  "Generate a 'deserialize' method for the given message descriptor.
+ Parameters:
+  MESSAGE: The message-descriptor to make a deserializer for.
   NAME: The name to make a deserializer for.
   CONSTRUCTOR: The constructor to use when making the object.
   MISSING-VALUE: The value to set a field to if not found while deserializing.
