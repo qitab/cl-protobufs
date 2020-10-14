@@ -247,10 +247,6 @@
       (cond (vectorp
              (assert (vectorp values))
              (loop for x across values
-                   ;; This is a work-around for a bug in a client library that
-                   ;; starts with 'Q' and should eventually be removed. The
-                   ;; caller should be supplying a sequence of numeric scalars.
-                   while x
                    do (iincf sum (funcall encoder x buffer))))
             (t
              (assert (listp values))
