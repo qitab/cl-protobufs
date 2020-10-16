@@ -1257,7 +1257,7 @@ Parameters:
                          (decode-uint32 ,vbuf ,vidx))
                        (if (= 1 (ilogand (iash map-tag -3) +max-field-number+))
                            (multiple-value-setq (key-data ,vidx)
-                             (deserialize-scalar ,key-class ,vbuf ,vidx))
+                             (deserialize-scalar ',key-class ,vbuf ,vidx))
                            ,(generate-non-repeated-field-deserializer
                              val-class 2 nil vbuf vidx 'val-data)))))
                 (make-wire-tag $wire-type-string index))))
