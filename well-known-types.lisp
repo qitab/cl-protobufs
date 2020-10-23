@@ -56,9 +56,9 @@ message is found, signal an error."
   "Given an Any message decode the contained message and return it.
   Parameters:
    ANY-MESSAGE: The message to unpack."
-  (let ((type (resolve-type-url (cl-protobufs.google.protobuf:any.type-url any-message)))
-        (value (cl-protobufs.google.protobuf:any.value any-message)))
-    (deserialize-from-bytes type value)))
+  (let* ((type (resolve-type-url (cl-protobufs.google.protobuf:any.type-url any-message)))
+         (value (cl-protobufs.google.protobuf:any.value any-message)))
+    (deserialize-from-bytes type (subseq value 0))))
 
 (defun pack-any (message &key (base-url "type.googleapis.com"))
     "Create an Any message containing MESSAGE.
