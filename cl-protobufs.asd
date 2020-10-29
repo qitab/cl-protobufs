@@ -97,6 +97,8 @@
       :proto-pathname "google/protobuf/timestamp.proto")
      (:protobuf-source-file "wrappers"
       :proto-pathname "google/protobuf/wrappers.proto")
+     (:protobuf-source-file "struct"
+      :proto-pathname "google/protobuf/struct.proto")
      (:file "well-known-types")))
    (:module "json"
     :serial t
