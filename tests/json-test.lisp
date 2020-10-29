@@ -166,7 +166,8 @@ the result is PROTO-EQUAL with MSG."
     (setf (google:struct.fields-gethash "d" struct1) bool-val)
     (setf (google:struct.fields-gethash "e" struct1) list-val)
     (let ((struct2 (google:make-struct))
-          (list-proto2 (google:make-list-value :values (list (google:make-value :struct-value struct1)))))
+          (list-proto2 (google:make-list-value :values (list (google:make-value
+                                                              :struct-value struct1)))))
       (setf (google:struct.fields-gethash "a" struct2) (google:make-value :struct-value struct1))
       (setf (google:struct.fields-gethash "b" struct2) (google:make-value :list-value list-proto2))
       (json-roundtrip num-val)
