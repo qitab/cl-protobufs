@@ -42,6 +42,15 @@
     (maybe-skip-chars stream chars)
     ch))
 
+(defun expect-token-or-string (stream string)
+  "Expect to see TOKEN as the next string in STREAM, as parsed by PARSE-TOKEN-OR-STRING.
+   Signal an error if not present, and return the parsed string."
+  (let ((str (parse-token-or-string stream)))
+    (skip-whitespace stream)
+    (if (string= str string)
+        str
+        (error "No ~S found at position ~D" string (file-position stream)))))
+
 (defun maybe-skip-chars (stream chars)
   "Skip some optional characters in the stream,
    then skip all of the following whitespace."

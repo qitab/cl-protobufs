@@ -153,6 +153,9 @@ Parameters:
 (defun print-enum-to-json (value type stream numeric-enums-p)
   "Print an enum VALUE of type TYPE to STREAM. If NUMERIC-ENUMS-P, then print the enums value
 rather than its name."
+  (when (eql type 'google:null-value)
+    (format stream "null")
+    (return-from print-enum-to-json))
   (if numeric-enums-p
       (format stream "~D" (enum-keyword-to-int type value))
       (format stream "\"~A\"" (pi::enum-name->proto value))))
@@ -174,10 +177,10 @@ Parameters:
                  (format stream ",")
                  (setf pair-printed t))
              (if indent
-                 (format stream "~&~V,0T\"~A\": " (+ indent 2) (write-to-string k))
+                 (format stream "~&~V,0T\"~A\": " (+ indent 2) k)
                  (format stream "\"~A\":"  (write-to-string k)))
              (print-field-to-json v (pi::map-value-class map-descriptor)
-                                  (and indent (+ indent 4)) stream camel-case-p numeric-enums-p)))
+                                  (and indent (+ indent 2)) stream camel-case-p numeric-enums-p)))
     (if indent
         (format stream "~&~V,0T}" indent)
         (format stream "}")))
@@ -237,8 +240,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
             (let (val error-p null-p)
               (cond
                 ((eql (peek-char nil stream nil) #\n)
-                 (pi::parse-token stream)
-                 (pi::skip-whitespace stream)
+                 (pi::expect-token-or-string stream "null")
                  (setf null-p t))
                 ((eq (proto-label field) :repeated)
                  (pi::expect-char stream #\[)
@@ -313,6 +315,12 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
           ((typep desc 'pi::enum-descriptor)
            (multiple-value-bind (name type-parsed)
                (pi::parse-token-or-string stream)
+             ;; special handling for well known enum NullValue.
+             (when (eql type 'google:null-value)
+               (assert (string= name "null") (name)
+                       "~S is not a valid keyword for well-known enum NullValue" name)
+               (return-from parse-value-from-json
+                 :null-value))
              (let ((enum (if (eql type-parsed 'symbol)
                              ;; If the parsed type is a symbol, then the enum was printed
                              ;; as an integer. Otherwise, it is a string which names a
@@ -390,10 +398,10 @@ be either an array, object, or primitive."
   (member type '(google:any
                  google:timestamp
                  google:duration
-;;               google:struct
-;;               google:value
+                 google:struct
+                 google:value
                  google:field-mask
-;;               google:list-value
+                 google:list-value
                  google:bool-value
                  google:string-value
                  google:bytes-value
@@ -463,6 +471,34 @@ for any types."
        (format stream "\"~{~a~^,~}\"" (mapcar (lambda (name)
                                             (pi::camel-case-but-one name '(#\_)))
                                               paths))))
+    ((google:struct)
+     (let ((field (first (proto-fields (find-message-descriptor type)))))
+       (print-map-to-json (google:fields object) (find-map-descriptor (proto-class field))
+                          indent stream camel-case-p numeric-enums-p)))
+    ((google:list-value)
+     (format stream "[")
+     (loop for print-comma-p = nil then t
+           for value in (google:values object)
+           do (when print-comma-p (format stream ","))
+              (when indent (format stream "~&~V,0T" (+ 2 indent)))
+              (print-field-to-json value 'google:value (and indent (+ indent 2))
+                                   stream camel-case-p numeric-enums-p))
+     (if indent
+         (format stream "~&~V,0T]" indent)
+         (format stream "]")))
+    ((google:value)
+     (let* ((oneof-data (slot-value object 'google::%kind))
+            ;; The wkt Value consists of a single oneof, so the first oneof in the
+            ;; descriptor's list is the one we are looking for.
+            (oneof-desc (first (pi::proto-oneofs (find-message-descriptor type))))
+            (set-field (pi::oneof-set-field oneof-data)))
+       (assert set-field ()
+               "Message ~S must have a set 'kind' oneof as it has well-known-type 'Value'." object)
+       (let* ((field (aref (pi::oneof-descriptor-fields oneof-desc)
+                           (pi::oneof-set-field oneof-data)))
+              (value (pi::oneof-value oneof-data)))
+         (print-field-to-json value (proto-class field)
+                              indent stream camel-case-p numeric-enums-p))))
     ;; Otherwise, TYPE is a wrapper type.
     (t (if object
            (print-scalar-to-json (google:value object)
@@ -474,14 +510,19 @@ for any types."
   "Parse a well known type TYPE from STREAM. IGNORE-UNKNOWN-FIELDS-P is passed to recursive
 calls to PARSE-JSON."
   ;; If the stream starts with 'n', then the data is NULL. In which case, return NIL.
+  ;; If the stream starts with 'n', then the data is NULL. In all cases except the `Value`
+  ;; well-known-type, we return NIL. However, if TYPE is GOOGLE:VALUE, then we return the
+  ;; wrapper enum that represents null.
   (when (eql (peek-char nil stream nil) #\n)
-    (assert (string= (pi::parse-token stream) "null"))
-    (return-from parse-special-json nil))
+    (pi::expect-token-or-string stream "null")
+    (return-from parse-special-json
+      (if (eql type 'google:value)
+          (google:make-value :null-value :null-value)
+          nil)))
   (case type
     ((google:any)
      (pi::expect-char stream #\{)
-     (let ((token (pi::parse-string stream)))
-       (assert (string= token "url")))
+     (pi::expect-token-or-string stream "url")
      (pi::expect-char stream #\:)
      (let* ((type-url (pi::parse-string stream))
             (type (wkt::resolve-type-url type-url)))
@@ -494,9 +535,8 @@ calls to PARSE-JSON."
                              :spliced-p t))
            ;; If URL names a well-known-type, then the next element in the object has key "VALUE",
            ;; and the value is the special JSON format. Parse that and close the object.
-           (let ((val-string (pi::parse-string stream))
-                 ret)
-             (assert (string= val-string "value"))
+           (let (ret)
+             (pi::expect-token-or-string stream "value")
              (pi::expect-char stream #\:)
              (setf ret (parse-special-json type stream ignore-unknown-fields-p))
              (pi::expect-char stream #\})
@@ -552,6 +592,51 @@ calls to PARSE-JSON."
        (google:make-field-mask
         :paths (mapcar (lambda (path) (nstring-downcase (pi::uncamel-case path #\_)))
                        camel-case-paths))))
+
+    ((google:struct)
+     (pi::expect-char stream #\{)
+     (loop with ret = (google:make-struct)
+           for key = (pi::parse-string stream)
+           do (pi::expect-char stream #\:)
+              (setf (google:struct.fields-gethash key ret)
+                    (parse-special-json 'google:value stream ignore-unknown-fields-p))
+              (if (eql (peek-char nil stream nil) #\,)
+                  (pi::expect-char stream #\,)
+                  (progn
+                    (pi::expect-char stream #\})
+                    (return ret)))))
+
+    ((google:list-value)
+     (pi::expect-char stream #\[)
+     (loop with ret = (google:make-list-value)
+           do (multiple-value-bind (data err)
+                  (parse-value-from-json 'google:value
+                                         :stream stream
+                                         :ignore-unknown-fields-p ignore-unknown-fields-p)
+                (if err
+                    (error "Error while parsing well known type VALUE from JSON format.")
+                    (push data (google:list-value.values ret))))
+              (if (eql (peek-char nil stream nil) #\,)
+                  (pi::expect-char stream #\,)
+                  (progn
+                    (pi::expect-char stream #\])
+                    (return ret)))))
+
+    ((google:value)
+     (case (peek-char nil stream nil)
+       ((#\{) (google:make-value
+               :struct-value (parse-special-json 'google:struct stream ignore-unknown-fields-p)))
+       ((#\[) (google:make-value
+               :list-value (parse-special-json 'google:list-value stream ignore-unknown-fields-p)))
+       ((#\") (google:make-value :string-value (pi::parse-string stream)))
+       ((#\t)
+        (pi::expect-token-or-string stream "true")
+        (google:make-value :bool-value t))
+       ((#\f)
+        (pi::expect-token-or-string stream "false")
+        (google:make-value :bool-value nil))
+       ;; Otherwise, the value has type double.
+       (t (google:make-value :number-value (pi::parse-double stream :append-d0 t)))))
 
     ;; Otherwise, the well known type is a wrapper type.
     (t (let ((object #+sbcl (make-instance type)
