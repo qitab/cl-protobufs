@@ -317,10 +317,10 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
                (pi::parse-token-or-string stream)
              ;; special handling for well known enum NullValue.
              (when (eql type 'google:null-value)
-               (assert (string= name "null") (name)
-                       "~S is not a valid keyword for well-known enum NullValue" name)
-               (return-from parse-value-from-json
-                 :null-value))
+               (if (string= name "null")
+                   (return-from parse-value-from-json :null-value)
+                   (protobuf-error
+                    "~S is not a valid keyword for well-known enum NullValue" name)))
              (let ((enum (if (eql type-parsed 'symbol)
                              ;; If the parsed type is a symbol, then the enum was printed
                              ;; as an integer. Otherwise, it is a string which names a
@@ -429,6 +429,7 @@ be either an array, object, or primitive."
   "For an OBJECT whose TYPE is a well-known type, print the object's special JSON mapping
 to STREAM. INDENT, CAMEL-CASE-P, and NUMERIC-ENUMS-P are passed recursively to PRINT-JSON
 for any types."
+  (declare (type symbol type))
   (case type
     ((google:any)
      (let ((url (google:any.type-url object))
@@ -472,7 +473,7 @@ for any types."
                                             (pi::camel-case-but-one name '(#\_)))
                                               paths))))
     ((google:struct)
-     (let ((field (first (proto-fields (find-message-descriptor type)))))
+     (let ((field (find-field-descriptor (find-message-descriptor type) 'google::%fields)))
        (print-map-to-json (google:fields object) (find-map-descriptor (proto-class field))
                           indent stream camel-case-p numeric-enums-p)))
     ((google:list-value)
@@ -510,15 +511,13 @@ for any types."
   "Parse a well known type TYPE from STREAM. IGNORE-UNKNOWN-FIELDS-P is passed to recursive
 calls to PARSE-JSON."
   ;; If the stream starts with 'n', then the data is NULL. In which case, return NIL.
-  ;; If the stream starts with 'n', then the data is NULL. In all cases except the `Value`
-  ;; well-known-type, we return NIL. However, if TYPE is GOOGLE:VALUE, then we return the
-  ;; wrapper enum that represents null.
+  ;; In all cases except the `Value` well-known-type, we return NIL. However, if TYPE is
+  ;; GOOGLE:VALUE, then we return the wrapper enum that represents null as per the spec.
   (when (eql (peek-char nil stream nil) #\n)
     (pi::expect-token-or-string stream "null")
     (return-from parse-special-json
-      (if (eql type 'google:value)
-          (google:make-value :null-value :null-value)
-          nil)))
+      (and (eql type 'google:value)
+           (google:make-value :null-value :null-value))))
   (case type
     ((google:any)
      (pi::expect-char stream #\{)
