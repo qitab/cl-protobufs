@@ -556,6 +556,24 @@ Parameters:
         (intern name package)
         (make-symbol name))))
 
+(defun scalarp (type)
+  "Returns true if the given protobuf type TYPE is a scalar type. Scalar
+   types are defined by the protobuf documentation. The cl-protobufs specific
+   type `symbol' is included as a scalar type, as it is treated as a synonym
+   to the `string' type. This is because symbols are transmitted as strings,
+   which are scalars, and then converted based on the lisp_type of the field.
+
+   https://developers.google.com/protocol-buffers/docs/proto#scalar "
+  (member type '(double-float float int32 int64 uint32 uint64 sint32
+                 sint32 sint64 fixed32 fixed64 sfixed32 sfixed64
+                 boolean string byte-vector symbol)))
+
+(defun packed-type-p (type)
+  "Returns true if the given protobuf TYPE can use a packed field."
+  (check-type type symbol)
+  (not (null (member type '(int32 int64 uint32 uint64 sint32 sint64
+                            fixed32 fixed64 sfixed32 sfixed64
+                            boolean float double-float)))))
 
 ;;; Warnings
 

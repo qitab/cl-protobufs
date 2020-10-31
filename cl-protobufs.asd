@@ -53,8 +53,7 @@
     :pathname ""
     :depends-on ("models")
     :components
-    ((:file "define-proto")
-     (:file "clos-transform")))
+    ((:file "define-proto")))
    (:module "serialization"
     :serial t
     :pathname ""

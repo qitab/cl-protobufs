@@ -444,7 +444,7 @@ Parameters:
          (map-desc (make-map-descriptor
                     :class class
                     :name name
-                    :key-class (lisp-type-to-protobuf-class key-type) ; a keyword like :intt32
+                    :key-class key-type
                     ;; If the value type is a message, then VALUE-TYPE will take the form
                     ;; (cl:or cl:null message). In this case, set VALUE-CLASS to be 'message'
                     ;; as that is the class of the value type.
@@ -452,7 +452,7 @@ Parameters:
                                      (destructuring-bind (a b msg-type) value-type
                                        (assert (and (eq a 'or) (eq b 'null)))
                                        msg-type)
-                                     (lisp-type-to-protobuf-class value-type))
+                                     value-type)
                     :key-type key-type
                     :value-type value-type
                     :value-kind value-kind)))
@@ -483,30 +483,26 @@ Parameters:
          (assert json-name)
          (assert index)
          (let ((default (if default-p default $empty-default)))
-
-           (multiple-value-bind (ptype pclass)
-               (clos-type-to-protobuf-type type)
-             (declare (ignore ptype))
-             (setf (aref field-descriptors oneof-offset)
-                   (make-instance 'field-descriptor
-                                  :name (or name (slot-name->proto slot))
-                                  :type type
-                                  :kind kind
-                                  :class pclass
-                                  :qualified-name (make-qualified-name
-                                                   *current-message-descriptor*
-                                                   (or name (slot-name->proto slot)))
-                                  :label :optional
-                                  :index index
-                                  ;; Oneof fields don't have a bit in the %%is-set vector, as field
-                                  ;; presence is tracked via the SET-FIELD slot of the oneof struct.
-                                  :field-offset nil
-                                  :internal-field-name internal-name
-                                  :external-field-name slot
-                                  :json-name json-name
-                                  :oneof-offset oneof-offset
-                                  :default default
-                                  :lazy (and lazy t)))))))
+           (setf (aref field-descriptors oneof-offset)
+                 (make-instance 'field-descriptor
+                                :name (or name (slot-name->proto slot))
+                                :type type
+                                :kind kind
+                                :class type
+                                :qualified-name (make-qualified-name
+                                                 *current-message-descriptor*
+                                                 (or name (slot-name->proto slot)))
+                                :label :optional
+                                :index index
+                                ;; Oneof fields don't have a bit in the %%is-set vector, as field
+                                ;; presence is tracked via the SET-FIELD slot of the oneof struct.
+                                :field-offset nil
+                                :internal-field-name internal-name
+                                :external-field-name slot
+                                :json-name json-name
+                                :oneof-offset oneof-offset
+                                :default default
+                                :lazy (and lazy t))))))
     `(progn
        ,(make-oneof-descriptor :internal-name internal-name
                                :external-name name
@@ -1672,78 +1668,77 @@ function) then there is no guarantee on the serialize function working properly.
   (destructuring-bind (slot &key type name (default nil default-p) packed lazy
                             json-name index label kind &allow-other-keys)
       field
-    (assert json-name)
+    (assert (and json-name index))
     (let* (;; Public accessors and setters for slots should be defined later.
            (internal-slot-name (fintern "%~A" slot))
            (reader (and conc-name
                         (fintern "~A~A" conc-name slot))))
-      (multiple-value-bind (ptype pclass)
-          (clos-type-to-protobuf-type type)
-        (declare (ignore ptype))
-        (assert index)
-        (multiple-value-bind (label repeated-storage-type) (values-list label)
-          (let* (;; Proto3 optional fields do not have offsets, as they don't have has-* functions.
-                 ;; Note that proto2-style optional fields in proto3 files are wrapped in oneofs by
-                 ;; protoc, and hence process-field is never called.
-                 (offset (and (not (eq (proto-syntax *current-file-descriptor*) :proto3))
-                              (not (eq label :repeated))
-                              field-offset))
-                 (default
-                  (if default-p
-                      default
-                      $empty-default))
-                 (cslot (unless alias-for
-                          (make-field-data
-                           :internal-slot-name internal-slot-name
-                           :external-slot-name slot
-                           :type
-                           (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
-                                  (list 'vector-of `,type))
-                                 ((and (eq label :repeated) (eq repeated-storage-type :list))
-                                  (list 'list-of `,type))
-                                 ((member kind '(:message :group))
-                                  (list 'cl:or 'cl:null `,type))
-                                 (t `,type))
-                           :accessor reader
-                           :initarg (kintern (symbol-name slot))
-                           :container (when (eq label :repeated) repeated-storage-type)
-                           :kind kind
-                           :initform
-                           (cond ((eq label :repeated)
-                                     ;; Repeated fields get a container for their elements
-                                     (if (eq repeated-storage-type :vector)
-                                         `(make-array 5 :fill-pointer 0 :adjustable t)
-                                         nil))
-                                 ((and (not default-p)
-                                          (eq label :optional)
-                                          ;; Use unbound for booleans only
-                                          (not (eq pclass 'boolean)))
-                                  nil)
-                                 (default-p `,default)))))
-                 (field (make-instance
-                         'field-descriptor
-                         :name  (or name (slot-name->proto slot))
-                         :type type
-                         :kind kind
-                         :class pclass
-                         :qualified-name (make-qualified-name *current-message-descriptor*
-                                                              (or name (slot-name->proto slot)))
-                         :label label
-                         :index  index
-                         :field-offset offset
-                         :internal-field-name internal-slot-name
-                         :external-field-name slot
-                         :json-name json-name
-                         :reader reader
-                         :default default
-                         ;; Pack the field only if requested and it actually makes sense
-                         :packed  (and (eq label :repeated) packed t)
+      (multiple-value-bind (label repeated-storage-type) (values-list label)
+        (let* (;; Proto3 optional fields do not have offsets, as they don't have has-* functions.
+               ;; Note that proto2-style optional fields in proto3 files are wrapped in oneofs by
+               ;; protoc, and hence process-field is never called.
+               (offset (and (not (eq (proto-syntax *current-file-descriptor*) :proto3))
+                            (not (eq label :repeated))
+                            field-offset))
+               (default
+                (if default-p
+                    default
+                    $empty-default))
+               (pclass (if (member type (list 'cl:keyword 'cl:symbol))
+                           'symbol
+                           type))
+               (cslot (unless alias-for
+                        (make-field-data
+                         :internal-slot-name internal-slot-name
+                         :external-slot-name slot
+                         :type
+                         (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
+                                (list 'vector-of `,type))
+                               ((and (eq label :repeated) (eq repeated-storage-type :list))
+                                (list 'list-of `,type))
+                               ((member kind '(:message :group))
+                                (list 'cl:or 'cl:null `,type))
+                               (t `,type))
+                         :accessor reader
+                         :initarg (kintern (symbol-name slot))
                          :container (when (eq label :repeated) repeated-storage-type)
-                         :lazy (and lazy t)
-                         :bool-index bool-index)))
-            (when (and bool-index default (not (eq default $empty-default)))
-              (setf (bit bool-values bool-index) 1))
-            (values field cslot index (and offset t))))))))
+                         :kind kind
+                         :initform
+                         (cond ((eq label :repeated)
+                                ;; Repeated fields get a container for their elements
+                                (if (eq repeated-storage-type :vector)
+                                    `(make-array 5 :fill-pointer 0 :adjustable t)
+                                    nil))
+                               ((and (not default-p)
+                                     (eq label :optional)
+                                     ;; Use unbound for booleans only
+                                     (not (eq pclass 'boolean)))
+                                nil)
+                               (default-p `,default)))))
+               (field (make-instance
+                       'field-descriptor
+                       :name  (or name (slot-name->proto slot))
+                       :type type
+                       :kind kind
+                       :class pclass
+                       :qualified-name (make-qualified-name *current-message-descriptor*
+                                                            (or name (slot-name->proto slot)))
+                       :label label
+                       :index  index
+                       :field-offset offset
+                       :internal-field-name internal-slot-name
+                       :external-field-name slot
+                       :json-name json-name
+                       :reader reader
+                       :default default
+                       ;; Pack the field only if requested and it actually makes sense
+                       :packed  (and (eq label :repeated) packed t)
+                       :container (when (eq label :repeated) repeated-storage-type)
+                       :lazy (and lazy t)
+                       :bool-index bool-index)))
+          (when (and bool-index default (not (eq default $empty-default)))
+            (setf (bit bool-values bool-index) 1))
+          (values field cslot index (and offset t)))))))
 
 (defparameter *rpc-package* nil
   "The Lisp package that implements RPC.
