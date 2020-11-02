@@ -1684,9 +1684,6 @@ function) then there is no guarantee on the serialize function working properly.
                 (if default-p
                     default
                     $empty-default))
-               (pclass (if (member type (list 'cl:keyword 'cl:symbol))
-                           'symbol
-                           type))
                (cslot (unless alias-for
                         (make-field-data
                          :internal-slot-name internal-slot-name
@@ -1712,7 +1709,7 @@ function) then there is no guarantee on the serialize function working properly.
                                ((and (not default-p)
                                      (eq label :optional)
                                      ;; Use unbound for booleans only
-                                     (not (eq pclass 'boolean)))
+                                     (not (eq type 'boolean)))
                                 nil)
                                (default-p `,default)))))
                (field (make-instance
@@ -1720,7 +1717,7 @@ function) then there is no guarantee on the serialize function working properly.
                        :name  (or name (slot-name->proto slot))
                        :type type
                        :kind kind
-                       :class pclass
+                       :class type
                        :qualified-name (make-qualified-name *current-message-descriptor*
                                                             (or name (slot-name->proto slot)))
                        :label label
