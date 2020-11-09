@@ -68,7 +68,7 @@
     :pathname ""
     :depends-on ("models" "parsing" "schema" "serialization")
     :components
-    ((:file "api")))
+    ((:file "message-api")))
    (:module "well-known-types"
     :serial t
     :pathname ""

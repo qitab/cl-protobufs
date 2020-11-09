@@ -6,8 +6,6 @@
 
 (in-package #:cl-protobufs.implementation)
 
-;;; Other API functions
-
 (defun object-initialized-p (object message)
   "Check if OBJECT with proto-message MESSAGE is initialized.
 The definition of initialized is all required-fields are set."
@@ -33,7 +31,6 @@ The definition of initialized is all required-fields are set."
                      (return-from object-initialized-p nil))))))
   t)
 
-;;; A Python-like, Protobufs2-compatible API
 (defun is-initialized (object)
   "Returns true if all of the fields of OBJECT are initialized."
   (let* ((class   (type-of object))
