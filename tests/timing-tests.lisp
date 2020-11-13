@@ -80,8 +80,8 @@ Parameters
     "Dwight D. Eisenhower" "John F. Kennedy" "Lyndon B. Johnson"
     "Richard Nixon" "Gerald Ford" "Jimmy Carter"
     "Ronald Reagan" "George H. W. Bush" "Bill Clinton"
-    "George W. Bush" "Barack Obama")
-  "A list of presidents from George Washington until Barack Obama")
+    "George W. Bush" "Barack Obama" "Donald Trump" "Joe Biden")
+  "A list of presidents from George Washington until now.")
 
 (defun clear-serialization-functions (proto-name)
   #-sbcl
