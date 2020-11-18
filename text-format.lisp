@@ -36,7 +36,7 @@ Parameters:
           (format stream "{")))
     (dolist (field (proto-fields message))
       (when (if (eq (slot-value field 'kind) :extends)
-                (has-extension object (slot-value field 'internal-field-name))
+                (has-extension object (slot-value field 'external-field-name))
                 (has-field object (slot-value field 'external-field-name)))
         (let* ((value
                  (if (eq (slot-value field 'kind) :extends)

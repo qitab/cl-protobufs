@@ -350,6 +350,61 @@ Parameters
       (assert-true (not (search "paint_type:" str1 :test #'char=)))
       (assert-true (search "paint_type:" str2 :test #'char=)))))
 
+(defun create-ext-serialization-functions ()
+  (pi::make-serializer auto-color)
+  (pi::make-serializer automobile)
+  (pi::make-serializer buy-car-request)
+  ;; todo(jgodbout): Fix deserialization.
+  ;; (pi::make-deserializer automobile)
+  ;; (pi::make-deserializer auto-color)
+  ;; (pi::make-deserializer buy-car-request)
+  )
+
+(defun clear-ext-serialization-functions (proto-name)
+  #-sbcl
+  (setf n(get `,proto-name :serialize) nil
+        (get `,proto-name :deserialize) nil)
+  #+sbcl (fmakunbound (list :protobuf :serialize proto-name))
+  ;; todo(jgodbout): Fix deserialization.
+  ;; #+sbcl (fmakunbound (list :protobuf :deserialize proto-name))
+  )
+
+(defun clear-ext-proto-serialization-functions ()
+  (loop for message in '(auto-color automobile bug-car-request)
+        do
+     (clear-serialization-functions message)))
+
+(deftest extension-serialization-optimized (serialization-suite)
+  (create-ext-serialization-functions)
+  (let* ((color1 (make-auto-color :r-value 100 :g-value 0 :b-value 100))
+         (car1   (make-automobile :model "Audi" :color color1))
+         (rqst1  (make-buy-car-request :auto car1))
+         (color2 (make-auto-color :r-value 100 :g-value 0 :b-value 100))
+         (car2   (make-automobile :model "Audi" :color color2))
+         (rqst2  (make-buy-car-request :auto car2)))
+    (setf (paint-type color2) :metallic)
+    (let ((ser1 (serialize-to-bytes rqst1 'buy-car-request))
+          (ser2 (serialize-to-bytes rqst2 'buy-car-request)))
+      (assert-false (equal ser1 ser2))
+      (assert-true (string= (with-output-to-string (s)
+                              (print-text-format rqst1 :stream s))
+                            (with-output-to-string (s)
+                              (print-text-format
+                               (deserialize 'buy-car-request ser1) :stream s))))
+      (assert-true (string= (with-output-to-string (s)
+                              (print-text-format rqst2 :stream s))
+                            (with-output-to-string (s)
+                              (print-text-format
+                               (deserialize 'buy-car-request ser2) :stream s)))))
+    (let ((str1 (with-output-to-string (s)
+                  (print-text-format rqst1 :stream s)))
+          (str2 (with-output-to-string (s)
+                  (print-text-format rqst2 :stream s))))
+      (assert-true (not (string= str1 str2)))
+      (assert-true (not (search "paint_type:" str1 :test #'char=)))
+      (assert-true (search "paint_type:" str2 :test #'char=))))
+  (clear-ext-proto-serialization-functions))
+
 (deftest group-serialization (serialization-suite)
   (let* ((meta1  (make-color-wheel1.metadata1 :revision "1.0"))
          (wheel1 (make-color-wheel1 :name "Colors" :metadata meta1))

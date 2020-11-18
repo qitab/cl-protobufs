@@ -142,7 +142,7 @@ Parameters:
   (let ((message-type (slot-value field 'kind)))
     (unless
         (if (eq message-type :extends)
-            (has-extension object (slot-value field 'internal-field-name))
+            (has-extension object (slot-value field 'external-field-name))
             (has-field object (slot-value field 'external-field-name)))
       (return-from emit-field 0))
     (let* ((type   (slot-value field 'class))
