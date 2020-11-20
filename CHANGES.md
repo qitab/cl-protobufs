@@ -77,6 +77,8 @@ change) and for internal code quality improvements.
     to be cl-protobufs.filename-without-extension instead of
     cl-protobufs-user.
 
+*   Add support for extensions in the generated serializer code.
+
 ## Version 2.0
 
 This version has many significant changes over the version that was originally

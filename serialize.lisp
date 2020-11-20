@@ -955,13 +955,17 @@ Parameters:
                         (or (find-message-descriptor class)
                             (find-enum-descriptor class))))
               (field-name (proto-external-field-name field))
-              (reader (when field-name
-                        `(,(proto-slot-function-name
-                            (proto-class message) field-name :get)
-                          ,vobj)))
-              (boundp `(,(proto-slot-function-name
-                          (proto-class message) field-name :has)
-                        ,vobj)))
+              (extension-p (eq (proto-kind field) :extends))
+              (reader (if extension-p
+                          `(,field-name ,vobj)
+                          `(,(proto-slot-function-name
+                              (proto-class message) field-name :get)
+                            ,vobj)))
+              (boundp (if extension-p
+                          `(has-extension ,vobj ',field-name)
+                          `(,(proto-slot-function-name
+                              (proto-class message) field-name :has)
+                            ,vobj))))
          (push (generate-field-serializer msg field boundp reader vbuf size)
                serializers)))
      (dolist (oneof (proto-oneofs message) serializers)
