@@ -48,7 +48,7 @@ Parameters:
     (let ((field-printed spliced-p))
       (dolist (field (proto-fields message))
         (when (if (eq (slot-value field 'pi::kind) :extends)
-                  (has-extension object (slot-value field 'internal-field-name))
+                  (has-extension object (slot-value field 'external-field-name))
                   (has-field object (slot-value field 'pi::external-field-name)))
           (let* ((name (if camel-case-p
                            (pi::proto-json-name field)

@@ -1327,7 +1327,8 @@ function) then there is no guarantee on the serialize function working properly.
                         :message-type :extends))) ; this message is an extension
          (top-level-form-p (null *current-message-descriptor*))
          ;; Only now can we bind *current-message-descriptor* to the new extended message
-         (*current-message-descriptor* extends))
+         (*current-message-descriptor* extends)
+         new-slot new-field)
     (assert message ()
             "There is no message named ~A to extend" name)
     (assert (eq type (proto-class message)) ()
@@ -1348,123 +1349,64 @@ function) then there is no guarantee on the serialize function working properly.
              (map () #'collect-form definers)
              (case model-type
                ((define-group)
-                (when extra-slot
-                  ;;--- Refactor to get rid of all this duplicated code!
-                  (let* ((sname  (field-data-internal-slot-name extra-slot))
-                         ;; The field name
-                         (fname (field-data-external-slot-name extra-slot))
-                         (stable (fintern "~A-VALUES" sname))
-                         (stype (field-data-type extra-slot))
-                         (reader (or (field-data-accessor extra-slot)
-                                     (if conc-name
-                                         (fintern "~A~A" conc-name sname)
-                                         (symbol-name sname))))
-                         (writer (fintern "~A-~A" 'set reader))
-                         (default (field-data-initform extra-slot)))
-                    (collect-form `(without-redefinition-warnings ()
-                                     (let ((,stable (tg:make-weak-hash-table
-                                                     :weakness :key :test #'eq)))
-                                       ,@(and reader `((defmethod ,reader ((object ,type))
-                                                         (gethash object ,stable ,default))))
-                                       ,@(and writer `((defmethod ,writer ((object ,type) ,stype)
-                                                         #-ccl (declare (type ,stype value))
-                                                         (setf (gethash object ,stable) value))))
-                                       ;; For Python compatibility
-                                       (defmethod get-extension ((object ,type)
-                                                                 (slot (eql ',fname)))
-                                         (values (gethash object ,stable ,default)))
-                                       ;; Set and has need to be defined for sname and fname
-                                       ;; for usefulness to reader and serialization
-                                       (defmethod set-extension ((object ,type)
-                                                                 (slot (eql ',sname))
-                                                                 value)
-                                         (setf (gethash object ,stable) value))
-                                       (defmethod set-extension ((object ,type)
-                                                                 (slot (eql ',fname))
-                                                                 value)
-                                         (setf (gethash object ,stable) value))
-                                       (defmethod has-extension ((object ,type)
-                                                                 (slot (eql ',fname)))
-                                         (multiple-value-bind (value foundp)
-                                             (gethash object ,stable)
-                                           (declare (ignore value))
-                                           foundp))
-                                       (defmethod has-extension ((object ,type)
-                                                                 (slot (eql ',sname)))
-                                         (multiple-value-bind (value foundp)
-                                             (gethash object ,stable)
-                                           (declare (ignore value))
-                                           foundp))
-                                       (defmethod clear-extension ((object ,type)
-                                                                   (slot (eql ',fname)))
-                                         (remhash object ,stable))
-                                       (defmethod (setf ,reader)
-                                           (val (object ,type))
-                                         (,writer object val)))))))
-                (setf (proto-kind extra-field) :extends)
-                (appendf (proto-fields extends) (list extra-field))
-                (appendf (proto-extended-fields extends) (list extra-field))))))
+                (setf new-slot extra-slot
+                      new-field extra-field)))))
           (otherwise
            (multiple-value-bind (field slot idx)
                (process-field field :conc-name conc-name :alias-for alias-for)
              (assert (index-within-extensions-p idx message) ()
                      "The index ~D is not in range for extending ~S"
                      idx (proto-class message))
-             (when slot
-               (let* (;; The slot name which is the %field-name
-                      (sname  (field-data-internal-slot-name slot))
-                      ;; The field name
-                      (fname (field-data-external-slot-name slot))
-                      (stable (fintern "~A-VALUES" sname))
-                      (stype (field-data-type slot))
-                      (reader (or (field-data-accessor slot)
-                                  (if conc-name
-                                      (fintern "~A~A" conc-name sname)
-                                      (symbol-name sname))))
-                      (writer (fintern "~A-~A" 'set reader))
-                      (default (field-data-initform slot)))
-                 ;; For the extended slots, each slot gets its own table
-                 ;; keyed by the object, which lets us avoid having a slot in each
-                 ;; instance that holds a table keyed by the slot name
-                 ;; Multiple 'define-extends' on the same class in the same image
-                 ;; will result in harmless redefinitions, so squelch the warnings
-                 ;;--- Maybe these methods need to be defined in 'define-message'?
-                 (collect-form
-                  `(without-redefinition-warnings ()
-                     (let ((,stable (tg:make-weak-hash-table :weakness :key :test #'eq)))
-                       ,@(and reader `((defmethod ,reader ((object ,type))
-                                         (gethash object ,stable ,default))))
-                       ,@(and writer `((defmethod ,writer ((object ,type) value)
-                                         #-ccl (declare (type ,stype value))
-                                         (setf (gethash object ,stable) value))))
-                       (defmethod get-extension ((object ,type) (slot (eql ',fname)))
-                         (values (gethash object ,stable ,default)))
-                       ;; Set and has need to be defined for sname and fname
-                       ;; for usefulness to reader and serialization
-                       (defmethod set-extension ((object ,type) (slot (eql ',sname)) value)
-                         (setf (gethash object ,stable) value))
-                       (defmethod set-extension ((object ,type) (slot (eql ',fname)) value)
-                         (setf (gethash object ,stable) value))
-                       (defmethod has-extension ((object ,type) (slot (eql ',fname)))
-                         (multiple-value-bind (value foundp)
-                             (gethash object ,stable)
-                           (declare (ignore value))
-                           foundp))
-                       (defmethod has-extension ((object ,type) (slot (eql ',sname)))
-                         (multiple-value-bind (value foundp)
-                             (gethash object ,stable)
-                           (declare (ignore value))
-                           foundp))
-                       (defmethod clear-extension ((object ,type) (slot (eql ',fname)))
-                         (remhash object ,stable))
-                       (defmethod (setf ,reader)
-                           (val (object ,type))
-                         (,writer object val)))))
-                 ;; This so that (de)serialization works
-                 (setf (proto-reader field) reader)))
-             (setf (proto-kind field) :extends)
-             (appendf (proto-fields extends) (list field))
-             (appendf (proto-extended-fields extends) (list field))))))
+             (setf new-slot slot
+                   new-field field))))
+        (when new-slot
+          (let* (;; The slot name which is the %field-name
+                 (sname  (field-data-internal-slot-name new-slot))
+                 ;; The field name
+                 (fname (field-data-external-slot-name new-slot))
+                 (stable (fintern "~A-VALUES" sname))
+                 (stype (field-data-type new-slot))
+                 (reader (or (field-data-accessor new-slot)
+                             (if conc-name
+                                 (fintern "~A~A" conc-name sname)
+                                 (symbol-name sname))))
+                 (writer (fintern "~A-~A" 'set reader))
+                 (default (field-data-initform new-slot)))
+            ;; For the extended slots, each slot gets its own table
+            ;; keyed by the object, which lets us avoid having a slot in each
+            ;; instance that holds a table keyed by the slot name
+            ;; Multiple 'define-extends' on the same class in the same image
+            ;; will result in harmless redefinitions, so squelch the warnings.
+            (collect-form
+             `(without-redefinition-warnings ()
+                (let ((,stable (tg:make-weak-hash-table :weakness :key :test #'eq)))
+                  ,@(and reader `((defmethod ,reader ((object ,type))
+                                    (gethash object ,stable ,default))))
+                  ,@(and writer `((defmethod ,writer ((object ,type) value)
+                                    #-ccl (declare (type ,stype value))
+                                    (setf (gethash object ,stable) value))))
+                  (defmethod get-extension ((object ,type) (slot (eql ',fname)))
+                    (values (gethash object ,stable ,default)))
+                  ;; Set and has need to be defined for sname and fname
+                  ;; for usefulness to reader and serialization
+                  (defmethod set-extension ((object ,type) (slot (eql ',sname)) value)
+                    (setf (gethash object ,stable) value))
+                  (defmethod set-extension ((object ,type) (slot (eql ',fname)) value)
+                    (setf (gethash object ,stable) value))
+                  (defmethod has-extension ((object ,type) (slot (eql ',fname)))
+                    (multiple-value-bind (value foundp)
+                        (gethash object ,stable)
+                      (declare (ignore value))
+                      foundp))
+                  (defmethod clear-extension ((object ,type) (slot (eql ',fname)))
+                    (remhash object ,stable))
+                  (defmethod (setf ,reader) (val (object ,type))
+                    (,writer object val)))))
+            ;; This so that (de)serialization works
+            (setf (proto-reader new-field) reader)))
+        (setf (proto-kind new-field) :extends)
+        (appendf (proto-fields extends) (list new-field))
+        (appendf (proto-extended-fields extends) (list new-field)))
       (collect-form `(record-protobuf-object ',type ,extends :message))
       (create-progn-with-enum-forms-if-top-level top-level-form-p forms))))
 
