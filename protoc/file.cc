@@ -29,7 +29,7 @@ namespace cl_protobufs {
 FileGenerator::FileGenerator(const FileDescriptor* file) :
     file_(file),
     lisp_package_name_(FileLispPackage(file)),
-    schema_name_(file->name()),
+    schema_name_(GetSchemaName(file->name())),
     enums_(file->enum_type_count()),
     messages_(file->message_type_count()),
     services_(file->service_count()) {
@@ -56,17 +56,6 @@ FileGenerator::FileGenerator(const FileDescriptor* file) :
       GOOGLE_LOG(FATAL) << "Unknown syntax for file: " << file->DebugString();
       break;
   }
-
-  // Derive schema name.
-  const size_t slash = schema_name_.find_last_of("\\/");
-  if (std::string::npos != slash) {
-    schema_name_.erase(0, slash + 1);
-  }
-  const size_t period = schema_name_.rfind('.');
-  if (std::string::npos != period) {
-    schema_name_.erase(period);
-  }
-  StrToLower(&schema_name_);
 }
 
 FileGenerator::~FileGenerator() {}

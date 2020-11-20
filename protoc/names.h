@@ -36,10 +36,13 @@ const std::string MessageLispName(const Descriptor* descriptor);
 // If descriptor->file() == file, the package name is omitted.
 const std::string QualifiedEnumLispName(const EnumDescriptor* descriptor,
                                         const FileDescriptor* file);
+
 const std::string QualifiedMessageLispName(const Descriptor* descriptor,
                                            const FileDescriptor* file);
 
 const std::string FileLispPackage(const FileDescriptor* descriptor);
+
+const std::string GetSchemaName(std::string filename);
 
 const std::string ToCamelCase(const std::string& name);
 

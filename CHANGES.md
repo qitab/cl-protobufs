@@ -73,6 +73,10 @@ change) and for internal code quality improvements.
 *   Type declarations have been added to field accessor functions to improve
     speed.
 
+*   Update protoc_gen_lisp now sets the default package for a proto
+    to be cl-protobufs.filename-without-extension instead of
+    cl-protobufs-user.
+
 ## Version 2.0
 
 This version has many significant changes over the version that was originally

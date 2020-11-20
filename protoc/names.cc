@@ -106,12 +106,26 @@ const std::string ToLispName(const std::string& name) {
   return DeCamel(name, true, false, "-");
 }
 
+const std::string GetSchemaName(std::string filename) {
+  const size_t slash = filename.find_last_of("\\/");
+  if (std::string::npos != slash) {
+    filename.erase(0, slash + 1);
+  }
+  const size_t period = filename.rfind('.');
+  if (std::string::npos != period) {
+    filename.erase(period);
+  }
+  StrToLower(&filename);
+  return filename;
+}
+
 // Namespace prefix for all generated packages.
 const char* const kClProtobufs = "CL-PROTOBUFS";
 
 const std::string FileLispPackage(const FileDescriptor* file) {
   if (file->package().empty()) {
-    return std::string(kClProtobufs) + "-USER";
+    return std::string(kClProtobufs) + "." +
+        ToUpper(GetSchemaName(file->name()));
   } else {
     return std::string(kClProtobufs) + "." +
            ToUpper(ToLispName(file->package()));
