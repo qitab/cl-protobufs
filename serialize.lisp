@@ -1324,8 +1324,10 @@ Parameters:
     (with-collectors ((deserializers collect-deserializer)
                       ;; Nonrepeating slots
                       (nslots collect-nslot)
+                      (extended-nslots collect-extended-nslot)
                       ;; For tracking repeated slots that will need to be reversed
                       (rslots collect-rslot)
+                      (extended-rslots collect-extended-rslot)
                       ;; For tracking oneof slots
                       (oneof-slots collect-oneof-slot))
       (flet ((include-field (field)
@@ -1347,13 +1349,17 @@ Parameters:
                     do (assert tag)
                        (assert deserializer)
                        (collect-deserializer `((,tag) ,deserializer))
-                       (when nslot
-                         (collect-nslot nslot))
-                       (when rslot
-                         (collect-rslot rslot))
-                       (when oneof-slot
-                         (collect-oneof-slot oneof-slot)))))))
+                       (cond ((and nslot (eq (proto-kind field) :extends))
+                              (collect-extended-nslot nslot))
+                             (nslot (collect-nslot nslot))
+                             ((and rslot (eq (proto-kind field) :extends))
+                              (collect-extended-rslot nslot))
+                             (rslot (collect-rslot rslot))
+                             (oneof-slot (collect-oneof-slot oneof-slot))))))))
       (let* ((rslots  (delete-duplicates rslots :key #'first))
+             (extended-rfields (mapcar #'first  extended-rslots))
+             (extended-rtemps  (mapcar #'second extended-rslots))
+             (extended-nslots  (delete-duplicates extended-nslots :key #'first))
              (rfields (mapcar #'first  rslots))
              (rtemps  (mapcar #'second rslots))
              (oneof-slots (delete-duplicates oneof-slots :test #'string= :key #'symbol-name))
@@ -1382,6 +1388,8 @@ Parameters:
                     ,@(loop for oneof-slot in oneof-slots
                             collect `(,oneof-slot (make-oneof)))
                     (,old-index ,vidx)
+                    ,@extended-nslots
+                    ,@extended-rtemps
                     ,@rtemps
                     ,skipped-bytes-tuple)
                 ,(when save-skipped-bytes-p `(declare (ignore ,old-index)))
@@ -1414,13 +1422,26 @@ Parameters:
                                                             `(nreverse ,temp))
                                        nconc `(,(intern (string mtemp) :keyword)
                                                ,(if missing-value
-                                                    `(if (null ,temp) ,missing-value
-                                                         ,conversion)
+                                                    `(if ,temp
+                                                         ,conversion
+                                                         ,missing-value)
                                                     conversion))))))
-                         (when (and ,skipped-bytes-tuple
-                                    (message-p struct))
-                           (setf (message-%%skipped-bytes struct)
-                                 (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf)))
+                         (when (message-p struct)
+                           ,(when extended-rfields
+                              `(,@(loop for field in extended-rfields
+                                        for temp in extended-rtemps
+                                        for mtemp = (slot-value-to-slot-name-symbol temp)
+                                        for conversion = (if (eq :vector (proto-container field))
+                                                             `(coerce (nreverse ,temp) 'vector)
+                                                             `(nreverse ,temp))
+                                        nconc `(when ,temp (setf (,mtemp struct) ,conversion)))))
+                           ,(when extended-nslots
+                              `(,@(loop for temp in extended-nslots
+                                        for mtemp = (slot-value-to-slot-name-symbol temp)
+                                        nconc `(when ,temp (setf (,mtemp struct) ,temp)))))
+                           (when ,skipped-bytes-tuple
+                             (setf (message-%%skipped-bytes struct)
+                                   (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf))))
                          struct)
                        ,vidx)))
                   (case tag

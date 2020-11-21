@@ -350,24 +350,20 @@ Parameters
       (assert-false (search "paint_type:" str1 :test #'char=))
       (assert-true (search "paint_type:" str2 :test #'char=)))))
 
-(defun create-ext-serialization-functions ()
-  (pi::make-serializer auto-color)
-  (pi::make-serializer automobile)
-  (pi::make-serializer buy-car-request)
-  ;; todo(jgodbout): Fix deserialization.
-  ;; (pi::make-deserializer automobile)
-  ;; (pi::make-deserializer auto-color)
-  ;; (pi::make-deserializer buy-car-request)
-  )
-
-(defun clear-ext-serialization-functions (proto-name)
+(defun clear-serialization-functions (proto-name)
   #-sbcl
   (setf (get `,proto-name :serialize) nil
         (get `,proto-name :deserialize) nil)
   #+sbcl (fmakunbound (list :protobuf :serialize proto-name))
-  ;; todo(jgodbout): Fix deserialization.
-  ;; #+sbcl (fmakunbound (list :protobuf :deserialize proto-name))
-  )
+  #+sbcl (fmakunbound (list :protobuf :deserialize proto-name)))
+
+(defun create-ext-serialization-functions ()
+  (pi::make-serializer auto-color)
+  (pi::make-serializer automobile)
+  (pi::make-serializer buy-car-request)
+  (pi::make-deserializer automobile)
+  (pi::make-deserializer auto-color)
+  (pi::make-deserializer buy-car-request))
 
 (defun clear-ext-proto-serialization-functions ()
   (loop for message in '(auto-color automobile buy-car-request)
@@ -445,13 +441,6 @@ Parameters
       (let* ((ser3 (serialize-to-bytes request-3 'color-wheel2-wrap))
              (res3 (deserialize-from-bytes 'color-wheel2-wrap ser3)))
         (assert-true (proto-equal res3 request-3))))))
-
-(defun clear-serialization-functions (proto-name)
-  #-sbcl
-  (setf (get `,proto-name :serialize) nil
-        (get `,proto-name :deserialize) nil)
-  #+sbcl (fmakunbound (list :protobuf :serialize proto-name))
-  #+sbcl (fmakunbound (list :protobuf :deserialize proto-name)))
 
 (defun clear-test-proto-backwards-compatibility ()
   (loop for message in '(proto-on-wire
