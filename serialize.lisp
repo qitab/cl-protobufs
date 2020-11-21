@@ -972,12 +972,6 @@ Parameters:
        (push (generate-oneof-serializer message oneof vobj vbuf size)
              serializers)))))
 
-(defmacro make-serializer (message-name)
-  "Create the serializer for a message.
-Parameters:
-  MESSAGE-NAME: The symbol name of a message."
-  (generate-serializer (find-message-descriptor message-name)))
-
 (defun generate-serializer (message)
   (let ((vobj (make-symbol "OBJ"))
         (vbuf (make-symbol "BUF"))
@@ -1004,6 +998,12 @@ Parameters:
               (t
                ,@serializers
                (incf ,size (emit-skipped-bytes ,vobj ,vbuf))))))))))
+
+(defun make-serializer (message-name)
+  "Create the serializer for a message.
+Parameters:
+  MESSAGE-NAME: The symbol name of a message."
+  (funcall #'generate-serializer (find-message-descriptor message-name)))
 
 (defun generate-oneof-serializer (message oneof vobj vbuf size)
   "Creates and returns the code that serializes a oneof.

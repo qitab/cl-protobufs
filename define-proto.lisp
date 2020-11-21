@@ -1279,6 +1279,7 @@ function) then there is no guarantee on the serialize function working properly.
       ;; Register it by the full symbol name.
       (record-protobuf-object type msg-desc :message)
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
+      (collect-form `(make-serializer ',type))
       (create-progn-with-enum-forms-if-top-level top-level-form-p type-forms forms))))
 
 (defun conc-name-for-type (type conc-name)
@@ -1408,6 +1409,7 @@ function) then there is no guarantee on the serialize function working properly.
         (appendf (proto-fields extends) (list new-field))
         (appendf (proto-extended-fields extends) (list new-field)))
       (collect-form `(record-protobuf-object ',type ,extends :message))
+      (collect-form `(make-serializer ',type))
       (create-progn-with-enum-forms-if-top-level top-level-form-p forms))))
 
 (defun index-within-extensions-p (index message)
@@ -1571,6 +1573,7 @@ function) then there is no guarantee on the serialize function working properly.
           (collect-type-form
            (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs)))
       (collect-form `(record-protobuf-object ',type ,message :message))
+      (collect-form `(make-serializer ',type))
       ;; Group can never be a top level element.
       `(progn
          define-group
