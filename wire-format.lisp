@@ -851,7 +851,7 @@
 ;;; boggles my mind. This should be reduced...
 ;;; At least macroize writing 4-byte integer so that you can use
 ;;; it for fixed32, single float, and (twice) for double-float
-#-(and sbcl x86-64)
+#-(and sbcl 64-bit)
 (progn
   (defmacro generate-integer-encoders (bits)
     "Generate 32- or 64-bit versions of integer encoders given BITS."
@@ -1129,7 +1129,7 @@
 ;;; Wire-level lengths
 ;;; These are called at the lowest level, so arg types are assumed to be correct
 
-#+(and sbcl x86-64)
+#+(and sbcl 64-bit)
 ;; The SBCL code is faster by a factor of 6 than the generic code.
 ;; This is not very SBCL-specific other than a trick involving 'truly-the'.
 (macrolet ((length-per-bits ()
@@ -1154,7 +1154,7 @@
               (1- (integer-length (logand (sb-ext:truly-the (signed-byte 64) val)
                                           sb-vm::most-positive-word)))))))
 
-#-sbcl
+#-(and sbcl 64-bit)
 (defmacro gen-length (bits)
   "Generate 32- or 64-bit versions of integer length functions."
   (assert (and (plusp bits) (zerop (mod bits 8))))
@@ -1176,10 +1176,10 @@
                until ,zerop-val)
          size))))
 
-#+(or (not sbcl) (not x86-64))
+#-(and sbcl 64-bit)
 (progn
-(gen-length 32)
-(gen-length 64))
+  (gen-length 32)
+  (gen-length 64))
 
 ;;; Skipping elements
 ;;; This is called at the lowest level, so arg types are assumed to be correct

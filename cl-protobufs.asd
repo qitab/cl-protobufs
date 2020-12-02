@@ -39,7 +39,7 @@
     :depends-on ("packages")
     :components
     ((:file "utilities")
-     #-sbcl (:file "float-bits")
+     #-(and sbcl 64-bit) (:file "float-bits")
      (:file "model-classes")
      (:file "conditions")))
    (:module "parsing"
