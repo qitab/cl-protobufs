@@ -425,6 +425,7 @@ be either an array, object, or primitive."
     ((google:u-int32-value) 'uint32)
     ((google:u-int64-value) 'uint64)))
 
+
 (defun print-special-json (object type stream indent camel-case-p numeric-enums-p)
   "For an OBJECT whose TYPE is a well-known type, print the object's special JSON mapping
 to STREAM. INDENT, CAMEL-CASE-P, and NUMERIC-ENUMS-P are passed recursively to PRINT-JSON
@@ -454,14 +455,19 @@ for any types."
                                       :camel-case-p camel-case-p
                                       :numeric-enums-p numeric-enums-p
                                       :spliced-p t))))
-    ;; todo(benkuehnert): LOCAL-TIME's utility f or printing rfc3339 strings does not
-    ;; support nanosecond precision and uses milisecond precision by default. Proto
-    ;; spec says that nanosecond precision should be used whenever possible.
     ((google:timestamp)
-     (let ((timestamp (local-time:unix-to-timestamp
-                       (google:timestamp.seconds object)
-                       :nsec (google:timestamp.nanos object))))
-       (format stream "~S" (local-time:format-rfc3339-timestring nil timestamp))))
+     (let* ((nsec (google:timestamp.nanos object))
+            (timestamp (local-time:unix-to-timestamp
+                        (google:timestamp.seconds object)
+                        :nsec nsec))
+            (prefix '((:year 4) #\- (:month 2) #\- (:day 2) #\T
+                      (:hour 2) #\: (:min 2) #\: (:sec 2)))
+            (suffix '(:gmt-offset-or-z))
+            (format (cond ((= nsec 0) (append prefix suffix))
+                          ((= (mod nsec 1000000) 0) (append prefix '(#\. (:msec 3)) suffix))
+                          ((= (mod nsec 1000) 0) (append prefix '(#\. (:usec 6)) suffix))
+                          (t (append prefix '(#\. (:nsec 9)) suffix)))))
+       (format stream "~S" (local-time:format-timestring nil timestamp :format format))))
     ((google:duration)
      (let ((seconds (google:duration.seconds object))
            (nanos (google:duration.nanos object)))
@@ -643,3 +649,4 @@ calls to PARSE-JSON."
              (value (parse-value-from-json (wrapper-message->type type) :stream stream)))
          (setf (google:value object) value)
          object))))
+

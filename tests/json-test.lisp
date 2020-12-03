@@ -228,6 +228,21 @@ the result is PROTO-EQUAL with MSG."
       (roundtrip-with-any bytes-wrap)
       (roundtrip-with-any int32-wrap))))
 
+;; Test JSON output for timestamps. It should use 0, 3, 6, or 9 fractional digits.
+(deftest rfc3339-output (json-suite)
+  (let ((0-frac (google:make-timestamp))
+        (3-frac (google:make-timestamp :nanos 123000000))
+        (6-frac (google:make-timestamp :nanos 123456000))
+        (9-frac (google:make-timestamp :nanos 123456789)))
+    (flet ((check-output (obj output)
+             (assert-true (string= output
+                                   (with-output-to-string (s)
+                                     (proto:print-json obj :stream s))))))
+      (check-output 0-frac "\"1970-01-01T00:00:00Z\"")
+      (check-output 3-frac "\"1970-01-01T00:00:00.123Z\"")
+      (check-output 6-frac "\"1970-01-01T00:00:00.123456Z\"")
+      (check-output 9-frac "\"1970-01-01T00:00:00.123456789Z\""))))
+
 (defparameter *any-with-null*
 "{
   \"url\": \"type.googleapis.com/test_proto.TextFormatTest\",
