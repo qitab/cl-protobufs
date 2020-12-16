@@ -23,7 +23,7 @@ const std::string LispSimpleFtoa(float value) {
     GOOGLE_LOG(FATAL) <<  "single-float-nan";
   }
 
-  std::string::size_type pos = result.find("e", 0);
+  std::string::size_type pos = result.find('e', 0);
   if (pos != std::string::npos) {
     result.replace(pos, 1, "f");
     return result;
@@ -41,7 +41,7 @@ const std::string LispSimpleDtoa(double value) {
     GOOGLE_LOG(FATAL) <<  "double-float-nan";
   }
 
-  std::string::size_type pos = result.find("e", 0);
+  std::string::size_type pos = result.find('e', 0);
   if (pos != std::string::npos) {
     result.replace(pos, 1, "d");
     return result;
