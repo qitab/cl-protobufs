@@ -467,7 +467,10 @@ for any types."
                           ((= (mod nsec 1000000) 0) (append prefix '(#\. (:msec 3)) suffix))
                           ((= (mod nsec 1000) 0) (append prefix '(#\. (:usec 6)) suffix))
                           (t (append prefix '(#\. (:nsec 9)) suffix)))))
-       (format stream "~S" (local-time:format-timestring nil timestamp :format format))))
+       (format stream "~S" (local-time:format-timestring
+                            nil timestamp
+                            :format format
+                            :timezone local-time:+utc-zone+))))
     ((google:duration)
      (let ((seconds (google:duration.seconds object))
            (nanos (google:duration.nanos object)))
@@ -649,4 +652,3 @@ calls to PARSE-JSON."
              (value (parse-value-from-json (wrapper-message->type type) :stream stream)))
          (setf (google:value object) value)
          object))))
-
