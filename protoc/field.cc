@@ -241,21 +241,28 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
     vars["key-type"] = FieldLispType(field->message_type()->field(0));
     vars["val-type"] = FieldLispType(field->message_type()->field(1));
     vars["val-kind"] = FieldLispKind(field->message_type()->field(1));
+    vars["val-default"]
+        = field->message_type()->field(1)->cpp_type()
+        == FieldDescriptor::CPPTYPE_ENUM ?
+        StrCat("\n     :val-default ",
+                     FieldLispDefault(field->message_type()->field(1))) : "";
     printer->Print(vars,
                    "\n(pi:define-map $name$\n"
                    "   :key-type $key-type$\n"
                    "   :value-type $val-type$\n"
                    "   :json-name \"$json-name$\"\n"
                    "   :value-kind $val-kind$\n"
-                   "   :index $tag$)");
+                   "   :index $tag$$val-default$)");
   } else {
     vars["type"] = FieldLispType(field);
     vars["kind"] = FieldLispKind(field);
     vars["label"] = FieldLispLabel(field);
     vars["packed"] = field->options().packed() ? " :packed cl:t" : "";
     vars["lazy"] = field->options().lazy() ? " :lazy cl:t" : "";
-    vars["default"] = field->has_default_value()
-        ? StrCat(" :default ", FieldLispDefault(field))
+    vars["default"] = field->has_default_value() ||
+                      (field->cpp_type() == FieldDescriptor::CPPTYPE_ENUM &&
+                       field->label() != FieldDescriptor::Label::LABEL_REPEATED)
+                      ? StrCat(" :default ", FieldLispDefault(field))
         : "";
     printer->Print(vars,
                    "\n($name$\n"

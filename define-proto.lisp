@@ -400,7 +400,8 @@ Parameters:
         (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
-(defmacro define-map (type-name &key key-type value-type json-name index value-kind)
+(defmacro define-map (type-name &key key-type value-type json-name index
+                                value-kind val-default)
   "Define a lisp type given the data for a protobuf map type.
 
  Parameters:
@@ -409,7 +410,8 @@ Parameters:
   VALUE-TYPE: Lisp type of the map's values.
   JSON-NAME: String to use as a JSON name for the field.
   VALUE-KIND: Category of the value type: :scalar, :message, :enum, etc.
-  INDEX: Message field number of this map type."
+  INDEX: Message field number of this map type.
+  VAL-DEFAULT: Specified type for the default value of the maps value type."
   (assert json-name)
   (assert value-kind)
   (check-type index integer)
@@ -440,6 +442,8 @@ Parameters:
                                 :json-name json-name
                                 :reader reader
                                 :type 'cl:hash-table
+                                :default (or val-default
+                                             $empty-default)
                                 :kind :map))
          (map-desc (make-map-descriptor
                     :class class
@@ -813,7 +817,7 @@ function) then there is no guarantee on the serialize function working properly.
          (key-type (map-key-type map-descriptor))
          (value-type (map-value-type map-descriptor))
          (value-kind (map-value-kind map-descriptor))
-         (val-default-form (get-default-form value-type $empty-default nil value-kind))
+         (val-default-form (get-default-form value-type  (proto-default field) nil value-kind))
          (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
          (index (proto-field-offset field)))
 
@@ -1002,10 +1006,7 @@ function) then there is no guarantee on the serialize function working properly.
          '(make-hash-table))
         ((or possible-default
              (eq type 'cl:boolean))
-         possible-default)
-        ((enum-default-value `,type))
-        (t
-         `(enum-default-value ',type))))))
+         possible-default)))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
   "Makes the definition forms for the define-group and define-message macros.
@@ -1627,33 +1628,37 @@ function) then there is no guarantee on the serialize function working properly.
                     default
                     $empty-default))
                (cslot (unless alias-for
-                        (make-field-data
-                         :internal-slot-name internal-slot-name
-                         :external-slot-name slot
-                         :type
-                         (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
-                                (list 'vector-of `,type))
-                               ((and (eq label :repeated) (eq repeated-storage-type :list))
-                                (list 'list-of `,type))
-                               ((member kind '(:message :group))
-                                (list 'cl:or 'cl:null `,type))
-                               (t `,type))
-                         :accessor reader
-                         :initarg (kintern (symbol-name slot))
-                         :container (when (eq label :repeated) repeated-storage-type)
-                         :kind kind
-                         :initform
-                         (cond ((eq label :repeated)
-                                ;; Repeated fields get a container for their elements
-                                (if (eq repeated-storage-type :vector)
-                                    `(make-array 5 :fill-pointer 0 :adjustable t)
-                                    nil))
-                               ((and (not default-p)
-                                     (eq label :optional)
-                                     ;; Use unbound for booleans only
-                                     (not (eq type 'boolean)))
-                                nil)
-                               (default-p `,default)))))
+                        ;; For enums we have to keep track of unknown
+                        ;; deserialized values so it can't be a strict
+                        ;; member of a set of keywords...
+                        (let ((type (if (eq kind :enum) 'keyword type)))
+                          (make-field-data
+                           :internal-slot-name internal-slot-name
+                           :external-slot-name slot
+                           :type
+                           (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
+                                  (list 'vector-of `,type))
+                                 ((and (eq label :repeated) (eq repeated-storage-type :list))
+                                  (list 'list-of `,type))
+                                 ((member kind '(:message :group))
+                                  (list 'cl:or 'cl:null `,type))
+                                 (t `,type))
+                           :accessor reader
+                           :initarg (kintern (symbol-name slot))
+                           :container (when (eq label :repeated) repeated-storage-type)
+                           :kind kind
+                           :initform
+                           (cond ((eq label :repeated)
+                                  ;; Repeated fields get a container for their elements
+                                  (if (eq repeated-storage-type :vector)
+                                      `(make-array 5 :fill-pointer 0 :adjustable t)
+                                      nil))
+                                 ((and (not default-p)
+                                       (eq label :optional)
+                                       ;; Use unbound for booleans only
+                                       (not (eq type 'boolean)))
+                                  nil)
+                                 (default-p `,default))))))
                (field (make-instance
                        'field-descriptor
                        :name  (or name (slot-name->proto slot))
