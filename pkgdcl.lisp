@@ -55,11 +55,16 @@
 
    ;; Descriptors -- descriptors contain all the information parsed from .proto
    ;; files and may be looked up by the symbol naming a protobuf message, enum,
-   ;; etc. For most use cases you won't need to deal with descriptors directly;
-   ;; just access the protos through the generated code APIs and a few other
-   ;; generic APIs above.
+   ;; etc. For most use cases it's not necessary to deal with descriptors
+   ;; directly; just access the protos through the generated code APIs and a
+   ;; few other generic APIs above. The descriptor APIs are mostly intended for
+   ;; writing code that deals with arbitrary protos when the types aren't known
+   ;; in advance.
 
-   ;; Descriptor types
+   #:abstract-descriptor
+   #:descriptor
+   #:enum-descriptor
+   #:enum-value-descriptor
    #:extension-descriptor
    #:field-descriptor
    #:file-descriptor
@@ -67,26 +72,35 @@
    #:method-descriptor
    #:option-descriptor
    #:service-descriptor
-   #:enum-descriptor
-   #:enum-value-descriptor
 
    ;; Descriptor accessors
+   #:proto-class
+   #:proto-imports
+   #:proto-name
+   #:proto-options
+   #:proto-package-name
+   #:proto-qualified-name
+   #:proto-services
+   #:proto-syntax
+   #:proto-type
+   #:proto-value
+   ;; TODO(cgay): should these have the proto- prefix?
    #:map-class
-   #:map-name
    #:map-key-class
-   #:map-value-class
    #:map-key-type
-   #:map-value-type
+   #:map-name
+   #:map-value-class
    #:map-value-kind
+   #:map-value-type
 
    ;; Descriptor lookup
-   #:find-message-descriptor
-   #:find-file-descriptor
-   #:find-service-descriptor
    #:find-enum-descriptor
-   #:find-map-descriptor
    #:find-field-descriptor
+   #:find-file-descriptor
+   #:find-map-descriptor
+   #:find-message-descriptor
    #:find-method-descriptor
+   #:find-service-descriptor
 
    #:find-option                        ; finds an option, not a descriptor
 
@@ -134,10 +148,9 @@
    #:make-deserializer
    #:make-serializer
    #:make-tag
-   #:proto-class
-   #:proto-external-field-name
-   #:proto-default
    #:proto-container
+   #:proto-default
+   #:proto-external-field-name
    #:proto-fields
    #:proto-index
    #:proto-input-name
@@ -145,14 +158,13 @@
    #:proto-internal-field-name
    #:proto-label
    #:proto-methods
-   #:proto-name
    #:proto-output-name
    #:proto-output-streaming-p
-   #:proto-qualified-name
    #:proto-server-stub
    #:proto-service-name
    #:proto-source-location              ; should be proto-source-pathname now?
    #:proto-streams-name
+
    #:serialize-scalar
 
    ;; For ASDF

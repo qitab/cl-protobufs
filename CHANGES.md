@@ -73,11 +73,10 @@ change) and for internal code quality improvements.
 *   Type declarations have been added to field accessor functions to improve
     speed.
 
-*   Update protoc_gen_lisp now sets the default package for a proto
-    to be cl-protobufs.filename-without-extension instead of
-    cl-protobufs-user.
+*   If no `package` is specified in a `.proto` file, protoc_gen_lisp now sets it
+    to `cl-protobufs.filename-without-extension` instead of `cl-protobufs-user`.
 
-*   Add support for extensions in the generated serializer code.
+*   Support for extensions has been added to the generated serialization code.
 
 ## Version 2.0
 

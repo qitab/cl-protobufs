@@ -42,8 +42,7 @@ Parameters:
 ;; It would be nice if most of the slots had only reader functions, but
 ;; that makes writing the protobuf parser a good deal more complicated.
 (defclass descriptor (abstract-descriptor)
-  ;; The Lisp name for the type of this object. For messages and groups it's
-  ;; the name of a struct. For scalar types it's INT32, STRING, etc.
+  ;; The Lisp name for the type of this object.
   ((class :type symbol
           :accessor proto-class
           :initarg :class
@@ -63,7 +62,7 @@ Parameters:
             :initarg :options
             :initform ()))
   (:documentation
-   "Shared attributes for protobuf descriptors."))
+   "Shared attributes for protobuf message descriptors."))
 
 (defun find-qualified-name (name protos
                             &key (proto-key #'proto-name) (full-key #'proto-qualified-name)
@@ -76,25 +75,27 @@ Parameters:
       (find name protos :key full-key  :test #'string=)))
 
 
-;; A Protobufs schema, corresponds to one .proto file
 (defclass file-descriptor (descriptor)
-  ((syntax :type (member :proto2 :proto3)       ; proto syntax. Either :proto2 or :proto3.
+  ((syntax :type (member :proto2 :proto3)
            :accessor proto-syntax
            :initarg :syntax)
-   (package :type (or null string)              ; the Protobufs package
-            :accessor proto-package
+   (package :type (or null string)
+            :accessor proto-package-name
             :initarg :package
             :initform nil)
    (imports :type (list-of string)      ; the names of schemas to be imported
             :accessor proto-imports
             :initarg :imports
             :initform ())
+   ;; TODO(cgay): why is this handled differently than messages, maps, etc, in
+   ;; that it is accessed via a file-descriptor rather than via a hash table?
+   ;; In fact, shouldn't services and messages share a namespace?
    (services :type (list-of service-descriptor)
              :accessor proto-services
              :initarg :services
              :initform ()))
   (:documentation
-   "Model class to describe a protobuf file."))
+   "Model class to describe a protobuf file, sometimes referred to as a schema."))
 
 (defmethod make-load-form ((file-desc file-descriptor) &optional environment)
   (with-slots (class) file-desc
@@ -118,7 +119,7 @@ Parameters:
       (print-unreadable-object (file-desc stream :type t :identity t)
         (format stream "~@[~S~]~@[ (package ~A)~]"
                 (proto-class file-desc)
-                (proto-package file-desc)))
+                (proto-package-name file-desc)))
       (format stream "~S" (proto-class file-desc))))
 
 ;; find-* functions for finding different proto meta-objects
@@ -217,7 +218,7 @@ message-descriptor.")
          :initarg :type
          :initform 'string))
   (:documentation
-   "Model class to describe a protobuf option, i.e., a keyword/value pair."))
+   "Model class to describe a protobuf option, i.e., a key/value pair."))
 
 (defmethod make-load-form ((o option-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
@@ -723,12 +724,13 @@ if we are not in SBCL."
     generate a fully qualified name string for the name."))
 
 (defmethod make-qualified-name ((parent-desc file-descriptor) name)
-  ;; If we're at the file level, the qualified name is the file's package "dot" the name.
-  (if (proto-package parent-desc)
-      (strcat (proto-package parent-desc) "." name)
-      name))
+  "Make a qualified name for NAME by prepending the package name from PARENT-DESC and a '.'."
+  (let* ((parent-name (proto-package-name parent-desc)))
+    (if parent-name
+        (strcat parent-name "." name)
+        name)))
 
 (defmethod make-qualified-name ((parent-desc message-descriptor) name)
-  ;; The qualified name is the message name "dot" the name
+  "Make a qualified name for NAME by prepending the message name from PARENT-DESC and a '.'."
   (let* ((parent-qual-name (proto-qualified-name parent-desc)))
     (strcat parent-qual-name "." name)))
