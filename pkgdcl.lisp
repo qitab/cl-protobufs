@@ -86,7 +86,6 @@
    #:proto-value
    ;; TODO(cgay): should these have the proto- prefix?
    #:map-class
-   #:map-key-class
    #:map-key-type
    #:map-name
    #:map-value-class

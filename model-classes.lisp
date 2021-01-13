@@ -151,7 +151,6 @@ message-descriptor.")
   "Describes a protobuf map."
   (class nil :type symbol)              ; Lisp type of the map
   (name nil :type string)               ; Protobuf name of the map
-  (key-class nil :type symbol)          ; Lisp type of the keys
   (value-class nil :type symbol)        ; Lisp type of the values
 
   ;; TODO(cgay): It looks like the *-class slots above contain keywords like

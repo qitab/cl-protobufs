@@ -262,15 +262,15 @@ Parameters:
                            buffer))
           ((setq desc (find-map-descriptor type))
            (let* ((tag (make-wire-tag $wire-type-string field-num))
-                  (key-class (map-key-class desc))
+                  (key-type (map-key-type desc))
                   (val-class (map-value-class desc)))
              (flet ((serialize-pair (k v)
                       (let ((ret-len (encode-uint32 tag buffer))
                             (map-len 0))
                         (with-placeholder (buffer)
                           ;; Key types are always scalar, so serialize-scalar works.
-                          (iincf map-len (serialize-scalar k key-class
-                                                           (make-tag key-class 1) buffer))
+                          (iincf map-len (serialize-scalar k key-type
+                                                           (make-tag key-type 1) buffer))
                           ;; Value types are arbitrary, non-map, non-repeated.
                           (iincf map-len (emit-non-repeated-field v val-class 2 buffer))
                           (i+ ret-len (i+ map-len (backpatch map-len)))))))
@@ -677,7 +677,7 @@ Parameters:
                     (progn
                       (unless (car cell)
                         (setf (car cell) (make-hash-table)))
-                      (let ((key-class (map-key-class map-desc))
+                      (let ((key-type (map-key-type map-desc))
                             (val-class (map-value-class map-desc))
                             map-tag map-len key-data start (val-data nil))
                         (multiple-value-setq (map-len index)
@@ -695,7 +695,7 @@ Parameters:
                           ;; just deserialize it.
                           (if (= 1 (ilogand (iash map-tag -3) +max-field-number+))
                               (multiple-value-setq (key-data index)
-                                (deserialize-scalar key-class buffer index))
+                                (deserialize-scalar key-type buffer index))
                               ;; Otherwise it must be a value, which has
                               ;; arbitrary type.
                               (multiple-value-setq (val-data index)
@@ -891,7 +891,7 @@ Parameters:
                                 ,tag ,vbuf))))))
           ((typep msg 'map-descriptor)
            (let* ((tag      (make-wire-tag $wire-type-string field-num))
-                  (key-class (map-key-class msg))
+                  (key-type (map-key-type msg))
                   (val-class (map-value-class msg)))
              `(when ,boundp
                 (let ((,vval ,reader))
@@ -899,8 +899,8 @@ Parameters:
                            (let ((ret-len (encode-uint32 ,tag ,vbuf))
                                  (map-len 0))
                              (with-placeholder (,vbuf)
-                               (iincf map-len (serialize-scalar k ',key-class
-                                                                ,(make-tag `,key-class 1)
+                               (iincf map-len (serialize-scalar k ',key-type
+                                                                ,(make-tag `,key-type 1)
                                                                 ,vbuf))
                                ,(generate-non-repeated-field-serializer
                                  `,val-class 2 'v 'v vbuf 'map-len)
@@ -1240,7 +1240,7 @@ Parameters:
                  (deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
               (make-wire-tag $wire-type-varint index)))
             ((typep msg 'map-descriptor)
-             (let* ((key-class (map-key-class msg))
+             (let* ((key-type (map-key-type msg))
                     (val-class (map-value-class msg)))
                (values
                 `(progn
@@ -1261,7 +1261,7 @@ Parameters:
                          (decode-uint32 ,vbuf ,vidx))
                        (if (= 1 (ilogand (iash map-tag -3) +max-field-number+))
                            (multiple-value-setq (key-data ,vidx)
-                             (deserialize-scalar ',key-class ,vbuf ,vidx))
+                             (deserialize-scalar ',key-type ,vbuf ,vidx))
                            ,(generate-non-repeated-field-deserializer
                              val-class 2 nil vbuf vidx 'val-data)))))
                 (make-wire-tag $wire-type-string index))))

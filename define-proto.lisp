@@ -448,7 +448,6 @@ Parameters:
          (map-desc (make-map-descriptor
                     :class class
                     :name name
-                    :key-class key-type
                     ;; If the value type is a message, then VALUE-TYPE will take the form
                     ;; (cl:or cl:null message). In this case, set VALUE-CLASS to be 'message'
                     ;; as that is the class of the value type.

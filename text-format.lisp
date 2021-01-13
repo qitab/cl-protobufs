@@ -145,20 +145,18 @@ Parameters:
       ((typep desc 'enum-descriptor)
        (print-enum value desc name stream (and pretty-print indent)))
       ((typep desc 'map-descriptor)
-       (let ((key-type (map-key-class desc))
-             (val-type (map-value-class desc)))
-         (loop for k being the hash-keys of value using (hash-value v)
-               do (if pretty-print
-                      (format stream "~&~V,0T~A { " (+ indent 2) name)
-                      (format stream "~A { " name))
-                  (print-scalar k key-type "key" stream nil)
-                  (print-non-repeated-field v val-type "value"
-                                            :stream stream
-                                            :print-name t
-                                            :pretty-print nil)
-                  (format stream "}")
-                  (when pretty-print
-                    (format stream "~%")))))
+       (loop for k being the hash-keys of value using (hash-value v)
+             do (if pretty-print
+                    (format stream "~&~V,0T~A { " (+ indent 2) name)
+                    (format stream "~A { " name))
+                (print-scalar k (map-key-type desc) "key" stream nil)
+                (print-non-repeated-field v (map-value-class desc) "value"
+                                          :stream stream
+                                          :print-name t
+                                          :pretty-print nil)
+                (format stream "}")
+                (when pretty-print
+                  (format stream "~%"))))
       ;; This case only happens when the user specifies a custom type and
       ;; doesn't support it above.
       (t
@@ -336,7 +334,7 @@ return T as a second value."
                               :key #'enum-value-descriptor-name)))
              (and enum (enum-value-descriptor-name enum))))
           ((typep desc 'map-descriptor)
-           (let ((key-type (map-key-class desc))
+           (let ((key-type (map-key-type desc))
                  (val-type (map-value-class desc)))
              (flet ((parse-map-entry (key-type val-type stream)
                       (let (key val)
