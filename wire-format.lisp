@@ -293,16 +293,21 @@
    VALUE-DESCRIPTORS."
   (declare (type keyword name))
   (let* ((desc (find name value-descriptors :key #'enum-value-descriptor-name)))
-    (assert desc () "There is no enum value for name ~S" name)
-    (the sfixed32 (enum-value-descriptor-value desc))))
+    (the sfixed32
+         (if desc
+             (enum-value-descriptor-value desc)
+             (parse-integer (cadr (split-string (symbol-name name))))))))
+
 
 (defun-inline find-enum-name (value value-descriptors)
   "Find the enum name corresponding to VALUE by searching for it in
    VALUE-DESCRIPTORS."
   (declare (type sfixed32 value))
   (let* ((desc (find value value-descriptors :key #'enum-value-descriptor-value)))
-    (assert desc () "There is no enum value name for value ~S" value)
-    (the keyword (enum-value-descriptor-name desc))))
+    (the keyword
+         (if desc
+             (enum-value-descriptor-name desc)
+             (kintern "~a-~a" "%UNDEFINED" value)))))
 
 (defun serialize-enum (name value-descriptors tag buffer)
   "Serializes the protobuf enum value corresponding to NAME (a keyword symbol)

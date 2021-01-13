@@ -275,6 +275,52 @@ only if the field has been manually set and has not been cleared since.
 This library supports optional fields in proto3 messages. These fields have the
 same semantics and generated code as proto2 optional fields.
 
+### Maps
+
+This section uses the following protocol buffer message as an example:
+
+```protocol-buffer
+message Dictionary {
+  map<int32,string> map_field = 1;
+}
+```
+
+This creates an associative map with keys of type `int32` and values of type
+`string`. In general, the key type can be any scalar type except `float` and
+`double`. The value type can be any protobuf type. For a message `dict` of type
+`Dictionary`, the following functions are created to access the map:
+
+```lisp
+(dictionary.map-field-gethash 2 dict)
+```
+
+This returns the value associated with `2` in the `map-field` field in `dict`.
+If there is no value explicitly set, this function returns the default value of
+the value type. In this case, the empty string.
+
+```lisp
+(setf (dictionary.map-field-gethash 1 dict) "one")
+```
+
+This associates `1` with the value `"one"` in the `map-field` field in `dict`.
+
+```lisp
+(dictionary.map-field-remhash 1 dict)
+```
+
+This removes any entry with key `1` in the `map-field` field in `dict`.
+
+Like the other fields, these functions are aliased by methods which are slower
+but more concise. Examples of the methods are: `(map-field-gethash 2 dict)`,
+`(setf (map-field-gethash 1 dict) "one")`, and `(map-field-remhash 1 dict)`.
+These have the same functionality as the above 3 functions respectively.
+
+These functions are type checked, and interfacing with the map with these
+functions alone will guarantee that (de)serialization functions as well as the
+`(dictionary.has-map-field dict)` function will work properly. The underlying
+hash table may be accessed directly via `(dictionary.map-field dict)`, but doing
+so may result in undefined behavior.
+
 ### Enums
 
 ```proto
@@ -341,51 +387,58 @@ these definitions:
 
 ```
 
-### Maps
 
-This section uses the following protocol buffer message as an example:
+#### Enum Backward Compatability
 
+For backward compatibility, unrecognized enum values are retained during
+deserialization and are output again when serialized. This allows a client
+that acts as a pass-through for the enum data to function correctly even if
+it uses a different version of the proto than the systems it is communicating with.
+
+Message Schema V1
 ```protocol-buffer
-message Dictionary {
-  map<int32,string> map_field = 1;
+enum DayOfWeek {
+  DAY_UNDEFINED = 0;
+  MON = 1;
+  TUE = 2;
+  WED = 3;
+}
+message DayIWillWork {
+  optional DayOfWeek workday = 1;
+}
+```
+Message Schema V2
+```protocol-buffer
+enum DayOfWeek {
+  DAY_UNDEFINED = 0;
+  MON = 1;
+  TUE = 2;
+  WED = 3;
+  THUR = 4;
+}
+message DayIWillWork {
+  optional DayOfWeek workday = 1;
 }
 ```
 
-This creates an associative map with keys of type `int32` and values of type
-`string`. In general, the key type can be any scalar type except `float` and
-`double`. The value type can be any protobuf type. For a message `dict` of type
-`Dictionary`, the following functions are created to access the map:
+If we send a V2 message:
 
-```lisp
-(dictionary.map-field-gethash 2 dict)
+```protocol-buffer
+DayIWillWork {
+  workday: THUR
+}
 ```
 
-This returns the value associated with `2` in the `map-field` field in `dict`.
-If there is no value explicitly set, this function returns the default value of
-the value type. In this case, the empty string.
+to a V1 system it will save the fact that the enum it
+received is 4. Calling `(day-i-will-work.workday v2-proto)`
+will return `:%undefined-4`. Reserialization will add the
+workday enum value to the serialized protobuf message, and
+deserialization on a V2 system will properly add the
+new `:thur` enum value to the new protocol beffer message.
 
-```lisp
-(setf (dictionary.map-field-gethash 1 dict) "one")
-```
-
-This associates `1` with the value `"one"` in the `map-field` field in `dict`.
-
-```lisp
-(dictionary.map-field-remhash 1 dict)
-```
-
-This removes any entry with key `1` in the `map-field` field in `dict`.
-
-Like the other fields, these functions are aliased by methods which are slower
-but more concise. Examples of the methods are: `(map-field-gethash 2 dict)`,
-`(setf (map-field-gethash 1 dict) "one")`, and `(map-field-remhash 1 dict)`.
-These have the same functionality as the above 3 functions respectively.
-
-These functions are type checked, and interfacing with the map with these
-functions alone will guarantee that (de)serialization functions as well as the
-`(dictionary.has-map-field dict)` function will work properly. The underlying
-hash table may be accessed directly via `(dictionary.map-field dict)`, but doing
-so may result in undefined behavior.
+Trying to call `(setf (day-i-will-work.workday v2-proto) :%undefined-4`
+will signal an error on a V1 or V2 system since `:%undefined-4` isn't a
+known enum value.
 
 ### Oneof
 

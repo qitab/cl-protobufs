@@ -838,7 +838,7 @@ function) then there is no guarantee on the serialize function working properly.
 
             `((defun-inline ,public-accessor-name (,new-key ,obj)
                 (declare (type ,key-type ,new-key))
-                (the (values ,val-type t)
+                (the (values ,(if (eq value-kind :enum) 'keyword val-type) t)
                      (multiple-value-bind (val flag)
                          (gethash ,new-key (,hidden-accessor-name ,obj))
                        (if flag
@@ -939,14 +939,18 @@ function) then there is no guarantee on the serialize function working properly.
          (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
          (bool-index (proto-bool-index field))
          (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
+         (field-type (proto-type field))
          (accessor-return-type
-          (cond ((eq (proto-container field) :vector)
-                 `(cl-protobufs:vector-of ,(proto-type field)))
-                ((eq (proto-container field) :list)
-                 `(cl-protobufs:list-of ,(proto-type field)))
-                ((member (proto-kind field) '(:message :group :extends))
-                 `(or null ,(proto-type field)))
-                (t (proto-type field)))))
+          ;; For enum accessors we return either the enum keyword or :%undefined-<n>
+          (let ((structure-field-type (if (eq (proto-kind field) :enum)
+                                          'keyword field-type)))
+            (cond ((eq (proto-container field) :vector)
+                   `(cl-protobufs:vector-of ,structure-field-type))
+                  ((eq (proto-container field) :list)
+                   `(cl-protobufs:list-of ,structure-field-type))
+                  ((member (proto-kind field) '(:message :group :extends))
+                   `(or null ,structure-field-type))
+                  (t structure-field-type)))))
     (with-gensyms (obj)
       `((defun-inline ,public-accessor-name (,obj)
           (the ,accessor-return-type

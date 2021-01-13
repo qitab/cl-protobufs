@@ -459,7 +459,7 @@ Parameters
 ;;; on a binary containing the previous version.
 (deftest test-proto-backwards-compatibility (serialization-suite)
   (loop :for optimized :in '(nil t) :do
-    (print optimized)
+    (format t "Testing optimized serializers: ~a~%"  optimized)
     (when optimized
       (dolist (class '(proto-on-wire proto-different-than-wire))
         (let ((message (find-message-descriptor class)))
@@ -484,3 +484,39 @@ Parameters
              (should-be-original-proto
               (deserialize 'proto-on-wire reserialized-proto-octets)))
         (assert-true (proto-equal should-be-original-proto proto-on-wire))))))
+
+
+;;; We make two protos: ProtoOnWire and ProtoDifferentThanWire.
+;;; The difference is that ProtoOnWire contains a superset of the
+;;; fields ProtoOnWire contains.
+;;;
+;;; We create a ProtoOnWire, serialize, and then deserialize
+;;; using the ProtoOnWire's bytes to a ProtoDifferentThanWire
+;;;
+;;; This aims to test updating a protocol buffer and deserializing
+;;; on a binary containing the previous version.
+(deftest test-proto-backwards-compatibility-for-enums (serialization-suite)
+  (loop :for optimized :in '(nil t) :do
+    (format t "Testing optimized serializers: ~a~%"  optimized)
+    (when optimized
+      (dolist (class '(message-v1 message-v2))
+        (let ((message (find-message-descriptor class)))
+          (handler-bind ((style-warning #'muffle-warning))
+            (eval (pi::generate-deserializer message))
+            (eval (pi::generate-serializer message))))))
+
+    (let* ((message-v2 (make-message-v2 :e :baz :e2 :baz
+                                        :e3 '(:baz) :e4 '(:baz)
+                                        :e5 :auto))
+           (proto-on-wire (serialize-to-bytes message-v2))
+           (message-v1 (deserialize 'message-v1 proto-on-wire)))
+      (assert-true message-v1)
+      (assert-eq (message-v1.e message-v1) :%undefined-1)
+      (assert-eq (message-v1.e2 message-v1) :%undefined-1)
+      (assert-equal (message-v1.e3 message-v1) '(:%undefined-1))
+      (assert-equal (message-v1.e4 message-v1) '(:%undefined-1))
+      (assert-eq (message-v1.e5 message-v1) :default)
+      (let* ((reserialized-proto-octets (serialize-to-bytes message-v1))
+             (should-be-original-proto
+              (deserialize 'message-v2 reserialized-proto-octets)))
+        (assert-true (proto-equal message-v2 should-be-original-proto))))))

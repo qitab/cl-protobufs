@@ -181,6 +181,35 @@ message Population {
 }
 
 
+enum EnumV1 {
+  default = 0;
+}
+
+enum EnumV2 {
+  auto = 0;
+  baz = 1;
+}
+
+message MessageV1 {
+  optional EnumV1 e = 1;
+  oneof OneofEnum {
+    EnumV1 e2 = 2;
+  }
+  repeated EnumV1 e3 = 3;
+  repeated EnumV1 e4 = 4 [packed=true];
+  optional EnumV1 e5 = 5;
+}
+
+message MessageV2 {
+  optional EnumV2 e = 1;
+  oneof OneofEnum {
+    EnumV2 e2= 2;
+  }
+  repeated EnumV2 e3 = 3;
+  repeated EnumV2 e4 = 4 [packed=true];
+  optional EnumV2 e5 = 5;
+}
+
 message ProtoOnWire {
   optional string beginning = 1;
   optional string always = 2;
