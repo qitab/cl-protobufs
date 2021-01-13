@@ -448,14 +448,6 @@ Parameters:
          (map-desc (make-map-descriptor
                     :class class
                     :name name
-                    ;; If the value type is a message, then VALUE-TYPE will take the form
-                    ;; (cl:or cl:null message). In this case, set VALUE-CLASS to be 'message'
-                    ;; as that is the class of the value type.
-                    :value-class (if (listp value-type)
-                                     (destructuring-bind (a b msg-type) value-type
-                                       (assert (and (eq a 'or) (eq b 'null)))
-                                       msg-type)
-                                     value-type)
                     :key-type key-type
                     :value-type value-type
                     :value-kind value-kind)))

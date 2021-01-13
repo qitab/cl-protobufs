@@ -88,7 +88,6 @@
    #:map-class
    #:map-key-type
    #:map-name
-   #:map-value-class
    #:map-value-kind
    #:map-value-type
 

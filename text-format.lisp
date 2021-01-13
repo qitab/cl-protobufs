@@ -150,7 +150,7 @@ Parameters:
                     (format stream "~&~V,0T~A { " (+ indent 2) name)
                     (format stream "~A { " name))
                 (print-scalar k (map-key-type desc) "key" stream nil)
-                (print-non-repeated-field v (map-value-class desc) "value"
+                (print-non-repeated-field v (map-value-type desc) "value"
                                           :stream stream
                                           :print-name t
                                           :pretty-print nil)
@@ -335,7 +335,7 @@ return T as a second value."
              (and enum (enum-value-descriptor-name enum))))
           ((typep desc 'map-descriptor)
            (let ((key-type (map-key-type desc))
-                 (val-type (map-value-class desc)))
+                 (val-type (map-value-type desc)))
              (flet ((parse-map-entry (key-type val-type stream)
                       (let (key val)
                         (expect-char stream #\{)

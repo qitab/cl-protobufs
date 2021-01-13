@@ -149,16 +149,10 @@ message-descriptor.")
 
 (defstruct (map-descriptor (:conc-name map-))
   "Describes a protobuf map."
-  (class nil :type symbol)              ; Lisp type of the map
-  (name nil :type string)               ; Protobuf name of the map
-  (value-class nil :type symbol)        ; Lisp type of the values
-
-  ;; TODO(cgay): It looks like the *-class slots above contain keywords like
-  ;; :int32 for scalar types and non-keyword symbols for message types, whereas
-  ;; the *-type slots below contain the actual CL types for scalars, like
-  ;; int32, string, boolean.  I think these can be consolidated if we stop
-  ;; using the keywords, like Ben did in his PR 156 that never got merged.
-
+  ;; Lisp type of the map. (This can be deleted.)
+  (class nil :type symbol)
+  ;; Protobuf name of the map
+  (name nil :type string)
   ;; The Lisp type of the key.
   (key-type nil)
   ;; The Lisp type of the value.
