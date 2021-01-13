@@ -81,13 +81,6 @@ as a type with enum-name being (MEMBER :enum-1 :enum-2 ...).
 It also creates methods to access the default-enum, and convert
 from the enum keyword to the enum index and back.
 
-If the enum being defined is at top level in the proto then
-then we output the result of the macro directly.
-If the enum is nested in other define forms, then we
-save the output of define-enum in a global and output the
-enum definitions before any other definitions. This guarantees
-the enum type is available for other messages definitions.
-
 DEFINE-EXTENSION:
 
 The define-extension macro defines a PROTOBUF-EXTENSION meta-object and
@@ -319,30 +312,6 @@ message, and of +<value_name>+ when the enum is defined at top-level."
     (check-type expansion (cons (eql member) list))
     (rest expansion)))
 
-(defvar *enum-forms* nil
-  "The enum forms have to be evaluated first as they become types
-for messages and sadly the messages can be defined before the enums.")
-
-(defun create-progn-with-enum-forms-if-top-level (top-level-form-p &rest lists)
-  "Create the output progn form for a define statement which may be top-level
-and have an enum inside of it. If it is top level output the internal enums
-before the rest of the forms, otherwise just output the forms collected.
-Parameters:
-  TOP-LEVEL-FORM-P: Bool stating whether this is top-level or not.
-  LISTS: The lists that have been collected in the defining form for output."
-  (let (out-list)
-    ;; Our foolish version of one-level flatten
-    (dolist (list (reverse lists))
-      (dolist (inner-list (reverse list))
-        (push inner-list out-list)))
-
-    (if (and top-level-form-p *enum-forms*)
-        (let ((output
-               `(progn ,@*enum-forms* ,@out-list)))
-          (setf *enum-forms* nil)
-          output)
-        `(progn ,@out-list))))
-
 (defmacro define-enum (type (&key name conc-name alias-for)
                        &body values)
   "Define a Lisp type given the data for a protobuf enum type.
@@ -391,13 +360,6 @@ Parameters:
         (collect-form `(record-protobuf-object ',type ,enum :enum))
         ;; Register it by the full symbol name.
         (record-protobuf-object type enum :enum))
-      ;; This is messy and should be fixed.
-      ;; Enums define types and functions that will need to be called
-      ;; when creating messages. As such they need to be first
-      ;; in the list of things a macro evaluated. So we make a global var
-      ;; and gaurantee they are first.
-      (when *current-message-descriptor* ; enum is nested inside a message
-        (push `(progn ,@forms) *enum-forms*))
       `(progn ,@forms))))
 
 (defmacro define-map (type-name &key key-type value-type json-name index
@@ -1152,7 +1114,6 @@ function) then there is no guarantee on the serialize function working properly.
                                   :conc-name conc-name
                                   :options (remove-options options "default" "packed")))
          (field-offset 0)
-         (top-level-form-p (null *current-message-descriptor*))
          (*current-message-descriptor* msg-desc)
          (bool-count (count-if #'non-repeated-bool-field fields))
          (bool-index -1)
@@ -1167,11 +1128,7 @@ function) then there is no guarantee on the serialize function working properly.
                       (oneofs collect-oneof))
       (dolist (field fields)
         (case (car field)
-          ((define-enum)
-           (let ((result (macroexpand-1 field env)))
-             (assert (eq (car result) 'progn) ()
-                     "The macroexpansion for ~S failed" field)))
-          ((define-message define-extend)
+          ((define-message define-extend define-enum)
            (let ((result (macroexpand-1 field env)))
              (assert (eq (car result) 'progn) ()
                      "The macroexpansion for ~S failed" field)
@@ -1273,7 +1230,7 @@ function) then there is no guarantee on the serialize function working properly.
       ;; Register it by the full symbol name.
       (record-protobuf-object type msg-desc :message)
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
-      (create-progn-with-enum-forms-if-top-level top-level-form-p type-forms forms))))
+      `(progn ,@type-forms ,@forms))))
 
 (defun conc-name-for-type (type conc-name)
   (and conc-name
@@ -1319,7 +1276,6 @@ function) then there is no guarantee on the serialize function working properly.
                                    (or options (copy-list (proto-options message)))
                                    "default" "packed")
                         :message-type :extends))) ; this message is an extension
-         (top-level-form-p (null *current-message-descriptor*))
          ;; Only now can we bind *current-message-descriptor* to the new extended message
          (*current-message-descriptor* extends)
          new-slot new-field)
@@ -1402,7 +1358,7 @@ function) then there is no guarantee on the serialize function working properly.
         (appendf (proto-fields extends) (list new-field))
         (appendf (proto-extended-fields extends) (list new-field)))
       (collect-form `(record-protobuf-object ',type ,extends :message))
-      (create-progn-with-enum-forms-if-top-level top-level-form-p forms))))
+      `(progn ,@forms))))
 
 (defun index-within-extensions-p (index message)
   (let ((extensions (proto-extensions message)))
