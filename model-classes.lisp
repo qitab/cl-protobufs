@@ -149,8 +149,6 @@ message-descriptor.")
 
 (defstruct (map-descriptor (:conc-name map-))
   "Describes a protobuf map."
-  ;; Protobuf name of the map
-  (name nil :type string)
   ;; The Lisp type of the key.
   (key-type nil)
   ;; The Lisp type of the value.
@@ -410,6 +408,7 @@ if we are not in SBCL."
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
 (defclass field-descriptor (descriptor)
+  ;; What does nil mean here? Needs a comment.
   ((kind :type (member :message :group :extends :enum :map :scalar nil)
          :accessor proto-kind
          :initarg :kind)

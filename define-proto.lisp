@@ -362,53 +362,53 @@ Parameters:
         (record-protobuf-object type enum :enum))
       `(progn ,@forms))))
 
-(defmacro define-map (type-name &key key-type value-type json-name index
-                                value-kind val-default)
+(defmacro define-map (field-name &key key-type value-type json-name index
+                                 value-kind val-default)
   "Define a lisp type given the data for a protobuf map type.
 
  Parameters:
-  TYPE-NAME: Lisp type of the map itself.
+  FIELD-NAME: Lisp name of the field containing this map.
   KEY-TYPE: Lisp type of the map's keys.
   VALUE-TYPE: Lisp type of the map's values.
-  JSON-NAME: String to use as a JSON name for the field.
+  JSON-NAME: String to use for the map field when reading/writing JSON.
+    Either the value of the json_name field option or derived from the
+    field name.
   VALUE-KIND: Category of the value type: :scalar, :message, :enum, etc.
   INDEX: Message field number of this map type.
   VAL-DEFAULT: Specified type for the default value of the maps value type."
   (assert json-name)
   (assert value-kind)
   (check-type index integer)
-  (let* ((slot type-name)
-         (name (class-name->proto type-name))
-         (reader (let ((prefix (proto-conc-name *current-message-descriptor*)))
+  (let* ((reader (let ((prefix (proto-conc-name *current-message-descriptor*)))
                    (and prefix
-                        (fintern "~A~A" prefix slot))))
-         (internal-slot-name (fintern "%~A" slot))
-         (qual-name (make-qualified-name *current-message-descriptor* (slot-name->proto slot)))
+                        (fintern "~A~A" prefix field-name))))
+         (internal-slot-name (fintern "%~A" field-name))
+         (qual-name (make-qualified-name *current-message-descriptor*
+                                         (slot-name->proto field-name)))
          (class (fintern (uncamel-case qual-name)))
          (mdata (make-field-data
                  :internal-slot-name internal-slot-name
-                 :external-slot-name slot
+                 :external-slot-name field-name
                  :type 'hash-table
                  :initform (if (eql key-type 'cl:string)
                                '(make-hash-table :test #'equal)
                                '(make-hash-table :test #'eq))
                  :accessor reader))
          (mfield (make-instance 'field-descriptor
-                                :name (slot-name->proto slot)
+                                :name (slot-name->proto field-name)
                                 :class class
                                 :qualified-name qual-name
                                 :label :optional
                                 :index index
                                 :internal-field-name internal-slot-name
-                                :external-field-name slot
+                                :external-field-name field-name
                                 :json-name json-name
                                 :reader reader
                                 :type 'cl:hash-table
                                 :default (or val-default
                                              $empty-default)
                                 :kind :map))
-         (map-desc (make-map-descriptor :name name
-                                        :key-type key-type
+         (map-desc (make-map-descriptor :key-type key-type
                                         :value-type value-type
                                         :value-kind value-kind)))
     (record-protobuf-object class map-desc :map)
