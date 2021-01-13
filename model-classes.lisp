@@ -149,8 +149,6 @@ message-descriptor.")
 
 (defstruct (map-descriptor (:conc-name map-))
   "Describes a protobuf map."
-  ;; Lisp type of the map. (This can be deleted.)
-  (class nil :type symbol)
   ;; Protobuf name of the map
   (name nil :type string)
   ;; The Lisp type of the key.

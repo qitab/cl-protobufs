@@ -46,6 +46,7 @@ change) and for internal code quality improvements.
 
 *   These definitions previously exported from `cl-protobufs` have been removed:
 
+    -   `map-class`
     -   `map-key-class` (use `map-key-type` instead)
     -   `map-value-class` (use `map-value-type` instead)
     -   `merge-from-array`

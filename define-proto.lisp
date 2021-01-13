@@ -445,12 +445,10 @@ Parameters:
                                 :default (or val-default
                                              $empty-default)
                                 :kind :map))
-         (map-desc (make-map-descriptor
-                    :class class
-                    :name name
-                    :key-type key-type
-                    :value-type value-type
-                    :value-kind value-kind)))
+         (map-desc (make-map-descriptor :name name
+                                        :key-type key-type
+                                        :value-type value-type
+                                        :value-kind value-kind)))
     (record-protobuf-object class map-desc :map)
     `(progn
        define-map
