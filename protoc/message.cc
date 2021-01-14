@@ -83,7 +83,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
 
   // Message options.
   printer->Indent();
-  printer->Print("\n(:conc-name \"\"");
+  printer->Print("\n(");
   if (group) {
     printer->Print("\n :index $tag$", "tag", StrCat(tag));
     printer->Print("\n :label $label$", "label", FieldKeywordLabel(label));

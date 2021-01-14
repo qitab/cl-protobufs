@@ -20,11 +20,9 @@ The lisp generated proto file should look like:
 ;; In a package named "cl-protobufs.<the-proto-package-name>"
 ;; With a local-nickname pi for cl-protobufs.implementation
 
-(pi:define-message color-wheel1
-    (:conc-name "")
+(pi:define-message color-wheel1 ()
   ;; Nested messages.
-  (pi:define-message color-wheel1.metadata1
-      (:conc-name "")
+  (pi:define-message color-wheel1.metadata1 ()
     ;; Fields.
     (author  :index 1  :type cl:string :label (:optional) :typename "string")
     (revision  :index 2  :type cl:string :label (:optional) :typename "string")
@@ -312,8 +310,7 @@ message, and of +<value_name>+ when the enum is defined at top-level."
     (check-type expansion (cons (eql member) list))
     (rest expansion)))
 
-(defmacro define-enum (type (&key name conc-name alias-for)
-                       &body values)
+(defmacro define-enum (type (&key name alias-for) &body values)
   "Define a Lisp type given the data for a protobuf enum type.
 Also generates conversion functions between enum values and numerals.  Function names are
 <enum_name>->NUMERAL and NUMERAL-><enum_name>, respectively.
@@ -322,20 +319,16 @@ Both accept an optional default argument.
 Parameters:
   TYPE: The name of the type.
   NAME: Override for the protobuf enum type name.
-  CONC-NAME: Prefix to the defaultly generated protobuf enum name.
   ALIAS-FOR: Make this enum an alias for another type.
   VALUES: The possible values for the enum in the form (name :index value)."
-  (let ((name (or name (class-name->proto type)))
-        (prefix (conc-name-for-type type conc-name)))
+  (let ((name (or name (class-name->proto type))))
     (with-collectors ((names collect-name) ; keyword symbols
                       (forms collect-form)
                       (value-descriptors collect-value-descriptor))
       ;; The middle value is :index, useful for readability of generated code...
       ;; (Except that the value is not actually an index, nor is the slot called index anymore.)
       (loop for (name nil value) in values do
-        (let* ((val-name (kintern (if prefix
-                                      (format nil "~A~A" prefix name)
-                                      (symbol-name name))))
+        (let* ((val-name (kintern (symbol-name name)))
                (val-desc (make-enum-value-descriptor :value value :name val-name)))
           (collect-name val-name)
           (collect-value-descriptor val-desc)))
@@ -379,10 +372,7 @@ Parameters:
   (assert json-name)
   (assert value-kind)
   (check-type index integer)
-  (let* ((reader (let ((prefix (proto-conc-name *current-message-descriptor*)))
-                   (and prefix
-                        (fintern "~A~A" prefix field-name))))
-         (internal-slot-name (fintern "%~A" field-name))
+  (let* ((internal-slot-name (fintern "%~A" field-name))
          (qual-name (make-qualified-name *current-message-descriptor*
                                          (slot-name->proto field-name)))
          (class (fintern (uncamel-case qual-name)))
@@ -393,7 +383,7 @@ Parameters:
                  :initform (if (eql key-type 'cl:string)
                                '(make-hash-table :test #'equal)
                                '(make-hash-table :test #'eq))
-                 :accessor reader))
+                 :accessor field-name))
          (mfield (make-instance 'field-descriptor
                                 :name (slot-name->proto field-name)
                                 :class class
@@ -403,7 +393,7 @@ Parameters:
                                 :internal-field-name internal-slot-name
                                 :external-field-name field-name
                                 :json-name json-name
-                                :reader reader
+                                :reader field-name
                                 :type 'cl:hash-table
                                 :default (or val-default
                                              $empty-default)
@@ -1083,14 +1073,13 @@ function) then there is no guarantee on the serialize function working properly.
 
 ;;; TODO(cgay): Is the NAME option used anymore, now that define-message isn't
 ;;; called directly in non-generated Lisp code?
-(defmacro define-message (type (&key name conc-name alias-for options)
+(defmacro define-message (type (&key name alias-for options)
                           &body fields &environment env)
   "Define a new protobuf message struct type.
 
  Parameters:
    TYPE - Symbol naming the new type.
    NAME - Optional symbol used to override the defaultly generated protobuf message name.
-   CONC-NAME - Prefix to the Lisp slot accessors, if supplied.
    ALIAS-FOR - If supplied, no Lisp struct is defined. Instead, the message is used
      as an alias for a class that already exists. This feature is intended to be
      used to define messages that will be serialized from existing Lisp classes;
@@ -1102,7 +1091,6 @@ function) then there is no guarantee on the serialize function working properly.
   (let* ((name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
-         (conc-name (conc-name-for-type type conc-name))
          (msg-desc (make-instance 'message-descriptor
                                   :class type
                                   :name  name
@@ -1111,7 +1099,6 @@ function) then there is no guarantee on the serialize function working properly.
                                                        *current-file-descriptor*)
                                                    name)
                                   :alias-for alias-for
-                                  :conc-name conc-name
                                   :options (remove-options options "default" "packed")))
          (field-offset 0)
          (*current-message-descriptor* msg-desc)
@@ -1159,12 +1146,10 @@ function) then there is no guarantee on the serialize function working properly.
                (collect-oneof oneof-desc))))
           (otherwise
            (multiple-value-bind (field slot idx offset-p)
-               (process-field field :conc-name conc-name
-                                    :alias-for alias-for
+               (process-field field :alias-for alias-for
                                     :field-offset field-offset
-                                    :bool-index
-                                    (when (non-repeated-bool-field field)
-                                      (incf bool-index))
+                                    :bool-index (when (non-repeated-bool-field field)
+                                                  (incf bool-index))
                                     :bool-values bool-values)
              (declare (ignore idx))
              (when offset-p
@@ -1232,13 +1217,6 @@ function) then there is no guarantee on the serialize function working properly.
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
       `(progn ,@type-forms ,@forms))))
 
-(defun conc-name-for-type (type conc-name)
-  (and conc-name
-       (typecase conc-name
-         ((member t) (format nil "~:@(~A~)-" type))
-         ((or string symbol) (string-upcase (string conc-name)))
-         (t nil))))
-
 (defmacro define-extension (from to)
   "Define an extension range within a message. FROM and TO are field numbers
    and are both inclusive."
@@ -1252,15 +1230,13 @@ function) then there is no guarantee on the serialize function working properly.
                        :to (if (eq to 'max) +max-field-number+ to))
        ())))
 
-(defmacro define-extend (type (&key name conc-name options) &body fields &environment env)
+(defmacro define-extend (type (&key name options) &body fields &environment env)
   "Define an extension to the message named TYPE. See define-message for descriptions of the
-   NAME, CONC-NAME, OPTIONS, and FIELDS parameters."
+   NAME, OPTIONS, and FIELDS parameters."
   (let* ((name (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
-         (message (find-message-descriptor type))
-         (conc-name (or (conc-name-for-type type conc-name)
-                        (and message (proto-conc-name message))))
+         (message (find-message-descriptor type)) ; should pass :error-p t here instead
          (alias-for (and message (proto-alias-for message)))
          (extends (and message
                        (make-instance
@@ -1269,7 +1245,6 @@ function) then there is no guarantee on the serialize function working properly.
                         :name   (proto-name message)
                         :qualified-name (proto-qualified-name message)
                         :alias-for alias-for
-                        :conc-name conc-name
                         :fields   (copy-list (proto-fields message))
                         :extensions (copy-list (proto-extensions message))
                         :options  (remove-options
@@ -1303,7 +1278,7 @@ function) then there is no guarantee on the serialize function working properly.
                       new-field extra-field)))))
           (otherwise
            (multiple-value-bind (field slot idx)
-               (process-field field :conc-name conc-name :alias-for alias-for)
+               (process-field field :alias-for alias-for)
              (assert (index-within-extensions-p idx message) ()
                      "The index ~D is not in range for extending ~S"
                      idx (proto-class message))
@@ -1317,9 +1292,7 @@ function) then there is no guarantee on the serialize function working properly.
                  (stable (fintern "~A-VALUES" sname))
                  (stype (field-data-type new-slot))
                  (reader (or (field-data-accessor new-slot)
-                             (if conc-name
-                                 (fintern "~A~A" conc-name sname)
-                                 (symbol-name sname))))
+                             (symbol-name sname)))
                  (writer (fintern "~A-~A" 'set reader))
                  (default (field-data-initform new-slot)))
             ;; For the extended slots, each slot gets its own table
@@ -1367,11 +1340,11 @@ function) then there is no guarantee on the serialize function working properly.
                    (i<= index (proto-extension-to ext))))
           extensions)))
 
-(defmacro define-group (type (&key index label name conc-name alias-for reader options)
+(defmacro define-group (type (&key index label name alias-for reader options)
                         &body fields &environment env)
   "Define a new protobuf message struct AND a field named by TYPE.
  Parameters:
-   TYPE, INDEX, NAME, CONC-NAME, ALIAS-FOR, and OPTIONS are as for define-message.
+   TYPE, INDEX, NAME, ALIAS-FOR, and OPTIONS are as for define-message.
    LABEL - nil (proto3), :required, :optional or :repeated.
    READER - A symbol naming a function to use to get the value, instead of
      using slot-value; this is often used when aliasing an existing class."
@@ -1381,11 +1354,6 @@ function) then there is no guarantee on the serialize function working properly.
          (name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
-         (conc-name (conc-name-for-type type conc-name))
-         (reader  (or reader
-                      (let ((msg-conc (proto-conc-name *current-message-descriptor*)))
-                        (and msg-conc
-                             (fintern "~A~A" msg-conc slot)))))
          (internal-slot-name (fintern "%~A" slot))
          (mslot   (unless alias-for
                     (make-field-data
@@ -1419,7 +1387,6 @@ function) then there is no guarantee on the serialize function working properly.
                     :name  name
                     :qualified-name (make-qualified-name *current-message-descriptor* name)
                     :alias-for alias-for
-                    :conc-name conc-name
                     :options   (remove-options options "default" "packed")
                     :message-type :group)) ; this message is a group
          (field-offset 0)
@@ -1469,8 +1436,7 @@ function) then there is no guarantee on the serialize function working properly.
                (collect-oneof oneof-desc))))
           (otherwise
            (multiple-value-bind (field slot idx offset-p)
-               (process-field field :conc-name conc-name
-                                    :alias-for alias-for
+               (process-field field :alias-for alias-for
                                     :field-offset field-offset
                                     :bool-index
                                     (when (non-repeated-bool-field field)
@@ -1531,7 +1497,7 @@ function) then there is no guarantee on the serialize function working properly.
          ,mfield
          ,mslot))))
 
-(defun process-field (field &key conc-name alias-for field-offset bool-index bool-values)
+(defun process-field (field &key alias-for field-offset bool-index bool-values)
   "Process one field descriptor within 'define-message' or 'define-extend'.
    Returns a field-descriptor object, a defstruct slot form, the field number,
    and a boolean indicating whether FIELD has an offset.
@@ -1547,7 +1513,6 @@ function) then there is no guarantee on the serialize function working properly.
      :lazy - Determines whether to lazily deserialize the field with respect to the proto API.
      :label - One of (:repeated :vector), (:repeated :list), (:optional), (:required).
      :kind - One of :enum :map :scalar :group :message :extends
-   CONC-NAME: The name to concatenate to the beginning of the field accessor.
    ALIAS-FOR is to determine if this is an alias for a difference field.
    FIELD-OFFSET is an internal concept of the index of a field
      in a proto-message.
@@ -1562,9 +1527,7 @@ function) then there is no guarantee on the serialize function working properly.
       field
     (assert (and json-name index))
     (let* (;; Public accessors and setters for slots should be defined later.
-           (internal-slot-name (fintern "%~A" slot))
-           (reader (and conc-name
-                        (fintern "~A~A" conc-name slot))))
+           (internal-slot-name (fintern "%~A" slot)))
       (multiple-value-bind (label repeated-storage-type) (values-list label)
         (let* (;; Proto3 optional fields do not have offsets, as they don't have has-* functions.
                ;; Note that proto2-style optional fields in proto3 files are wrapped in oneofs by
@@ -1592,7 +1555,7 @@ function) then there is no guarantee on the serialize function working properly.
                                  ((member kind '(:message :group))
                                   (list 'cl:or 'cl:null `,type))
                                  (t `,type))
-                           :accessor reader
+                           :accessor slot
                            :initarg (kintern (symbol-name slot))
                            :container (when (eq label :repeated) repeated-storage-type)
                            :kind kind
@@ -1622,7 +1585,7 @@ function) then there is no guarantee on the serialize function working properly.
                        :internal-field-name internal-slot-name
                        :external-field-name slot
                        :json-name json-name
-                       :reader reader
+                       :reader slot
                        :default default
                        ;; Pack the field only if requested and it actually makes sense
                        :packed  (and (eq label :repeated) packed t)

@@ -292,12 +292,7 @@ message-descriptor.")
 ;; This would have been far less confusing if it sounded more obviously like a 'descriptor'
 ;; and not the contents of the message per se.
 (defclass message-descriptor (descriptor)
-  ;; The prefix used for Lisp accessors. (Needs more explanation.)
-  ;; TODO(cgay): would it be too obvious if we called this accessor-prefix?
-  ((conc :type (or null string)
-         :accessor proto-conc-name
-         :initarg :conc-name
-         :initform nil)
+  (
    ;; Use this if you want to make this message descriptor an alias for an existing Lisp type.
    (alias :type (or null symbol)
           :accessor proto-alias-for
