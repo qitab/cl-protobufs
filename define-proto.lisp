@@ -1071,8 +1071,6 @@ function) then there is no guarantee on the serialize function working properly.
        (not (member '(:repeated :list) field :test #'equal))
        (not (member '(:repeated :vector) field :test #'equal))))
 
-;;; TODO(cgay): Is the NAME option used anymore, now that define-message isn't
-;;; called directly in non-generated Lisp code?
 (defmacro define-message (type (&key name alias-for options)
                           &body fields &environment env)
   "Define a new protobuf message struct type.
@@ -1080,6 +1078,8 @@ function) then there is no guarantee on the serialize function working properly.
  Parameters:
    TYPE - Symbol naming the new type.
    NAME - Optional symbol used to override the defaultly generated protobuf message name.
+     This is supplied automatically by protoc-gen-lisp when TYPE cannot be accurately
+     converted back to a camelCase name.
    ALIAS-FOR - If supplied, no Lisp struct is defined. Instead, the message is used
      as an alias for a class that already exists. This feature is intended to be
      used to define messages that will be serialized from existing Lisp classes;
