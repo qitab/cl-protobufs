@@ -21,9 +21,8 @@
   ;; bugs by running in debug mode and getting type-conversion then turning off
   ;; debug mode and getting type failures.  This is because debug mode turns on
   ;; type checking and type conversion.
-  (defparameter $optimize-serialization
-    #+debug-serialization *optimize-default*
-    #-debug-serialization *optimize-fast-unsafe*)
+  (defparameter $optimize-serialization *optimize* ; NOLINT
+    "(declare (optimize)) settings for serialization code.")
 
   (defconstant $wire-type-varint 0)
   (defconstant $wire-type-64bit  1)

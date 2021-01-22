@@ -9,15 +9,12 @@
 ;;; Text parsing utilities
 
 (defun-inline proto-whitespace-char-p (ch)
-  (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\space #\tab #\return #\newline))))
 
 (defun-inline proto-eol-char-p (ch)
-  (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\return #\newline))))
 
 (defun-inline proto-token-char-p (ch)
-  (declare #.*optimize-fast-unsafe*)
   (and ch (or (alpha-char-p ch)
               (digit-char-p ch)
               (member ch '(#\_ #\.)))))

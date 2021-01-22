@@ -14,7 +14,8 @@
 ;;; variable-length pieces such as strings and sub-messages.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter $optimize-buffering '(optimize (speed 3) (safety 0))))
+  (defparameter $optimize-buffering *optimize* ; NOLINT
+    "(declare (optimize)) settings to use for buffer code."))
 
 (deftype array-index ()
   #+sbcl 'sb-int:index
