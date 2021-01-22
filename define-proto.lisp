@@ -1539,38 +1539,36 @@ function) then there is no guarantee on the serialize function working properly.
                 (if default-p
                     default
                     $empty-default))
+               ;; For enums we have to keep track of unknown deserialized values so the
+               ;; type must be 'keyword instead of '(member :a :b ...).
+               (type (if (eq kind :enum) 'keyword type))
                (cslot (unless alias-for
-                        ;; For enums we have to keep track of unknown
-                        ;; deserialized values so it can't be a strict
-                        ;; member of a set of keywords...
-                        (let ((type (if (eq kind :enum) 'keyword type)))
-                          (make-field-data
-                           :internal-slot-name internal-slot-name
-                           :external-slot-name slot
-                           :type
-                           (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
-                                  (list 'vector-of `,type))
-                                 ((and (eq label :repeated) (eq repeated-storage-type :list))
-                                  (list 'list-of `,type))
-                                 ((member kind '(:message :group))
-                                  (list 'cl:or 'cl:null `,type))
-                                 (t `,type))
-                           :accessor slot
-                           :initarg (kintern (symbol-name slot))
-                           :container (when (eq label :repeated) repeated-storage-type)
-                           :kind kind
-                           :initform
-                           (cond ((eq label :repeated)
-                                  ;; Repeated fields get a container for their elements
-                                  (if (eq repeated-storage-type :vector)
-                                      `(make-array 5 :fill-pointer 0 :adjustable t)
-                                      nil))
-                                 ((and (not default-p)
-                                       (eq label :optional)
-                                       ;; Use unbound for booleans only
-                                       (not (eq type 'boolean)))
-                                  nil)
-                                 (default-p `,default))))))
+                        (make-field-data
+                         :internal-slot-name internal-slot-name
+                         :external-slot-name slot
+                         :type (cond ((eq label :repeated)
+                                      (if (eq repeated-storage-type :vector)
+                                          `(vector-of ,type)
+                                          `(list-of ,type)))
+                                     ((member kind '(:message :group))
+                                      `(or null ,type))
+                                     (t `,type))
+                         :accessor slot
+                         :initarg (kintern (symbol-name slot))
+                         :container (when (eq label :repeated) repeated-storage-type)
+                         :kind kind
+                         :initform
+                         (cond ((eq label :repeated)
+                                ;; Repeated fields get a container for their elements
+                                (if (eq repeated-storage-type :vector)
+                                    `(make-array 5 :fill-pointer 0 :adjustable t)
+                                    nil))
+                               ((and (not default-p)
+                                     (eq label :optional)
+                                     ;; Use unbound for booleans only
+                                     (not (eq type 'boolean)))
+                                nil)
+                               (default-p `,default)))))
                (field (make-instance
                        'field-descriptor
                        :name  (or name (slot-name->proto slot))
