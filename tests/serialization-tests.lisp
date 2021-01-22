@@ -347,7 +347,7 @@ Parameters
           (str2 (with-output-to-string (s)
                   (print-text-format request-2 :stream s))))
       (assert-false (string= str1 str2))
-      (assert-false (search "paint_type:" str1 :test #'char=))
+      (assert-false (search "pain_type:" str1 :test #'char=))
       (assert-true (search "paint_type:" str2 :test #'char=)))))
 
 (defun clear-serialization-functions (proto-name)

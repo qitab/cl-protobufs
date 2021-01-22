@@ -30,7 +30,7 @@ Parameters
     (setf (cl-protobufs.protobuf-unittest:zero p) "x")
     (assert-true (string-equal (cl-protobufs.protobuf-unittest:zero p) "x"))
     (clear p)
-    (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:zero)))
+    (assert-true (has-field p 'cl-protobufs.protobuf-unittest:zero))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:one)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:fixed-value)))
     (assert-true (not (has-field p 'cl-protobufs.protobuf-unittest:fixed-value2)))
