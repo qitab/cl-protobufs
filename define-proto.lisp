@@ -1574,7 +1574,7 @@ function) then there is no guarantee on the serialize function working properly.
                (field (make-instance
                        'field-descriptor
                        :name  (or name (slot-name->proto slot))
-                       :type type
+                       :type (if (eq kind :enum) 'keyword type)
                        :kind kind
                        :class type
                        :qualified-name (make-qualified-name *current-message-descriptor*
