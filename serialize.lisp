@@ -676,7 +676,10 @@ Parameters:
                 (if map-desc
                     (progn
                       (unless (car cell)
-                        (setf (car cell) (make-hash-table)))
+                        (setf (car cell)
+                              (make-hash-table :test (if (eql (map-key-type map-desc) 'string)
+                                                         #'equal
+                                                         #'eq))))
                       (let (map-tag map-len key-data start val-data)
                         (multiple-value-setq (map-len index)
                           (decode-uint32 buffer index))
@@ -1241,7 +1244,10 @@ Parameters:
               `(progn
                  ;; If ,dest points to the "unset" placeholder, make a new hash-table.
                  (unless (typep ,dest 'hash-table)
-                   (setq ,dest (make-hash-table)))
+                   (setq ,dest
+                         (make-hash-table :test ,(if (eql (map-key-type msg) 'string)
+                                                     #'equal
+                                                     #'eq))))
                  ;; TODO(benkuehnert): val-data should be the default value
                  ;; of ,key-type instead of nil.
                  (let (val-data map-tag map-len key-data start)
