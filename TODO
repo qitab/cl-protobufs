@@ -28,8 +28,8 @@ TO DO
 [  - &key name should give the Protobufs name for the field			]
 [  - 'option lisp_name="pkg:name"' should give the Lisp name for the slot	]
 
-- Refactor 'define-message'/'define-extend'/'define-group'
-  to avoid so much duplicated code
+- Refactor 'define-message' and 'define-extend' to avoid so much
+  duplicated code
 
 [- Need search paths in the ASDF .proto module					]
 

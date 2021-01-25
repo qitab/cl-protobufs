@@ -8,6 +8,11 @@ message OneofProto {
     int32 intval = 2;
     string strval = 3;
     bool boolval = 4;
+    // TODO(cgay): support groups inside oneof
+    // group GroupVal = 6 {
+    //   optional int32 intval2 = 7;
+    //   optional string strval2 = 8;
+    // }
   }
   optional int32 after = 5;
 }

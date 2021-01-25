@@ -111,16 +111,17 @@ Parameters
 
 (deftest test-proto-slot-function-name (quick-suite)
   (assert-true (eq (pi::proto-slot-function-name 'a 'b :clear)
-              'a.clear-b))
+                   'a.clear-b))
   (assert-true (eq (pi::proto-slot-function-name 'a 'b :has)
-              'a.has-b))
+                   'a.has-b))
   (assert-true (eq (pi::proto-slot-function-name 'a 'b :get)
-              'a.b)))
+                   'a.b)))
 
 (deftest test-object-initialized (quick-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol)))
-    (assert-true (not (pi::object-initialized-p
-                       p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol))))
+    (assert-false (pi::object-initialized-p
+                   p (find-message-descriptor
+                      'cl-protobufs.protobuf-unittest:test-protocol)))
     (setf (cl-protobufs.protobuf-unittest:test-protocol.zero p) "a"
           (cl-protobufs.protobuf-unittest:test-protocol.one p) "b"
           (cl-protobufs.protobuf-unittest:test-protocol.fixed-value p) 0
@@ -129,35 +130,40 @@ Parameters
 
     ;; Initialized all of the required fields on the object.
     (assert-true (pi::object-initialized-p
-             p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)))
+                  p (find-message-descriptor
+                     'cl-protobufs.protobuf-unittest:test-protocol)))
 
     ;; Cleared one of the required fields.
     (cl-protobufs.protobuf-unittest:test-protocol.clear-one p)
-    (assert-true (not (pi::object-initialized-p
-                  p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol))))
+    (assert-false (pi::object-initialized-p
+                   p (find-message-descriptor
+                      'cl-protobufs.protobuf-unittest:test-protocol)))
 
     ;; Add the required field on the top lovel object back.
     (setf (cl-protobufs.protobuf-unittest:test-protocol.one p) "b")
 
     ;; Next test with a sub-object
-    (let ((thirteen (cl-protobufs.protobuf-unittest:make-thirteen)))
+    (let ((thirteen (cl-protobufs.protobuf-unittest:make-test-protocol.thirteen)))
       (setf (cl-protobufs.protobuf-unittest:test-protocol.thirteen p) thirteen)
 
-      ;; Thirteen is missing fourteen which is required,
-      ;; the top level object isn't initialized if one of it's
-      ;; sub-objects is un-initialized.
-      (assert-true (not (pi::object-initialized-p
-                    p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol))))
+      ;; Thirteen is missing fourteen which is required, the top level object
+      ;; isn't initialized if one of its sub-objects is un-initialized.
+      (assert-false (pi::object-initialized-p
+                     p (find-message-descriptor
+                        'cl-protobufs.protobuf-unittest:test-protocol)))
 
       ;; Set thirteen
-      (setf (cl-protobufs.protobuf-unittest:thirteen.fourteen thirteen) :enum-whatever)
+      (setf (cl-protobufs.protobuf-unittest:test-protocol.thirteen.fourteen thirteen)
+            :enum-whatever)
       (assert-true (pi::object-initialized-p
-               p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)))
+                    p (find-message-descriptor
+                       'cl-protobufs.protobuf-unittest:test-protocol)))
 
       ;; Clear fourteen and make sure the object is again not initialized.
-      (cl-protobufs.protobuf-unittest:thirteen.clear-fourteen thirteen)
-      (assert-true (not (pi::object-initialized-p
-                    p (find-message-descriptor 'cl-protobufs.protobuf-unittest:test-protocol)))))))
+      (cl-protobufs.protobuf-unittest:test-protocol.thirteen.clear-fourteen thirteen)
+      (assert-false (pi::object-initialized-p
+                     p (find-message-descriptor
+                        'cl-protobufs.protobuf-unittest:test-protocol))))))
 
 (deftest test-proto-equivalent-p (quick-suite)
   (let* ((p (cl-protobufs.protobuf-unittest:make-test-protocol))
@@ -200,8 +206,8 @@ Parameters
       (assert-false (pi::proto-equal proto2 proto1)))
 
     ;; With a sub-object
-    (let ((thirteen-1 (cl-protobufs.protobuf-unittest:make-thirteen))
-          (thirteen-2 (cl-protobufs.protobuf-unittest:make-thirteen)))
+    (let ((thirteen-1 (cl-protobufs.protobuf-unittest:make-test-protocol.thirteen))
+          (thirteen-2 (cl-protobufs.protobuf-unittest:make-test-protocol.thirteen)))
       ;; sanity assert-true
       (assert-true (pi::proto-equal thirteen-1 thirteen-2))
       (assert-true (pi::proto-equal thirteen-1 thirteen-2 :exact t))
@@ -216,17 +222,18 @@ Parameters
       (assert-false (pi::proto-equal p q :exact t))
 
       ;; enum-whatever is the default so still equivalent
-      (setf (cl-protobufs.protobuf-unittest:thirteen.fourteen thirteen-2) :enum-whatever)
+      (setf (cl-protobufs.protobuf-unittest:test-protocol.thirteen.fourteen thirteen-2)
+            :enum-whatever)
       (assert-true (pi::proto-equal p q))))
 
-  (let* ((g-1 (cl-protobufs.protobuf-unittest:make-g :v1 1))
-         (g-2 (cl-protobufs.protobuf-unittest:make-g))
+  (let* ((g-1 (cl-protobufs.protobuf-unittest:make-time-protocol.g :v1 1))
+         (g-2 (cl-protobufs.protobuf-unittest:make-time-protocol.g))
          (p (cl-protobufs.protobuf-unittest:make-time-protocol :g (list g-1)))
          (q (cl-protobufs.protobuf-unittest:make-time-protocol :g (list g-2))))
     (assert-true (not (pi::proto-equal p q)))
     (assert-false (pi::proto-equal p q :exact t))
 
-    (setf (cl-protobufs.protobuf-unittest:g.v1 g-2) 1)
+    (setf (cl-protobufs.protobuf-unittest:time-protocol.g.v1 g-2) 1)
     (assert-true (pi::proto-equal p q))
     (assert-true (pi::proto-equal p q :exact t))))
 

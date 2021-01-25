@@ -45,10 +45,14 @@ Parameters
 (defun do-basic-serialization ()
   (loop :for optimized :in '(nil t)
         :do
+     ;; TODO(cgay): This makes the tests non-repeatable in the REPL. Either
+     ;; find a safe way to delete the optimized serializers after the test,
+     ;; separate into optimized and non-optimized tests, or remove the
+     ;; non-optimized path completely. Similar problem in other tests.
      (when optimized
        (dolist (class '(basic-test1 basic-test2 basic-test3 basic-test4
-                        basic-test5 basic-test6 basic-test7 subgroups))
-         (let ((message (find-message-descriptor class)))
+                        basic-test5 basic-test6 basic-test7.subgroups))
+         (let ((message (find-message-descriptor class :error-p t)))
            (handler-bind ((style-warning #'muffle-warning))
              (eval (pi::generate-deserializer message))
              (eval (pi::generate-serializer message))))))
@@ -65,10 +69,10 @@ Parameters
                      :intvals '(2 3 5 7)
                      :strvals '("two" "three" "five" "seven")
                      :recvals (list test2 test2b)))
-            (group1 (make-subgroups
+            (group1 (make-basic-test7.subgroups
                      :strval "g1"
                      :intvals '(1 1 2 3)))
-            (group2 (make-subgroups
+            (group2 (make-basic-test7.subgroups
                      :strval "g2"))
             (test7  (make-basic-test7
                      :strval1 "seven"
@@ -83,22 +87,22 @@ Parameters
              (tser5  (serialize-to-bytes test5 'basic-test5))
              (tser6  (serialize-to-bytes test6 'basic-test6))
              (tser7  (serialize-to-bytes test7 'basic-test7)))
-         (assert-true (equalp tser1 #(#x08 #x96 #x01)))
-         (assert-true (equalp tser1b #(#x08 #xEA #xFE #xFF #xFF #x0F)))
-         (assert-true (equalp tser2 #(#x12 #x07 #x74 #x65 #x73 #x74 #x69 #x6E #x67)))
-         (assert-true (equalp tser3 #(#x1A #x03 #x08 #x96 #x01)))
-         (assert-true (equalp tser4 #(#x1A #x09 #x12 #x07 #x74 #x65 #x73 #x74 #x69 #x6E #x67)))
-         (assert-true (equalp tser5 *tser5-bytes*))
-         (assert-true (equalp tser6 *tser6-bytes*))
-         (assert-true (equalp tser7 *tser7-bytes*))
+         (assert-equalp #(#x08 #x96 #x01) tser1)
+         (assert-equalp #(#x08 #xEA #xFE #xFF #xFF #x0F) tser1b)
+         (assert-equalp #(#x12 #x07 #x74 #x65 #x73 #x74 #x69 #x6E #x67) tser2)
+         (assert-equalp #(#x1A #x03 #x08 #x96 #x01) tser3)
+         (assert-equalp #(#x1A #x09 #x12 #x07 #x74 #x65 #x73 #x74 #x69 #x6E #x67) tser4)
+         (assert-equalp *tser5-bytes* tser5)
+         (assert-equalp *tser6-bytes* tser6)
+         (assert-equalp *tser7-bytes* tser7)
          (macrolet ((slots-equalp (obj1 obj2 &rest slots)
                       (pi::with-gensyms (vobj1 vobj2)
                         (pi::with-collectors ((forms collect-form))
                           (dolist (slot slots)
                             (collect-form
-                             `(assert-true
-                                  (equalp (proto-slot-value ,vobj1 ',slot)
-                                          (proto-slot-value ,vobj2 ',slot)))))
+                             `(assert-equalp
+                                  (proto-slot-value ,vobj1 ',slot)
+                                  (proto-slot-value ,vobj2 ',slot))))
                           `(let ((,vobj1 ,obj1)
                                  (,vobj2 ,obj2))
                              ,@forms)))))
@@ -406,7 +410,7 @@ Parameters
          (wheel1 (make-color-wheel1 :name "Colors" :metadata meta1))
          (color1 (make-color1 :r-value 100 :g-value 0 :b-value 100))
          (request-1  (make-add-color1 :wheel wheel1 :color color1))
-         (meta2  (make-metadata :revision "1.0"))
+         (meta2  (make-color-wheel2.metadata :revision "1.0"))
          (wheel2 (make-color-wheel2 :name "Colors" :metadata meta2))
          (color2 (make-color2 :r-value 100 :g-value 0 :b-value 100))
          (request-2  (make-add-color2 :wheel wheel2 :color color2))
@@ -432,9 +436,9 @@ Parameters
                       (print-text-format
                        (deserialize 'add-color2 ser2) :stream s))
                     9)))
-      ; this tests the optimized serializer's ability to serialize messages
-      ; which have nested messages which have group fields.
-      (pi::make-serializer metadata)
+      ;; This tests the optimized serializer's ability to serialize messages
+      ;; which have nested messages which have group fields.
+      (pi::make-serializer color-wheel2.metadata)
       (pi::make-serializer color2)
       (pi::make-serializer color-wheel2)
       (pi::make-serializer color-wheel2-wrap)
@@ -486,15 +490,11 @@ Parameters
         (assert-true (proto-equal should-be-original-proto proto-on-wire))))))
 
 
-;;; We make two protos: ProtoOnWire and ProtoDifferentThanWire.
-;;; The difference is that ProtoOnWire contains a superset of the
-;;; fields ProtoOnWire contains.
-;;;
-;;; We create a ProtoOnWire, serialize, and then deserialize
-;;; using the ProtoOnWire's bytes to a ProtoDifferentThanWire
-;;;
-;;; This aims to test updating a protocol buffer and deserializing
-;;; on a binary containing the previous version.
+;;; Serialize a message-v2 proto and then try to deserialize it as a
+;;; message-v1, which is missing the `baz = 1` value in the enum it uses. This
+;;; simulates interaction of a newer version of a proto in which an enum value
+;;; has been added with an older version. In the old version the unknown enum
+;;; values should be retained as :%undefined-n where n is the numerical value.
 (deftest test-proto-backwards-compatibility-for-enums (serialization-suite)
   (loop :for optimized :in '(nil t) :do
     (format t "Testing optimized serializers: ~a~%"  optimized)
@@ -508,8 +508,8 @@ Parameters
     (let* ((message-v2 (make-message-v2 :e :baz :e2 :baz
                                         :e3 '(:baz) :e4 '(:baz)
                                         :e5 :auto))
-           (proto-on-wire (serialize-to-bytes message-v2))
-           (message-v1 (deserialize 'message-v1 proto-on-wire)))
+           (v2-bytes (serialize-to-bytes message-v2))
+           (message-v1 (deserialize 'message-v1 v2-bytes)))
       (assert-true message-v1)
       (assert-eq (message-v1.e message-v1) :%undefined-1)
       (assert-eq (message-v1.e2 message-v1) :%undefined-1)

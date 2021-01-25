@@ -55,7 +55,7 @@ Parameters
     (optional-nested-enum :foo :baz)
     (optional-foreign-enum :foreign-foo :foreign-baz)
     (optional-group
-     nil (cl-protobufs.protobuf-unittest:make-optional-group :a 117))
+     nil (cl-protobufs.protobuf-unittest:make-test-all-types.optional-group :a 117))
     (optional-import-enum :import-foo :IMPORT-BAZ)
     ;; XXXX: C++ test does not verify these fields.
     (optional-string-piece "" "124") (optional-cord "" "125")))
@@ -98,8 +98,8 @@ Parameters
     (repeated-foreign-enum :foreign-bar :foreign-baz :foreign-foo)
     (repeated-import-enum :import-bar :import-baz :import-foo)
     (repeated-group
-     (cl-protobufs.protobuf-unittest:make-repeated-group :a 217)
-     (cl-protobufs.protobuf-unittest:make-repeated-group :a 317))
+     (cl-protobufs.protobuf-unittest:make-test-all-types.repeated-group :a 217)
+     (cl-protobufs.protobuf-unittest:make-test-all-types.repeated-group :a 317))
     ;; XXXX: C++ test does not verify these fields.
     (repeated-string-piece "224" "324" "524")
     (repeated-cord "225" "325" "525")))

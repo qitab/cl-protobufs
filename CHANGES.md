@@ -17,8 +17,8 @@ change) and for internal code quality improvements.
     `message-descriptor`, `service-descriptor`, `enum-descriptor`, etc.
 
 *   `push`, `length`, and `nth` functions have been added for repeated fields.
-    Both generic and generated code versions are available. See README.md for
-    details.
+    Both generic and generated code versions are available. See
+    [README.md](README.md) for details.
 
 *   `base-message` was renamed to `message`. This is the base type of any
     generated message struct.
@@ -80,6 +80,11 @@ change) and for internal code quality improvements.
     to `cl-protobufs.filename-without-extension` instead of `cl-protobufs-user`.
 
 *   Support for extensions has been added to the generated serialization code.
+
+*   Internal support for groups has been redone such that a group field `G` is
+    exactly equivalent to defining a nested message named `G` and a field named
+    `g` of type `G`. This affects the API by changing the field accessor names
+    from just `g` to `G.g`. See the section on [Groups](README.md#Groups).
 
 ## Version 2.0
 

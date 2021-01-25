@@ -130,7 +130,6 @@
    #:define-message
    #:define-extend
    #:define-extension
-   #:define-group
    #:define-service
 
    #:add-file-descriptor

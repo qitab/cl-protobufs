@@ -58,7 +58,6 @@ The possible top level define macros are:
 Inside of those macros there may also be define-* macros:
 - define-enum
 - define-message
-- define-group
 - define-extension
 - define-extend
 - define-service
@@ -69,15 +68,13 @@ The most common define-* macros we will see are the macros that
 define messages, which generate PROTOBUF-MESSAGE classes and
 create the message structures that hold data. These are:
 - define-message
-- define-group
 - define-extend
 
 DEFINE-ENUM:
 
-The define-enum macro creates a ENUM-DESCRIPTOR meta-object as well
-as a type with enum-name being (MEMBER :enum-1 :enum-2 ...).
-It also creates methods to access the default-enum, and convert
-from the enum keyword to the enum index and back.
+The define-enum macro creates a ENUM-DESCRIPTOR meta-object, as well as methods
+to access the default value, and convert from the enum keyword to the numerical
+value and back.
 
 DEFINE-EXTENSION:
 
@@ -89,40 +86,37 @@ allowed in a protobuf message.
 
 DEFINE-EXTEND:
 
-The define-extend macro creates a PROTOBUF-MESSAGE meta-object that
-overrides a PROTOBUF-MESSAGE meta-object created in define-message or
-define-group. The new meta-object will be identical to the original
-but with extra fields.
+The define-extend macro creates a PROTOBUF-MESSAGE meta-object that overrides a
+PROTOBUF-MESSAGE meta-object created in define-message. The new meta-object
+is identical to the original but with extra fields.
 
 We return forms to create this meta-object as well as accessors and
 setters for the new fields.
 
-DEFINE-MESSAGE DEFINE-GROUP:
+DEFINE-MESSAGE:
 
-The define-message and define-group macros work much the same way.
-They take the type (message name) and a list of sub-elements which
-may include define-message, define-group, define-extension, define-extend,
-define-enum, or a field which is just a declaration of the field object in a proto.
+The define-message macro works much the same way.  It takes the type (message
+name) and a list of sub-elements which may include define-message,
+define-extension, define-extend, define-enum, or a field which is just a
+declaration of the field object in a proto.
 
 Example:   (author  :index 1  :type cl:string :label (:optional) :typename "string")
 
 First we create the PROTOBUF-MESSAGE meta-object that is defined in the
 define-message lambda list and store it in *current-message-descriptor*.  If we
-see a define-message or define-group we recursively call the define macro to
-create a subgroup which will be named:
+see a define-message we recursively call the define macro to create a submessage
+named:
 
   top-level-message.submessage1.submessage2
 
-We save the resultant forms that are output as so define-message or define-group
-may output them at the and of the macro-call.
+We save the resultant forms that are output so define-message may output them
+at the and of the macro-call.
 
 If we see a define-enum, define-message, or define-extend macro
 we save the resultant form to a list of forms to output.
 
-If we see a define-group form we call it and it creates a message just like
-define-message. The only difference is a group acts as a field in a message
-as well as being an message type in the message, so we must add a field to the
-PROTOBUF-MESSAGE meta-object as if it were a field.
+The deprecated "group" feature is handled in the protoc plug-in by generating
+both a nested message and a field that uses the nested message.
 
 If we see a field we call process-field which creates a FIELD-DESCRIPTOR
 containing details of the field and returns a form to create this meta-object.
@@ -304,23 +298,17 @@ message, and of +<value_name>+ when the enum is defined at top-level."
        ,@constants
        (export ',(mapcar #'second constants)))))
 
-(defun enum-keywords (enum-type)
-  "Returns all keywords that belong to the given ENUM-TYPE."
-  (let ((expansion (type-expand enum-type)))
-    (check-type expansion (cons (eql member) list))
-    (rest expansion)))
-
 (defmacro define-enum (type (&key name alias-for) &body values)
   "Define a Lisp type given the data for a protobuf enum type.
-Also generates conversion functions between enum values and numerals.  Function names are
-<enum_name>->NUMERAL and NUMERAL-><enum_name>, respectively.
-Both accept an optional default argument.
+ Also generates conversion functions between enum values and integers:
+ <enum_name>-keyword-to-int and <enum_name>-int-to-keyword.  Both
+ accept an optional default value argument.
 
-Parameters:
-  TYPE: The name of the type.
-  NAME: Override for the protobuf enum type name.
-  ALIAS-FOR: Make this enum an alias for another type.
-  VALUES: The possible values for the enum in the form (name :index value)."
+ Parameters:
+   TYPE: The name of the type.
+   NAME: Override for the protobuf enum type name.
+   ALIAS-FOR: Make this enum an alias for another type.
+   VALUES: The possible values for the enum in the form (name :index value)."
   (let ((name (or name (class-name->proto type))))
     (with-collectors ((names collect-name) ; keyword symbols
                       (forms collect-form)
@@ -332,16 +320,16 @@ Parameters:
                (val-desc (make-enum-value-descriptor :value value :name val-name)))
           (collect-name val-name)
           (collect-value-descriptor val-desc)))
-      (let ((enum (make-enum-descriptor
-                   :class  type
-                   :name   name
-                   :alias-for (if (listp alias-for)
-                                  alias-for
-                                  (list alias-for))
-                   :values value-descriptors)))
+      (let ((enum (make-enum-descriptor :class type
+                                        :name name
+                                        :alias-for (if (listp alias-for)
+                                                       alias-for
+                                                       (list alias-for))
+                                        :values value-descriptors)))
         (cond ((and alias-for (not (eq type alias-for)))
-               ;; If we've got an alias, define a type that is a subtype of
-               ;; the Lisp enum so that typep and subtypep work.
+               ;; If we've got an alias, define a type that is a subtype of the
+               ;; Lisp enum so that typep and subtypep work. Note that if `alias-for`
+               ;; is not a (member ...) type the enum-keywords function will fail.
                (collect-form `(deftype ,type () ',alias-for)))
               ((null alias-for)
                (collect-form `(deftype ,type () '(member ,@names)))
@@ -422,6 +410,9 @@ Parameters:
     (loop for field in fields
           for oneof-offset from 0
           do
+       ;; TODO(cgay): this doesn't currently handle groups. If we want to
+       ;; support this we need to handle define-message and fields with :kind
+       ;; :group here.
        (destructuring-bind (slot &key type name (default nil default-p)
                                  lazy json-name index kind &allow-other-keys)
            field
@@ -954,7 +945,7 @@ function) then there is no guarantee on the serialize function working properly.
          possible-default)))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
-  "Makes the definition forms for the define-group and define-message macros.
+  "Makes the definition forms for the define-message macro.
 
  Parameters:
   PROTO-TYPE: The Lisp type name of the proto message.
@@ -1073,7 +1064,7 @@ function) then there is no guarantee on the serialize function working properly.
 
 (defmacro define-message (type (&key name alias-for options)
                           &body fields &environment env)
-  "Define a new protobuf message struct type.
+  "Define a new protobuf message type.
 
  Parameters:
    TYPE - Symbol naming the new type.
@@ -1120,14 +1111,14 @@ function) then there is no guarantee on the serialize function working properly.
              (assert (eq (car result) 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-type-form (cdr result))))
-          ((define-extension define-group define-map)
+          ((define-extension define-map)
            (destructuring-bind (&optional progn model-type model definers extra-field extra-slot)
                (macroexpand-1 field env)
              (assert (eq progn 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-form definers)
              (case model-type
-               ((define-group define-map)
+               ((define-map)
                 (when extra-slot
                   (collect-slot extra-slot))
                 (setf (proto-field-offset extra-field) field-offset)
@@ -1145,7 +1136,9 @@ function) then there is no guarantee on the serialize function working properly.
                (push oneof-desc (proto-oneofs msg-desc))
                (collect-oneof oneof-desc))))
           (otherwise
-           (multiple-value-bind (field slot idx offset-p)
+           ;; It's a regular field. Note that groups generate both a nested
+           ;; message and a field with :kind :group.
+           (multiple-value-bind (field-desc slot idx offset-p)
                (process-field field :alias-for alias-for
                                     :field-offset field-offset
                                     :bool-index (when (non-repeated-bool-field field)
@@ -1154,15 +1147,15 @@ function) then there is no guarantee on the serialize function working properly.
              (declare (ignore idx))
              (when offset-p
                (incf field-offset))
-             (if (proto-lazy-p field)
-                 (collect-lazy-field field)
-                 (collect-non-lazy-field field))
-             (assert (not (find-field-descriptor msg-desc (proto-index field))) ()
+             (if (proto-lazy-p field-desc)
+                 (collect-lazy-field field-desc)
+                 (collect-non-lazy-field field-desc))
+             (assert (not (find-field-descriptor msg-desc (proto-index field-desc))) ()
                      "The field ~S overlaps with another field in ~S"
-                     (proto-internal-field-name field) (proto-class msg-desc))
+                     (proto-internal-field-name field-desc) (proto-class msg-desc))
              (when slot
                (collect-slot slot))
-             (push field (proto-fields msg-desc))))))
+             (push field-desc (proto-fields msg-desc))))))
       ;; Not required, but this will have the proto-fields serialized
       ;; in the order they were defined.
       (setf (proto-fields msg-desc) (nreverse (proto-fields msg-desc)))
@@ -1230,7 +1223,7 @@ function) then there is no guarantee on the serialize function working properly.
                        :to (if (eq to 'max) +max-field-number+ to))
        ())))
 
-(defmacro define-extend (type (&key name options) &body fields &environment env)
+(defmacro define-extend (type (&key name options) &body fields)
   "Define an extension to the message named TYPE. See define-message for descriptions of the
    NAME, OPTIONS, and FIELDS parameters."
   (let* ((name (or name (class-name->proto type)))
@@ -1252,39 +1245,28 @@ function) then there is no guarantee on the serialize function working properly.
                                    "default" "packed")
                         :message-type :extends))) ; this message is an extension
          ;; Only now can we bind *current-message-descriptor* to the new extended message
-         (*current-message-descriptor* extends)
-         new-slot new-field)
+         (*current-message-descriptor* extends))
     (assert message ()
             "There is no message named ~A to extend" name)
     (assert (eq type (proto-class message)) ()
             "The type ~S doesn't match the type of the message being extended ~S"
             type message)
     (with-collectors ((forms collect-form))
-      (dolist (field fields)
+      (loop for field in fields
+            with new-slot = nil
+            with new-field = nil
+            do
         (assert (not (member (car field)
                              '(define-enum define-message define-extend define-extension)))
                 () "The body of ~S can only contain field and group definitions" 'define-extend)
-        (case (car field)
-          ((define-group)
-           (destructuring-bind (&optional progn model-type model definers extra-field extra-slot)
-               (macroexpand-1 field env)
-             (declare (ignore model))
-             (assert (eq progn 'progn) ()
-                     "The macroexpansion for ~S failed" field)
-             (map () #'collect-form definers)
-             (case model-type
-               ((define-group)
-                (setf new-slot extra-slot
-                      new-field extra-field)))))
-          (otherwise
-           (multiple-value-bind (field slot idx)
-               (process-field field :alias-for alias-for)
-             (assert (index-within-extensions-p idx message) ()
-                     "The index ~D is not in range for extending ~S"
-                     idx (proto-class message))
-             (setf new-slot slot
-                   new-field field))))
-        (when new-slot
+        (multiple-value-bind (field-desc slot idx)
+            (process-field field :alias-for alias-for)
+          (assert (index-within-extensions-p idx message) ()
+                  "The index ~D is not in range for extending ~S"
+                  idx (proto-class message))
+          (setf new-slot slot)
+          (setf new-field field-desc))
+        (when new-slot          ; why isn't it an error for new-slot to be nil?
           (let* (;; The slot name which is the %field-name
                  (sname  (field-data-internal-slot-name new-slot))
                  ;; The field name
@@ -1340,163 +1322,6 @@ function) then there is no guarantee on the serialize function working properly.
                    (i<= index (proto-extension-to ext))))
           extensions)))
 
-(defmacro define-group (type (&key index label name alias-for reader options)
-                        &body fields &environment env)
-  "Define a new protobuf message struct AND a field named by TYPE.
- Parameters:
-   TYPE, INDEX, NAME, ALIAS-FOR, and OPTIONS are as for define-message.
-   LABEL - nil (proto3), :required, :optional or :repeated.
-   READER - A symbol naming a function to use to get the value, instead of
-     using slot-value; this is often used when aliasing an existing class."
-  (check-type index integer)
-  (check-type label (member :required :optional :repeated))
-  (let* ((slot    (or type (and name (proto->slot-name name *package*))))
-         (name    (or name (class-name->proto type)))
-         (options (loop for (key val) on options by #'cddr
-                        collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
-         (internal-slot-name (fintern "%~A" slot))
-         (mslot   (unless alias-for
-                    (make-field-data
-                     :internal-slot-name internal-slot-name
-                     :external-slot-name slot
-                     :type
-                     (case label
-                       (:required (list 'cl:or 'cl:null `,type))
-                       (:optional (list 'cl:or 'cl:null `,type))
-                       (:repeated (list 'list-of `,type)))
-                     :initform nil
-                     :accessor reader
-                     :container (when (eq label :repeated) :list)
-                     :initarg (kintern (symbol-name slot))
-                     :kind :group)))
-         (mfield  (make-instance 'field-descriptor
-                    :name  (slot-name->proto slot)
-                    :class type
-                    :qualified-name (make-qualified-name *current-message-descriptor*
-                                                         (slot-name->proto slot))
-                    :type type
-                    :label label
-                    :container (when (eq label :repeated) :list)
-                    :index index
-                    :internal-field-name internal-slot-name
-                    :external-field-name slot
-                    :reader reader
-                    :kind :group))
-         (message (make-instance 'message-descriptor
-                    :class type
-                    :name  name
-                    :qualified-name (make-qualified-name *current-message-descriptor* name)
-                    :alias-for alias-for
-                    :options   (remove-options options "default" "packed")
-                    :message-type :group)) ; this message is a group
-         (field-offset 0)
-         (bool-count (count-if #'non-repeated-bool-field fields))
-         (bool-index -1)
-         (bool-values (make-array bool-count :element-type 'bit :initial-element 0))
-         ;; Only now can we bind *current-message-descriptor* to the (group) message.
-         (*current-message-descriptor* message))
-    (with-collectors ((slots collect-slot)
-                      (forms collect-form)
-                      ;; The typedef needs to be first in forms otherwise ccl warns.
-                      ;; We'll collect them separately and splice them in first.
-                      (type-forms collect-type-form)
-                      (lazy-fields collect-lazy-field)
-                      (non-lazy-fields collect-non-lazy-field)
-                      (oneofs collect-oneof))
-      (dolist (field fields)
-        (case (car field)
-          ((define-enum define-message define-extend)
-           (let ((result (macroexpand-1 field env)))
-             (assert (eq (car result) 'progn) ()
-                     "The macroexpansion for ~S failed" field)
-             (map () #'collect-form (cdr result))))
-          ((define-extension define-group define-map)
-           (destructuring-bind (&optional progn model-type model definers extra-field extra-slot)
-               (macroexpand-1 field env)
-             (assert (eq progn 'progn) ()
-                     "The macroexpansion for ~S failed" field)
-             (map () #'collect-type-form definers)
-             (case model-type
-               ((define-group define-map)
-                (setf (proto-field-offset extra-field) field-offset)
-                (incf field-offset)
-                (collect-non-lazy-field extra-field)
-                (when extra-slot
-                  (collect-slot extra-slot))
-                (appendf (proto-fields message) (list extra-field)))
-               ((define-extension)
-                (appendf (proto-extensions message) (list model))))))
-          ((define-oneof)
-           (destructuring-bind (&optional progn oneof-desc)
-               (macroexpand-1 field env)
-             (assert (eq progn 'progn) ()
-                     "The macroexpansion for ~S failed" field)
-             (when oneof-desc
-               (appendf (proto-oneofs message) (list oneof-desc))
-               (collect-oneof oneof-desc))))
-          (otherwise
-           (multiple-value-bind (field slot idx offset-p)
-               (process-field field :alias-for alias-for
-                                    :field-offset field-offset
-                                    :bool-index
-                                    (when (non-repeated-bool-field field)
-                                      (incf bool-index))
-                                    :bool-values bool-values)
-             (declare (ignore idx))
-             (when offset-p
-               (incf field-offset))
-             (if (proto-lazy-p field)
-                 (collect-lazy-field field)
-                 (collect-non-lazy-field field))
-             (assert (not (find-field-descriptor message (proto-index field))) ()
-                     "The field ~S overlaps with another field in ~S"
-                     (proto-internal-field-name field) (proto-class message))
-             (when slot
-               (collect-slot slot))
-             (appendf (proto-fields message) (list field))))))
-      ;; todo(jgodbout): Storing the is-set vector as N >= 1 slots of
-      ;; type sb-ext:word rather than 1 slot as a bit-vector would reduce
-      ;; the memory reads by 1 per slot access.
-      (collect-slot
-       (make-field-data
-          :internal-slot-name '%%is-set
-          :external-slot-name '%%is-set
-          :type `(bit-vector ,field-offset)
-          :initarg :%%is-set
-          :container :vector
-          :initform `(make-array ,field-offset
-                                 :element-type 'bit
-                                 :initial-element 0)))
-
-      (unless (= bool-index -1)
-        (collect-slot
-         (make-field-data
-          :internal-slot-name '%%bool-values
-          :external-slot-name '%%bool-values
-          :type `(bit-vector ,bool-count)
-          :initarg :%%bool-values
-          :container :vector
-          :initform `(make-array ,bool-count :element-type 'bit
-                                             :initial-contents ,bool-values))))
-
-      (if alias-for
-        ;; If we've got an alias, define a a type that is the subtype of
-        ;; the Lisp class that typep and subtypep work
-        (unless (or (eq type alias-for) (find-class type nil))
-          (collect-type-form `(deftype ,type () ',alias-for)))
-          (collect-type-form
-           (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs)))
-      (collect-form `(record-protobuf-object ',type ,message :message))
-      ;; Group can never be a top level element.
-      `(progn
-         define-group
-         ,message
-         (
-          ,@type-forms
-          ,@forms)
-         ,mfield
-         ,mslot))))
-
 (defun process-field (field &key alias-for field-offset bool-index bool-values)
   "Process one field descriptor within 'define-message' or 'define-extend'.
    Returns a field-descriptor object, a defstruct slot form, the field number,
@@ -1539,6 +1364,7 @@ function) then there is no guarantee on the serialize function working properly.
                 (if default-p
                     default
                     $empty-default))
+               (default (if default-p default $empty-default))
                (cslot (unless alias-for
                         ;; For enums we have to keep track of unknown
                         ;; deserialized values so it can't be a strict
@@ -1573,14 +1399,14 @@ function) then there is no guarantee on the serialize function working properly.
                                  (default-p `,default))))))
                (field (make-instance
                        'field-descriptor
-                       :name  (or name (slot-name->proto slot))
+                       :name (or name (slot-name->proto slot))
                        :type (if (eq kind :enum) 'keyword type)
                        :kind kind
                        :class type
                        :qualified-name (make-qualified-name *current-message-descriptor*
                                                             (or name (slot-name->proto slot)))
                        :label label
-                       :index  index
+                       :index index
                        :field-offset offset
                        :internal-field-name internal-slot-name
                        :external-field-name slot
@@ -1588,7 +1414,7 @@ function) then there is no guarantee on the serialize function working properly.
                        :reader slot
                        :default default
                        ;; Pack the field only if requested and it actually makes sense
-                       :packed  (and (eq label :repeated) packed t)
+                       :packed (and (eq label :repeated) packed t)
                        :container (when (eq label :repeated) repeated-storage-type)
                        :lazy (and lazy t)
                        :bool-index bool-index)))

@@ -4,6 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT.
 
+// LINT: ALLOW_GROUPS
+
 syntax = "proto2";      // for compatibility with internal Google compiler
 
 package protobuf_unittest;
@@ -53,7 +55,7 @@ message Test1Proto {
   repeated Test1Msg r_msg = 20;
 
   // non-repeated group
-  repeated group TestGroup1 = 21 {
+  optional group TestGroup1 = 21 {
     optional int32 a = 22;
   };
 

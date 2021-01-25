@@ -56,6 +56,7 @@ const std::string FieldLispType(const FieldDescriptor* field) {
       case FieldDescriptor::TYPE_STRING:
         type = "cl:string";
         break;
+      case FieldDescriptor::TYPE_GROUP:
       case FieldDescriptor::TYPE_MESSAGE:
         type = QualifiedMessageLispName(field->message_type(), field->file());
         break;
@@ -227,6 +228,11 @@ const std::string FieldLispDefault(const FieldDescriptor* field) {
 const std::string FieldLispName(const FieldDescriptor* field) {
   if (field->options().HasExtension(lisp_slot)) {
     return field->options().GetExtension(lisp_slot);
+  } else if (field->type() == FieldDescriptor::TYPE_GROUP) {
+    // For groups the field name and message name are derived from the same
+    // string. For "group FooBar {" the field name is "foobar" so we use the
+    // message name instead, to get the correct hyphenation.
+    return ToLispName(field->message_type()->name());
   } else {
     return ToLispName(field->name());
   }
@@ -275,13 +281,13 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
 void GenerateExtension(io::Printer* printer,
                        const FieldDescriptor* extension,
                        const FileDescriptor* file) {
-      printer->Print(
-          "\n(pi:define-extend $name$ ()",
-          "name", QualifiedMessageLispName(extension->containing_type(), file));
-      printer->Indent();
-      GenerateField(printer, extension);
-      printer->Print(")");
-      printer->Outdent();
+  printer->Print(
+      "\n(pi:define-extend $name$ ()",
+      "name", QualifiedMessageLispName(extension->containing_type(), file));
+  printer->Indent();
+  GenerateField(printer, extension);
+  printer->Print(")");
+  printer->Outdent();
 }
 
 }  // namespace cl_protobufs

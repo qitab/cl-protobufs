@@ -181,7 +181,41 @@ named "abc". If you prefer to use a shorter package name we recommend using
 You may have multiple `.proto` files use the same package if desired. The
 package exports the symbols described in the sections below.
 
-### Messages and Groups (proto2)
+### Groups (proto2 only) {#Groups}
+
+Groups are a deprecated way of defining a nested message and a field in a single
+declaration:
+
+```protocol-buffer
+syntax = "proto2";
+package abc;
+message Foo {
+  optional group Bar = 1 {
+    optional string a = 1;
+    optional int32 b = 2;
+  }
+}
+```
+
+This is treated exactly the same way as defining a nested message named `Bar`
+and a field named `bar`:
+
+```protocol-buffer
+syntax = "proto2";
+package abc;
+message Foo {
+  message Bar {
+    optional string a = 1;
+    optional int32 b = 2;
+  }
+  optional Bar bar = 1;
+}
+```
+
+See the following sections for details on how to access nested messages and
+fields from Lisp.
+
+### Messages (proto2)
 
 This section uses the following protocol buffer messages as an example:
 
@@ -218,6 +252,7 @@ protobuf type   | default value
 numerics        | zero of the appropriate type
 strings         | the empty string
 messages        | `nil`
+groups          | `nil`
 enums           | the first value listed in the .proto file
 booleans        | `nil`
 repeated fields | the empty list
@@ -765,3 +800,14 @@ Parse a JSON encoding and return the parsed protobuf object. The parmeters are:
 -   `stream`: The stream to read from. By default, this is \*standard-input\*.
 -   `ignore-unknown-fields-p`: If true, silently ignore any unrecognized fields
     encountered when parsing. If `nil`, the parser will throw an error.
+
+
+## Known Deficiencies
+
+This is a non-exhaustive list of ways in which cl-protobufs doesn't currently
+meet the Protocol Buffers spec.
+
+*   Groups are not supported withone `oneof` fields.
+*   The `[deprecated=true]` field option is not supported.
+*   The JSON output for a message `M` should only include the fields and values
+    contained in `M`. Instead it is wrapped in `M { ... }`.

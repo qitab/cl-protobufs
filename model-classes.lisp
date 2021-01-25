@@ -24,7 +24,10 @@ Parameters:
   (setf (gethash pathname *file-descriptors*) (find-file-descriptor symbol)))
 
 (defstruct message
-  "All protobuf message objects are of this type."
+  "All protobuf message objects extend this type. Note that some fields that
+   logically belong here, such as %%bool-values, are conditionally added to the
+   generated message defstructs in the `define-message' macro, to avoid using
+   memory for their slots when they're not needed."
   ;; %%skipped-bytes will contain all of the bytes we couldn't
   ;; identify when we tried to deserialize a proto but will
   ;; add to the serialized bytes for the proto if we serialize it.
@@ -153,7 +156,7 @@ message-descriptor.")
   (key-type nil)
   ;; The Lisp type of the value.
   (value-type nil)
-  (value-kind nil :type (member :scalar :message :group :enum)))
+  (value-kind nil :type (member :scalar :message :enum)))
 
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
@@ -286,6 +289,12 @@ message-descriptor.")
 (defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
   (make-load-form-saving-slots desc :environment environment))
 
+(defun enum-keywords (enum-type)
+  "Returns all keywords that belong to the given ENUM-TYPE."
+  (let ((expansion (type-expand enum-type)))
+    (check-type expansion (cons (eql member) list))
+    (rest expansion)))
+
 ;; An object describing a Protobufs message. Confusingly most local variables that hold
 ;; instances of this struct are named MESSAGE, but the C API makes it clear that
 ;; a Message is not its descriptor.
@@ -324,9 +333,8 @@ message-descriptor.")
                :initarg :extensions
                :initform ())
    ;; :message is an ordinary message
-   ;; :group is a (deprecated) group (kind of an "implicit" message)
    ;; :extends is an 'extends' to an existing message
-   (message-type :type (member :message :group :extends)
+   (message-type :type (member :message :extends)
                  :accessor proto-message-type
                  :initarg :message-type
                  :initform :message))
@@ -403,7 +411,8 @@ if we are not in SBCL."
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
 (defclass field-descriptor (descriptor)
-  ;; What does nil mean here? Needs a comment.
+  ;; :group means this is a message-typed field but it should be serialized as
+  ;; a group. What does nil mean here? Needs a comment.
   ((kind :type (member :message :group :extends :enum :map :scalar nil)
          :accessor proto-kind
          :initarg :kind)
@@ -672,6 +681,9 @@ if we are not in SBCL."
    field-descriptor having that ID. ID may be a symbol naming the defstruct
    slot, the field name (string), or the field number."))
 
+;; TODO(cgay): This is exported but it's not useful to users since `name` is
+;; expected to be the internal field name. Should be the external name and we
+;; can do something different internally to find field descriptors.
 (defmethod find-field-descriptor ((desc message-descriptor) (name symbol)
                                   &optional relative-to)
   (declare (ignore relative-to))

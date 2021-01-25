@@ -48,23 +48,13 @@ MessageGenerator::MessageGenerator(const Descriptor* descriptor) :
 
 MessageGenerator::~MessageGenerator() {}
 
-namespace {
-// For the strange define-group.
-const std::string FieldKeywordLabel(const FieldDescriptor::Label label) {
-  switch (label) {
-    case FieldDescriptor::LABEL_OPTIONAL:
-      return ":optional";
-    case FieldDescriptor::LABEL_REQUIRED:
-      return ":required";
-    case FieldDescriptor::LABEL_REPEATED:
-      return ":repeated";
-    default:
-      GOOGLE_LOG(FATAL) << "Unknown field label: " << label;
-      return ":error";
-  }
+// Generate code for a normal message.
+void MessageGenerator::Generate(io::Printer* printer) {
+  GenerateSource(printer, lisp_name_, -1, FieldDescriptor::MAX_LABEL);
 }
-}  // namespace
 
+// Generate code for a message or group. If it's a group, tag is a field number
+// > 0 and label is a valid label: optional, required, or repeated.
 void MessageGenerator::GenerateSource(io::Printer* printer,
                                       const std::string& lisp_name,
                                       const int tag,
@@ -73,21 +63,14 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
   // this generated message for map types.
   if (descriptor_->options().map_entry())
     return;
-  const bool group = tag >= 0;
   printer->Print("\n\n");
-  printer->Print((group ? "(pi:define-group $name$" :
-                          "(pi:define-message $name$"),
-                 "name", lisp_name);
+  printer->Print("(pi:define-message $name$", "name", lisp_name);
   printer->Annotate("name", descriptor_);
   printer->Indent();
 
   // Message options.
   printer->Indent();
   printer->Print("\n(");
-  if (group) {
-    printer->Print("\n :index $tag$", "tag", StrCat(tag));
-    printer->Print("\n :label $label$", "label", FieldKeywordLabel(label));
-  }
   if (CamelIsSpitting(descriptor_->name())) {
     printer->Print("\n :name \"$name$\"", "name", descriptor_->name());
     printer->Annotate("name", descriptor_->name());
@@ -113,25 +96,9 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
 
   if (descriptor_->nested_type_count() > 0) {
     printer->Print("\n;; Nested messages");
-    int printed = 0;
     for (int n = 0; n < descriptor_->nested_type_count(); ++n) {
-      // Strange handling of group fields.
-      // Remove all groups. Those should be generated with the fields.
-      bool skip = false;
-      for (int f = 0; f < descriptor_->field_count(); ++f) {
-        if (descriptor_->field(f)->type() == FieldDescriptor::TYPE_GROUP &&
-            descriptor_->field(f)->message_type() ==
-            descriptor_->nested_type(n)) {
-          skip = true;
-          break;
-        }
-      }
-      if (!skip) {
-        nested_[n]->Generate(printer);
-        ++printed;
-      }
+      nested_[n]->Generate(printer);
     }
-    if (!printed) printer->Print(".. are all groups.\n");
   }
 
   if (descriptor_->field_count() > 0) {
@@ -155,7 +122,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
           const FieldDescriptor* field  = oneof->field(j);
           seen_fields.insert(field->index());
           if (field->type() == FieldDescriptor::TYPE_GROUP) {
-            // Strange way of handling group fields.
+            // TODO(cgay): This is untested and doesn't work.
             MessageGenerator group(field->message_type());
             group.GenerateSource(printer,
                                  ToLispName(field->message_type()->name()),
@@ -174,19 +141,10 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
     for (int i = 0; i < descriptor_->field_count(); ++i) {
       const FieldDescriptor* field = descriptor_->field(i);
       if (seen_fields.find(field->index()) == seen_fields.end()) {
-        if (field->type() == FieldDescriptor::TYPE_GROUP) {
-          // Strange way of handling group fields.
-          MessageGenerator group(field->message_type());
-          group.GenerateSource(printer,
-                               ToLispName(field->message_type()->name()),
-                               field->number(),
-                               field->label());
-        } else {
-          GenerateField(printer, field);
-        }
+        GenerateField(printer, field);
       }
     }
-  }
+  }  // Done with fields
 
   if (descriptor_->extension_count() > 0) {
     printer->Print("\n;; Extensions");
@@ -215,43 +173,16 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
   printer->Outdent();
 }
 
-void MessageGenerator::Generate(io::Printer* printer) {
-  GenerateSource(printer, lisp_name_, -1, FieldDescriptor::MAX_LABEL);
-}
-
 void MessageGenerator::AddExports(std::vector<std::string>* exports) {
   for (int n = 0; n < descriptor_->nested_type_count(); ++n) {
-    // Strange handling of group fields.
-    // Remove all groups. Those should be exported with the fields.
-    // The field accessors of a group are not exported because
-    // we're skipping the whole group.  Fix it.
-    bool skip = false;
-    for (int f = 0; f < descriptor_->field_count(); ++f) {
-      if (descriptor_->field(f)->type() == FieldDescriptor::TYPE_GROUP &&
-          descriptor_->field(f)->message_type() ==
-          descriptor_->nested_type(n)) {
-        skip = true;
-        break;
-      }
-    }
-    if (!skip) {
-      nested_[n]->AddExports(exports);
-    }
+    nested_[n]->AddExports(exports);
   }
-
   for (int i = 0; i < descriptor_->enum_type_count(); ++i) {
     enums_[i]->AddExports(exports);
   }
   exports->push_back(lisp_name_);
   for (int i = 0; i < descriptor_->field_count(); ++i) {
-    const FieldDescriptor* field = descriptor_->field(i);
-    // For groups, the message type name must be used for the correct lisp name.
-    // E.g. when a group is named `SomeGroup`, the field name is `somegroup`,
-    // but we want `some-group`.
-    std::string name = field->type() == FieldDescriptor::TYPE_GROUP
-                           ? ToLispName(field->message_type()->name())
-                           : FieldLispName(field);
-    exports->push_back(name);
+    exports->push_back(FieldLispName(descriptor_->field(i)));
   }
   for (int i = 0; i < descriptor_->extension_count(); ++i) {
     exports->push_back(FieldLispName(descriptor_->extension(i)));

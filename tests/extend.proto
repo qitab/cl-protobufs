@@ -4,6 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT.
 
+// LINT: ALLOW_GROUPS
+
 syntax = "proto2";
 
 import "extend-base.proto"; // Test proto
@@ -22,6 +24,12 @@ message Bar {
   // Extend file-local Foo with imported Bar.
   extend Foo {
     optional extend_base.Bar foo_228 = 228;
+  }
+  // Extend file-local Foo with a group field.
+  extend Foo {
+    optional group Zoo = 233 {
+      repeated string abc = 1;
+    }
   }
   // Extend imported Foo with this Bar.
   extend extend_base.Foo {
