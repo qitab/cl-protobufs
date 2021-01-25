@@ -298,7 +298,7 @@ message, and of +<value_name>+ when the enum is defined at top-level."
        ,@constants
        (export ',(mapcar #'second constants)))))
 
-(defmacro define-enum (type (&key name alias-for) &body values)
+(defmacro define-enum (type (&key name) &body values)
   "Define a Lisp type given the data for a protobuf enum type.
  Also generates conversion functions between enum values and integers:
  <enum_name>-keyword-to-int and <enum_name>-int-to-keyword.  Both
@@ -307,7 +307,6 @@ message, and of +<value_name>+ when the enum is defined at top-level."
  Parameters:
    TYPE: The name of the type.
    NAME: Override for the protobuf enum type name.
-   ALIAS-FOR: Make this enum an alias for another type.
    VALUES: The possible values for the enum in the form (name :index value)."
   (let ((name (or name (class-name->proto type))))
     (with-collectors ((names collect-name) ; keyword symbols
@@ -322,22 +321,13 @@ message, and of +<value_name>+ when the enum is defined at top-level."
           (collect-value-descriptor val-desc)))
       (let ((enum (make-enum-descriptor :class type
                                         :name name
-                                        :alias-for (if (listp alias-for)
-                                                       alias-for
-                                                       (list alias-for))
                                         :values value-descriptors)))
-        (cond ((and alias-for (not (eq type alias-for)))
-               ;; If we've got an alias, define a type that is a subtype of the
-               ;; Lisp enum so that typep and subtypep work. Note that if `alias-for`
-               ;; is not a (member ...) type the enum-keywords function will fail.
-               (collect-form `(deftype ,type () ',alias-for)))
-              ((null alias-for)
-               (collect-form `(deftype ,type () '(member ,@names)))
-               (collect-form (make-enum-conversion-forms type value-descriptors))
-               (collect-form (make-enum-constant-forms type value-descriptors))
-               ;; The default value is the keyword associated with the first element.
-               (collect-form `(defmethod enum-default-value ((e (eql ',type)))
-                                ,(enum-value-descriptor-name (car value-descriptors))))))
+        (collect-form `(deftype ,type () '(member ,@names)))
+        (collect-form (make-enum-conversion-forms type value-descriptors))
+        (collect-form (make-enum-constant-forms type value-descriptors))
+        ;; The default value is the keyword associated with the first element.
+        (collect-form `(defmethod enum-default-value ((e (eql ',type)))
+                         ,(enum-value-descriptor-name (car value-descriptors))))
         (collect-form `(record-protobuf-object ',type ,enum :enum))
         ;; Register it by the full symbol name.
         (record-protobuf-object type enum :enum))

@@ -132,15 +132,10 @@ Parameters
   (assert-eql 10 (proto:enum-keyword-to-int 'pb:outer-enum :some-unknown-keyword 10))
   (assert-eq :bah (proto:enum-int-to-keyword 'pb:outer-enum 1234 :bah)))
 
-(deftype orig-type () '(member :eins :zwei :drei))
-(pi:define-schema 'my-schema :package 'proto-test :syntax :proto2)
-(pi:define-enum alias-enum (:alias-for orig-type))
-
 (deftest test-enum-keywords (enum-mapping-suite)
   (assert-equal '(:foo :bar :baz :foo-bar :zaphod) (proto:enum-keywords 'pb:my-message.my-enum))
   (assert-equal '(:foo :bar :baz :zaphod) (proto:enum-keywords 'pb:outer-enum))
-  (assert-equal '(:one :two :three) (proto:enum-keywords 'pb:another-enum))
-  (assert-equal '(:eins :zwei :drei) (proto:enum-keywords 'alias-enum)))
+  (assert-equal '(:one :two :three) (proto:enum-keywords 'pb:another-enum)))
 
 (deftest test-enum-forward-declaration (enum-mapping-suite)
   (let ((msg (pb:make-my-other-message :other-enum :baz))

@@ -268,10 +268,6 @@ message-descriptor.")
   (class nil :type symbol)
   ;; The string naming the protobuf type for this enum.
   (name nil :type string)
-  ;; Not sure what this is or why it was originally added. Based on the one existing test that uses
-  ;; it the type of this slot shouldn't be (list-of enum-value-descriptor). (SBCL doesn't seem to
-  ;; care.) Perhaps it can be deleted.
-  (alias-for nil :type (list-of enum-value-descriptor))
   ;; The name and integer value of each enum element.
   (values nil :type (list-of enum-value-descriptor)))
 
