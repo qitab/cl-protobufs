@@ -23,9 +23,13 @@
   (clunit:run-suite 'map-suite :use-debugger use-debugger
                                :signal-condition-on-fail t))
 
-; todo(benkuehnert):
-; - Test maps with aliased types as the value.
-; - Test map type text format
+;; Copied from tests/serialization-tests.lisp
+(defun clear-serialization-functions (proto-name)
+  #-sbcl
+  (setf (get `,proto-name :serialize) nil
+        (get `,proto-name :deserialize) nil)
+  #+sbcl (fmakunbound (list :protobuf :serialize proto-name))
+  #+sbcl (fmakunbound (list :protobuf :deserialize proto-name)))
 
 ;; Tests that accessor functions are working: setf, gethash, remhash, has.
 (deftest accessor-check (map-suite)
@@ -80,7 +84,17 @@
     (setf (map-enum.map-field-gethash "two" msg) :one)
     ;; Verify that the map is case-sensitive.
     (assert-true (eq (map-enum.map-field-gethash "Two" msg) :two))
-    (assert-true (eq (map-enum.map-field-gethash "two" msg) :one))))
+    (assert-true (eq (map-enum.map-field-gethash "two" msg) :one))
+    ;; Verify that this works after serializing/deserializing
+    (loop :for optimized :in '(nil t)
+          :do
+       (when optimized
+         (pi:make-deserializer map-enum))
+       (let* ((bytes (serialize-to-bytes msg 'map-enum))
+              (msg-roundtrip (deserialize-from-bytes 'map-enum bytes)))
+         (assert-true (eq (map-enum.map-field-gethash "Two" msg-roundtrip) :two))
+         (assert-true (eq (map-enum.map-field-gethash "two" msg-roundtrip) :one)))))
+  (clear-serialization-functions 'map-enum))
 
 ;; Verify that generic (de)serialization works.
 (deftest serialization-test (map-suite)
