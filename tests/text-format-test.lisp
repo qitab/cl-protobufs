@@ -83,12 +83,6 @@ Parameters
 
 (deftest test-parse-text-format-nested-symbol-names (text-format-suite)
   (assert-true (proto:find-message-descriptor 'test-pb:text-format-test))
-  ;; TODO(dlroxe) should expect nested name, not top-level name
   (assert-true (proto:find-message-descriptor 'test-pb:text-format-test.nested-message1))
-  ;; (assert-true (proto:find-message-descriptor 'test-pb:text-format-test.nested-message1))
-
-  ;; TODO(dlroxe) should assert-true nested name, not top-level name
-  (assert-true (proto:find-message-descriptor 'test-pb:text-format-test.nested-message1.nested-message2))
-  ;; (assert-true (proto:find-message-descriptor
-  ;;               'test-pb:text-format-test.nested-message1.nested-message2))
-  )
+  (assert-true (proto:find-message-descriptor
+                'test-pb:text-format-test.nested-message1.nested-message2)))
