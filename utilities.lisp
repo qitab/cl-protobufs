@@ -327,14 +327,15 @@ Arguments:
 (defmacro doseq ((var sequence &optional result) &body body)
   "Iterates over SEQUENCE, binding VAR to each element in turn. Uses DOLIST or DOVECTOR depending on
    the type of the sequence. In optimized code, this turns out to be faster than (map () #'f
-   sequence). Returns RESULT. Note that the body gets expanded twice!" ;; TODO(dougk): fix
-  (with-gensyms (vseq)
-    `(let ((,vseq ,sequence))
-       (if (vectorp ,vseq)
-           (dovector (,var ,vseq ,result)
-             ,@body)
-           (dolist (,var ,vseq ,result)
-             ,@body)))))
+   sequence). Returns RESULT."
+  (with-gensyms (vseq vbody)
+    `(flet ((,vbody (,var) ,@body))
+       (let ((,vseq ,sequence))
+         (if (vectorp ,vseq)
+             (dovector (,var ,vseq ,result)
+               (,vbody ,var))
+             (dolist (,var ,vseq ,result)
+               (,vbody ,var)))))))
 
 
 (defmacro appendf (place tail)
