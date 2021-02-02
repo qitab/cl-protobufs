@@ -6,24 +6,10 @@
 
 (in-package #:cl-protobufs.implementation)
 
-
-;;; Protocol buffers wire format
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-  ;; Warning:
-  ;; If you need to debug the (de)serializer, (pushnew :debug-serialization
-  ;; *features*) Otherwise, we remove type checking and type conversion from
-  ;; the (de)serializers for speed.  For cl-protobufs this is fine, we will
-  ;; make a guarantee that we will serialize/deserialize the right type.
-  ;;
-  ;; Note: The debugging feature should be used cautiously, you can run into
-  ;; bugs by running in debug mode and getting type-conversion then turning off
-  ;; debug mode and getting type failures.  This is because debug mode turns on
-  ;; type checking and type conversion.
-  (defparameter $optimize-serialization
-    #+debug-serialization *optimize-default*
-    #-debug-serialization *optimize-fast-unsafe*)
+  ;; Warning: see comment at the top of utilities.lisp about these settings.
+  (defparameter $optimize-serialization *optimize-fast-unsafe*) ; NOLINT
 
   (defconstant $wire-type-varint 0)
   (defconstant $wire-type-64bit  1)
