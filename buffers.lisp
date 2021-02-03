@@ -163,7 +163,7 @@
     ;; use any space in the new block. That block can be smaller than what is
     ;; needed now, but don't drop it - push a new next-block in front.
     (unless (and (cdr (buffer-next buffer))
-                 (>= (length (the vector (cadr (buffer-next buffer)))) defecit))
+                 (>= (length (the vector (second (buffer-next buffer)))) defecit))
       (rplacd (buffer-next buffer)
               (cons (new-block buffer defecit) (cdr (buffer-next buffer)))))
     (when (zerop space-remaining)

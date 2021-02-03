@@ -1365,11 +1365,11 @@ function) then there is no guarantee on the serialize function working properly.
                            :external-slot-name slot
                            :type
                            (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
-                                  (list 'vector-of `,type))
+                                  `(vector-of ,type))
                                  ((and (eq label :repeated) (eq repeated-storage-type :list))
-                                  (list 'list-of `,type))
+                                  `(list-of ,type))
                                  ((member kind '(:message :group))
-                                  (list 'cl:or 'cl:null `,type))
+                                  `(or null ,type))
                                  (t `,type))
                            :accessor slot
                            :initarg (kintern (symbol-name slot))

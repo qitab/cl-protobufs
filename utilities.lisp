@@ -73,7 +73,7 @@
       `(the fixnum (logior (the fixnum ,(car fixnums))
                            ,(if (cddr fixnums)
                                 `(ilogior ,@(cdr fixnums))
-                                `(the fixnum ,(cadr fixnums)))))
+                                `(the fixnum ,(second fixnums)))))
       `(the fixnum ,(car fixnums))))
 
 (defmacro ilogand (&rest fixnums)
@@ -82,7 +82,7 @@
       `(the fixnum (logand (the fixnum ,(car fixnums))
                            ,(if (cddr fixnums)
                                 `(ilogand ,@(cdr fixnums))
-                                `(the fixnum ,(cadr fixnums)))))
+                                `(the fixnum ,(second fixnums)))))
       `(the fixnum ,(car fixnums))))
 
 (define-modify-macro iincf (&optional (delta 1)) i+)
@@ -235,8 +235,7 @@
         ((symbolp x) (keywordify (symbol-name x)))
         ((zerop (length x)) nil)
         ((string-not-equal x "nil")
-         (intern (substitute #\- #\_ (string-upcase x)) (find-package "KEYWORD")))
-        (t nil)))
+         (intern (substitute #\- #\_ (string-upcase x)) (find-package "KEYWORD")))))
 
 (defun join-intern (&rest symbols)
   "Given SYMBOLS, return a symbol made by joining the symbol names with a dot, e.g.

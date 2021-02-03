@@ -191,8 +191,7 @@ Parameters:
                      (size 0))
                  (doseq (name value)
                    (iincf size (serialize-enum name (enum-descriptor-values desc) tag buffer)))
-                 size)))
-          (t nil))))
+                 size))))))
 
 (defun emit-repeated-message-field (msg-desc messages type field-num kind buffer)
   "Serialize a repeated message (or group) field.
@@ -282,8 +281,7 @@ Parameters:
                           (i+ ret-len (i+ map-len (backpatch map-len)))))))
                (loop for k being the hash-keys of value
                        using (hash-value v)
-                     sum (serialize-pair k v)))))
-          (t nil))))
+                     sum (serialize-pair k v))))))))
 
 (defun emit-non-repeated-message-field (msg-desc msg type field-num kind buffer)
   "Serialize a non-repeated message field to buffer.
@@ -592,9 +590,8 @@ Parameters:
         ;; Note that the default end tag is 0, which is also an end of
         ;; message marker (there can never be "real" zero tags because
         ;; field indices start at 1)
-        (loop
-            for cell on initargs by #'cddr
-            do
+        (loop for cell on initargs by #'cddr
+              do
            (let* ((field (car cell))
                   (inner-index (field-offset field))
                   (bool-index (field-bool-index field))
@@ -604,34 +601,32 @@ Parameters:
                   (oneof-offset (proto-oneof-offset field)))
              (rplaca cell initargs)
              (when (eq (proto-label field) :repeated)
-               (let ((data (nreverse (cadr cell))))
-                 (setf (cadr cell)
+               (let ((data (nreverse (second cell))))
+                 (setf (second cell)
                        (if (eq :vector (proto-container field))
                            (coerce data 'vector) data))))
              (cond ((eq (proto-kind field) :extends)
                     ;; If an extension we'll have to set it manually later...
-                    (progn
-                      (push `(,(proto-internal-field-name field) ,(cadr cell))
-                            extension-list)))
+                    (push `(,(proto-internal-field-name field) ,(second cell))
+                        extension-list))
                    (bool-index
-                    (push (cons bool-index (cadr cell)) bool-map)
+                    (push (cons bool-index (second cell)) bool-map)
                     (when inner-index
                       (push inner-index offset-list)))
                    ;; Fields contained in a oneof need to be wrapped in
                    ;; a oneof struct.
                    (oneof-offset
                     (push (make-oneof
-                           :value (cadr cell)
+                           :value (second cell)
                            :set-field oneof-offset)
-                          initargs-final)
+                        initargs-final)
                     (push (car cell) initargs-final))
                    ;; Otherwise we have to mark is set later.
                    (t
-                    (progn
-                      (push (cadr cell) initargs-final)
-                      (push (car cell) initargs-final)
-                      (when inner-index
-                        (push inner-index offset-list)))))))
+                    (push (second cell) initargs-final)
+                    (push (car cell) initargs-final)
+                    (when inner-index
+                      (push inner-index offset-list))))))
         (let ((new-struct
                #+sbcl ; use the defstruct description to get the constructor name
                (let ((dd (sb-kernel:layout-info (sb-pcl::class-wrapper class))))
@@ -849,8 +844,7 @@ Parameters:
                     (,iterator (,vval ,reader)
                                (iincf ,size (serialize-enum
                                              ,vval '(,@(enum-descriptor-values msg))
-                                             ,tag ,vbuf)))))))
-          (t nil))))
+                                             ,tag ,vbuf))))))))))
 
 (defun generate-non-repeated-field-serializer (class kind field-num boundp reader vbuf size)
   "Generate the field serializer for a non-repeated field
@@ -915,8 +909,7 @@ Parameters:
                                  2 'v 'v vbuf 'map-len)
                                (i+ ret-len (i+ map-len (backpatch map-len)))))))
                     (iincf ,size (loop for k being the hash-keys of ,vval using (hash-value v)
-                                       sum (serialize-pair k v))))))))
-          (t nil))))
+                                       sum (serialize-pair k v)))))))))))
 
 ;;; Compile-time generation of serializers
 ;;; Type-checking is done at the top-level methods specialized on 'symbol',
@@ -1080,11 +1073,10 @@ Parameters:
                   class kind index lazy-p vbuf vidx oneof-val)
                (when deserializer
                  (setf deserializer
-                       `(progn
-                          (let ((,oneof-val))
-                            ,deserializer
-                            (setf (oneof-value ,temp) ,oneof-val)
-                            (setf (oneof-set-field ,temp) ,oneof-offset))))
+                       `(let ((,oneof-val))
+                          ,deserializer
+                          (setf (oneof-value ,temp) ,oneof-val)
+                          (setf (oneof-set-field ,temp) ,oneof-offset)))
                  (return-from generate-field-deserializer
                    (values (list tag) (list deserializer) nil nil temp)))
                (unknown-field-type class field message))))
@@ -1196,8 +1188,7 @@ Parameters:
                                     (setq ,dest (nreconc x ,dest)))))
                (values (list non-packed-form packed-form)
                        (list tag packed-tag)
-                       t)))
-            (t nil)))))
+                       t)))))))
 
 (defun generate-non-repeated-field-deserializer
     (class kind index lazy-p vbuf vidx dest)

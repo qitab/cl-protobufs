@@ -807,7 +807,7 @@ Parse a JSON encoding and return the parsed protobuf object. The parmeters are:
 This is a non-exhaustive list of ways in which cl-protobufs doesn't currently
 meet the Protocol Buffers spec.
 
-*   Groups are not supported withone `oneof` fields.
+*   Groups are not supported within `oneof` fields.
 *   The `[deprecated=true]` field option is not supported.
 *   The JSON output for a message `M` should only include the fields and values
     contained in `M`. Instead it is wrapped in `M { ... }`.
