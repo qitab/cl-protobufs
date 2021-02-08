@@ -3,7 +3,7 @@
 ![SBCL-Tests](https://github.com/qitab/cl-protobufs/workflows/SBCL-Tests/badge.svg?branch=master)
 ![CCL-Tests](https://github.com/qitab/cl-protobufs/workflows/CCL-Tests/badge.svg?branch=master)
 ![ABCL-Tests](https://github.com/qitab/cl-protobufs/workflows/ABCL-Tests/badge.svg)
-[![Gitter](https://badges.gitter.im/cl-protobufs/community.svg)](https://gitter.im/cl-protobufs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Gitter](https://badges.gitter.im/qitab/community.svg)](https://gitter.im/qitab/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 
 
