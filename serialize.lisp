@@ -84,8 +84,8 @@
            (proto-%bytes object))
       (let ((fast-function
              #-sbcl (get type :serialize)
-             #+sbcl (handler-case (fdefinition `(:protobuf :serialize ,type))
-                      (undefined-function () nil)))
+             #+sbcl (when (fboundp `(:protobuf :serialize ,type))
+                      (fdefinition `(:protobuf :serialize ,type))))
             (b (make-octet-buffer 100)))
         (if fast-function
             (funcall (the function fast-function) object b)
@@ -344,8 +344,8 @@ Parameters:
   (check-type type symbol)
   (let ((fast-function
          #-sbcl (get type :deserialize)
-         #+sbcl (handler-case (fdefinition `(:protobuf :deserialize ,type))
-                  (undefined-function () nil))))
+         #+sbcl (when (fboundp `(:protobuf :deserialize ,type))
+                  (fdefinition `(:protobuf :deserialize ,type)))))
     (if fast-function
         (funcall (the function fast-function) buffer start end)
         (%deserialize type buffer start end))))
