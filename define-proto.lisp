@@ -371,7 +371,6 @@ message, and of +<value_name>+ when the enum is defined at top-level."
                                 :internal-field-name internal-slot-name
                                 :external-field-name field-name
                                 :json-name json-name
-                                :reader field-name
                                 :type 'cl:hash-table
                                 :default (or val-default
                                              $empty-default)
@@ -1296,9 +1295,7 @@ function) then there is no guarantee on the serialize function working properly.
                   (defmethod clear-extension ((object ,type) (slot (eql ',fname)))
                     (remhash object ,stable))
                   (defmethod (setf ,reader) (val (object ,type))
-                    (,writer object val)))))
-            ;; This so that (de)serialization works
-            (setf (proto-reader new-field) reader)))
+                    (,writer object val)))))))
         (setf (proto-kind new-field) :extends)
         (appendf (proto-fields extends) (list new-field))
         (appendf (proto-extended-fields extends) (list new-field)))
@@ -1401,7 +1398,6 @@ function) then there is no guarantee on the serialize function working properly.
                        :internal-field-name internal-slot-name
                        :external-field-name slot
                        :json-name json-name
-                       :reader slot
                        :default default
                        ;; Pack the field only if requested and it actually makes sense
                        :packed (and (eq label :repeated) packed t)

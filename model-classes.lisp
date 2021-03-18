@@ -449,10 +449,6 @@ if we are not in SBCL."
     :type string                                ; This is pulled directly from protoc output.
     :accessor proto-json-name
     :initarg :json-name)
-   (reader :type (or null symbol)               ; A reader that is used to access the value
-           :accessor proto-reader               ; if it's supplied, it's used instead of 'value'
-           :initarg :reader
-           :initform nil)
    (default :accessor proto-default             ; Default value (untyped), pulled out of the options
             :initarg :default
             :initform $empty-default)

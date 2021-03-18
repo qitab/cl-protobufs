@@ -64,7 +64,6 @@ TO DO
 [      - If we do it this way, no other special magic is needed			]
 [        Serialization, e.g., should just work					]
 [        Scoping should also just work						]
-[      - We will need 'proto-writer' as an analog to 'proto-reader'		]
 [  - Get deserialization working;						]
 [      Need to call the 'proto-writer' function if its around			]
 [      instead of just using (setf (slot-value ...) ...)			]
