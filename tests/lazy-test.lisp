@@ -29,9 +29,9 @@ Parameters
 
 (deftest test-lazy-field-schema (lazy-suite)
   (let* ((container-message (proto:find-message-descriptor 'container))
-         (container-fields (pi::proto-fields container-message))
+         (container-fields (proto:proto-fields container-message))
          (inner-field (find 'inner container-fields
-                            :key #'pi::proto-external-field-name)))
+                            :key #'proto:proto-external-field-name)))
     (assert-true (pi::proto-lazy-p inner-field))))
 
 (deftest test-lazy-field-serialize (lazy-suite)

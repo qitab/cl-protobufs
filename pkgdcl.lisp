@@ -68,25 +68,11 @@
    #:extension-descriptor
    #:field-descriptor
    #:file-descriptor
+   #:map-descriptor
    #:message-descriptor
    #:method-descriptor
    #:option-descriptor
    #:service-descriptor
-
-   ;; Descriptor accessors
-   #:proto-class
-   #:proto-imports
-   #:proto-name
-   #:proto-options
-   #:proto-package-name
-   #:proto-qualified-name
-   #:proto-services
-   #:proto-syntax
-   #:proto-type
-   #:proto-value
-   #:map-key-type
-   #:map-value-kind
-   #:map-value-type
 
    ;; Descriptor lookup
    #:find-enum-descriptor
@@ -96,6 +82,49 @@
    #:find-message-descriptor
    #:find-method-descriptor
    #:find-service-descriptor
+
+   ;; descriptor accessors
+   #:enum-descriptor-class
+   #:enum-descriptor-name
+   #:enum-descriptor-values
+   #:map-key-type
+   #:map-value-kind
+   #:map-value-type
+   #:oneof-descriptor-fields
+   #:oneof-descriptor-name
+   #:oneof-descriptor-synthetic-p
+   #:proto-class
+   #:proto-client-stub
+   #:proto-container
+   #:proto-default
+   #:proto-external-field-name
+   #:proto-fields
+   #:proto-imports
+   #:proto-index
+   #:proto-input-name
+   #:proto-input-streaming-p
+   #:proto-input-type
+   #:proto-internal-field-name
+   #:proto-kind
+   #:proto-label
+   #:proto-methods
+   #:proto-name
+   #:proto-oneofs
+   #:proto-options
+   #:proto-output-name
+   #:proto-output-streaming-p
+   #:proto-output-type
+   #:proto-package-name
+   #:proto-qualified-name
+   #:proto-server-stub
+   #:proto-service-name
+   #:proto-services
+   #:proto-source-location
+   #:proto-streams-name
+   #:proto-streams-type
+   #:proto-syntax
+   #:proto-type
+   #:proto-value
 
    #:find-option                        ; finds an option, not a descriptor
 
@@ -122,7 +151,7 @@
   (:use :common-lisp :cl-protobufs)
   (:import-from :alexandria #:define-constant)
   (:export
-   ;; Exported solely for use by generated code.
+   ;; Exported for use by generated code. These shouldn't be called directly.
    #:define-schema
    #:define-enum
    #:define-map
@@ -142,22 +171,6 @@
    #:make-deserializer
    #:make-serializer
    #:make-tag
-   #:proto-container
-   #:proto-default
-   #:proto-external-field-name
-   #:proto-fields
-   #:proto-index
-   #:proto-input-name
-   #:proto-input-type
-   #:proto-internal-field-name
-   #:proto-label
-   #:proto-methods
-   #:proto-output-name
-   #:proto-output-streaming-p
-   #:proto-server-stub
-   #:proto-service-name
-   #:proto-source-location              ; should be proto-source-pathname now?
-   #:proto-streams-name
 
    #:serialize-scalar
 

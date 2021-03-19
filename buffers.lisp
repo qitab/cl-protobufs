@@ -716,7 +716,8 @@ and rewind BUFFER so that it is empty."
     (if (and (typep val 'fixnum) (i<= (setq encoded-length (length32 val)) 2))
         (let ((low7 (logand val #x7F)))
           (case encoded-length
-            (1 `(progn (octet-out ,buffer ,low7) 1))
+            (1 `(progn (octet-out ,buffer ,low7)
+                       1))
             (2 `(progn (octet-out2 ,buffer ,(logior #x80 low7) ,(ldb (byte 7 7) val))
                        2))))
         form)))

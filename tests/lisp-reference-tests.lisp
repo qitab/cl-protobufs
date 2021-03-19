@@ -9,16 +9,6 @@
         #:clunit
         #:cl-protobufs
         #:cl-protobufs.protobuf-package-unittest1)
-  (:import-from #:cl-protobufs.implementation
-                #:proto-name
-                #:proto-fields
-                #:proto-services
-                #:proto-methods
-                #:proto-input-type
-                #:proto-output-type
-                #:proto-extended-fields
-                #:proto-class
-                #:proto-internal-field-name)
   (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
@@ -35,7 +25,7 @@ Parameters
 
 (defun find-message-with-string (message name)
   (find-message-descriptor (intern (nstring-upcase (pi::uncamel-case name))
-                                   (symbol-package (pi::proto-class message)))))
+                                   (symbol-package (proto-class message)))))
 
 (deftest cross-package-reference-test (reference-suite)
   (flet ((find-by-name (name proto-object)
@@ -61,7 +51,7 @@ Parameters
            (message-in-other-package-extend
             (find-by-name "MessageInOtherPackage" bing))
            (baa (find-by-name-in-list
-                 "baa" (proto-extended-fields message-in-other-package-extend))))
+                 "baa" (pi::proto-extended-fields message-in-other-package-extend))))
       (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-in-other-package
                           (proto-class baz)))
       (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:enum-in-other-package

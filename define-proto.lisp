@@ -451,7 +451,7 @@ for a proto-message field."
   (clear nil :type symbol))
 
 (defun set-field-accessor-functions (message-name field-name)
-  "Set the get, set, and has functions for a proto field on a fields symbol p-list.
+  "Set the get, set, and has functions for a proto field on a field's symbol p-list.
 Parameters:
   MESSAGE-NAME: The symbol name of the protobuf message containing the field.
   FIELD-NAME: The symbol name for the field."
@@ -463,7 +463,7 @@ Parameters:
          :clear (proto-slot-function-name message-name field-name :clear))))
 
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
-  "Create the common forms needed for all message fields has, is-set, clear, set.
+  "Create the common forms needed for all message fields: has, is-set, clear, set.
 
  Parameters:
   PROTO-TYPE: The Lisp type name of the proto message.
@@ -714,7 +714,8 @@ Paramters:
 
                   (set-field-accessor-functions ',proto-type ',public-slot-name)
 
-                  (export '(,has-function-name ,clear-function-name
+                  (export '(,has-function-name
+                            ,clear-function-name
                             ,public-accessor-name))))))))))
 
 (defun make-map-accessor-forms (proto-type public-slot-name slot-name field)
