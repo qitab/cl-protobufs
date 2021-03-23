@@ -721,15 +721,6 @@ Creates a byte-vector and serializes a protobuf message to that byte-vector. The
 specify the type of object to serialize.
 
 ```lisp
-(serialize-object-to-file (filename object &optional (type (type-of object))))
-```
-
-Serialize a protobuf message to a file. Calls `with-open-file` using
-`:direction :output` and `:element-type '(unsigned-byte 8)`. `filename` is the
-name of the file to write to. `object` is the object to serialize. Optionally
-use `type` to specify the type of object to serialize.
-
-```lisp
 (defun serialize-object-to-stream (stream object &optional (type (type-of object)))
 ```
 
