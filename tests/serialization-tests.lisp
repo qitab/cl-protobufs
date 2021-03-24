@@ -167,47 +167,43 @@ Parameters
                      (pi::with-collectors ((forms collect-form))
                        (dolist (slot slots)
                          (collect-form
-                          `(assert-true (equalp
-                                         (,slot
-                                          ,vobj1)
-                                         (,slot
-                                          ,vobj2)))))
+                          `(assert-equalp (,slot ,vobj1) (,slot ,vobj2))))
                        `(let ((,vobj1 ,obj1)
                               (,vobj2 ,obj2))
                           ,@forms)))))
         (let ((text (with-output-to-string (s)
                       (print-text-format test1 :stream s))))
-          (assert-true (string= text (with-output-to-string (s)
-                                       (print-text-format
-                                        (deserialize-from-bytes 'basic-test1 tser1)
-                                        :stream s))))
+          (assert-equal text (with-output-to-string (s)
+                               (print-text-format
+                                (deserialize-from-bytes 'basic-test1 tser1)
+                                :stream s)))
           (slots-equalp test1 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test1 :stream s))
                         intval))
         (let ((text (with-output-to-string (s)
                       (print-text-format test1b :stream s))))
-          (assert-true (string= text (with-output-to-string (s)
-                                       (print-text-format
-                                        (deserialize-from-bytes 'basic-test1 tser1b)
-                                        :stream s))))
+          (assert-equal text (with-output-to-string (s)
+                               (print-text-format
+                                (deserialize-from-bytes 'basic-test1 tser1b)
+                                :stream s)))
           (slots-equalp test1b (with-input-from-string (s text)
                                  (parse-text-format 'basic-test1 :stream s))
                         intval))
         (let ((text (with-output-to-string (s)
                       (print-text-format test2 :stream s))))
-          (assert-true (string= text (with-output-to-string (s)
-                                       (print-text-format
-                                        (deserialize-from-bytes 'basic-test2 tser2)
-                                        :stream s))))
+          (assert-equal text (with-output-to-string (s)
+                               (print-text-format
+                                (deserialize-from-bytes 'basic-test2 tser2)
+                                :stream s)))
           (slots-equalp test2 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test2 :stream s))
                         intval strval))
         (let ((text (with-output-to-string (s)
                       (print-text-format test3 :stream s))))
-          (assert-true (string= text (with-output-to-string (s)
-                                       (print-text-format
-                                        (deserialize-from-bytes 'basic-test3 tser3)
-                                        :stream s))))
+          (assert-equal text (with-output-to-string (s)
+                               (print-text-format
+                                (deserialize-from-bytes 'basic-test3 tser3)
+                                :stream s)))
           (slots-equalp test3 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test3 :stream s))
                         intval strval)
@@ -217,10 +213,10 @@ Parameters
                         intval))
         (let ((text (with-output-to-string (s)
                       (print-text-format test4 :stream s))))
-          (assert-true (string= text (with-output-to-string (s)
-                                       (print-text-format
-                                        (deserialize-from-bytes 'basic-test4 tser4)
-                                        :stream s))))
+          (assert-equal text (with-output-to-string (s)
+                               (print-text-format
+                                (deserialize-from-bytes 'basic-test4 tser4)
+                                :stream s)))
           (slots-equalp test4 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test4 :stream s))
                         intval strval)
@@ -230,19 +226,19 @@ Parameters
                         intval strval))
         (let ((text (with-output-to-string (s)
                       (print-text-format test5 :stream s))))
-          (assert-true (string= text (with-output-to-string (s)
-                                       (print-text-format
-                                        (deserialize-from-bytes 'basic-test5 tser5)
-                                        :stream s))))
+          (assert-equal text (with-output-to-string (s)
+                               (print-text-format
+                                (deserialize-from-bytes 'basic-test5 tser5)
+                                :stream s)))
           (slots-equalp test5 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test5 :stream s))
                         color intvals strvals))
         (let ((text (with-output-to-string (s)
                       (print-text-format test6 :stream s))))
-          (assert-true (string= text (with-output-to-string (s)
-                                       (print-text-format
-                                        (deserialize-from-bytes 'basic-test6 tser6)
-                                        :stream s))))
+          (assert-equal text (with-output-to-string (s)
+                               (print-text-format
+                                (deserialize-from-bytes 'basic-test6 tser6)
+                                :stream s)))
           (slots-equalp test6 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test6 :stream s))
                         intvals strvals)
@@ -263,12 +259,13 @@ Parameters
                   (buf (serialize-to-bytes message type))
                   (new (deserialize-from-bytes type buf))
                   (newbuf (serialize-to-bytes new type)))
-             (assert-true (equalp (length buf) (length newbuf)))
-             (assert-true (equalp buf newbuf))
-             (assert-true (string= (with-output-to-string (s)
-                                     (print-text-format message :stream s))
-                                   (with-output-to-string (s)
-                                     (print-text-format new :stream s)))))))
+             (assert-equalp (length buf) (length newbuf))
+             (assert-equalp buf newbuf)
+             (assert-equal
+                 (with-output-to-string (s)
+                   (print-text-format message :stream s))
+                 (with-output-to-string (s)
+                   (print-text-format new :stream s))))))
     (do-test (make-outer :i 4))
     (do-test (make-outer :i -4))
     (let ((inner-1 (mapcar #'(lambda (i) (make-inner :i i)) '(1 2 3)))
@@ -297,12 +294,12 @@ Parameters
           (ser-space0 (serialize-to-bytes space0 (type-of space0)))
           (ser-space1 (serialize-to-bytes space1 (type-of space1)))
           (ser-space2 (serialize-to-bytes space2 (type-of space2))))
-      (assert-true (equalp ser-speed0 #()))
-      (assert-true (equalp ser-speed1 #(#x0A #x00)))
-      (assert-true (equalp ser-speed2 #(#x0A #x00)))
-      (assert-true (equalp ser-space0 #()))
-      (assert-true (equalp ser-space1 #(#x0A #x00)))
-      (assert-true (equalp ser-space2 #(#x0A #x00))))))
+      (assert-equalp ser-speed0 #())
+      (assert-equalp ser-speed1 #(#x0A #x00))
+      (assert-equalp ser-speed2 #(#x0A #x00))
+      (assert-equalp ser-space0 #())
+      (assert-equalp ser-space1 #(#x0A #x00))
+      (assert-equalp ser-space2 #(#x0A #x00)))))
 
 ;; Extension example
 ;; This test can not (or should not) work with optimize :SPEED because of poor Lisp style,
@@ -336,16 +333,18 @@ Parameters
     (let ((ser1 (serialize-to-bytes request-1 'buy-car-request))
           (ser2 (serialize-to-bytes request-2 'buy-car-request)))
       (assert-false (equal ser1 ser2))
-      (assert-true (string= (with-output-to-string (s)
-                              (print-text-format request-1 :stream s))
-                            (with-output-to-string (s)
-                              (print-text-format
-                               (deserialize-from-bytes 'buy-car-request ser1) :stream s))))
-      (assert-true (string= (with-output-to-string (s)
-                              (print-text-format request-2 :stream s))
-                            (with-output-to-string (s)
-                              (print-text-format
-                               (deserialize-from-bytes 'buy-car-request ser2) :stream s)))))
+      (assert-equal
+          (with-output-to-string (s)
+            (print-text-format request-1 :stream s))
+          (with-output-to-string (s)
+            (print-text-format
+             (deserialize-from-bytes 'buy-car-request ser1) :stream s)))
+      (assert-equal
+          (with-output-to-string (s)
+            (print-text-format request-2 :stream s))
+          (with-output-to-string (s)
+            (print-text-format
+             (deserialize-from-bytes 'buy-car-request ser2) :stream s))))
     (let ((str1 (with-output-to-string (s)
                   (print-text-format request-1 :stream s)))
           (str2 (with-output-to-string (s)
@@ -386,16 +385,18 @@ Parameters
     (let ((ser1 (serialize-to-bytes request-1 'buy-car-request))
           (ser2 (serialize-to-bytes request-2 'buy-car-request)))
       (assert-false (equal ser1 ser2))
-      (assert-true (string= (with-output-to-string (s)
-                              (print-text-format request-1 :stream s))
-                            (with-output-to-string (s)
-                              (print-text-format
-                               (deserialize-from-bytes 'buy-car-request ser1) :stream s))))
-      (assert-true (string= (with-output-to-string (s)
-                              (print-text-format request-2 :stream s))
-                            (with-output-to-string (s)
-                              (print-text-format
-                               (deserialize-from-bytes 'buy-car-request ser2) :stream s)))))
+      (assert-equal
+          (with-output-to-string (s)
+            (print-text-format request-1 :stream s))
+          (with-output-to-string (s)
+            (print-text-format
+             (deserialize-from-bytes 'buy-car-request ser1) :stream s)))
+      (assert-equal
+          (with-output-to-string (s)
+            (print-text-format request-2 :stream s))
+          (with-output-to-string (s)
+            (print-text-format
+             (deserialize-from-bytes 'buy-car-request ser2) :stream s))))
     (let ((str1 (with-output-to-string (s)
                   (print-text-format request-1 :stream s)))
           (str2 (with-output-to-string (s)
@@ -417,25 +418,22 @@ Parameters
          (request-3  (make-color-wheel2-wrap :id 9001 :wheel wheel2 :metaname "meta")))
     (let ((ser1 (serialize-to-bytes request-1 'add-color1))
           (ser2 (serialize-to-bytes request-2 'add-color2)))
-      (assert-true (string= (subseq
-                             (with-output-to-string (s)
-                               (print-text-format request-1 :stream s))
-                             9)
-                            (subseq
-                             (with-output-to-string (s)
-                               (print-text-format request-2 :stream s))
-                             9)))
-      (assert-true
-          (string= (subseq
-                    (with-output-to-string (s)
-                      (print-text-format
-                       (deserialize-from-bytes 'add-color1 ser1) :stream s))
-                    9)
-                   (subseq
-                    (with-output-to-string (s)
-                      (print-text-format
-                       (deserialize-from-bytes 'add-color2 ser2) :stream s))
-                    9)))
+      (assert-equal
+          (subseq (with-output-to-string (s)
+                    (print-text-format request-1 :stream s))
+                  9)
+          (subseq (with-output-to-string (s)
+                    (print-text-format request-2 :stream s))
+                  9))
+      (assert-equal
+          (subseq (with-output-to-string (s)
+                    (print-text-format
+                     (deserialize-from-bytes 'add-color1 ser1) :stream s))
+                  9)
+          (subseq (with-output-to-string (s)
+                    (print-text-format
+                     (deserialize-from-bytes 'add-color2 ser2) :stream s))
+                  9))
       ;; This tests the optimized serializer's ability to serialize messages
       ;; which have nested messages which have group fields.
       (pi::make-serializer color-wheel2.metadata)

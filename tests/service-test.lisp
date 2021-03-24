@@ -46,18 +46,18 @@ Parameters
          (input (pi::proto-input-name method))
          (output (pi::proto-output-name method)))
     ;; Input/output names must be fully qualified.
-    (assert-true (string= "protobuf_package_unittest1.Record2fLookupRequest" input))
-    (assert-true (string= "protobuf_package_unittest1.Record2fLookupResponse" output))))
+    (assert-equal "protobuf_package_unittest1.Record2fLookupRequest" input)
+    (assert-equal "protobuf_package_unittest1.Record2fLookupResponse" output)))
 
 (deftest test-method-options (services-suite)
   (let* ((service (proto:find-service-descriptor
                    'cl-protobufs.service-test-pb:service-test
                    'cl-protobufs.service-test-pb:foo-service))
          (method (proto:find-method-descriptor service 'cl-protobufs.service-test-pb::bar-method)))
-    (assert-true (eq :udp (pi::find-option method "protocol")))
-    (assert-true (eql 30.0d0 (pi::find-option method "deadline")))
-    (assert-true (eq t (pi::find-option method "duplicate_suppression")))
-    (assert-true (eql -123 (pi::find-option method "client_logging")))
-    (assert-true (eq :privacy-and-integrity (pi::find-option method "security_level")))
-    (assert-true (equal "admin" (pi::find-option method "security_label")))
-    (assert-true (eql 42 (pi::find-option method "legacy_client_initial_tokens")))))
+    (assert-eq :udp (pi::find-option method "protocol"))
+    (assert-eql 30.0d0 (pi::find-option method "deadline"))
+    (assert-eq t (pi::find-option method "duplicate_suppression"))
+    (assert-eql -123 (pi::find-option method "client_logging"))
+    (assert-eq :privacy-and-integrity (pi::find-option method "security_level"))
+    (assert-equal "admin" (pi::find-option method "security_label"))
+    (assert-eql 42 (pi::find-option method "legacy_client_initial_tokens"))))

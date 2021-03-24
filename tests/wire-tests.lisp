@@ -52,7 +52,7 @@ Parameters
 (deftest zig-zag-test (wire-format-suite)
   (flet ((verify (encoder pairs)
            (loop for (input output) in pairs
-                 do (assert-true (= (funcall encoder input) output)))))
+                 do (assert-eql (funcall encoder input) output))))
     (verify #'zig-zag-encode32
             `((0 0) (-1 1) (1 2) (-2 3)
               (#x3fffffff #x7ffffffe)
@@ -82,9 +82,9 @@ Parameters
               (#xfffffffffffffffe #x7fffffffffffffff)
               (#xffffffffffffffff ,(- #x8000000000000000 (ash 1 64))))))
   (flet ((round-trip32 (n)
-           (assert-true (= n (zig-zag-decode32 (zig-zag-encode32 n)))))
+           (assert-eql (zig-zag-decode32 (zig-zag-encode32 n)) n))
          (round-trip64 (n)
-           (assert-true (= n (zig-zag-decode64 (zig-zag-encode64 n))))))
+           (assert-eql (zig-zag-decode64 (zig-zag-encode64 n)) n)))
     (dolist (n '(0 1 -1 14927 -3612))
       (round-trip32 n))
     (dolist (n '(0 1 -1 14927 -3612 856912304801416 -75123905439571256))
@@ -93,7 +93,7 @@ Parameters
 (deftest encode-length-tests (wire-format-suite)
   (flet ((verify (encoder pairs)
            (loop for (input output) in pairs
-                 do (assert-true (= (funcall encoder input) output)))))
+                 do (assert-eql output (funcall encoder input)))))
     (verify #'length32
             '((#x0 1) (#x7f 1)                ; 0-7 bits
               (#x80 2) (#x3fff 2)             ; 8-14 bits
@@ -125,15 +125,12 @@ Paramaters:
                     (array (progn
                              (funcall encoder input buf)
                              (concatenate-blocks (compactify-blocks buf)))))
-               ;; Are the bytes as assert-trueed?
-               (assert-true (equalp array assert-trueed-buf)))
+               (assert-equalp array assert-trueed-buf))
         when decoder
           do (multiple-value-bind (decoded-value index)
                  (funcall decoder assert-trueed-buf 0)
-               ;; Did we get the right value?
-               (assert-true (= decoded-value input))
-               ;; Did we get the right index increment?
-               (assert-true (= (length assert-trueed) index)))))
+               (assert-eql input decoded-value)
+               (assert-eql index (length assert-trueed)))))
 
 (deftest encode/decode-ints-tests (wire-format-suite)
   (verify-encode-decode #'encode-uint32

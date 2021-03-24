@@ -27,23 +27,23 @@ Parameters
 (deftest test-optional-serialization (serialize-suite)
   (let* ((msg (make-optional-message))
          (msg-bytes (serialize-to-bytes msg 'optional-message)))
-    (assert-true (equalp msg-bytes #()))
+    (assert-equalp msg-bytes #())
 
     (setf (optional-no-default msg) 3
           (optional-with-default msg) 3
           msg-bytes (serialize-to-bytes msg 'optional-message))
-    (assert-true (equalp msg-bytes #(8 3 16 3)))
+    (assert-equalp msg-bytes #(8 3 16 3))
 
     (setf (optional-no-default msg) 2
           (optional-with-default msg) 2
           msg-bytes (serialize-to-bytes msg 'optional-message))
     ;; 8 = field 1 varint, 2 = 2, 16 = field 2 varint, 2 = 2
-    (assert-true (equalp msg-bytes #(8 2 16 2)))
+    (assert-equalp msg-bytes #(8 2 16 2))
 
     (clear msg)
     (setf (optional-no-default msg) 2
           msg-bytes (serialize-to-bytes msg 'optional-message))
-    (assert-true (equalp msg-bytes #(8 2)))))
+    (assert-equalp msg-bytes #(8 2))))
 
 
 (deftest test-required-serialization (serialize-suite)
@@ -53,19 +53,19 @@ Parameters
     (setf (required-no-default msg) 3
           (required-with-default msg) 3
           msg-bytes (serialize-to-bytes msg 'required-message))
-    (assert-true (equalp msg-bytes #(8 3 16 3)))
+    (assert-equalp msg-bytes #(8 3 16 3))
 
     (setf (required-no-default msg) 2
           (required-with-default msg) 2
           msg-bytes (serialize-to-bytes msg 'required-message))
-    (assert-true (equalp msg-bytes #(8 2 16 2)))
+    (assert-equalp msg-bytes #(8 2 16 2))
 
     ;; TODO(jgodbout): We should optionally throw an error that
     ;; a required field is unset.
     (clear msg)
     (setf (required-no-default msg) 2
           msg-bytes (serialize-to-bytes msg 'required-message))
-    (assert-true (equalp msg-bytes #(8 2)))))
+    (assert-equalp msg-bytes #(8 2))))
 
 
 (deftest test-repeated-serialization (serialize-suite)
@@ -74,11 +74,11 @@ Parameters
 
     (push 3 (repeated-no-default msg))
     (setf msg-bytes (serialize-to-bytes msg 'repeated-message))
-    (assert-true (equalp msg-bytes #(8 3)))
+    (assert-equalp msg-bytes #(8 3))
 
     (clear msg)
     (setf msg-bytes (serialize-to-bytes msg 'repeated-message))
-    (assert-true (equalp msg-bytes #()))))
+    (assert-equalp msg-bytes #())))
 
 
 (deftest test-float-serialization (serialize-suite)
@@ -89,7 +89,7 @@ Parameters
     (let* ((msg-bytes (serialize-to-bytes msg 'message-with-floats))
            (des-msg (deserialize-from-bytes 'message-with-floats msg-bytes)))
 
-      (assert-true (= (message-with-floats.test-float des-msg) 5.0))
+      (assert-eql 5.0 (message-with-floats.test-float des-msg))
       (assert-true (typep (message-with-floats.test-float des-msg) 'float))
-      (assert-true (= (message-with-floats.test-double des-msg) 6.0d0))
+      (assert-eql 6.0d0 (message-with-floats.test-double des-msg))
       (assert-true (typep (message-with-floats.test-double des-msg) 'double-float)))))

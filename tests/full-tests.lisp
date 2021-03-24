@@ -161,9 +161,9 @@ Parameters
       (let ((accessor (field-function "" field))
             (v0 (first values))
             (v1 (second values)))
-        (assert (= (length (funcall accessor m)) 2))
-        (assert (field-equal (first (funcall accessor m)) v0))
-        (assert (field-equal (second (funcall accessor m)) v1))))))
+        (assert-eql 2 (length (funcall accessor m)))
+        (assert-true (field-equal (first (funcall accessor m)) v0))
+        (assert-true (field-equal (second (funcall accessor m)) v1))))))
 
 (define-constant +packed-field-info+
   '((packed-int32 601 701) (packed-int64 602 702)
@@ -181,20 +181,20 @@ Parameters
     (let ((accessor (field-function "" field))
           (v0 (first values))
           (v1 (second values)))
-      (assert (= (length (funcall accessor m)) 2))
-      (assert (field-equal (first (funcall accessor m)) v0))
-      (assert (field-equal (second (funcall accessor m)) v1)))))
+      (assert-eql 2 (length (funcall accessor m)))
+      (assert-true (field-equal (first (funcall accessor m)) v0))
+      (assert-true (field-equal (second (funcall accessor m)) v1)))))
 
 (defun read-message (type file-name)
   (with-open-file (stream file-name :direction :input :element-type '(unsigned-byte 8))
     (pi::deserialize-from-stream type stream)))
 
-(defun test-parse-from-file ()
+(deftest test-parse-from-file (full-suite)
   (let ((message (read-message 'cl-protobufs.protobuf-unittest:test-all-types
                                +golden-file-name+)))
     (expect-all-fields-set message)))
 
-(defun test-parse-packed-from-file ()
+(deftest test-parse-packed-from-file (full-suite)
   (let ((message (read-message 'cl-protobufs.protobuf-unittest:test-packed-types
                                +golden-packed-file-name+)))
     (expect-packed-fields-set message)))
@@ -216,7 +216,7 @@ Parameters
              (entries (list v0 v1)))
         (funcall setter entries m)))))
 
-(defun test-parse-helpers ()
+(deftest test-parse-helpers (full-suite)
   (let ((m1 (cl-protobufs.protobuf-unittest:make-test-all-types)))
     (set-all-fields m1)
     (expect-all-fields-set m1)
@@ -236,24 +236,22 @@ Parameters
 
           for default-value = (first values)
           do
-       (assert (field-equal (funcall accessor m)
-                            default-value))
-       (assert (not (funcall has-function m)))))
+       (assert-true (field-equal (funcall accessor m) default-value))
+       (assert-false (funcall has-function m))))
 
   (let ((field-info *default-field-info*))
     (loop for (field . values) in field-info do
       (let* ((accessor (pi::proto-slot-function-name
                         (type-of m) field :get))
              (default-value (first values)))
-        (assert (field-equal (funcall accessor m)
-                             default-value)))))
+        (assert-true (field-equal (funcall accessor m) default-value)))))
 
   ;; repeated fields
   (let ((field-info *repeated-field-info*))
     (loop for (field . nil) in field-info do
       (let* ((accessor (pi::proto-slot-function-name
                         (type-of m) field :get)))
-        (assert (zerop (length (funcall accessor m))))))))
+        (assert-eql 0 (length (funcall accessor m)))))))
 
 (defun modify-repeated-fields (m)
   (let ((field-info *repeated-field-info*))
@@ -272,11 +270,11 @@ Parameters
                        field))
             (v0 (third values))
             (v1 (second values)))
-        (assert-true (= (length (funcall accessor m)) 2))
+        (assert-eql 2 (length (funcall accessor m)))
         (assert-true (field-equal (first (funcall accessor m)) v0))
         (assert-true (field-equal (second (funcall accessor m)) v1))))))
 
-(defun test-modify-repeated-fields ()
+(deftest test-modify-repeated-fields (full-suite)
   (let ((m (cl-protobufs.protobuf-unittest:make-test-all-types)))
     (expect-clear m)
     (set-all-fields m)
@@ -288,12 +286,4 @@ Parameters
 
 (deftest test-enum-default (full-suite)
   (let ((m (cl-protobufs.protobuf-unittest:make-sparse-enum-message)))
-    (assert-true (eq (cl-protobufs.protobuf-unittest:sparse-enum-message.sparse-enum m)
-                     :SPARSE-A))))
-
-(deftest test (full-suite)
-  (test-parse-from-file)
-  (test-parse-packed-from-file)
-  (test-parse-helpers)
-  (test-modify-repeated-fields)
-  (values))
+    (assert-eq :SPARSE-A (cl-protobufs.protobuf-unittest:sparse-enum-message.sparse-enum m))))

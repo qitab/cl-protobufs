@@ -52,26 +52,32 @@ Parameters
             (find-by-name "MessageInOtherPackage" bing))
            (baa (find-by-name-in-list
                  "baa" (pi::proto-extended-fields message-in-other-package-extend))))
-      (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-in-other-package
-                          (proto-class baz)))
-      (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:enum-in-other-package
-                          (proto-class bonk)))
-      (assert-true (equal 'message-defined-in-both-packages
-                          (proto-class bam)))
-      (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-defined-in-both-packages
-                          (proto-class bing)))
-      (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-in-other-package
-                          (proto-class boo)))
-      (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-in-other-package
-                          (proto-input-type bloop)))
-      (assert-true (equal 'message-with-cross-package-reference
-                          (proto-output-type bloop)))
-      (assert-true (equal 'message-with-cross-package-reference
-                          (proto-input-type beep)))
-      (assert-true (equal 'cl-protobufs.protobuf-package-unittest2:message-in-other-package
-                          (proto-output-type beep)))
-      (assert-true (equal 'cl-protobufs.protobuf-package-unittest1::%baa
-                          (proto-internal-field-name baa)))))
+      (assert-equal
+          'cl-protobufs.protobuf-package-unittest2:message-in-other-package
+          (proto-class baz))
+      (assert-equal
+          'cl-protobufs.protobuf-package-unittest2:enum-in-other-package
+          (proto-class bonk))
+      (assert-equal
+          'message-defined-in-both-packages
+          (proto-class bam))
+      (assert-equal
+          'cl-protobufs.protobuf-package-unittest2:message-defined-in-both-packages
+          (proto-class bing))
+      (assert-equal
+          'cl-protobufs.protobuf-package-unittest2:message-in-other-package
+          (proto-class boo))
+      (assert-equal
+          'cl-protobufs.protobuf-package-unittest2:message-in-other-package
+          (proto-input-type bloop))
+      (assert-equal 'message-with-cross-package-reference (proto-output-type bloop))
+      (assert-equal 'message-with-cross-package-reference (proto-input-type beep))
+      (assert-equal
+          'cl-protobufs.protobuf-package-unittest2:message-in-other-package
+          (proto-output-type beep))
+      (assert-equal
+          'cl-protobufs.protobuf-package-unittest1::%baa
+          (proto-internal-field-name baa))))
 
   (let* ((orig1 (make-message-with-cross-package-reference))
          (bam1 (make-message-defined-in-both-packages))
@@ -101,20 +107,14 @@ Parameters
            (new2 (deserialize-from-bytes 'message-with-cross-package-extension bytes2)))
       (assert-true (typep (baz new1)
                           'cl-protobufs.protobuf-package-unittest2:message-in-other-package))
-      (assert-true (equal 123
-                          (cl-protobufs.protobuf-package-unittest2:foo (baz new1))))
-      (assert-true (equal :bar
-                          (bonk new1)))
-      (assert-true (equal "bomb"
-                          (boom (bam new1))))
-      (assert-true (equal "gun"
-                          (cl-protobufs.protobuf-package-unittest2:bang (bing new1))))
+      (assert-equal 123 (cl-protobufs.protobuf-package-unittest2:foo (baz new1)))
+      (assert-equal :bar (bonk new1))
+      (assert-equal "bomb" (boom (bam new1)))
+      (assert-equal "gun" (cl-protobufs.protobuf-package-unittest2:bang (bing new1)))
       (assert-true (typep (boo new2)
                           'cl-protobufs.protobuf-package-unittest2:message-in-other-package))
-      (assert-true (equal 123
-                          (cl-protobufs.protobuf-package-unittest2:foo (boo new2))))
-      (assert-true (equal 456
-                          (baa (boo new2)))))))
+      (assert-equal 123 (cl-protobufs.protobuf-package-unittest2:foo (boo new2)))
+      (assert-equal 456 (baa (boo new2))))))
 
 (deftest forward-reference-test (reference-suite)
   (flet ((find-by-name (name proto-objects)
