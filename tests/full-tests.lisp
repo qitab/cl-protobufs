@@ -185,9 +185,9 @@ Parameters
       (assert (field-equal (first (funcall accessor m)) v0))
       (assert (field-equal (second (funcall accessor m)) v1)))))
 
-(defun read-message (class-name file-name)
+(defun read-message (type file-name)
   (with-open-file (stream file-name :direction :input :element-type '(unsigned-byte 8))
-    (pi::deserialize-from-stream class-name :stream stream)))
+    (pi::deserialize-from-stream type stream)))
 
 (defun test-parse-from-file ()
   (let ((message (read-message 'cl-protobufs.protobuf-unittest:test-all-types
@@ -221,8 +221,8 @@ Parameters
     (set-all-fields m1)
     (expect-all-fields-set m1)
     (let* ((bytes (serialize-to-bytes m1))
-           (m2 (deserialize 'cl-protobufs.protobuf-unittest:test-all-types
-                            bytes 0 (length bytes))))
+           (m2 (deserialize-from-bytes 'cl-protobufs.protobuf-unittest:test-all-types
+                                       bytes)))
       (expect-all-fields-set m2))))
 
 (defun expect-clear (m)

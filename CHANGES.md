@@ -32,17 +32,17 @@ change) and for internal code quality improvements.
     -   And similar renamings for the generated code versions. See README.md for
         details.
 
-*   The word "object" has been removed from the serialization/deserialization
-    functions:
+*   The serialization APIs have been made less redundant and more consistent:
 
-    -   `serialize-object` is now `serialize`
-    -   `serialize-object-to-bytes` is now `serialize-to-bytes`
-    -   `serialize-object-to-stream` is now `serialize-to-stream`
-
-    Also `serialize-object-to-file` and `deserialize-object-from-file` have been
-    removed. These functions didn't give access to all file-opening options and
-    are trivial to implement by calling `with-open-file` and
-    `serialize-to-stream`.
+    -   These definitions have been removed:
+        -   `serialize-object`
+        -   `deserialize-object`
+        -   `serialize-object-to-file` (use `with-open-file` instead)
+        -   `deserialize-object-from-file` (use `with-open-file` instead)
+    -   `serialize-object-to-bytes` is now called `serialize-to-bytes`.
+    -   `serialize-object-to-stream` is now called `serialize-to-stream` and the
+        argument order matches the order for `deserialize-from-stream`.
+    -   `deserialize-object-from-bytes` is now called `deserialize-from-bytes`.
 
 *   These definitions previously exported from `cl-protobufs` have been removed:
 

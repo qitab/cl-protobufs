@@ -63,10 +63,7 @@
 
 ;;; Serialization
 
-;;; TODO(cgay): this arglist and deserialize-from-stream should be at least a
-;;; little bit symmetrical. I suggest the stream always be the first argument
-;;; for both, or be a keyword arg for both. Kill &optional with fire. :)
-(defun serialize-to-stream (stream object &optional (type (type-of object)))
+(defun serialize-to-stream (object stream &optional (type (type-of object)))
   "Serialize OBJECT of type TYPE onto the STREAM using wire format.
    OBJECT and TYPE are as described in SERIALIZE-TO-BYTES."
   (let ((buffer (serialize-to-bytes object type)))
@@ -89,7 +86,7 @@
             (b (make-octet-buffer 100)))
         (if fast-function
             (funcall (the function fast-function) object b)
-            (serialize object (find-message-descriptor type) b))
+            (serialize-message object (find-message-descriptor type) b))
         (let ((compact-buf (compactify-blocks b)))
           (concatenate-blocks compact-buf)))))
 
@@ -109,7 +106,7 @@
       0))
 
 ;; The default function uses metadata from the message descriptor.
-(defun serialize (object msg-desc buffer)
+(defun serialize-message (object msg-desc buffer)
   "Serialize OBJECT with message descriptor MSG-DESC into BUFFER using wire format.
    The value returned is the number of octets written to BUFFER."
   (declare (buffer buffer)
@@ -240,7 +237,7 @@ Parameters:
                              (funcall custom-serializer msg buffer)))
                       (t
                        (setq submessage-size
-                             (serialize msg msg-desc buffer))))
+                             (serialize-message msg msg-desc buffer))))
                 (iincf size (+ (backpatch submessage-size) submessage-size)))))))
     size))
 
@@ -321,12 +318,12 @@ Parameters:
                           (funcall custom-serializer msg buffer)))
                    (t
                     (setq submessage-size
-                          (serialize msg msg-desc buffer))))
+                          (serialize-message msg msg-desc buffer))))
              (+ tag-size (backpatch submessage-size) submessage-size))))))
 
 ;;; Deserialization
 
-(defun deserialize-from-stream (type &key (stream *standard-input*))
+(defun deserialize-from-stream (type stream)
   "Deserialize an object of type TYPE from STREAM."
   (let* ((size    (file-length stream))
          (buffer  (make-byte-vector size)))
@@ -350,21 +347,10 @@ Parameters:
         (funcall (the function fast-function) buffer start end)
         (%deserialize type buffer start end))))
 
-;; DESERIALIZE-FROM-BYTES should be sole user-facing API, because that is the
-;; interface which decides whether to call a fast function or the
-;; introspection-based stuff. The DESERIALIZE methods are supposed to be a
-;; hidden internal detail, with sophisticated applications being permitted to
-;; override them. Furthermore, consistency with the fast auto-generated
-;; functions, demands that the START and END bounding indices not be optional.
-;; Sadly, much code exists calling DESERIALIZE directly when really
-;; DESERIALIZE-FROM-BYTES was meant.  To that end, I am "hiding" the methods as
-;; %DESERIALIZE and allowing DESERIALIZE to be called as it was before.
-
-(defun-inline deserialize (type buffer &optional (start 0) (end (length buffer)))
-  (deserialize-from-bytes type buffer start end))
-
 ;; Allow clients to add their own methods.
 ;; For example, you might want to preserve object identity.
+;; (Named with leading % for historical reasons. That could be fixed now
+;; and this could be exported.)
 (defgeneric %deserialize (type buffer start end &optional end-tag)
   (:documentation
    "Deserialize an object of type TYPE from BUFFER between indices START and END.

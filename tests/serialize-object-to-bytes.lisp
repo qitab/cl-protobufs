@@ -87,7 +87,7 @@ Parameters
           (message-with-floats.test-double msg) 6.0d0)
 
     (let* ((msg-bytes (serialize-to-bytes msg 'message-with-floats))
-           (des-msg (deserialize 'message-with-floats msg-bytes)))
+           (des-msg (deserialize-from-bytes 'message-with-floats msg-bytes)))
 
       (assert-true (= (message-with-floats.test-float des-msg) 5.0))
       (assert-true (typep (message-with-floats.test-float des-msg) 'float))

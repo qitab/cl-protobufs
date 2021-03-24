@@ -106,39 +106,39 @@ Parameters
                           `(let ((,vobj1 ,obj1)
                                  (,vobj2 ,obj2))
                              ,@forms)))))
-           (slots-equalp test1 (deserialize 'basic-test1 tser1)
+           (slots-equalp test1 (deserialize-from-bytes 'basic-test1 tser1)
                          intval)
-           (slots-equalp test1b (deserialize 'basic-test1 tser1b)
+           (slots-equalp test1b (deserialize-from-bytes 'basic-test1 tser1b)
                          intval)
-           (slots-equalp test2 (deserialize 'basic-test2 tser2)
+           (slots-equalp test2 (deserialize-from-bytes 'basic-test2 tser2)
                          intval strval)
-           (slots-equalp test3 (deserialize 'basic-test3 tser3)
+           (slots-equalp test3 (deserialize-from-bytes 'basic-test3 tser3)
                          intval strval)
            (slots-equalp (recval test3)
-                         (recval (deserialize 'basic-test3 tser3))
+                         (recval (deserialize-from-bytes 'basic-test3 tser3))
                          intval)
-           (slots-equalp test4 (deserialize 'basic-test4 tser4)
+           (slots-equalp test4 (deserialize-from-bytes 'basic-test4 tser4)
                          intval strval)
            (slots-equalp (recval test4)
-                         (recval (deserialize 'basic-test4 tser4))
+                         (recval (deserialize-from-bytes 'basic-test4 tser4))
                          intval strval)
-           (slots-equalp test5 (deserialize 'basic-test5 tser5)
+           (slots-equalp test5 (deserialize-from-bytes 'basic-test5 tser5)
                          color intvals strvals)
-           (slots-equalp test6 (deserialize 'basic-test6 tser6)
+           (slots-equalp test6 (deserialize-from-bytes 'basic-test6 tser6)
                          intvals strvals)
            (slots-equalp (first (recvals test6))
-                         (first (recvals (deserialize 'basic-test6 tser6)))
+                         (first (recvals (deserialize-from-bytes 'basic-test6 tser6)))
                          strval)
            (slots-equalp (second (recvals test6))
-                         (second (recvals (deserialize 'basic-test6 tser6)))
+                         (second (recvals (deserialize-from-bytes 'basic-test6 tser6)))
                          strval)
-           (slots-equalp test7 (deserialize 'basic-test7 tser7)
+           (slots-equalp test7 (deserialize-from-bytes 'basic-test7 tser7)
                          strval1 intvals strval2)
            (slots-equalp (first (subgroups test7))
-                         (first (subgroups (deserialize 'basic-test7 tser7)))
+                         (first (subgroups (deserialize-from-bytes 'basic-test7 tser7)))
                          strval intvals)
            (slots-equalp (second (subgroups test7))
-                         (second (subgroups (deserialize 'basic-test7 tser7)))
+                         (second (subgroups (deserialize-from-bytes 'basic-test7 tser7)))
                          strval intvals))))))
 
 (deftest text-serialization (serialization-suite)
@@ -179,7 +179,7 @@ Parameters
                       (print-text-format test1 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize 'basic-test1 tser1)
+                                        (deserialize-from-bytes 'basic-test1 tser1)
                                         :stream s))))
           (slots-equalp test1 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test1 :stream s))
@@ -188,7 +188,7 @@ Parameters
                       (print-text-format test1b :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize 'basic-test1 tser1b)
+                                        (deserialize-from-bytes 'basic-test1 tser1b)
                                         :stream s))))
           (slots-equalp test1b (with-input-from-string (s text)
                                  (parse-text-format 'basic-test1 :stream s))
@@ -197,7 +197,7 @@ Parameters
                       (print-text-format test2 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize 'basic-test2 tser2)
+                                        (deserialize-from-bytes 'basic-test2 tser2)
                                         :stream s))))
           (slots-equalp test2 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test2 :stream s))
@@ -206,7 +206,7 @@ Parameters
                       (print-text-format test3 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize 'basic-test3 tser3)
+                                        (deserialize-from-bytes 'basic-test3 tser3)
                                         :stream s))))
           (slots-equalp test3 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test3 :stream s))
@@ -219,7 +219,7 @@ Parameters
                       (print-text-format test4 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize 'basic-test4 tser4)
+                                        (deserialize-from-bytes 'basic-test4 tser4)
                                         :stream s))))
           (slots-equalp test4 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test4 :stream s))
@@ -232,7 +232,7 @@ Parameters
                       (print-text-format test5 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize 'basic-test5 tser5)
+                                        (deserialize-from-bytes 'basic-test5 tser5)
                                         :stream s))))
           (slots-equalp test5 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test5 :stream s))
@@ -241,7 +241,7 @@ Parameters
                       (print-text-format test6 :stream s))))
           (assert-true (string= text (with-output-to-string (s)
                                        (print-text-format
-                                        (deserialize 'basic-test6 tser6)
+                                        (deserialize-from-bytes 'basic-test6 tser6)
                                         :stream s))))
           (slots-equalp test6 (with-input-from-string (s text)
                                 (parse-text-format 'basic-test6 :stream s))
@@ -261,7 +261,7 @@ Parameters
   (flet ((do-test (message)
            (let* ((type (type-of message))
                   (buf (serialize-to-bytes message type))
-                  (new (deserialize type buf))
+                  (new (deserialize-from-bytes type buf))
                   (newbuf (serialize-to-bytes new type)))
              (assert-true (equalp (length buf) (length newbuf)))
              (assert-true (equalp buf newbuf))
@@ -340,12 +340,12 @@ Parameters
                               (print-text-format request-1 :stream s))
                             (with-output-to-string (s)
                               (print-text-format
-                               (deserialize 'buy-car-request ser1) :stream s))))
+                               (deserialize-from-bytes 'buy-car-request ser1) :stream s))))
       (assert-true (string= (with-output-to-string (s)
                               (print-text-format request-2 :stream s))
                             (with-output-to-string (s)
                               (print-text-format
-                               (deserialize 'buy-car-request ser2) :stream s)))))
+                               (deserialize-from-bytes 'buy-car-request ser2) :stream s)))))
     (let ((str1 (with-output-to-string (s)
                   (print-text-format request-1 :stream s)))
           (str2 (with-output-to-string (s)
@@ -390,12 +390,12 @@ Parameters
                               (print-text-format request-1 :stream s))
                             (with-output-to-string (s)
                               (print-text-format
-                               (deserialize 'buy-car-request ser1) :stream s))))
+                               (deserialize-from-bytes 'buy-car-request ser1) :stream s))))
       (assert-true (string= (with-output-to-string (s)
                               (print-text-format request-2 :stream s))
                             (with-output-to-string (s)
                               (print-text-format
-                               (deserialize 'buy-car-request ser2) :stream s)))))
+                               (deserialize-from-bytes 'buy-car-request ser2) :stream s)))))
     (let ((str1 (with-output-to-string (s)
                   (print-text-format request-1 :stream s)))
           (str2 (with-output-to-string (s)
@@ -429,12 +429,12 @@ Parameters
           (string= (subseq
                     (with-output-to-string (s)
                       (print-text-format
-                       (deserialize 'add-color1 ser1) :stream s))
+                       (deserialize-from-bytes 'add-color1 ser1) :stream s))
                     9)
                    (subseq
                     (with-output-to-string (s)
                       (print-text-format
-                       (deserialize 'add-color2 ser2) :stream s))
+                       (deserialize-from-bytes 'add-color2 ser2) :stream s))
                     9)))
       ;; This tests the optimized serializer's ability to serialize messages
       ;; which have nested messages which have group fields.
@@ -477,8 +477,8 @@ Parameters
                            :end (list "mander")))
            (proto-on-wire-octet-bytes (serialize-to-bytes proto-on-wire))
            (my-deserialized-proto
-            (deserialize 'proto-different-than-wire
-                         proto-on-wire-octet-bytes))
+            (deserialize-from-bytes 'proto-different-than-wire
+                                    proto-on-wire-octet-bytes))
            (proto-different-than-wire (make-proto-different-than-wire
                                        :beginning "char"
                                        :always "pika-pal")))
@@ -486,7 +486,7 @@ Parameters
       (assert-true (proto-equal my-deserialized-proto proto-different-than-wire))
       (let* ((reserialized-proto-octets (serialize-to-bytes my-deserialized-proto))
              (should-be-original-proto
-              (deserialize 'proto-on-wire reserialized-proto-octets)))
+              (deserialize-from-bytes 'proto-on-wire reserialized-proto-octets)))
         (assert-true (proto-equal should-be-original-proto proto-on-wire))))))
 
 
@@ -509,7 +509,7 @@ Parameters
                                         :e3 '(:baz) :e4 '(:baz)
                                         :e5 :auto))
            (v2-bytes (serialize-to-bytes message-v2))
-           (message-v1 (deserialize 'message-v1 v2-bytes)))
+           (message-v1 (deserialize-from-bytes 'message-v1 v2-bytes)))
       (assert-true message-v1)
       (assert-eq (message-v1.e message-v1) :%undefined-1)
       (assert-eq (message-v1.e2 message-v1) :%undefined-1)
@@ -518,5 +518,5 @@ Parameters
       (assert-eq (message-v1.e5 message-v1) :default)
       (let* ((reserialized-proto-octets (serialize-to-bytes message-v1))
              (should-be-original-proto
-              (deserialize 'message-v2 reserialized-proto-octets)))
+              (deserialize-from-bytes 'message-v2 reserialized-proto-octets)))
         (assert-true (proto-equal message-v2 should-be-original-proto))))))

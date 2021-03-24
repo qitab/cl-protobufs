@@ -38,10 +38,8 @@
    ;; Binary format
    #:serialize-to-stream
    #:serialize-to-bytes
-   #:serialize
    #:deserialize-from-stream
    #:deserialize-from-bytes
-   #:deserialize
    #:make-message-with-bytes
    #:set-method-do-not-deserialize-input
 

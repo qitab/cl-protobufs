@@ -713,7 +713,7 @@ Constructor to make a byte vector. `size` is the size of the underlying vector.
 size.
 
 ```lisp
-(defun serialize-object-to-bytes (object &optional (type (type-of object))))
+(defun serialize-to-bytes (object &optional (type (type-of object))))
 ```
 
 Creates a byte-vector and serializes a protobuf message to that byte-vector. The
@@ -721,20 +721,28 @@ Creates a byte-vector and serializes a protobuf message to that byte-vector. The
 specify the type of object to serialize.
 
 ```lisp
-(defun serialize-object-to-stream (stream object &optional (type (type-of object)))
+(defun serialize-to-stream (object stream &optional (type (type-of object)))
 ```
 
 Serialize `object`, a protobuf message, to `stream`. Optionally use `type` to
 specify the type of object to serialize.
 
 ```lisp
-(defun deserialize-object (type buffer &optional (start 0) (end (length buffer))))
+(defun deserialize-from-bytes (type buffer &optional (start 0) (end (length buffer))))
 ```
 
 Deserialize a protobuf message returning the newly created structure. `type` is
 the symbol naming the protobuf message to deserialize. `buffer` is the
 byte-vector containing the data to deserialize. `start` (inclusive) and `end`
 (exclusive) delimit the range of bytes to deserialize.
+
+```lisp
+(defun deserialize-from-stream (type stream)
+```
+
+Deserialize an object of type `type` by reading bytes from `stream`. `type` is
+the symbol naming the protobuf message to deserialize.
+
 
 ## Well Known Types
 

@@ -37,4 +37,4 @@
      BUFFER: A cl-protobufs:byte-vector containing the serialized
        add-numbers-request.
    Returns: The deserialized add-numbers-request protobuf message."
-  (deserialize (find-message-descriptor 'add-numbers-request) buffer))
+  (deserialize-from-bytes (find-message-descriptor 'add-numbers-request) buffer))

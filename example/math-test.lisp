@@ -32,12 +32,12 @@
   ;; Create a response object and serialize it.
   (let* ((response (make-add-numbers-response :response 1))
          (serialized-response
-           (serialize-add-numbers-response response)))
+          (serialize-add-numbers-response response)))
 
     ;; Clear the response proto object and serialize the result.
     (clear response)
     (let* ((cleared-serialized-response
-             (serialize-add-numbers-response response)))
+            (serialize-add-numbers-response response)))
 
       ;; These two serialized objects should be different.
       (expect  (not (equalp cleared-serialized-response
@@ -49,5 +49,5 @@
       ;; Finally deserialize the response and assert its field
       ;; is the same as when we started.
       (let ((round-trip-response
-             (deserialize 'add-numbers-response serialized-response)))
+             (deserialize-from-bytes 'add-numbers-response serialized-response)))
         (expect (= 1 (add-numbers-response.response round-trip-response)))))))
