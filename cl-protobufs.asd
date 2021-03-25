@@ -125,7 +125,7 @@
    ;; TODO(cgay): do these tests really depend on each other in the ways that
    ;;   the :depends-on clauses imply? If so, why?
    ;;
-   ;;   lisp-service-test.lisp not included as the necessary fields in
+   ;;   service-test.lisp is not included since the necessary fields in
    ;;   service-test.proto are not currently exported.
 
    (:module "root-suite"
@@ -133,12 +133,12 @@
             :pathname ""
             :components ((:file "root-suite")))
 
-   (:module "wire-level-tests"
+   (:module "wire-level-test"
     :serial t
     :pathname ""
     :depends-on ("packages")
-    :components ((:file "varint-tests")
-                 (:file "wire-tests")))
+    :components ((:file "varint-test")
+                 (:file "wire-test")))
 
    (:module "descriptor-extensions"
     :serial t
@@ -166,23 +166,23 @@
      (:protobuf-source-file "unittest"
       :depends-on ("unittest_import"))))
 
-   (:module "object-level-tests"
+   (:module "object-level-test"
     :serial t
     :pathname ""
-    :depends-on ("wire-level-tests")
+    :depends-on ("wire-level-test")
     :components ((:protobuf-source-file "serialization")
-                 (:file "serialization-tests")
-                 (:file "symbol-import-tests")))
+                 (:file "serialization-test")
+                 (:file "symbol-import-test")))
 
-   (:module "brown-tests"
+   (:module "brown-test"
     :serial t
     :pathname ""
-    :depends-on ("object-level-tests")
+    :depends-on ("object-level-test")
     :components ((:protobuf-source-file "testproto1")
                  (:protobuf-source-file "testproto2")
-                 (:file "quick-tests")))
+                 (:file "quick-test")))
 
-   (:module "lisp-reference-tests"
+   (:module "lisp-reference-test"
     :serial t
     :pathname ""
     :depends-on ("descriptor-extensions")
@@ -191,7 +191,7 @@
                   :depends-on ("package_test2"))
                  (:protobuf-source-file "forward_reference"
                   :proto-search-path ("../" "../google/protobuf/"))
-                 (:file "lisp-reference-tests")))
+                 (:file "lisp-reference-test")))
 
    (:module "nested-extend-test"
     :serial t
@@ -269,11 +269,11 @@
     :depends-on ("google-tests-proto")
     :components ((:file "packed-test")))
 
-   (:module "serialize-object-to-bytes-test"
+   (:module "serialize-to-bytes-test"
     :serial t
     :pathname ""
-    :depends-on ("object-level-tests")
-    :components ((:file "serialize-object-to-bytes")))
+    :depends-on ("object-level-test")
+    :components ((:file "serialize-to-bytes-test")))
 
    (:module "text-format-test"
     :serial t
@@ -300,24 +300,24 @@
     :pathname ""
     :components ((:file "well-known-types-test")))
 
-   (:module "google-tests"
+   (:module "google-test"
     :serial t
     :pathname ""
-    :depends-on ("root-suite" "brown-tests" "google-tests-proto")
+    :depends-on ("root-suite" "brown-test" "google-tests-proto")
     :components
-    ((:file "full-tests")
+    ((:file "full-test")
      (:static-file "golden_message.data")
      (:static-file "golden_packed_message.data")))
 
    ;; ABCL is slow, these tests take to long.
    #-abcl
-   (:module "timing-tests"
+   (:module "timing-test"
     :serial t
     :pathname ""
     :components ((:protobuf-source-file "proto3")
                  (:protobuf-source-file "serialization")
-                 (:file "timing-tests")))
-   (:module "vector-tests"
+                 (:file "timing-test")))
+   (:module "vector-test"
     :serial t
     :pathname ""
     :depends-on ("descriptor-extensions")
