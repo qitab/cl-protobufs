@@ -269,11 +269,11 @@
     :depends-on ("google-tests-proto")
     :components ((:file "packed-test")))
 
-   (:module "serialize-object-to-bytes-test"
+   (:module "serialize-to-bytes-test"
     :serial t
     :pathname ""
     :depends-on ("object-level-tests")
-    :components ((:file "serialize-object-to-bytes")))
+    :components ((:file "serialize-to-bytes-test")))
 
    (:module "text-format-test"
     :serial t
