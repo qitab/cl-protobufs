@@ -137,8 +137,8 @@
     :serial t
     :pathname ""
     :depends-on ("packages")
-    :components ((:file "varint-tests")
-                 (:file "wire-tests")))
+    :components ((:file "varint-test")
+                 (:file "wire-test")))
 
    (:module "descriptor-extensions"
     :serial t
@@ -171,8 +171,8 @@
     :pathname ""
     :depends-on ("wire-level-tests")
     :components ((:protobuf-source-file "serialization")
-                 (:file "serialization-tests")
-                 (:file "symbol-import-tests")))
+                 (:file "serialization-test")
+                 (:file "symbol-import-test")))
 
    (:module "brown-tests"
     :serial t
@@ -180,7 +180,7 @@
     :depends-on ("object-level-tests")
     :components ((:protobuf-source-file "testproto1")
                  (:protobuf-source-file "testproto2")
-                 (:file "quick-tests")))
+                 (:file "quick-test")))
 
    (:module "lisp-reference-tests"
     :serial t
@@ -191,7 +191,7 @@
                   :depends-on ("package_test2"))
                  (:protobuf-source-file "forward_reference"
                   :proto-search-path ("../" "../google/protobuf/"))
-                 (:file "lisp-reference-tests")))
+                 (:file "lisp-reference-test")))
 
    (:module "nested-extend-test"
     :serial t
@@ -305,7 +305,7 @@
     :pathname ""
     :depends-on ("root-suite" "brown-tests" "google-tests-proto")
     :components
-    ((:file "full-tests")
+    ((:file "full-test")
      (:static-file "golden_message.data")
      (:static-file "golden_packed_message.data")))
 
@@ -316,7 +316,8 @@
     :pathname ""
     :components ((:protobuf-source-file "proto3")
                  (:protobuf-source-file "serialization")
-                 (:file "timing-tests")))
+                 (:file "timing-test")))
+   
    (:module "vector-tests"
     :serial t
     :pathname ""
