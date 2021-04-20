@@ -614,15 +614,13 @@ Parameters:
                     (when inner-index
                       (push inner-index offset-list))))))
         (let ((new-struct
-               #+sbcl ; use the defstruct description to get the constructor name
-               (let ((dd (sb-kernel:layout-info (sb-pcl::class-wrapper class))))
-                 (apply (sb-kernel:dd-default-constructor dd) initargs-final))
-               ;; We have to call the constructor for the object as
+               ;; For SBCL, a defstruct description conveys the constructor name.
+               ;; Otherwise we have to _guess_ the constructor for the object, as
                ;; we have no idea if MAKE-INSTANCE will actually work.
-               ;; So just use the constructor name.
-               #-sbcl
-               (let ((class-name (class-name class)))
-                 (apply (get-constructor-name class-name) initargs-final))))
+               ;; And for #+sbcl, passing the CLASS rather than its name avoids
+               ;; an unecessary detour through the global name->class mapping.
+               (apply (get-constructor-name #+sbcl class #-sbcl (class-name class))
+                      initargs-final)))
 
           ;; Most fields in a proto are set above.
           ;; Special care must be given for extensions,
@@ -1459,3 +1457,15 @@ Parameters:
 Parameters:
   CLASS-NAME: The name of the structure-class proto."
   (get class-name :default-constructor))
+;;; NB: the #-sbcl definition takes a CLASS-NAME, but #+sbcl takes a CLASS
+#+sbcl
+(defun get-constructor-name (class)
+  "Get the constructor function name for a structure-class
+by reading its defstruct description
+Parameters:
+  CLASS: The structure-class proto."
+  (macrolet ((wrapper-dd (x)
+               `(,(or (find-symbol "WRAPPER-DD" "SB-KERNEL")
+                      (find-symbol "LAYOUT-INFO" "SB-KERNEL"))
+                 ,x)))
+    (sb-kernel:dd-default-constructor (wrapper-dd (sb-pcl::class-wrapper class)))))
