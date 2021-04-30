@@ -149,8 +149,8 @@ Parameters:
              do (if pretty-print
                     (format stream "~&~V,0T~A { " (+ indent 2) name)
                     (format stream "~A { " name))
-                (print-scalar k (map-key-type desc) "key" stream nil)
-                (print-non-repeated-field v (map-value-type desc) "value"
+                (print-scalar k (proto-key-type desc) "key" stream nil)
+                (print-non-repeated-field v (proto-value-type desc) "value"
                                           :stream stream
                                           :print-name t
                                           :pretty-print nil)
@@ -334,8 +334,8 @@ return T as a second value."
                               :key #'enum-value-descriptor-name)))
              (and enum (enum-value-descriptor-name enum))))
           ((typep desc 'map-descriptor)
-           (let ((key-type (map-key-type desc))
-                 (val-type (map-value-type desc)))
+           (let ((key-type (proto-key-type desc))
+                 (val-type (proto-value-type desc)))
              (flet ((parse-map-entry (key-type val-type stream)
                       (let (key val)
                         (expect-char stream #\{)

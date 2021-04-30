@@ -85,9 +85,12 @@
    #:enum-descriptor-class
    #:enum-descriptor-name
    #:enum-descriptor-values
-   #:map-key-type
-   #:map-value-kind
-   #:map-value-type
+
+   ;; The map-* versions are deprecated, to be removed in release 4.0.
+   #:proto-key-type    #:map-key-type
+   #:proto-value-kind  #:map-value-kind
+   #:proto-value-type  #:map-value-type
+
    #:oneof-descriptor-fields
    #:oneof-descriptor-name
    #:oneof-descriptor-synthetic-p

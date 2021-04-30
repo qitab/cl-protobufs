@@ -179,7 +179,7 @@ Parameters:
              (if indent
                  (format stream "~&~V,0T\"~A\": " (+ indent 2) k)
                  (format stream "\"~A\":"  (write-to-string k)))
-             (print-field-to-json v (pi::map-value-type map-descriptor)
+             (print-field-to-json v (pi::proto-value-type map-descriptor)
                                   (and indent (+ indent 2)) stream camel-case-p numeric-enums-p)))
     (if indent
         (format stream "~&~V,0T}" indent)
@@ -335,8 +335,8 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
           ((typep desc 'pi::map-descriptor)
            (pi::expect-char stream #\{)
            (loop with pairs = ()
-                 with key-type = (pi::map-key-type desc)
-                 with val-type = (pi::map-value-type desc)
+                 with key-type = (pi::proto-key-type desc)
+                 with val-type = (pi::proto-value-type desc)
                  for pair = (cons nil nil)
                  do (setf (car pair)
                           (if (eql key-type 'string)

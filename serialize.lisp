@@ -263,9 +263,9 @@ Parameters:
                            buffer))
           ((setq desc (find-map-descriptor type))
            (let* ((tag (make-wire-tag $wire-type-string field-num))
-                  (key-type (map-key-type desc))
-                  (val-type (map-value-type desc))
-                  (val-kind (map-value-kind desc)))
+                  (key-type (proto-key-type desc))
+                  (val-type (proto-value-type desc))
+                  (val-kind (proto-value-kind desc)))
              (flet ((serialize-pair (k v)
                       (let ((ret-len (encode-uint32 tag buffer))
                             (map-len 0))
@@ -663,7 +663,7 @@ Parameters:
                     (progn
                       (unless (car cell)
                         (setf (car cell)
-                              (make-hash-table :test (if (eql (map-key-type map-desc) 'string)
+                              (make-hash-table :test (if (eql (proto-key-type map-desc) 'string)
                                                          #'equal
                                                          #'eq))))
                       (let (map-tag map-len key-data start val-data)
@@ -682,12 +682,12 @@ Parameters:
                           ;; just deserialize it.
                           (if (= 1 (ilogand (iash map-tag -3) +max-field-number+))
                               (multiple-value-setq (key-data index)
-                                (deserialize-scalar (map-key-type map-desc) buffer index))
+                                (deserialize-scalar (proto-key-type map-desc) buffer index))
                               ;; Otherwise it must be a value, which has
                               ;; arbitrary type.
                               (multiple-value-setq (val-data index)
                                 (deserialize-structure-object-field
-                                 (map-value-type map-desc) buffer index map-tag nil nil))))))
+                                 (proto-value-type map-desc) buffer index map-tag nil nil))))))
                     (rplaca cell
                             (progn
                               (multiple-value-setq (data index)
@@ -878,7 +878,7 @@ Parameters:
                                 ,tag ,vbuf))))))
           ((typep msg 'map-descriptor)
            (let* ((tag      (make-wire-tag $wire-type-string field-num))
-                  (key-type (map-key-type msg)))
+                  (key-type (proto-key-type msg)))
              `(when ,boundp
                 (let ((,vval ,reader))
                   (flet ((serialize-pair (k v)
@@ -889,7 +889,7 @@ Parameters:
                                                                 ,(make-tag `,key-type 1)
                                                                 ,vbuf))
                                ,(generate-non-repeated-field-serializer
-                                 `,(map-value-type msg) (map-value-kind msg)
+                                 `,(proto-value-type msg) (proto-value-kind msg)
                                  2 'v 'v vbuf 'map-len)
                                (i+ ret-len (i+ map-len (backpatch map-len)))))))
                     (iincf ,size (loop for k being the hash-keys of ,vval using (hash-value v)
@@ -1231,7 +1231,7 @@ Parameters:
                  ;; If ,dest points to the "unset" placeholder, make a new hash-table.
                  (unless (typep ,dest 'hash-table)
                    (setq ,dest
-                         (make-hash-table :test ,(if (eql (map-key-type msg) 'string)
+                         (make-hash-table :test ,(if (eql (proto-key-type msg) 'string)
                                                      #'equal
                                                      #'eq))))
                  ;; TODO(benkuehnert): val-data should be the default value
@@ -1248,9 +1248,10 @@ Parameters:
                        (decode-uint32 ,vbuf ,vidx))
                      (if (= 1 (ilogand (iash map-tag -3) +max-field-number+))
                          (multiple-value-setq (key-data ,vidx)
-                           (deserialize-scalar ',(map-key-type msg) ,vbuf ,vidx))
+                           (deserialize-scalar ',(proto-key-type msg) ,vbuf ,vidx))
                          ,(generate-non-repeated-field-deserializer
-                           (map-value-type msg) (map-value-kind msg) 2 nil vbuf vidx 'val-data)))))
+                           (proto-value-type msg) (proto-value-kind msg)
+                           2 nil vbuf vidx 'val-data)))))
               (make-wire-tag $wire-type-string index)))))))
 
 (defun slot-value-to-slot-name-symbol (slot-value)

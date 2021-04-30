@@ -49,6 +49,21 @@
     ;; then the is-set vector is properly updated.
     (assert-false (has-field m 'map-field))))
 
+
+(deftest descriptor-accessor-check (map-suite)
+  ;; TODO(b/186795342): 'cl-protobufs.map-test::map-test.map-proto.map-field
+  ;; should be exported.
+  (let* ((map-desc (find-map-descriptor 'cl-protobufs.map-test::map-test.map-proto.map-field)))
+    (assert-true map-desc)
+    (assert-equal 'int32 (proto-key-type map-desc))
+    (assert-equal 'string (proto-value-type map-desc))
+    (assert-equal :scalar (proto-value-kind map-desc))
+
+    ;; Check that the deprecated map-* APIs work too.
+    (assert-equal 'int32 (map-key-type map-desc))
+    (assert-equal 'string (map-value-type map-desc))
+    (assert-equal :scalar (map-value-kind map-desc))))
+
 ;; The same as accessor-check above, except this uses the defmethods.
 (deftest method-check (map-suite)
   (let ((m (make-map-proto)))

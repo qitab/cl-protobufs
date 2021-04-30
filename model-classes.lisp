@@ -150,13 +150,18 @@ message-descriptor.")
       (when error-p
         (protobuf-error "~S does not name a protobuf message type" qualified-name))))
 
-(defstruct (map-descriptor (:conc-name map-))
+(defstruct (map-descriptor (:conc-name proto-))
   "Describes a protobuf map."
   ;; The Lisp type of the key.
   (key-type nil)
   ;; The Lisp type of the value.
   (value-type nil)
   (value-kind nil :type (member :scalar :message :enum)))
+
+;; Delete these compatibility shims on next major release.
+(defun-inline map-key-type   (desc) (proto-key-type desc))
+(defun-inline map-value-type (desc) (proto-value-type desc))
+(defun-inline map-value-kind   (desc) (proto-value-kind desc))
 
 (defmethod make-load-form ((m map-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))

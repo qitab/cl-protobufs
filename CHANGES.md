@@ -1,5 +1,16 @@
 # cl-protobufs Release Notes
 
+## Version 3.1
+
+*   `map-descriptor` accessor functions have been renamed to match most other
+    descriptor accessors. The old names may continue to be used, but will be
+    removed in the next major release. The changes are:
+
+    -   `map-key-type` is now `proto-key-type`
+    -   `map-value-type` is now `proto-value-type`
+    -   `map-value-kind` is now `proto-value-kind` (`:scalar`, `:message`, or
+        `:enum`)
+
 ## Version 3.0
 
 This release is largely for an overhaul of the public API (hence a major version
