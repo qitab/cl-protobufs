@@ -34,18 +34,18 @@
 ;; Tests that accessor functions are working: setf, gethash, remhash, has.
 (deftest accessor-check (map-suite)
   (let ((m (make-map-proto)))
-    (assert-true (not (map-proto.has-map-field m)))
+    (assert-false (map-proto.has-map-field m))
     (setf (map-proto.map-field-gethash 1 m) "string")
-    (assert-true (string-equal (map-proto.map-field-gethash 1 m) "string"))
+    (assert-equal "string" (map-proto.map-field-gethash 1 m))
     (clear m)
-    (assert-true (not (map-proto.has-map-field m)))
-    ;; ensure that clear made a new empty hash-table
-    (assert-true (string-equal (map-proto.map-field-gethash 1 m) ""))
+    (assert-false (map-proto.has-map-field m))
+    ;; Ensure that clear made a new empty hash-table.
+    (assert-equal "" (map-proto.map-field-gethash 1 m))
     (setf (map-proto.map-field-gethash 1 m) "string")
     (map-proto.map-field-remhash 1 m)
-    ;; ensure that removing a key works
-    (assert-true (string-equal (map-proto.map-field-gethash 1 m) ""))
-    ;; ensure that if removing a key causes the hash-table to be empty,
+    ;; Ensure that removing a key works.
+    (assert-equal "" (map-proto.map-field-gethash 1 m))
+    ;; Ensure that if removing a key causes the hash-table to be empty,
     ;; then the is-set vector is properly updated.
     (assert-false (has-field m 'map-field))))
 
@@ -67,39 +67,39 @@
 ;; The same as accessor-check above, except this uses the defmethods.
 (deftest method-check (map-suite)
   (let ((m (make-map-proto)))
-    (assert-true (not (has-field m 'map-field)))
+    (assert-false (has-field m 'map-field))
     (setf (map-field-gethash 1 m) "string")
-    (assert-true (string-equal (map-field-gethash 1 m) "string"))
+    (assert-equal "string" (map-field-gethash 1 m))
     (clear m)
-    (assert-true (string-equal (map-field-gethash 1 m) ""))
+    (assert-equal "" (map-field-gethash 1 m))
     (setf (map-field-gethash 1 m) "string")
     (map-field-remhash 1 m)
-    (assert-true (string-equal (map-field-gethash 1 m) ""))
+    (assert-equal "" (map-field-gethash 1 m))
     (assert-false (has-field m 'map-field))))
 
 ;; Verify that the map returns the correct default value when unset.
 (deftest default-check (map-suite)
   (let ((test (make-map-all)))
-    (assert-equal (map-all.intmap-gethash 0 test) 0)
-    (assert-equal (map-all.stringmap-gethash 0 test) "")
-    (assert-equal (map-all.msgmap-gethash 0 test) nil)
-    (assert-equal (map-all.enummap-gethash 0 test) :one)))
+    (assert-equal 0 (map-all.intmap-gethash 0 test))
+    (assert-equal "" (map-all.stringmap-gethash 0 test))
+    (assert-equal nil (map-all.msgmap-gethash 0 test))
+    (assert-equal :one (map-all.enummap-gethash 0 test))))
 
 ;; Verify that the lisp hash-table properly handles string keys
 (deftest string-key-check (map-suite)
   (let ((msg (make-map-enum)))
     (setf (map-enum.map-field-gethash "two" msg) :two)
-    (assert-true (eq (map-enum.map-field-gethash "two" msg) :two))
+    (assert-eq :two (map-enum.map-field-gethash "two" msg))
     ;; Verify that this works after clearing the hash table, too.
     (map-enum.clear-map-field msg)
     (setf (map-enum.map-field-gethash "two" msg) :two)
-    (assert-true (eq (map-enum.map-field-gethash "two" msg) :two))
+    (assert-eq :two (map-enum.map-field-gethash "two" msg))
     (map-enum.clear-map-field msg)
     (setf (map-enum.map-field-gethash "Two" msg) :two)
     (setf (map-enum.map-field-gethash "two" msg) :one)
     ;; Verify that the map is case-sensitive.
-    (assert-true (eq (map-enum.map-field-gethash "Two" msg) :two))
-    (assert-true (eq (map-enum.map-field-gethash "two" msg) :one))
+    (assert-eq :two (map-enum.map-field-gethash "Two" msg))
+    (assert-eq :one (map-enum.map-field-gethash "two" msg))
     ;; Verify that this works after serializing/deserializing
     (loop :for optimized :in '(nil t)
           :do
@@ -107,8 +107,8 @@
          (pi:make-deserializer map-enum))
        (let* ((bytes (serialize-to-bytes msg 'map-enum))
               (msg-roundtrip (deserialize-from-bytes 'map-enum bytes)))
-         (assert-true (eq (map-enum.map-field-gethash "Two" msg-roundtrip) :two))
-         (assert-true (eq (map-enum.map-field-gethash "two" msg-roundtrip) :one)))))
+         (assert-eq :two (map-enum.map-field-gethash "Two" msg-roundtrip))
+         (assert-eq :one (map-enum.map-field-gethash "two" msg-roundtrip)))))
   (clear-serialization-functions 'map-enum))
 
 ;; Verify that generic (de)serialization works.
