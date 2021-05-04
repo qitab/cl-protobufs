@@ -55,7 +55,7 @@ The possible top level define macros are:
 - define-extend
 - define-service
 
-Inside of those macros there may also be define-* macros:
+Inside of those macros there may also be define-* forms:
 - define-enum
 - define-message
 - define-extension
@@ -64,9 +64,9 @@ Inside of those macros there may also be define-* macros:
 - define-map
 - define-oneof
 
-The most common define-* macros we will see are the macros that
-define messages, which generate PROTOBUF-MESSAGE classes and
-create the message structures that hold data. These are:
+The most common define-* forms are those that define messages, which generate
+MESSAGE-DESCRIPTOR classes and create the message structures that hold
+data. These are:
 - define-message
 - define-extend
 
@@ -78,11 +78,9 @@ value and back.
 
 DEFINE-EXTENSION:
 
-The define-extension macro defines a PROTOBUF-EXTENSION meta-object and
-set it in a PROTOBUF-MESSAGE meta-object.
-
-This meta-object details the possible range indices of proto extensions
-allowed in a protobuf message.
+Creates an EXTENSION-DESCRIPTOR and stores it in the containing message. This
+descriptor simply defines the allowed range of indices for extending the
+message.
 
 DEFINE-EXTEND:
 
@@ -335,7 +333,7 @@ message, and of +<value_name>+ when the enum is defined at top-level."
 
 (defmacro define-map (field-name &key key-type value-type json-name index
                                  value-kind val-default)
-  "Define a lisp type given the data for a protobuf map type.
+  "Define a Lisp type given the data for a protobuf map type.
 
  Parameters:
   FIELD-NAME: Lisp name of the field containing this map.
@@ -346,7 +344,7 @@ message, and of +<value_name>+ when the enum is defined at top-level."
     field name.
   VALUE-KIND: Category of the value type: :scalar, :message, :enum, etc.
   INDEX: Message field number of this map type.
-  VAL-DEFAULT: Specified type for the default value of the maps value type."
+  VAL-DEFAULT: Default value for the map entries, or nil to use $empty-default."
   (assert json-name)
   (assert value-kind)
   (check-type index integer)
@@ -379,12 +377,9 @@ message, and of +<value_name>+ when the enum is defined at top-level."
                                         :value-type value-type
                                         :value-kind value-kind)))
     (record-protobuf-object class map-desc :map)
-    `(progn
-       define-map
-       map-desc
-       ((record-protobuf-object ',class ,map-desc :map))
-       ,mfield
-       ,mdata)))
+    `((record-protobuf-object ',class ,map-desc :map)
+      ,mfield
+      ,mdata)))
 
 (defmacro define-oneof (name (&key synthetic-p) &body fields)
   "Creates a oneof descriptor and the defining forms for its fields.
@@ -1101,22 +1096,24 @@ function) then there is no guarantee on the serialize function working properly.
              (assert (eq (car result) 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-type-form (cdr result))))
-          ((define-extension define-map)
-           (destructuring-bind (&optional progn model-type model definers extra-field extra-slot)
+          ((define-map)
+           (destructuring-bind (definer extra-field extra-slot)
                (macroexpand-1 field env)
-             (assert (eq progn 'progn) ()
-                     "The macroexpansion for ~S failed" field)
-             (map () #'collect-form definers)
-             (case model-type
-               ((define-map)
-                (when extra-slot
-                  (collect-slot extra-slot))
-                (setf (proto-field-offset extra-field) field-offset)
-                (incf field-offset)
-                (collect-non-lazy-field extra-field)
-                (push extra-field (proto-fields msg-desc)))
-               ((define-extension)
-                (push model (proto-extensions msg-desc))))))
+             (collect-form definer)
+             (collect-slot extra-slot)
+             (setf (proto-field-offset extra-field) field-offset)
+             (incf field-offset)
+             (collect-non-lazy-field extra-field)
+             (push extra-field (proto-fields msg-desc))))
+          ((define-extension)
+           (destructuring-bind (from to) (cdr field)
+             (let* ((to (etypecase to
+                          (integer to)
+                          (symbol (if (string-equal to "MAX") +max-field-number+ to))))
+                    (ext-desc (make-instance 'extension-descriptor
+                                             :from from
+                                             :to (if (eq to 'max) +max-field-number+ to))))
+               (push ext-desc (proto-extensions msg-desc)))))
           ((define-oneof)
            (destructuring-bind (&optional progn oneof-desc)
                (macroexpand-1 field env)
@@ -1199,19 +1196,6 @@ function) then there is no guarantee on the serialize function working properly.
       (record-protobuf-object type msg-desc :message)
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
       `(progn ,@type-forms ,@forms))))
-
-(defmacro define-extension (from to)
-  "Define an extension range within a message. FROM and TO are field numbers
-   and are both inclusive."
-  (let ((to (etypecase to
-              (integer to)
-              (symbol (if (string-equal to "MAX") +max-field-number+ to)))))
-    `(progn
-       define-extension
-       ,(make-instance 'extension-descriptor
-                       :from from
-                       :to (if (eq to 'max) +max-field-number+ to))
-       ())))
 
 (defmacro define-extend (type (&key name options) &body fields)
   "Define an extension to the message named TYPE. See define-message for descriptions of the
