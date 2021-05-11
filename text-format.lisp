@@ -97,7 +97,7 @@ Parameters:
       ((typep (setq desc (or (find-message-descriptor type)
                              (find-enum-descriptor type)))
               'message-descriptor)
-       (dolist (v values)
+       (doseq (v values)
          (print-text-format v :indent (+ indent 2)
                               :stream stream
                               :name name

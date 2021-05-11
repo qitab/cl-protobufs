@@ -200,3 +200,24 @@ Parameters
         (outer-proto.push-repeated-proto 10 outer-proto)
       (error nil)
       (:no-error (assert-fail)))))
+
+(deftest test-text-output (vector-suite)
+  (let ((outer-proto (make-outer-proto))
+        (repeated1 (make-repeated-proto))
+        (repeated2 (make-repeated-proto)))
+    (repeated-proto.push-repeated-int32 1 repeated1)
+    (repeated-proto.push-repeated-int32 2 repeated1)
+    (repeated-proto.push-repeated-int32 3 repeated2)
+    (outer-proto.push-repeated-proto repeated1 outer-proto)
+    (outer-proto.push-repeated-proto repeated2 outer-proto)
+    (assert-equality #'string= "OuterProto {
+  repeated_proto {
+    repeated_int32: 1
+    repeated_int32: 2
+  }
+  repeated_proto {
+    repeated_int32: 3
+  }
+}
+" (with-output-to-string (s)
+    (print-text-format outer-proto :stream s)))))
