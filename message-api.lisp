@@ -167,10 +167,11 @@ Parameters:
            value
            object))
 
-(defgeneric encoded-field (object slot)
+(defgeneric encoded-field (object field-name)
   (:documentation
-   "Returns the encoded value of the field 'slot', or NIL if does not exist.
-For repeated fields, returns a list of the encoded values, which may be NILs.")
+   "Returns the encoded value of the field FIELD-NAME, or signals
+    protobuf-error if the field doesn't exist. For repeated fields, returns a
+    list of the encoded values, which may contain NILs.")
   (:method ((object structure-object) slot)
     (let* ((class (type-of object))
            (message (find-message-descriptor class :error-p t))
@@ -181,7 +182,7 @@ For repeated fields, returns a list of the encoded values, which may be NILs.")
                                                  (proto-name message))))
                (lazy-slot (intern (nstring-upcase (format nil "%~A" slot))
                                   lisp-package)))
-          (setf field (find-field-descriptor message lazy-slot))
+          (setf field (%find-field-descriptor message lazy-slot))
           (when field
             (setf slot lazy-slot))))
       (unless field

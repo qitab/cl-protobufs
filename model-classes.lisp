@@ -670,24 +670,30 @@ if we are not in SBCL."
 (defmethod make-load-form ((o oneof-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
 
+(defun %find-field-descriptor (desc internal-field-name)
+  "Like find-field-descriptor, but looks in DESC for INTERNAL-FIELD-NAME
+   instead of the external field name."
+  (or (find internal-field-name (proto-fields desc)
+            :key #'proto-internal-field-name)
+      (loop for oneof in (proto-oneofs desc)
+              thereis (find internal-field-name (oneof-descriptor-fields oneof)
+                            :key #'proto-internal-field-name))))
+
 ;;; TODO(cgay): looks like relative-to is for searching relative to a current
 ;;; namespace and isn't implemented yet.
 (defgeneric find-field-descriptor (desc id &optional relative-to)
   (:documentation
    "Given a message-descriptor DESC and a field ID, returns the
-   field-descriptor having that ID. ID may be a symbol naming the defstruct
-   slot, the field name (string), or the field number."))
+   field-descriptor having that ID. ID may be the symbol naming the
+   field, the field name (string), or the field number."))
 
-;; TODO(cgay): This is exported but it's not useful to users since `name` is
-;; expected to be the internal field name. Should be the external name and we
-;; can do something different internally to find field descriptors.
 (defmethod find-field-descriptor ((desc message-descriptor) (name symbol)
                                   &optional relative-to)
   (declare (ignore relative-to))
-  (or (find name (proto-fields desc) :key #'proto-internal-field-name)
+  (or (find name (proto-fields desc) :key #'proto-external-field-name)
       (loop for oneof in (proto-oneofs desc)
               thereis (find name (oneof-descriptor-fields oneof)
-                            :key #'proto-internal-field-name))))
+                            :key #'proto-external-field-name))))
 
 (defmethod find-field-descriptor ((desc message-descriptor) (name string)
                                   &optional relative-to)

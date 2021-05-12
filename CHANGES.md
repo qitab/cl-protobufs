@@ -11,6 +11,12 @@
     -   `map-value-kind` is now `proto-value-kind` (`:scalar`, `:message`, or
         `:enum`)
 
+*   `(defmethod find-field-descriptor ((desc message-descriptor) (name symbol))`
+    has been changed such that the `name` parameter no longer expects the
+    internalized symbol (i.e., with a leading `%`). If the field name is
+    `"foo_bar"` in the `.proto` file then `name` should be the symbol `foo-bar`
+    in the generated code's package.
+
 ## Version 3.0
 
 This release is largely for an overhaul of the public API (hence a major version

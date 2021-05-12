@@ -482,7 +482,7 @@ for any types."
                                             (pi::camel-case-but-one name '(#\_)))
                                               paths))))
     ((google:struct)
-     (let ((field (find-field-descriptor (find-message-descriptor type) 'google::%fields)))
+     (let ((field (pi::%find-field-descriptor (find-message-descriptor type) 'google::%fields)))
        (print-map-to-json (google:fields object) (find-map-descriptor (proto-class field))
                           indent stream camel-case-p numeric-enums-p)))
     ((google:list-value)
