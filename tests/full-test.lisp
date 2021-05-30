@@ -29,7 +29,7 @@ Parameters
 
 (define-constant +pwd+ #.(make-pathname
                           :directory (pathname-directory
-                                      (or *compile-file-truename* *load-truename*)))
+                                      (or *compile-file-pathname* *load-pathname*)))
                  :test #'equal)
 
 (define-constant +golden-file-name+
