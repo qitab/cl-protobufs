@@ -63,6 +63,41 @@ only if the same fields have been explicitly set."
      (return-from map-field-equal nil))
   t)
 
+(defun oneof-field-equal (oneof-1 oneof-2 oneof-descriptor exact)
+    "Returns true if two maps with the same map-descriptor are equal.
+Parameters:
+  ONEOF-1: The first oneof to compare.
+  ONEOF-2: The second oneof to compare.
+  ONEOF-DESCRIPTOR: The oneof descriptor for the two oneofs.
+  EXACT: If true consider the messages to be equal
+only if the same fields have been explicitly set."
+  (let ((set-field-1 (oneof-set-field oneof-1))
+        (set-field-2 (oneof-set-field oneof-2)))
+
+    ;; Check if one of the fields aren't set.
+    (unless (and set-field-1 set-field-2)
+      (return-from oneof-field-equal
+        (not (or set-field-1 set-field-2))))
+
+    ;; Check the same field is set.
+    (unless (eql (oneof-set-field oneof-1)
+                 (oneof-set-field oneof-2))
+      (return-from oneof-field-equal nil))
+
+    ;; Check for field equality.
+    (let* ((lisp-type
+            (proto-class
+             (aref (oneof-descriptor-fields oneof-descriptor)
+                   set-field-1))))
+      (if (or (scalarp lisp-type)
+              (find-enum-descriptor lisp-type))
+          (scalar-field-equal (oneof-value oneof-1)
+                              (oneof-value oneof-2))
+          (proto-equal (oneof-value oneof-1)
+                       (oneof-value oneof-2)
+                       :exact exact)))))
+
+
 (defun scalar-field-equal (object-1 object-2)
   "Check if two objects with scalar type are equal.
 Parameters:
@@ -106,29 +141,8 @@ only if the same fields have been explicitly set."
             = (slot-value message-1 (oneof-descriptor-internal-name oneof))
           for slot-value-2
             = (slot-value message-2 (oneof-descriptor-internal-name oneof))
-          for set-field-1
-            = (oneof-set-field slot-value-1)
-          for set-field-2
-            = (oneof-set-field slot-value-2)
-          for lisp-type
-            = (when set-field-1 (proto-class
-                                 (aref (oneof-descriptor-fields oneof)
-                                       set-field-1)))
-          unless (and set-field-1 set-field-2)
-            do (when (or set-field-1 set-field-2)
-                 (return-from proto-equal nil))
-          unless (eql (oneof-set-field slot-value-1)
-                      (oneof-set-field slot-value-2))
-            do (return-from proto-equal nil)
-          when (or (scalarp lisp-type) (find-enum-descriptor lisp-type))
-            do (unless (scalar-field-equal (oneof-value slot-value-1)
-                                           (oneof-value slot-value-2))
-                 (return-from proto-equal nil))
-          when (find-message-descriptor lisp-type)
-            do (unless (proto-equal (oneof-value slot-value-1)
-                                    (oneof-value slot-value-2)
-                                    :exact exact)
-                 (return-from proto-equal nil)))
+          unless (oneof-field-equal slot-value-1 slot-value-2 oneof exact)
+            do (return-from proto-equal nil))
 
     (loop for field in (proto-fields message)
           for lisp-type = (proto-class field)
