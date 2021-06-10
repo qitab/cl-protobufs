@@ -37,6 +37,32 @@ The definition of initialized is all required-fields are set."
          (message (find-message-descriptor class :error-p t)))
     (object-initialized-p object message)))
 
+(defun map-field-equal (map-1 map-2 map-descriptor exact)
+  "Returns true if two maps with the same map-descriptor are equal.
+Parameters:
+  MAP-1: The first map to compare.
+  MAP-2: The second map to compare.
+  MAP-DESCRIPTOR: The map descriptor for the two maps.
+  EXACT: If true consider the messages to be equal
+only if the same fields have been explicitly set."
+  (unless (= (hash-table-count map-1)
+             (hash-table-count map-2))
+    (return-from map-field-equal nil))
+  (loop for key being the hash-keys of map-1
+          using (hash-value map-1-value)
+        for map-2-value = (gethash key map-2)
+        unless
+        (if (or (scalarp (proto-value-type map-descriptor))
+                (find-enum-descriptor (proto-value-type map-descriptor)))
+            (scalar-field-equal map-1-value
+                                map-2-value)
+            (proto-equal map-1-value
+                         map-2-value
+                         :exact exact))
+        do
+     (return-from map-field-equal nil))
+  t)
+
 (defun scalar-field-equal (object-1 object-2)
   "Check if two objects with scalar type are equal.
 Parameters:
@@ -57,7 +83,7 @@ set.
 Parameters:
   MESSAGE-1: The first protobuf message.
   MESSAGE-2: The second protobuf message.
-  EXACT: If true Consider the messages to be equal
+  EXACT: If true consider the messages to be equal
 only if the same fields have been explicitly set."
   (let* ((class-1 (type-of message-1))
          (message (find-message-descriptor class-1)))
@@ -91,8 +117,8 @@ only if the same fields have been explicitly set."
           unless (and set-field-1 set-field-2)
             do (when (or set-field-1 set-field-2)
                  (return-from proto-equal nil))
-          unless (equal (oneof-set-field slot-value-1)
-                        (oneof-set-field slot-value-2))
+          unless (eql (oneof-set-field slot-value-1)
+                      (oneof-set-field slot-value-2))
             do (return-from proto-equal nil)
           when (or (scalarp lisp-type) (find-enum-descriptor lisp-type))
             do (unless (scalar-field-equal (oneof-value slot-value-1)
@@ -118,6 +144,12 @@ only if the same fields have been explicitly set."
                  (return-from proto-equal nil))
           unless (and slot-value-1 slot-value-2)
             do (when (or slot-value-1 slot-value-2)
+                 (return-from proto-equal nil))
+          when (and slot-value-1 (eq (proto-kind field) :map))
+            do (unless (map-field-equal slot-value-1
+                                        slot-value-2
+                                        (find-map-descriptor lisp-type)
+                                        exact)
                  (return-from proto-equal nil))
           when (and slot-value-1 (eq (proto-label field) :repeated))
             do (unless (= (length slot-value-1) (length slot-value-2))
