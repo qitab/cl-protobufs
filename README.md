@@ -256,6 +256,7 @@ groups          | `nil`
 enums           | the first value listed in the .proto file
 booleans        | `nil`
 repeated fields | the empty list
+symbols         | `nil`
 
 Note that with nested messages and long message names, field accessor names can
 get pretty long. If speed is not an issue it is also possible to access fields
@@ -584,6 +585,50 @@ If the repeated field has length less then `n` we signal an error.
 ```
 
 This clears the repeated field of all elements.
+
+### Symbols
+
+A string field may be annotated as a symbol field, which will cause it to be
+represented in Lisp as an interned symbol rather than a string. Example:
+
+```lisp
+import "third_party/lisp/cl_protobufs/proto2-descriptor-extensions.proto";
+
+message Foo {
+   optional symbol = 1 [(lisp_type) = "CL:SYMBOL"];
+}
+```
+
+When converting from text mode, we uppercase the string, and if it does not
+contain a colon we intern it as a keyword symbol, except that we special case
+"T" and "NIL" to refer to the corresponding Lisp symbols. If the string contains
+a colon at the beginning, then we also intern it as a keyword symbol, but if it
+contains a colon elsewhere in the string, the portion preceding the colon is
+interpreted a package name. Thus, the following lines are equivalent
+
+```
+symbol: "foo"
+symbol: "FOO"
+symbol: "keyword:foo"
+```
+
+as are
+
+```
+symbol: "t"
+symbol: "common-lisp:t"
+```
+
+but note that these are different:
+
+```
+symbol: "t"
+symbol: ":t"
+```
+
+Multiple colons are not allowed, nor are the single-quote, double-quote, and
+backslash characters.
+
 
 ### Options
 

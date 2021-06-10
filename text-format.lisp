@@ -127,7 +127,7 @@ Parameters:
   PRETTY-PRINT: When true, print newlines and indentation."
   (let (desc)
     ;; If VALUE is NIL and the type is not boolean, there is nothing to do.
-    (unless (or value (eq type 'boolean))
+    (unless (or value (eq type 'boolean) (eq type 'symbol))
       (return-from print-non-repeated-field nil))
     (cond
       ((scalarp type)
@@ -178,7 +178,7 @@ Parameters:
             the end.
           - If indent is nil, then do not indent and
             do not write a newline."
-  (when (or val (eq type 'boolean))
+  (when (or val (eq type 'boolean) (eq type 'symbol))
     (when indent
       (format stream "~&~V,0T" (+ indent 2)))
     (when name
@@ -197,10 +197,7 @@ Parameters:
        (format stream "~D" val))
       ;; A few of our homegrown types
       ((symbol)
-       (let ((val (if (keywordp val)
-                      (string val)
-                      (format nil "~A:~A" (package-name (symbol-package val)) (symbol-name val)))))
-         (format stream "\"~A\"" val)))
+       (format stream "\"~A\"" (lisp-symbol-string val)))
       ((date time datetime timestamp)
        (format stream "~D" val)))
     (if indent
@@ -313,6 +310,7 @@ return T as a second value."
              ((float) (parse-float stream))
              ((double-float) (parse-double stream))
              ((string) (parse-string stream))
+             ((symbol) (make-lisp-symbol (parse-string stream) t))
              ((boolean) (let ((token (parse-token stream)))
                           (cond ((string= token "true") t)
                                 ((string= token "false") nil)

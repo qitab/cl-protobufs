@@ -29,35 +29,49 @@ Parameters
   uint_field: 1
   float_field: 1.5
   double_field: 1.5d0
-  string_field: \"A string\"
-  string_fields: \"First\"
-  string_fields: \"Second\"
+  string_field: 'A string'
+  string_fields: 'First'
+  string_fields: 'Second'
   enum_vals: NONE
   enum_vals: TWENTY_ONE
   two_level_nesting {
     int_field: 2
   }
-  map_field { key: 1 value: \"one\" }
-  map_field { key: 2 value: \"two\" }
+  map_field { key: 1 value: 'one' }
+  map_field { key: 2 value: 'two' }
   oneof_int_field: 5
+  symbol_field: 'abc'
+  symbol_field: ':def'
+  symbol_field: 'cl-protobufs.test.text-format:ghi'
+  symbol_field: 't'
+  symbol_field: 'nil'
+  symbol_field: ':t'
+  symbol_field: ':nil'
 }
 ")
 
 (deftest test-parse-text-format (text-format-suite)
   (let ((msg (proto:parse-text-format 'test-pb:text-format-test
                                       :stream (make-string-input-stream *text-format-msg*))))
-    (assert-true (eql 100 (test-pb:int-field msg)))
-    (assert-true (eql -1 (test-pb:sint-field msg)))
-    (assert-true (eql 1 (test-pb:uint-field msg)))
-    (assert-true (eql 1.5 (test-pb:float-field msg)))
-    (assert-true (eql 1.5d0 (test-pb:double-field msg)))
-    (assert-true (string-equal "A string" (test-pb:string-field msg)))
-    (assert-true (equal '("First" "Second")  (test-pb:string-fields msg)))
-    (assert-true (equal '(:NONE :TWENTY-ONE) (test-pb:enum-vals msg)))
-    (assert-true (equal 2 (test-pb:int-field (test-pb:two-level-nesting msg))))
+    (assert-eql 100 (test-pb:int-field msg))
+    (assert-eql -1 (test-pb:sint-field msg))
+    (assert-eql 1 (test-pb:uint-field msg))
+    (assert-eql 1.5 (test-pb:float-field msg))
+    (assert-eql 1.5d0 (test-pb:double-field msg))
+    (assert-equal "A string" (test-pb:string-field msg))
+    (assert-equal '("First" "Second")  (test-pb:string-fields msg))
+    (assert-equal '(:NONE :TWENTY-ONE) (test-pb:enum-vals msg))
+    (assert-equal 2 (test-pb:int-field (test-pb:two-level-nesting msg)))
     (assert-true (string= (test-pb:text-format-test.map-field-gethash 1 msg) "one"))
     (assert-true (string= (test-pb:text-format-test.map-field-gethash 2 msg) "two"))
-    (assert-true (eql 5 (test-pb:oneof-int-field msg)))))
+    (assert-eql 5 (test-pb:oneof-int-field msg))
+    (assert-eq :ABC (test-pb:nth-symbol-field 0 msg))
+    (assert-eq :DEF (test-pb:nth-symbol-field 1 msg))
+    (assert-eq 'GHI (test-pb:nth-symbol-field 2 msg))
+    (assert-eq t (test-pb:nth-symbol-field 3 msg))
+    (assert-eq nil (test-pb:nth-symbol-field 4 msg))
+    (assert-eq :t (test-pb:nth-symbol-field 5 msg))
+    (assert-eq :nil (test-pb:nth-symbol-field 6 msg))))
 
 ; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-text-format (text-format-suite)
@@ -79,7 +93,7 @@ Parameters
     (let* ((text (get-output-stream-string out-stream))
            (msg-parse (proto:parse-text-format 'test-pb:text-format-test
                                                :stream (make-string-input-stream text))))
-      (assert-true (proto:proto-equal msg-parse msg)))))
+      (assert-equality #'proto:proto-equal msg msg-parse))))
 
 (deftest test-parse-text-format-nested-symbol-names (text-format-suite)
   (assert-true (proto:find-message-descriptor 'test-pb:text-format-test))

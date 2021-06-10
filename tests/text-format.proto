@@ -8,6 +8,8 @@ syntax = "proto2";
 
 package test_proto;
 
+import "proto2-descriptor-extensions.proto"; // descriptor extension
+
 enum TextEnumValues {
   NONE = 0;
   TWENTY_ONE = 21;
@@ -51,4 +53,6 @@ message TextFormatTest {
   optional int64 int64_field = 26;
   optional sint64 sint64_field = 27;
   repeated int32 int_vals = 28;
+  repeated string symbol_field = 29 [(lisp_type) = "CL:SYMBOL"];
+  optional string symbol_field2 = 30 [(lisp_type) = "CL:SYMBOL"];
 }

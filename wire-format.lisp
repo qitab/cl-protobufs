@@ -150,11 +150,7 @@
        (symbol
         ;; XXX: This implementation is bad. Should write one uint32 for the sum of
         ;; lengths of package-name and symbol-name plus 1, then the tokens.
-        (let ((val (if (keywordp val)
-                       (string val)
-                       ;; Non-keyword symbols are consy, avoid them if possible
-                       (format nil "~A:~A" (package-name (symbol-package val)) (symbol-name val)))))
-          (encode-string val buffer)))
+        (encode-string (lisp-symbol-string val) buffer))
        ((date time datetime timestamp)
         (encode-int64 val buffer))))))
 

@@ -195,19 +195,56 @@
           bindings)
      ,@body))
 
-(defun make-lisp-symbol (string)
-  "Intern the symbol described by STRING. If STRING has no colon a symbol interned in the keyword
-   package is returned. Otherwise, STRING should be of the form 'package:string' and the symbol
-   PACKAGE::STRING is returned."
-  ;; This doesn't handle ":foo" (keyword package) or "foo:bar:baz" (error?).
-  (let* ((string (string-upcase (string string)))
-         (colon  (position #\: string))
-         (package-name (if colon (subseq string 0 colon) "KEYWORD"))
-         (package (or (find-package package-name)
-                      (make-package package-name :use ())))
-         (last-colon (position #\: string :from-end t))
-         (sym (if colon (subseq string (+ last-colon 1)) string)))
-    (intern sym package)))
+(defun lisp-symbol-string (symbol)
+  "Returns the string used as the wire format for SYMBOL."
+  (case symbol
+    ((t) "T")
+    ((nil) "NIL")
+    (:t ":T")
+    (:nil ":NIL")
+    (otherwise
+     (if (keywordp symbol)
+         (symbol-name symbol)
+         (format nil "~A:~A"
+                 (let ((package (symbol-package symbol)))
+                   (if package (package-name package) "#"))
+                 (symbol-name symbol))))))
+
+(defun make-lisp-symbol (input-string &optional check-bad-chars)
+  "Intern the symbol described by INPUT-STRING. If INPUT-STRING is
+   \"nil\" or \"t\" then return nil or t. If string has no colon
+   return a keyword symbol.
+   Otherwise, STRING should be of the form 'package:string' and the symbol
+   PACKAGE::STRING is returned.
+   If CHECK-BAD-CHARS is specified, disallow strings with more than one colon
+   or strings that have certain other bad characters."
+  (let ((string (string-upcase input-string)))
+    (cond
+      ((string= string "T") T)
+      ((string= string "NIL") NIL)
+      (t
+       (when check-bad-chars
+         (let* ((bad-chars `(#\' #\\ #\"))
+                (bad-char (find-if #'(lambda (x) (member x bad-chars)) string)))
+           (when bad-char
+             (protobuf-error "Invalid symbol character ~S in ~S" bad-char input-string))))
+       (let ((pos (position #\: string))
+             symbol-name
+             package-name)
+         (if pos
+             (setq symbol-name (subseq string (1+ pos))
+                   package-name (if (= pos 0) "KEYWORD" (subseq string 0 pos)))
+             (setq symbol-name string
+                   package-name "KEYWORD"))
+         (when (and check-bad-chars
+                    (find #\: symbol-name))
+           (protobuf-error "Invalid symbol character ~S in ~S" #\: input-string))
+         (if (string= package-name "#")
+             (make-symbol symbol-name)
+             (let ((package (or (find-package package-name)
+                                (make-package package-name :use ()))))
+               ;; Discard 2nd value from intern so that this function returns only 1 value.
+               (values (intern symbol-name package)))))))))
 
 (defun qualified-symbol-name (symbol)
   "Return a string representing SYMBOL qualified with its package name."
