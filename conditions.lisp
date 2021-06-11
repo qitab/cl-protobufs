@@ -34,6 +34,11 @@
     while printing, parsing, serializing, or otherwise processing a protocol
     buffer object."))
 
+(define-condition unknown-field (protobuf-error)
+  ()
+  (:documentation
+   "An unknown field was encountered when parsing a text proto."))
+
 (defun unknown-field-type (type field object)
   "Signal an unknown-field-type error for TYPE in relation to FIELD. OBJECT
    is usually the protobuf message being printed or serialized, or the descriptor

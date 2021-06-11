@@ -277,7 +277,9 @@ attempt to parse the name of the message and match it against MSG-DESC."
              (type  (and field (proto-class field)))
              (slot  (and field (proto-external-field-name field))))
         (if (null field)
-            (skip-field stream)
+            (error 'unknown-field
+              :format-control "unknown field ~S, while parsing message of type ~A"
+              :format-arguments (list name msg-desc))
             (multiple-value-bind (val error-p)
                 (parse-field type :stream stream)
               (cond
@@ -365,22 +367,3 @@ return T as a second value."
                   (list (parse-map-entry key-type val-type stream)))))))
           ;; Parsing failed, return t as a second vlaue to indicate failure.
           (t (values nil t)))))
-
-(defun skip-field (stream)
-  "Skip either a token or a balanced {}-pair."
-  (ecase (peek-char nil stream nil)
-    ((#\:)
-     (read-char stream)
-     (skip-whitespace stream)
-     (parse-token-or-string stream))
-    ((#\{)
-     (let ((depth 0))
-       (loop for ch = (read-char stream)
-             do (cond ((eql ch #\")
-                       (loop for ch0 = (read-char stream)
-                             until (eql ch0 #\")))
-                      ((eql ch #\{)
-                       (iincf depth))
-                      ((eql ch #\})
-                       (idecf depth)))
-             until (i= depth 0))))))

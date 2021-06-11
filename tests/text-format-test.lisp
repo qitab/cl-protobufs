@@ -100,3 +100,12 @@ Parameters
   (assert-true (proto:find-message-descriptor 'test-pb:text-format-test.nested-message1))
   (assert-true (proto:find-message-descriptor
                 'test-pb:text-format-test.nested-message1.nested-message2)))
+
+(deftest test-parse-text-unknown-field (text-format-suite)
+  (multiple-value-bind (result condition)
+      (ignore-errors
+       (proto:parse-text-format
+        'test-pb:text-format-test
+        :stream (make-string-input-stream "TextFormatTest { int_field: 100 random_field: 200 }")))
+    (declare (ignore result))
+    (assert-true condition)))
