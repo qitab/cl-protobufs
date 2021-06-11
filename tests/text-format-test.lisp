@@ -64,6 +64,7 @@ Parameters
     (assert-equal 2 (test-pb:int-field (test-pb:two-level-nesting msg)))
     (assert-true (string= (test-pb:text-format-test.map-field-gethash 1 msg) "one"))
     (assert-true (string= (test-pb:text-format-test.map-field-gethash 2 msg) "two"))
+    (assert-true (test-pb:text-format-test.has-map-field msg))
     (assert-eql 5 (test-pb:oneof-int-field msg))
     (assert-eq :ABC (test-pb:nth-symbol-field 0 msg))
     (assert-eq :DEF (test-pb:nth-symbol-field 1 msg))
@@ -93,6 +94,7 @@ Parameters
     (let* ((text (get-output-stream-string out-stream))
            (msg-parse (proto:parse-text-format 'test-pb:text-format-test
                                                :stream (make-string-input-stream text))))
+      (assert-true (test-pb:text-format-test.has-map-field msg-parse))
       (assert-equality #'proto:proto-equal msg msg-parse))))
 
 (deftest test-parse-text-format-nested-symbol-names (text-format-suite)

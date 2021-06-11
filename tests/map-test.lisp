@@ -47,8 +47,17 @@
     (assert-equal "" (map-proto.map-field-gethash 1 m))
     ;; Ensure that if removing a key causes the hash-table to be empty,
     ;; then the is-set vector is properly updated.
-    (assert-false (has-field m 'map-field))))
+    (assert-false (has-field m 'map-field))
 
+    (let ((my-hash-table (make-hash-table)))
+      (setf (map-proto.map-field m) my-hash-table)
+      (assert-false (has-field m 'map-field))
+
+      (setf (gethash 1 my-hash-table) "string")
+      (assert-true (has-field m 'map-field))
+      (assert-equal "string" (map-proto.map-field-gethash 1 m))
+      (clrhash my-hash-table)
+      (assert-false (has-field m 'map-field)))))
 
 (deftest descriptor-accessor-check (map-suite)
   ;; TODO(b/186795342): 'cl-protobufs.map-test::map-test.map-proto.map-field
@@ -133,6 +142,10 @@
            (t2res (deserialize-from-bytes 'map-message t2ser))
            (t3res (deserialize-from-bytes 'map-enum t3ser))
            (t4res (deserialize-from-bytes 'nested-map t4ser)))
+      (assert-true (has-field t1res 'map-field))
+      (assert-true (has-field t2res 'map-field))
+      (assert-true (has-field t3res 'map-field))
+      (assert-true (has-field (nested-map.subfield t4res) 'map-field))
       (assert-true (proto-equal test1 t1res))
       (assert-true (proto-equal test2 t2res))
       (assert-true (proto-equal test3 t3res))
@@ -170,6 +183,10 @@
            (t2res (deserialize-from-bytes 'map-message t2ser))
            (t3res (deserialize-from-bytes 'map-enum t3ser))
            (t4res (deserialize-from-bytes 'nested-map t4ser)))
+      (assert-true (has-field t1res 'map-field))
+      (assert-true (has-field t2res 'map-field))
+      (assert-true (has-field t3res 'map-field))
+      (assert-true (has-field (nested-map.subfield t4res) 'map-field))
       (assert-true (proto-equal test1 t1res))
       (assert-true (proto-equal test2 t2res))
       (assert-true (proto-equal test3 t3res))

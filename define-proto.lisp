@@ -372,7 +372,8 @@ message, and of +<value_name>+ when the enum is defined at top-level."
                                 :type 'cl:hash-table
                                 :default (or val-default
                                              $empty-default)
-                                :kind :map))
+                                :kind :map
+                                :field-offset nil))
          (map-desc (make-map-descriptor :key-type key-type
                                         :value-type value-type
                                         :value-kind value-kind)))
@@ -485,6 +486,7 @@ Parameters:
     ;; If index is nil, then this field does not have a reserved bit in the %%is-set vector.
     ;; This means that the field is proto3-style optional, so checking for field presence must
     ;; be done by checking if the bound value is default.
+
     (with-gensyms (obj new-value cur-value)
       `(
         (defun-inline (setf ,public-accessor-name) (,new-value ,obj)
@@ -495,7 +497,6 @@ Parameters:
                `(setf (bit (,bit-field-name ,obj) ,bool-index)
                       (if ,new-value 1 0))
                `(setf (,hidden-accessor-name ,obj) ,new-value)))
-
 
         ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
         ;; question: "Is this field set to the default value?". This is done so that the optimized
@@ -510,8 +511,9 @@ Parameters:
                      (:vector `(not (= (length ,cur-value) 0)))
                      (:list `(and ,cur-value t))
                      (t (case (proto-type field)
-                          ((byte-vector cl:string) `(not (= (length ,cur-value) 0)))
+                          ((byte-vector cl:string) `(> (length ,cur-value) 0))
                           ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
+                          (cl:hash-table `(> (hash-table-count ,cur-value) 0))
                           ;; Otherwise, the type is integral. EQ suffices to check equality.
                           (t `(not (eq ,cur-value ,default-form)))))))))
 
@@ -734,16 +736,14 @@ function) then there is no guarantee on the serialize function working properly.
          (key-type (proto-key-type map-descriptor))
          (value-type (proto-value-type map-descriptor))
          (value-kind (proto-value-kind map-descriptor))
-         (val-default-form (get-default-form value-type  (proto-default field) nil value-kind))
-         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
-         (index (proto-field-offset field)))
+         (val-default-form
+          (get-default-form value-type (proto-default field) nil value-kind)))
 
     (with-gensyms (obj new-val new-key)
       `(
         (defun-inline (setf ,public-accessor-name) (,new-val ,new-key ,obj)
           (declare (type ,key-type ,new-key)
                    (type ,value-type ,new-val))
-          (setf (bit (,is-set-accessor ,obj) ,index) 1)
           (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
 
         ;; If the map's value type is a message, then the default value returned
@@ -764,16 +764,10 @@ function) then there is no guarantee on the serialize function working properly.
 
         (defun-inline ,public-remove-name (,new-key ,obj)
           (declare (type ,key-type ,new-key))
-          (remhash ,new-key (,hidden-accessor-name ,obj))
-          (if (= 0 (hash-table-count (,hidden-accessor-name ,obj)))
-              (setf (bit (,is-set-accessor ,obj) ,index) 0)))
+          (remhash ,new-key (,hidden-accessor-name ,obj)))
 
         (defun-inline ,clear-function-name (,obj)
-          ,(when index
-             `(setf (bit (,is-set-accessor ,obj) ,index) 0))
-          (setf (,hidden-accessor-name ,obj) ,(if (eql key-type 'cl:string)
-                                                  '(make-hash-table :test #'equal)
-                                                  '(make-hash-table :test #'eq))))
+          (clrhash (,hidden-accessor-name ,obj)))
 
         ;; These defmethods have the same functionality as the functions defined above
         ;; but they don't require a refernece to the message type, so using them is more
@@ -1101,8 +1095,6 @@ function) then there is no guarantee on the serialize function working properly.
                (macroexpand-1 field env)
              (collect-form definer)
              (collect-slot extra-slot)
-             (setf (proto-field-offset extra-field) field-offset)
-             (incf field-offset)
              (collect-non-lazy-field extra-field)
              (push extra-field (proto-fields msg-desc))))
           ((define-extension)
