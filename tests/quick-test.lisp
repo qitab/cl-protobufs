@@ -249,6 +249,81 @@ Parameters
                 "bbaz")
                "protobuf_unittest.bbaz")))
 
+(deftest test-non-bool-field-equal-with-vector (quick-suite)
+  (let ((fd (make-instance 'cl-protobufs.implementation::field-descriptor
+                           :label :repeated
+                           :kind :scalar
+                           :container :vector
+                           :class 'string
+                           :index 1)))
+    (assert-false (pi::non-bool-field-equal #("a") #() fd t))
+    (assert-false (pi::non-bool-field-equal #() #("a") fd t))
+    (assert-false (pi::non-bool-field-equal #("A") #("a") fd t))
+    (assert-true (pi::non-bool-field-equal #("a") #("a") fd t)))
+
+  (let ((fd (make-instance 'cl-protobufs.implementation::field-descriptor
+                           :label :repeated
+                           :kind :message
+                           :container :vector
+                           :class 'cl-protobufs.protobuf-unittest:test-message
+                           :index 1))
+        (test-message-1 (cl-protobufs.protobuf-unittest:make-test-message
+                         :foo 1
+                         :bar 0))
+        (test-message-2 (cl-protobufs.protobuf-unittest:make-test-message
+                         :foo 1)))
+
+    (assert-false (pi::non-bool-field-equal
+                   (vector test-message-1) (vector test-message-2) fd t))
+    (assert-true (pi::non-bool-field-equal
+                   (vector test-message-1) (vector test-message-2) fd nil))))
+
+(deftest test-non-bool-field-equal-with-list (quick-suite)
+  (let ((fd (make-instance 'cl-protobufs.implementation::field-descriptor
+                           :label :repeated
+                           :kind :scalar
+                           :container :list
+                           :class 'string
+                           :index 1)))
+    (assert-false (pi::non-bool-field-equal (list "a") () fd t))
+    (assert-false (pi::non-bool-field-equal () (list "a") fd t))
+    (assert-false (pi::non-bool-field-equal (list "A") (list "a") fd t))
+    (assert-true (pi::non-bool-field-equal (list "a") (list "a") fd t)))
+
+  (let ((fd (make-instance 'cl-protobufs.implementation::field-descriptor
+                           :label :repeated
+                           :kind :message
+                           :container :list
+                           :class 'cl-protobufs.protobuf-unittest:test-message
+                           :index 1))
+        (test-message-1 (cl-protobufs.protobuf-unittest:make-test-message
+                         :foo 1
+                         :bar 0))
+        (test-message-2 (cl-protobufs.protobuf-unittest:make-test-message
+                         :foo 1)))
+
+    (assert-false (pi::non-bool-field-equal
+                   (list test-message-1) (list test-message-2) fd t))
+    (assert-true (pi::non-bool-field-equal
+                   (list test-message-1) (list test-message-2) fd nil))))
+
+(deftest test-non-bool-field-equal-with-message (quick-suite)
+  (let ((fd (make-instance 'cl-protobufs.implementation::field-descriptor
+                           :label :optional
+                           :kind :message
+                           :container nil
+                           :class 'cl-protobufs.protobuf-unittest:test-message
+                           :index 1))
+        (test-message-1 (cl-protobufs.protobuf-unittest:make-test-message
+                         :foo 1
+                         :bar 0))
+        (test-message-2 (cl-protobufs.protobuf-unittest:make-test-message
+                         :foo 1)))
+
+    (assert-false (pi::non-bool-field-equal test-message-1 test-message-2 fd t))
+    (assert-true (pi::non-bool-field-equal test-message-1 test-message-2 fd nil))
+    (assert-true (pi::non-bool-field-equal test-message-1 test-message-1 fd t))
+    (assert-true (pi::non-bool-field-equal test-message-1 test-message-1 fd nil))))
 
 ;;; Some tests for the mechanism that maps a field number to its descriptor.
 ;;; The need for such is that in deserializing a structure using the generic path,
@@ -257,7 +332,6 @@ Parameters
 ;;;   (keywordify (proto-name (find-field-descriptor msg-descriptor field-number)))
 ;;; It would be really nice if, in general, FIND-FIELD would use other than linear scan,
 ;;; however tackling that was more than I was willing to undertake at present.
-
 (defun test-find-in-field-map ()
   ;; Using the simple hash-based field map, in the test below I observe between 6 and 8
   ;; as the worst-case number of probes to find a field object from its number.

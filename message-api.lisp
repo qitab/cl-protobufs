@@ -45,23 +45,20 @@ Parameters:
   MAP-DESCRIPTOR: The map descriptor for the two maps.
   EXACT: If true consider the messages to be equal
 only if the same fields have been explicitly set."
-  (unless (= (hash-table-count map-1)
-             (hash-table-count map-2))
-    (return-from map-field-equal nil))
-  (loop for key being the hash-keys of map-1
-          using (hash-value map-1-value)
-        for map-2-value = (gethash key map-2)
-        unless
-        (if (or (scalarp (proto-value-type map-descriptor))
-                (find-enum-descriptor (proto-value-type map-descriptor)))
-            (scalar-field-equal map-1-value
-                                map-2-value)
-            (proto-equal map-1-value
-                         map-2-value
-                         :exact exact))
-        do
-     (return-from map-field-equal nil))
-  t)
+  (and (= (hash-table-count map-1)
+          (hash-table-count map-2))
+
+       (loop for key being the hash-keys of map-1
+               using (hash-value map-1-value)
+             for map-2-value = (gethash key map-2)
+             always
+             (if (or (scalarp (proto-value-type map-descriptor))
+                     (find-enum-descriptor (proto-value-type map-descriptor)))
+                 (scalar-field-equal map-1-value
+                                     map-2-value)
+                 (proto-equal map-1-value
+                              map-2-value
+                              :exact exact)))))
 
 (defun oneof-field-equal (oneof-1 oneof-2 oneof-descriptor exact)
     "Returns true if two maps with the same map-descriptor are equal.
@@ -97,6 +94,39 @@ only if the same fields have been explicitly set."
                        (oneof-value oneof-2)
                        :exact exact)))))
 
+(defun non-bool-field-equal (field-1 field-2 field-descriptor exact)
+  "Returns true if two proto-fields which aren't bools or oneofs are equal.
+Parameters:
+  FIELD-1: The first field to compare.
+  FIELD-2: The second field to compare.
+  FIELD-DESCRIPTOR: The field descriptor for the two fields.
+  EXACT: If true consider the messages to be equal
+only if the same fields have been explicitly set."
+  (declare (type field-descriptor field-descriptor))
+  (let ((lisp-type (proto-class field-descriptor)))
+    (assert (not (eql lisp-type 'boolean)))
+
+    (unless (and field-1 field-2)
+      (return-from non-bool-field-equal
+        (not (or field-1 field-2))))
+
+    (when (or (scalarp lisp-type)
+              (find-enum-descriptor lisp-type))
+      (return-from non-bool-field-equal
+        (scalar-field-equal field-1 field-2)))
+
+    (when (eql (proto-kind field-descriptor) :map)
+      (return-from non-bool-field-equal
+        (map-field-equal field-1
+                         field-2
+                         (find-map-descriptor lisp-type)
+                         exact))))
+
+  (if (proto-container field-descriptor)
+      (and (= (length field-1) (length field-2))
+           (every (lambda (x y) (proto-equal x y :exact exact))
+                  field-1 field-2))
+      (proto-equal field-1 field-2 :exact exact)))
 
 (defun scalar-field-equal (object-1 object-2)
   "Check if two objects with scalar type are equal.
@@ -105,7 +135,11 @@ Parameters:
   OBJECT-2: The second scalar object."
   (typecase object-1
     (string (string= object-1 object-2))
-    (t (equalp object-1 object-2))))
+    (byte-vector (equalp object-1 object-2))
+    ((or list vector)
+     (and (= (length object-1) (length object-2))
+          (every #'scalar-field-equal object-1 object-2)))
+    (t (eql object-1 object-2))))
 
 (defun proto-equal (message-1 message-2 &key (exact nil))
   "Check if two protobuf messages are equal. By default
@@ -122,64 +156,41 @@ Parameters:
 only if the same fields have been explicitly set."
   (let* ((class-1 (type-of message-1))
          (message (find-message-descriptor class-1)))
-    (unless (and message (eq (type-of message-2) class-1))
-      (return-from proto-equal nil))
 
-    (when (and exact
-               (not (equalp (slot-value message-1 '%%is-set)
-                            (slot-value message-2 '%%is-set))))
-      (return-from proto-equal nil))
+    (and
+     ;; Check the messages are the same.
+     message
+     (eq (type-of message-2) class-1)
 
-    ;; Bool values are stored in a vector.
-    (when (and (slot-exists-p message-1 '%%bool-values)
-               (not (equalp (slot-value message-1 '%%bool-values)
-                            (slot-value message-2 '%%bool-values))))
-      (return-from proto-equal nil))
+     ;; Check same fields are set if exact is specified.
+     (or (not exact)
+         (equalp (slot-value message-1 '%%is-set)
+                 (slot-value message-2 '%%is-set)))
 
-    (loop for oneof in (proto-oneofs message)
-          for slot-value-1
-            = (slot-value message-1 (oneof-descriptor-internal-name oneof))
-          for slot-value-2
-            = (slot-value message-2 (oneof-descriptor-internal-name oneof))
-          unless (oneof-field-equal slot-value-1 slot-value-2 oneof exact)
-            do (return-from proto-equal nil))
+     ;; Bool values are stored in a vector.
+     (or (not (slot-exists-p message-1 '%%bool-values))
+         (equalp (slot-value message-1 '%%bool-values)
+                 (slot-value message-2 '%%bool-values)))
 
-    (loop for field in (proto-fields message)
-          for lisp-type = (proto-class field)
-          for slot-value-1
-            = (unless (eq lisp-type 'boolean)
-                (slot-value message-1 (proto-internal-field-name field)))
-          for slot-value-2
-            = (when slot-value-1
-                (slot-value message-2 (proto-internal-field-name field)))
-          when (and (not (eq lisp-type 'boolean))
-                    (or (scalarp lisp-type) (find-enum-descriptor lisp-type)))
-            do (unless (scalar-field-equal slot-value-1 slot-value-2)
-                 (return-from proto-equal nil))
-          unless (and slot-value-1 slot-value-2)
-            do (when (or slot-value-1 slot-value-2)
-                 (return-from proto-equal nil))
-          when (and slot-value-1 (eq (proto-kind field) :map))
-            do (unless (map-field-equal slot-value-1
-                                        slot-value-2
-                                        (find-map-descriptor lisp-type)
-                                        exact)
-                 (return-from proto-equal nil))
-          when (and slot-value-1 (eq (proto-label field) :repeated))
-            do (unless (= (length slot-value-1) (length slot-value-2))
-                 (return-from proto-equal nil))
-          when (and slot-value-1 (find-message-descriptor lisp-type))
-            do (loop for x in
-                           (if (eq (proto-label field) :repeated)
-                               slot-value-1
-                               (list slot-value-1))
-                     for y in
-                           (if (eq (proto-label field) :repeated)
-                               slot-value-2
-                               (list slot-value-2))
-                     do (unless (and x y (proto-equal x y :exact exact))
-                          (return-from proto-equal nil))))
-    t))
+     ;; oneofs
+     (loop for oneof in (proto-oneofs message)
+           for slot-value-1
+             = (slot-value message-1 (oneof-descriptor-internal-name oneof))
+           for slot-value-2
+             = (slot-value message-2 (oneof-descriptor-internal-name oneof))
+           always (oneof-field-equal slot-value-1 slot-value-2 oneof exact))
+
+     ;; regular fields
+     (loop for field in (proto-fields message)
+           for lisp-type = (proto-class field)
+           for slot-value-1
+             = (unless (eq lisp-type 'boolean)
+                 (slot-value message-1 (proto-internal-field-name field)))
+           for slot-value-2
+             = (when slot-value-1
+                 (slot-value message-2 (proto-internal-field-name field)))
+           always (or (eql lisp-type 'boolean)
+                      (non-bool-field-equal slot-value-1 slot-value-2 field exact))))))
 
 (defgeneric clear (object)
   (:documentation
