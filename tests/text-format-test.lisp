@@ -23,36 +23,34 @@ Parameters
                                        :signal-condition-on-fail t))
 
 (defparameter *text-format-msg*
-"TextFormatTest {
-  int_field: 100
-  sint_field: -1
-  uint_field: 1
-  float_field: 1.5
-  double_field: 1.5d0
-  string_field: 'A string'
-  string_fields: 'First'
-  string_fields: 'Second'
-  enum_vals: NONE
-  enum_vals: TWENTY_ONE
-  two_level_nesting {
-    int_field: 2
-  }
-  map_field { key: 1 value: 'one' }
-  map_field { key: 2 value: 'two' }
-  oneof_int_field: 5
-  symbol_field: 'abc'
-  symbol_field: ':def'
-  symbol_field: 'cl-protobufs.test.text-format:ghi'
-  symbol_field: 't'
-  symbol_field: 'nil'
-  symbol_field: ':t'
-  symbol_field: ':nil'
+"int_field: 100
+sint_field: -1
+uint_field: 1
+float_field: 1.5
+double_field: 1.5d0
+string_field: 'A string'
+string_fields: 'First'
+string_fields: 'Second'
+enum_vals: NONE
+enum_vals: TWENTY_ONE
+two_level_nesting {
+  int_field: 2
 }
-")
+map_field { key: 1 value: 'one' }
+map_field { key: 2 value: 'two' }
+oneof_int_field: 5
+symbol_field: 'abc'
+symbol_field: ':def'
+symbol_field: 'cl-protobufs.test.text-format:ghi'
+symbol_field: 't'
+symbol_field: 'nil'
+symbol_field: ':t'
+symbol_field: ':nil'")
 
 (deftest test-parse-text-format (text-format-suite)
-  (let ((msg (proto:parse-text-format 'test-pb:text-format-test
-                                      :stream (make-string-input-stream *text-format-msg*))))
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream *text-format-msg*))))
     (assert-eql 100 (test-pb:int-field msg))
     (assert-eql -1 (test-pb:sint-field msg))
     (assert-eql 1 (test-pb:uint-field msg))
@@ -92,8 +90,9 @@ Parameters
     (setf (test-pb:text-format-test.map-field-gethash 2 msg) "two")
     (proto:print-text-format msg :stream out-stream)
     (let* ((text (get-output-stream-string out-stream))
-           (msg-parse (proto:parse-text-format 'test-pb:text-format-test
-                                               :stream (make-string-input-stream text))))
+           (msg-parse (proto:parse-text-format
+                       'test-pb:text-format-test
+                       :stream (make-string-input-stream text))))
       (assert-true (test-pb:text-format-test.has-map-field msg-parse))
       (assert-equality #'proto:proto-equal msg msg-parse))))
 
@@ -108,6 +107,6 @@ Parameters
       (ignore-errors
        (proto:parse-text-format
         'test-pb:text-format-test
-        :stream (make-string-input-stream "TextFormatTest { int_field: 100 random_field: 200 }")))
+        :stream (make-string-input-stream "int_field: 100 random_field: 200")))
     (declare (ignore result))
     (assert-true condition)))

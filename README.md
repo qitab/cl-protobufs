@@ -693,16 +693,23 @@ This section documents the symbols exported from the `cl-protobufs` package.
 The base type from which every generated protobuf message inherits.
 
 ```lisp
-(defun print-text-format (object &key (stream *standard-output*)
-                                 (print-name t)
-                                 (pretty-print t))
+(defun print-text-format (object &key
+                                 (indent -2)
+                                 (stream *standard-output*)
+                                 (pretty-print t)))
 ```
 
 Prints a protocol buffer message to a stream. `object` is the protocol buffer
 message, group, or extension to print. `stream` is the stream to print to.
-`print-name` may be set to `nil` to prevent printing the name of the object
-first. `pretty-print` may be set to `nil` to minimize textual output by omitting
+`pretty-print` may be set to `nil` to minimize textual output by omitting
 most whitespace.
+
+```lisp
+(defun parse-text-format (type &key (stream *standard-input*)))
+```
+
+Parses a protocol buffer message written in text-format.
+`type` is the type of message to parse. `stream` is the stream to read from.
 
 ```lisp
 (defun is-initialized (object))

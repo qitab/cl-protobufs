@@ -10,52 +10,55 @@
 ;;; The exported symbols are parse-text-format and print-text-format.
 
 (defun print-text-format (object &key
-                                   (indent 0)
-                                   (stream *standard-output*)
-                                   name
-                                   (print-name t)
-                                   (pretty-print t))
+                                 (stream *standard-output*)
+                                 (pretty-print t))
+    "Prints a protocol buffer message to a stream.
+Parameters:
+  OBJECT: The protocol buffer message to print.
+  STREAM: The stream to print to.
+  PRETTY-PRINT: When true, generate line breaks and other human readable output
+    in the text format. When false, replace line breaks with spaces."
+  (print-text-format-impl object nil :stream stream
+                                     :pretty-print pretty-print))
+
+(defun print-text-format-impl (object field-name &key
+                                      (indent -2)
+                                      (stream *standard-output*)
+                                      (pretty-print t))
   "Prints a protocol buffer message to a stream.
 Parameters:
   OBJECT: The protocol buffer message to print.
-  INDENT: Indent the output by INDENT spaces.
+  INDENT: Indent the output by INDENT spaces. Only used for pretty-printing.
   STREAM: The stream to print to.
-  NAME: A string. If supplied (and PRINT-NAME is T), this string will be
-    used as the name in printing. If not supplied, then the PROTO-NAME slot
-    of OBJECT's message descriptor will be used.
-  PRINT-NAME: Bool for printing the name of the top level proto message.
   PRETTY-PRINT: When true, generate line breaks and other human readable output
-    in the text format. When false, replace line breaks with spaces."
+    in the text format. When false, replace line breaks with spaces.
+  FIELD-NAME: The name of the field we are printing."
   (let* ((type (type-of object))
          (message (find-message-descriptor type :error-p t)))
-    (let ((name (or name (proto-name message))))
-      (if print-name
-          (if pretty-print
-              (format stream "~&~V,0T~A {~%" indent name)
-              (format stream "~A { " name))
-          (format stream "{")))
+    (when field-name
+      (if pretty-print
+          (format stream "~&~V,0T~A {~%" indent field-name)
+          (format stream "~A { " field-name)))
     (dolist (field (proto-fields message))
       (when (if (eq (slot-value field 'kind) :extends)
                 (has-extension object (slot-value field 'external-field-name))
                 (has-field object (slot-value field 'external-field-name)))
         (let* ((value
-                 (if (eq (slot-value field 'kind) :extends)
-                     (get-extension object (slot-value field 'external-field-name))
-                     (proto-slot-value object (slot-value field 'external-field-name)))))
+                (if (eq (slot-value field 'kind) :extends)
+                    (get-extension object (slot-value field 'external-field-name))
+                    (proto-slot-value object (slot-value field 'external-field-name)))))
           (if (eq (proto-label field) :repeated)
               (print-repeated-field value
                                     (proto-class field)
                                     (proto-name field)
                                     :indent indent
                                     :stream stream
-                                    :print-name print-name
                                     :pretty-print pretty-print)
               (print-non-repeated-field value
                                         (proto-class field)
                                         (proto-name field)
                                         :indent indent
                                         :stream stream
-                                        :print-name print-name
                                         :pretty-print pretty-print)))))
     (dolist (oneof (proto-oneofs message))
       (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
@@ -67,15 +70,15 @@ Parameters:
                                       (proto-name field-desc)
                                       :indent indent
                                       :stream stream
-                                      :print-name print-name
                                       :pretty-print pretty-print)))))
-    (if pretty-print
-        (format stream "~&~V,0T}~%" indent)
-        (format stream "} "))
+    (when field-name
+      (if pretty-print
+          (format stream "~&~V,0T}~%" indent)
+          (format stream "} ")))
     nil))
 
 (defun print-repeated-field
-    (values type name &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
+    (values type name &key (indent 0) (stream *standard-output*) (pretty-print t))
   "Print the text format of a single field which is not repeated.
 Parameters:
   VALUES: The list or vector of values in the field to print.
@@ -84,7 +87,6 @@ Parameters:
   NAME: The name of the field. This is printed before the value.
   INDENT: If supplied, indent the text by INDENT spaces.
   STREAM: The stream to output to.
-  PRINT-NAME: Whether or not to print the name of the field.
   PRETTY-PRINT: When true, print newlines and indentation."
   (unless values
     (return-from print-repeated-field nil)) ; If values is NIL, then there is nothing to do.
@@ -98,11 +100,9 @@ Parameters:
                              (find-enum-descriptor type)))
               'message-descriptor)
        (doseq (v values)
-         (print-text-format v :indent (+ indent 2)
-                              :stream stream
-                              :name name
-                              :print-name print-name
-                              :pretty-print pretty-print)))
+         (print-text-format-impl v name :indent (+ indent 2)
+                                        :stream stream
+                                        :pretty-print pretty-print)))
       ((typep desc 'enum-descriptor)
        (doseq (v values)
          (print-enum v desc name stream (and pretty-print indent))))
@@ -114,7 +114,7 @@ Parameters:
               :format-arguments (list type name))))))
 
 (defun print-non-repeated-field
-    (value type name &key (indent 0) (stream *standard-output*) (print-name t) (pretty-print t))
+    (value type name &key (indent 0) (stream *standard-output*) (pretty-print t))
   "Print the text format of a single field which is not repeated.
 Parameters:
   VALUE: The value in the field to print.
@@ -137,11 +137,9 @@ Parameters:
                              (find-enum-descriptor type)
                              (find-map-descriptor type)))
               'message-descriptor)
-       (print-text-format value :indent (+ indent 2)
-                                :stream stream
-                                :name name
-                                :print-name print-name
-                                :pretty-print pretty-print))
+       (print-text-format-impl value name :indent (+ indent 2)
+                                          :stream stream
+                                          :pretty-print pretty-print))
       ((typep desc 'enum-descriptor)
        (print-enum value desc name stream (and pretty-print indent)))
       ((typep desc 'map-descriptor)
@@ -152,7 +150,6 @@ Parameters:
                 (print-scalar k (proto-key-type desc) "key" stream nil)
                 (print-non-repeated-field v (proto-value-type desc) "value"
                                           :stream stream
-                                          :print-name t
                                           :pretty-print nil)
                 (format stream "}")
                 (when pretty-print
@@ -235,27 +232,22 @@ Parameters:
 
 ;;; Parse objects that were serialized using the text format
 
-(defgeneric parse-text-format (type &key stream parse-name)
-  (:documentation
-   "Parses an object of type TYPE from the stream STREAM using text format."))
-
-(defmethod parse-text-format ((type symbol)
-                              &key (stream *standard-input*) (parse-name t))
+(defun parse-text-format (type &key (stream *standard-input*))
+  "Parses an object in stream STREAM of type TYPE written in text format."
+  (declare (type symbol type)
+           (type stream stream))
   (let ((message (find-message-descriptor type :error-p t)))
-    (parse-text-format message :stream stream :parse-name parse-name)))
+    (parse-text-format-impl message t :stream stream)))
 
 ;;; TODO(cgay): replace all assertions here with something that signals a
 ;;; subtype of protobuf-error and shows current stream position.
 
-(defmethod parse-text-format ((msg-desc message-descriptor)
-                              &key (stream *standard-input*) (parse-name t))
+(defun parse-text-format-impl
+    (msg-desc top-level &key (stream *standard-input*))
   "Parse a protobuf message with descriptor MSG-DESC from STREAM. This method
-returns the parsed object. PARSE-NAME is a flag used for recursive calls. If true,
+returns the parsed object. TOP-LEVEL is a flag used for recursive calls. If true,
 attempt to parse the name of the message and match it against MSG-DESC."
-  (when parse-name
-    (let ((name (parse-token stream)))
-      (assert (string= name (proto-name msg-desc)) ()
-              "The message is not of the expected type ~A" (proto-name msg-desc))))
+  (declare (type message-descriptor msg-desc))
   (let ((object #+sbcl (make-instance (or (proto-alias-for msg-desc)
                                           (proto-class msg-desc)))
                 #-sbcl (funcall (get-constructor-name
@@ -263,23 +255,27 @@ attempt to parse the name of the message and match it against MSG-DESC."
                                      (proto-class msg-desc)))))
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
-    (expect-char stream #\{)
+    (unless top-level
+      (expect-char stream #\{))
     (loop
       (skip-whitespace stream)
-      (when (eql (peek-char nil stream nil) #\})
-        (read-char stream)
+      (when (or (not (peek-char nil stream nil))
+                (eql (peek-char nil stream nil) #\}))
+        (read-char stream nil)
+        ;; We should respect the order of slots as
+        ;; they were in the message.
         (dolist (slot rslots)
           (setf (proto-slot-value object slot)
                 (nreverse (proto-slot-value object slot))))
-        (return-from parse-text-format object))
+        (return-from parse-text-format-impl object))
       (let* ((name  (parse-token stream))
              (field (and name (find-field-descriptor msg-desc name)))
              (type  (and field (proto-class field)))
              (slot  (and field (proto-external-field-name field))))
         (if (null field)
             (error 'unknown-field
-              :format-control "unknown field ~S, while parsing message of type ~A"
-              :format-arguments (list name msg-desc))
+                   :format-control "unknown field ~S, while parsing message of type ~A"
+                   :format-arguments (list name msg-desc))
             (multiple-value-bind (val error-p)
                 (parse-field type :stream stream)
               (cond
@@ -324,9 +320,9 @@ return T as a second value."
           ((typep desc 'message-descriptor)
            (when (eql (peek-char nil stream nil) #\:)
              (read-char stream))
-           (parse-text-format (find-message-descriptor type)
-                              :stream stream
-                              :parse-name nil))
+           (parse-text-format-impl (find-message-descriptor type)
+                                   nil
+                                   :stream stream))
           ((typep desc 'enum-descriptor)
            (expect-char stream #\:)
            (let* ((name (parse-token stream))

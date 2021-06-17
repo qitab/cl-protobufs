@@ -53,7 +53,7 @@ Parameters
            (serialized (serialize-to-bytes msg))
            (text (with-output-to-string (s) (print-text-format msg :stream s)))
            (json (with-output-to-string (s) (print-json msg :stream s))))
-      (assert-true (string= (format nil "AllSingular {~%}~%") text))
+      (assert-true (string= "" text))
       (assert-true (string= (format nil "{~%}") json))
       (assert-true (equalp serialized #())))))
 

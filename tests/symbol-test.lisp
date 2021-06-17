@@ -59,7 +59,7 @@ Parameters
         (assert-true condition)))))
 
 (deftest test-uninterned-symbol (symbol-suite)
-  (let* ((textproto "TextFormatTest { symbol_field2: '#:foo' }")
+  (let* ((textproto "symbol_field2: '#:foo'")
          (msg (proto:parse-text-format
                'test-pb:text-format-test
                :stream (make-string-input-stream textproto)))

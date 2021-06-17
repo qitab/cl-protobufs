@@ -210,14 +210,14 @@ Parameters
     (repeated-proto.push-repeated-int32 3 repeated2)
     (outer-proto.push-repeated-proto repeated1 outer-proto)
     (outer-proto.push-repeated-proto repeated2 outer-proto)
-    (assert-equality #'string= "OuterProto {
-  repeated_proto {
-    repeated_int32: 1
-    repeated_int32: 2
-  }
-  repeated_proto {
-    repeated_int32: 3
-  }
+    (assert-equality #'string=
+        "repeated_proto {
+  repeated_int32: 1
+  repeated_int32: 2
 }
-" (with-output-to-string (s)
-    (print-text-format outer-proto :stream s)))))
+repeated_proto {
+  repeated_int32: 3
+}
+"
+        (with-output-to-string (s)
+          (print-text-format outer-proto :stream s)))))

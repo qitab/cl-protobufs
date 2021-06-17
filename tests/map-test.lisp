@@ -199,6 +199,7 @@
          (test2 (make-map-message :before 1 :after 1))
          (test3 (make-map-enum :before 1 :after 2))
          (test4 (make-nested-map :strval "test" :subfield test1 :after 2)))
+
     (flet ((round-trip (message)
              (let ((text (with-output-to-string (s)
                            (print-text-format message :stream s))))
