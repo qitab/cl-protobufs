@@ -47,6 +47,20 @@ symbol_field: 'nil'
 symbol_field: ':t'
 symbol_field: ':nil'")
 
+
+(defparameter *double-nested-message*
+  (list
+   "int_field: 0
+one_level_nesting {
+  int_field: 1
+  message_2 {
+    int_field: 2
+  }
+}
+"
+   "int_field: 0 one_level_nesting { int_field: 1 message_2 { int_field: 2 } } ")
+  "The pretty print and non pretty-print versions of a doubly nested message.")
+
 (deftest test-parse-text-format (text-format-suite)
   (let ((msg (proto:parse-text-format
               'test-pb:text-format-test
@@ -95,6 +109,40 @@ symbol_field: ':nil'")
                        :stream (make-string-input-stream text))))
       (assert-true (test-pb:text-format-test.has-map-field msg-parse))
       (assert-equality #'proto:proto-equal msg msg-parse))))
+
+(deftest test-doubly-nested-mesage (text-format-suite)
+  (let* ((nested-message-2
+          (test-pb:make-text-format-test.nested-message1.nested-message2
+           :int-field 2))
+         (nested-message-1
+          (test-pb:make-text-format-test.nested-message1
+           :int-field 1
+           :message-2 nested-message-2))
+         (msg (test-pb:make-text-format-test
+               :int-field 0
+               :one-level-nesting nested-message-1))
+         (out-stream (make-string-output-stream)))
+
+    ;; Pretty print test
+    (proto:print-text-format msg)
+    (proto:print-text-format msg :stream out-stream)
+    (let* ((text (get-output-stream-string out-stream))
+           (msg-parse (proto:parse-text-format
+                       'test-pb:text-format-test
+                       :stream (make-string-input-stream text))))
+      (assert-equality #'proto:proto-equal msg msg-parse)
+      (assert-equality #'string= text (first *double-nested-message*)))
+
+    ;; Non-pretty print test
+    (proto:print-text-format msg :pretty-print nil :stream out-stream)
+    (let* ((text (get-output-stream-string out-stream))
+           (msg-parse (proto:parse-text-format
+                       'test-pb:text-format-test
+                       :stream (make-string-input-stream text))))
+      (assert-equality #'proto:proto-equal msg msg-parse)
+      (assert-equality #'string= text (second *double-nested-message*)))))
+
+
 
 (deftest test-parse-text-format-nested-symbol-names (text-format-suite)
   (assert-true (proto:find-message-descriptor 'test-pb:text-format-test))

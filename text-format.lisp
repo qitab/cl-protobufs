@@ -18,11 +18,11 @@ Parameters:
   STREAM: The stream to print to.
   PRETTY-PRINT: When true, generate line breaks and other human readable output
     in the text format. When false, replace line breaks with spaces."
-  (print-text-format-impl object nil :stream stream
-                                     :pretty-print pretty-print))
+  (print-text-format-impl object :stream stream
+                                 :pretty-print pretty-print))
 
-(defun print-text-format-impl (object field-name &key
-                                      (indent -2)
+(defun print-text-format-impl (object &key
+                                      (indent 0)
                                       (stream *standard-output*)
                                       (pretty-print t))
   "Prints a protocol buffer message to a stream.
@@ -31,14 +31,9 @@ Parameters:
   INDENT: Indent the output by INDENT spaces. Only used for pretty-printing.
   STREAM: The stream to print to.
   PRETTY-PRINT: When true, generate line breaks and other human readable output
-    in the text format. When false, replace line breaks with spaces.
-  FIELD-NAME: The name of the field we are printing."
+    in the text format. When false, replace line breaks with spaces."
   (let* ((type (type-of object))
          (message (find-message-descriptor type :error-p t)))
-    (when field-name
-      (if pretty-print
-          (format stream "~&~V,0T~A {~%" indent field-name)
-          (format stream "~A { " field-name)))
     (dolist (field (proto-fields message))
       (when (if (eq (slot-value field 'kind) :extends)
                 (has-extension object (slot-value field 'external-field-name))
@@ -71,10 +66,6 @@ Parameters:
                                       :indent indent
                                       :stream stream
                                       :pretty-print pretty-print)))))
-    (when field-name
-      (if pretty-print
-          (format stream "~&~V,0T}~%" indent)
-          (format stream "} ")))
     nil))
 
 (defun print-repeated-field
@@ -100,9 +91,11 @@ Parameters:
                              (find-enum-descriptor type)))
               'message-descriptor)
        (doseq (v values)
-         (print-text-format-impl v name :indent (+ indent 2)
-                                        :stream stream
-                                        :pretty-print pretty-print)))
+         (print-message-brace t name pretty-print indent stream)
+         (print-text-format-impl v :indent (+ indent 2)
+                                   :stream stream
+                                   :pretty-print pretty-print)
+         (print-message-brace nil name pretty-print indent stream)))
       ((typep desc 'enum-descriptor)
        (doseq (v values)
          (print-enum v desc name stream (and pretty-print indent))))
@@ -137,15 +130,17 @@ Parameters:
                              (find-enum-descriptor type)
                              (find-map-descriptor type)))
               'message-descriptor)
-       (print-text-format-impl value name :indent (+ indent 2)
-                                          :stream stream
-                                          :pretty-print pretty-print))
+       (print-message-brace t name pretty-print indent stream)
+       (print-text-format-impl value :indent (+ indent 2)
+                                     :stream stream
+                                     :pretty-print pretty-print)
+       (print-message-brace nil name pretty-print indent stream))
       ((typep desc 'enum-descriptor)
        (print-enum value desc name stream (and pretty-print indent)))
       ((typep desc 'map-descriptor)
        (loop for k being the hash-keys of value using (hash-value v)
              do (if pretty-print
-                    (format stream "~&~V,0T~A { " (+ indent 2) name)
+                    (format stream "~&~V,0T~A { " indent name)
                     (format stream "~A { " name))
                 (print-scalar k (proto-key-type desc) "key" stream nil)
                 (print-non-repeated-field v (proto-value-type desc) "value"
@@ -177,7 +172,7 @@ Parameters:
             do not write a newline."
   (when (or val (eq type 'boolean) (eq type 'symbol))
     (when indent
-      (format stream "~&~V,0T" (+ indent 2)))
+      (format stream "~&~V,0T" indent))
     (when name
       (format stream "~A: " name))
     (ecase type
@@ -217,7 +212,7 @@ Parameters:
             do not write a newline."
   (when val
     (when indent
-      (format stream "~&~V,0T" (+ indent 2)))
+      (format stream "~&~V,0T" indent))
     (when name
       (format stream "~A: " name))
     (let* ((e (find (keywordify val)
@@ -229,6 +224,23 @@ Parameters:
       (if indent
           (format stream "~%")
           (format stream " ")))))
+
+(defun print-message-brace (opening-p name pretty-print indent stream)
+  "Print either the opening NAME { or closing }.
+
+Parameters:
+  OPENING-P: Is this an opening or closing brace.
+  NAME: The name to print before the value. If NIL, no name will be printed.
+  PRETTY-PRINT: When true, print newlines and indentation.
+  INDENT: A set indentation to print to. Used only for pretty-print.
+  STREAM: The stream to print to."
+  (if opening-p
+      (if pretty-print
+          (format stream "~&~V,0T~A {~%" indent name)
+          (format stream "~A { " name))
+      (if pretty-print
+          (format stream "~&~V,0T}~%" indent)
+          (format stream "} "))))
 
 ;;; Parse objects that were serialized using the text format
 

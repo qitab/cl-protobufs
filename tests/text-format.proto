@@ -34,10 +34,10 @@ message TextFormatTest {
   optional uint32 embedded_comment_g = 17; /* comment */
   message NestedMessage1 {
     optional int32 int_field = 1;
-
     message NestedMessage2 {
       optional int32 int_field = 2;
     }
+    optional NestedMessage2 message_2 = 2;
   }
 
   optional NestedMessage1 one_level_nesting = 18;
