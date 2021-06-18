@@ -43,71 +43,34 @@ Parameters:
                     (get-extension object (slot-value field 'external-field-name))
                     (proto-slot-value object (slot-value field 'external-field-name)))))
           (if (eq (proto-label field) :repeated)
-              (print-repeated-field value
-                                    (proto-class field)
-                                    (proto-name field)
-                                    :indent indent
-                                    :stream stream
-                                    :pretty-print pretty-print)
-              (print-non-repeated-field value
-                                        (proto-class field)
-                                        (proto-name field)
-                                        :indent indent
-                                        :stream stream
-                                        :pretty-print pretty-print)))))
+              (doseq (val value)
+                     (print-field val
+                                  (proto-class field)
+                                  (proto-name field)
+                                  :indent indent
+                                  :stream stream
+                                  :pretty-print pretty-print))
+              (print-field value
+                           (proto-class field)
+                           (proto-name field)
+                           :indent indent
+                           :stream stream
+                           :pretty-print pretty-print)))))
     (dolist (oneof (proto-oneofs message))
       (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
              (set-field (oneof-set-field oneof-data)))
         (when set-field
           (let ((field-desc (aref (oneof-descriptor-fields oneof) set-field)))
-            (print-non-repeated-field (oneof-value oneof-data)
-                                      (proto-class field-desc)
-                                      (proto-name field-desc)
-                                      :indent indent
-                                      :stream stream
-                                      :pretty-print pretty-print)))))
+            (print-field (oneof-value oneof-data)
+                         (proto-class field-desc)
+                         (proto-name field-desc)
+                         :indent indent
+                         :stream stream
+                         :pretty-print pretty-print)))))
     nil))
 
-(defun print-repeated-field
-    (values type name &key (indent 0) (stream *standard-output*) (pretty-print t))
-  "Print the text format of a single field which is not repeated.
-Parameters:
-  VALUES: The list or vector of values in the field to print.
-  TYPE: The protobuf type to print. This is obtained from
-    the PROTO-CLASS slot in the field-descriptor.
-  NAME: The name of the field. This is printed before the value.
-  INDENT: If supplied, indent the text by INDENT spaces.
-  STREAM: The stream to output to.
-  PRETTY-PRINT: When true, print newlines and indentation."
-  (unless values
-    (return-from print-repeated-field nil)) ; If values is NIL, then there is nothing to do.
-  (let (desc)
-    (cond
-      ((scalarp type)
-       (doseq (v values)
-         (print-scalar v type name stream
-                       (and pretty-print indent))))
-      ((typep (setq desc (or (find-message-descriptor type)
-                             (find-enum-descriptor type)))
-              'message-descriptor)
-       (doseq (v values)
-         (print-message-brace t name pretty-print indent stream)
-         (print-text-format-impl v :indent (+ indent 2)
-                                   :stream stream
-                                   :pretty-print pretty-print)
-         (print-message-brace nil name pretty-print indent stream)))
-      ((typep desc 'enum-descriptor)
-       (doseq (v values)
-         (print-enum v desc name stream (and pretty-print indent))))
-      ;; This case only happens when the user specifies a custom type and
-      ;; doesn't support it above.
-      (t
-       (error 'unknown-type
-              :format-control "unknown type ~S, while printing repeated field ~S"
-              :format-arguments (list type name))))))
-
-(defun print-non-repeated-field
-    (value type name &key (indent 0) (stream *standard-output*) (pretty-print t))
+(defun print-field (value type name
+                    &key (indent 0) (stream *standard-output*) (pretty-print t))
   "Print the text format of a single field which is not repeated.
 Parameters:
   VALUE: The value in the field to print.
@@ -118,10 +81,10 @@ Parameters:
   STREAM: The stream to output to.
   PRINT-NAME: Whether or not to print the name of the field.
   PRETTY-PRINT: When true, print newlines and indentation."
+  ;; If VALUE is NIL and the type is not boolean, there is nothing to do.
+  (unless (or value (eq type 'boolean) (eq type 'symbol))
+    (return-from print-field nil))
   (let (desc)
-    ;; If VALUE is NIL and the type is not boolean, there is nothing to do.
-    (unless (or value (eq type 'boolean) (eq type 'symbol))
-      (return-from print-non-repeated-field nil))
     (cond
       ((scalarp type)
        (print-scalar value type name stream
@@ -143,9 +106,9 @@ Parameters:
                     (format stream "~&~V,0T~A { " indent name)
                     (format stream "~A { " name))
                 (print-scalar k (proto-key-type desc) "key" stream nil)
-                (print-non-repeated-field v (proto-value-type desc) "value"
-                                          :stream stream
-                                          :pretty-print nil)
+                (print-field v (proto-value-type desc) "value"
+                             :stream stream
+                             :pretty-print nil)
                 (format stream "}")
                 (when pretty-print
                   (format stream "~%"))))
