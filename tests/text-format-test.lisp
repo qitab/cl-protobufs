@@ -110,3 +110,13 @@ symbol_field: ':nil'")
         :stream (make-string-input-stream "int_field: 100 random_field: 200")))
     (declare (ignore result))
     (assert-true condition)))
+
+;; No trailing "}" in submessage
+(deftest test-parse-incomplete-nested-message (text-format-suite)
+  (multiple-value-bind (result condition)
+      (ignore-errors
+       (proto:parse-text-format
+        'test-pb:text-format-test
+        :stream (make-string-input-stream "one_level_nesting { int_field: 100 ")))
+    (declare (ignore result))
+    (assert-true condition)))

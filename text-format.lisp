@@ -237,16 +237,15 @@ Parameters:
   (declare (type symbol type)
            (type stream stream))
   (let ((message (find-message-descriptor type :error-p t)))
-    (parse-text-format-impl message t :stream stream)))
+    (parse-text-format-impl message :stream stream)))
 
 ;;; TODO(cgay): replace all assertions here with something that signals a
 ;;; subtype of protobuf-error and shows current stream position.
 
 (defun parse-text-format-impl
-    (msg-desc top-level &key (stream *standard-input*))
+    (msg-desc &key (stream *standard-input*))
   "Parse a protobuf message with descriptor MSG-DESC from STREAM. This method
-returns the parsed object. TOP-LEVEL is a flag used for recursive calls. If true,
-attempt to parse the name of the message and match it against MSG-DESC."
+returns the parsed object."
   (declare (type message-descriptor msg-desc))
   (let ((object #+sbcl (make-instance (or (proto-alias-for msg-desc)
                                           (proto-class msg-desc)))
@@ -255,13 +254,10 @@ attempt to parse the name of the message and match it against MSG-DESC."
                                      (proto-class msg-desc)))))
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
-    (unless top-level
-      (expect-char stream #\{))
     (loop
       (skip-whitespace stream)
       (when (or (not (peek-char nil stream nil))
                 (eql (peek-char nil stream nil) #\}))
-        (read-char stream nil)
         ;; We should respect the order of slots as
         ;; they were in the message.
         (dolist (slot rslots)
@@ -320,9 +316,12 @@ return T as a second value."
           ((typep desc 'message-descriptor)
            (when (eql (peek-char nil stream nil) #\:)
              (read-char stream))
-           (parse-text-format-impl (find-message-descriptor type)
-                                   nil
-                                   :stream stream))
+           (skip-whitespace stream)
+           (expect-char stream #\{)
+           (prog1 (parse-text-format-impl (find-message-descriptor type)
+                                   :stream stream)
+             (skip-whitespace stream)
+             (expect-char stream #\})))
           ((typep desc 'enum-descriptor)
            (expect-char stream #\:)
            (let* ((name (parse-token stream))
