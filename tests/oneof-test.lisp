@@ -192,8 +192,7 @@ Parameters
 
 
 (deftest test-oneof-equal-with-scalars (oneof-suite)
-  (let* ((intlist (make-oneof-test.int-list :ints (list 1 2 3 4 5)))
-         (oneof-test-1 (make-oneof-test :single-int 1))
+  (let* ((oneof-test-1 (make-oneof-test :single-int 1))
          (oneof-test-2 (make-oneof-test :single-int 1))
          (oneof-1 (cl-protobufs.oneof-test::oneof-test-%my-oneof oneof-test-1))
          (oneof-2 (cl-protobufs.oneof-test::oneof-test-%my-oneof oneof-test-2))
@@ -206,8 +205,7 @@ Parameters
                   oneof-1 oneof-2 oneof-descriptor t))))
 
 (deftest test-oneof-equal-with-different-scalars (oneof-suite)
-  (let* ((intlist (make-oneof-test.int-list :ints (list 1 2 3 4 5)))
-         (oneof-test-1 (make-oneof-test :single-int 1))
+  (let* ((oneof-test-1 (make-oneof-test :single-int 1))
          (oneof-test-2 (make-oneof-test :single-int 2))
          (oneof-1 (cl-protobufs.oneof-test::oneof-test-%my-oneof oneof-test-1))
          (oneof-2 (cl-protobufs.oneof-test::oneof-test-%my-oneof oneof-test-2))
