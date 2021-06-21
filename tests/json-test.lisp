@@ -96,11 +96,17 @@ Parameters
                       :initial-contents '(3 5 7 112 81))
         (pb:bytes-field msg))))
 
-(defun json-roundtrip (msg)
+(defun json-roundtrip (msg &key (pretty-print 0)
+                           (camel-case-p t)
+                           numeric-enums-p)
   "For a message object MSG, print to JSON, then parse from JSON and assert that
 the result is PROTO-EQUAL with MSG."
   (let* ((text (with-output-to-string (s)
-                 (proto:print-json msg :stream s)))
+                 (proto:print-json msg
+                                   :indent pretty-print
+                                   :camel-case-p camel-case-p
+                                   :numeric-enums-p numeric-enums-p
+                                   :stream s)))
          (msg (with-input-from-string (s text)
                 (proto:parse-json (type-of msg) :stream s))))
     (assert-true (proto:proto-equal msg msg))))
@@ -108,7 +114,7 @@ the result is PROTO-EQUAL with MSG."
 ;; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-json (json-suite)
   ;; Try several different flags when printing. The parser should handle each one.
-  (dolist (key '(nil :no-pretty-print :no-camel-case :numeric-enums))
+  (dolist (key '(t :no-pretty-print :no-camel-case :numeric-enums))
     (let* ((nested (pb:make-text-format-test.nested-message1 :int-field 2))
            (msg (pb:make-text-format-test
                  :int-field 100
@@ -128,7 +134,11 @@ the result is PROTO-EQUAL with MSG."
                  :sint64-field -1)))
       (setf (pb:text-format-test.map-field-gethash 1 msg) "one")
       (setf (pb:text-format-test.map-field-gethash 2 msg) "two")
-      (json-roundtrip msg))))
+      (ecase key
+        (:no-pretty-print (json-roundtrip msg :pretty-print nil))
+        (:no-camel-case (json-roundtrip msg :camel-case-p nil))
+        (:numeric-enums (json-roundtrip msg :numeric-enums-p t))
+        (t (json-roundtrip msg))))))
 
 
 (deftest any-roundtrip (json-suite)
