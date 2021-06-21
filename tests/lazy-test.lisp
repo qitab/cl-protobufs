@@ -48,23 +48,22 @@ Parameters
            (bytes (proto:serialize-to-bytes proto))
            (restored (proto:deserialize-from-bytes 'container bytes)))
 
-      (let ((restored (proto:deserialize-from-bytes 'container bytes)))
-        ;; The original proto doesn't have encoded field.
-        (assert-false (proto:encoded-field proto 'inner))
-        ;; The deserialized proto does have encoded field.
-        (assert-true (proto:encoded-field restored 'inner))
+      ;; The original proto doesn't have encoded field.
+      (assert-false (proto:encoded-field proto 'inner))
+      ;; The deserialized proto does have encoded field.
+      (assert-true (proto:encoded-field restored 'inner))
 
-        ;; If the encoded field is deserialized independently, we get the correct result.
-        (let ((inner (proto:deserialize-from-bytes
-                      'inner
-                      (proto:encoded-field restored 'inner))))
-          (assert-equal 42 (value inner)))
-        ;; If the field is accessed, it's deserialized lazily.
-        (assert-eql 42 (value (inner restored)))
+      ;; If the encoded field is deserialized independently, we get the correct result.
+      (let ((inner (proto:deserialize-from-bytes
+                    'inner
+                    (proto:encoded-field restored 'inner))))
+        (assert-equal 42 (value inner)))
+      ;; If the field is accessed, it's deserialized lazily.
+      (assert-eql 42 (value (inner restored)))
 
-        ;; Verify fields around the lazy field are restored correctly.
-        (assert-eql 10 (value-before restored))
-        (assert-eql 20 (value-after restored)))
+      ;; Verify fields around the lazy field are restored correctly.
+      (assert-eql 10 (value-before restored))
+      (assert-eql 20 (value-after restored))
 
       ;; Ensure that editing a lazy field clears the %BYTES slot.
       (let ((restored (proto:deserialize-from-bytes 'container bytes))
