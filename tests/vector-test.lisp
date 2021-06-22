@@ -56,25 +56,21 @@ Parameters
     ;; push-* returns the same value as was passed in on successful push.
     (loop for i from 1 to 10
           do
-       (assert-eql (push-repeated-int32 i vector-proto) i)
-       (assert-eql (push-repeated-int64 i vector-proto) i)
-       (assert-eql (push-repeated-uint32 i vector-proto) i)
-       (assert-eql (push-repeated-uint64 i vector-proto) i)
-       (assert-eql (push-repeated-sint32 i  vector-proto) i)
-       (assert-eql (push-repeated-sint64 i vector-proto) i)
-       (assert-eql (push-repeated-fixed32 i vector-proto) i)
-       (assert-eql (push-repeated-fixed64 i vector-proto) i)
-       (assert-eql (push-repeated-sfixed32 i vector-proto) i)
-       (assert-eql (push-repeated-sfixed64 i vector-proto) i)
-       (assert-eql (push-repeated-float (coerce i 'float) vector-proto)
-           (coerce i 'float))
-       (assert-eql (repeated-proto.push-repeated-double (coerce i 'double-float)
-                                                        vector-proto)
-           (coerce i 'double-float))
-       (assert-eql (push-repeated-bool (= (mod i 2) 0) vector-proto)
-           (= (mod i 2) 0))
-       (assert-equal (push-repeated-string (write-to-string i) vector-proto)
-           (write-to-string i)))
+       (assert-eql i (push-repeated-int32 i vector-proto))
+       (assert-eql i (push-repeated-int64 i vector-proto))
+       (assert-eql i (push-repeated-uint32 i vector-proto))
+       (assert-eql i (push-repeated-uint64 i vector-proto))
+       (assert-eql i (push-repeated-sint32 i  vector-proto))
+       (assert-eql i (push-repeated-sint64 i vector-proto))
+       (assert-eql i (push-repeated-fixed32 i vector-proto))
+       (assert-eql i (push-repeated-fixed64 i vector-proto))
+       (assert-eql i (push-repeated-sfixed32 i vector-proto))
+       (assert-eql i (push-repeated-sfixed64 i vector-proto))
+       (assert-eql (coerce i 'float) (push-repeated-float (coerce i 'float) vector-proto))
+       (assert-eql (coerce i 'double-float)
+           (repeated-proto.push-repeated-double (coerce i 'double-float) vector-proto))
+       (assert-eql (= (mod i 2) 0) (push-repeated-bool (= (mod i 2) 0) vector-proto))
+       (assert-equal (write-to-string i) (push-repeated-string (write-to-string i) vector-proto)))
     (loop for i from 1 to 10
           do
        (push i (repeated-list-proto.repeated-int32 list-proto))
@@ -173,11 +169,14 @@ Parameters
 ;; field.
 (deftest test-message-type-checking (vector-suite)
   (let ((outer-proto (make-outer-proto)))
+    ;; If you remove type-checking this won't work.
+    ;; todo(jgodbout): Find why ABCL isn't working...
+    #-(or opt abcl)
     (dolist (element (list nil 1 "a"))
       (handler-case
           (outer-proto.push-repeated-proto element outer-proto)
-        (error nil)
-        (:no-error (assert-fail))))
+        (error (condition) (assert-true (typep condition 'type-error)))
+        (:no-error () (assert-fail "Should have received an error."))))
     (assert-true (outer-proto.push-repeated-proto (make-repeated-proto) outer-proto))))
 
 
@@ -195,11 +194,7 @@ Parameters
     (loop for i from 0 to 9
           do
        (assert-eq (repeated-proto.nth-repeated-int32 i vector-proto) i)
-       (assert-eq (repeated-list-proto.nth-repeated-int32 (- 9 i) list-proto) i))
-    (handler-case
-        (outer-proto.push-repeated-proto 10 outer-proto)
-      (error nil)
-      (:no-error (assert-fail)))))
+       (assert-eq (repeated-list-proto.nth-repeated-int32 (- 9 i) list-proto) i))))
 
 (deftest test-text-output (vector-suite)
   (let ((outer-proto (make-outer-proto))

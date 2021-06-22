@@ -114,7 +114,7 @@ Parameters:
       (assert-true (typep (boo new2)
                           'cl-protobufs.protobuf-package-unittest2:message-in-other-package))
       (assert-equal 123 (cl-protobufs.protobuf-package-unittest2:foo (boo new2)))
-      (assert-equal 456 (baa (boo new2))))))
+      (assert-equal (values 456 t) (baa (boo new2))))))
 
 (deftest forward-reference-test (reference-suite)
   (flet ((find-by-name (name proto-objects)

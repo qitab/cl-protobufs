@@ -231,6 +231,7 @@ message-descriptor.")
   (make-instance 'option-descriptor
                  :name name :value value :type type))
 
+;; todo(jgodbout): Is t needed?
 (defun find-option (desc name)
   "Given a protobuf descriptor DESC and the NAME of an option, returns the
    value of the option and its Lisp type. The third value is T if an option was

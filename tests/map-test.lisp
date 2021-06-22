@@ -24,27 +24,41 @@
                                :signal-condition-on-fail t))
 
 ;; Copied from tests/serialization-tests.lisp
-(defun clear-serialization-functions (proto-name)
-  #-sbcl
-  (setf (get `,proto-name :serialize) nil
-        (get `,proto-name :deserialize) nil)
-  #+sbcl (fmakunbound (list :protobuf :serialize proto-name))
-  #+sbcl (fmakunbound (list :protobuf :deserialize proto-name)))
+(defun clear-serialization-functions ()
+  "Clear the optimized serialization functions."
+  (dolist (msg '(map-proto val-message map-message
+                 map-enum nested-map))
+    #-sbcl
+    (setf (get `,msg :serialize) nil
+          (get `,msg :deserialize) nil)
+    #+sbcl (fmakunbound (list :protobuf :serialize msg))
+    #+sbcl (fmakunbound (list :protobuf :deserialize msg))))
+
+(defun create-serialization-functions ()
+  "Create the optimized serialization functions."
+  (dolist (msg '(map-proto val-message map-message
+                 map-enum nested-map))
+    (let ((message (find-message-descriptor msg :error-p t)))
+      (eval (pi::generate-deserializer message))
+      (eval (pi::generate-serializer message)))))
 
 ;; Tests that accessor functions are working: setf, gethash, remhash, has.
 (deftest accessor-check (map-suite)
   (let ((m (make-map-proto)))
     (assert-false (map-proto.has-map-field m))
     (setf (map-proto.map-field-gethash 1 m) "string")
-    (assert-equal "string" (map-proto.map-field-gethash 1 m))
+    (assert-equal (values "string" t)
+        (map-proto.map-field-gethash 1 m))
     (clear m)
     (assert-false (map-proto.has-map-field m))
     ;; Ensure that clear made a new empty hash-table.
-    (assert-equal "" (map-proto.map-field-gethash 1 m))
+    (assert-equal (values "" nil)
+        (map-proto.map-field-gethash 1 m))
     (setf (map-proto.map-field-gethash 1 m) "string")
     (map-proto.map-field-remhash 1 m)
     ;; Ensure that removing a key works.
-    (assert-equal "" (map-proto.map-field-gethash 1 m))
+    (assert-equal (values "" nil)
+        (map-proto.map-field-gethash 1 m))
     ;; Ensure that if removing a key causes the hash-table to be empty,
     ;; then the is-set vector is properly updated.
     (assert-false (has-field m 'map-field))
@@ -55,7 +69,8 @@
 
       (setf (gethash 1 my-hash-table) "string")
       (assert-true (has-field m 'map-field))
-      (assert-equal "string" (map-proto.map-field-gethash 1 m))
+      (assert-equal (values "string" t)
+          (map-proto.map-field-gethash 1 m))
       (clrhash my-hash-table)
       (assert-false (has-field m 'map-field)))))
 
@@ -78,47 +93,53 @@
   (let ((m (make-map-proto)))
     (assert-false (has-field m 'map-field))
     (setf (map-field-gethash 1 m) "string")
-    (assert-equal "string" (map-field-gethash 1 m))
+    (assert-equal (values "string" t) (map-field-gethash 1 m))
     (clear m)
-    (assert-equal "" (map-field-gethash 1 m))
+    (assert-equal (values "" nil) (map-field-gethash 1 m))
     (setf (map-field-gethash 1 m) "string")
     (map-field-remhash 1 m)
-    (assert-equal "" (map-field-gethash 1 m))
+    (assert-equal (values ""  nil) (map-field-gethash 1 m))
     (assert-false (has-field m 'map-field))))
 
 ;; Verify that the map returns the correct default value when unset.
 (deftest default-check (map-suite)
   (let ((test (make-map-all)))
-    (assert-equal 0 (map-all.intmap-gethash 0 test))
-    (assert-equal "" (map-all.stringmap-gethash 0 test))
-    (assert-equal nil (map-all.msgmap-gethash 0 test))
-    (assert-equal :one (map-all.enummap-gethash 0 test))))
+    (assert-eq (values 0 nil) (map-all.intmap-gethash 0 test))
+    (assert-equal (values "" nil) (map-all.stringmap-gethash 0 test))
+    (assert-eq (values nil nil) (map-all.msgmap-gethash 0 test))
+    (assert-eql (values :one nil) (map-all.enummap-gethash 0 test))))
 
 ;; Verify that the lisp hash-table properly handles string keys
 (deftest string-key-check (map-suite)
   (let ((msg (make-map-enum)))
     (setf (map-enum.map-field-gethash "two" msg) :two)
-    (assert-eq :two (map-enum.map-field-gethash "two" msg))
+    (assert-eql (values :two t)
+        (map-enum.map-field-gethash "two" msg))
     ;; Verify that this works after clearing the hash table, too.
     (map-enum.clear-map-field msg)
     (setf (map-enum.map-field-gethash "two" msg) :two)
-    (assert-eq :two (map-enum.map-field-gethash "two" msg))
+    (assert-eql (values :two t)
+        (map-enum.map-field-gethash "two" msg))
     (map-enum.clear-map-field msg)
     (setf (map-enum.map-field-gethash "Two" msg) :two)
     (setf (map-enum.map-field-gethash "two" msg) :one)
     ;; Verify that the map is case-sensitive.
-    (assert-eq :two (map-enum.map-field-gethash "Two" msg))
-    (assert-eq :one (map-enum.map-field-gethash "two" msg))
+    (assert-eql (values :two t)
+        (map-enum.map-field-gethash "Two" msg))
+    (assert-eql (values :one t)
+        (map-enum.map-field-gethash "two" msg))
     ;; Verify that this works after serializing/deserializing
     (loop :for optimized :in '(nil t)
           :do
        (when optimized
-         (pi:make-deserializer map-enum))
+         (create-serialization-functions))
        (let* ((bytes (serialize-to-bytes msg 'map-enum))
               (msg-roundtrip (deserialize-from-bytes 'map-enum bytes)))
-         (assert-eq :two (map-enum.map-field-gethash "Two" msg-roundtrip))
-         (assert-eq :one (map-enum.map-field-gethash "two" msg-roundtrip)))))
-  (clear-serialization-functions 'map-enum))
+         (assert-eql (values :two t)
+             (map-enum.map-field-gethash "Two" msg-roundtrip))
+         (assert-eql (values :one t)
+             (map-enum.map-field-gethash "two" msg-roundtrip)))))
+  (clear-serialization-functions))
 
 ;; Verify that generic (de)serialization works.
 (deftest serialization-test (map-suite)
@@ -153,16 +174,7 @@
 
 ;; Verify that optimized (de)serialization works.
 (deftest optimized-serialization-test (map-suite)
-  (pi:make-serializer map-proto)
-  (pi:make-serializer val-message)
-  (pi:make-serializer map-message)
-  (pi:make-serializer map-enum)
-  (pi:make-serializer nested-map)
-  (pi:make-deserializer map-proto)
-  (pi:make-deserializer val-message)
-  (pi:make-deserializer map-message)
-  (pi:make-deserializer map-enum)
-  (pi:make-deserializer nested-map)
+  (create-serialization-functions)
   (let* ((test1 (make-map-proto :strval "test" :intval 1))
          (submsg1 (make-val-message :strval "one"))
          (submsg2 (make-val-message :strval "two"))
@@ -190,7 +202,8 @@
       (assert-true (proto-equal test1 t1res))
       (assert-true (proto-equal test2 t2res))
       (assert-true (proto-equal test3 t3res))
-      (assert-true (proto-equal test4 t4res)))))
+      (assert-true (proto-equal test4 t4res)))
+    (clear-serialization-functions)))
 
 (deftest text-format-test (map-suite)
   (let* ((test1 (make-map-proto :strval "test" :intval 1))
