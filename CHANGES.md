@@ -17,6 +17,9 @@
     `"foo_bar"` in the `.proto` file then `name` should be the symbol `foo-bar`
     in the generated code's package.
 
+*   Remove the third returned value, `t`, from `find-option` function when an
+    option is found.
+
 ## Version 3.0
 
 This release is largely for an overhaul of the public API (hence a major version
