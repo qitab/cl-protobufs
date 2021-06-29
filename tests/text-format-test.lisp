@@ -168,3 +168,27 @@ one_level_nesting {
         :stream (make-string-input-stream "one_level_nesting { int_field: 100 ")))
     (declare (ignore result))
     (assert-true condition)))
+
+;; We go to pains not to hard-code the actual text format for this proto.
+;; Also, if text format output were ever non-deterministic in Lisp, like in other
+;; languages, this test will fail.
+(deftest test-format-string (text-format-suite)
+  (let* ((nested (test-pb:make-text-format-test.nested-message1 :int-field 2))
+         (msg (test-pb:make-text-format-test :int-field 100
+                                             :sint-field -1
+                                             :uint-field 1
+                                             :float-field 1.5
+                                             :double-field 1.5d0
+                                             :string-field "A string"
+                                             :string-fields (list "First" "Second")
+                                             :enum-vals (list :none :twenty-one)
+                                             :one-level-nesting nested
+                                             :oneof-int-field 5))
+         (text-msg-pretty (with-output-to-string (s)
+                            (proto:print-text-format msg :stream s :pretty-print t)))
+         (text-msg-not (with-output-to-string (s)
+                         (proto:print-text-format msg :stream s :pretty-print nil))))
+    (assert-equality #'string=
+        text-msg-pretty (format nil "~@/cl-protobufs:fmt/" msg))
+    (assert-equality #'string=
+        text-msg-not (format nil "~/cl-protobufs:fmt/" msg))))

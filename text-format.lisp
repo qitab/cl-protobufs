@@ -337,3 +337,14 @@ return T as a second value."
                   (list (parse-map-entry key-type val-type stream)))))))
           ;; Parsing failed, return t as a second vlaue to indicate failure.
           (t (values nil t)))))
+
+(defun fmt (stream proto colon-p at-sign-p &optional width &rest other-args)
+  "Format command for protobufs
+   ~/cl-protobufs:fmt/ emits a non-pretty-printed protobuf of PROTO to STREAM.
+   ~@/cl-protobufs:fmt/ emits a pretty-printed protobuf of PROTO to STREAM.
+   COLON-P and AT-SIGN-P are the usual for format directives.
+   WIDTH and OTHER-ARGS  is ignored."
+  (declare (ignore width))
+  (cond (other-args (error "FORMAT directive ~~/cl-protobufs:fmt/ takes only one argument."))
+        (colon-p (error "FORMAT directive ~~/cl-protobufs:fmt/ does not take colons."))
+        (t (print-text-format proto :stream stream :pretty-print at-sign-p))))
