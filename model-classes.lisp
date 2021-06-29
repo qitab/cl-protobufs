@@ -404,7 +404,6 @@ if we are not in SBCL."
   (:documentation
    "Clears the value of the extended slot SLOT from OBJECT."))
 
-
 (defconstant $empty-default 'empty-default
   "The marker used in 'proto-default' used to indicate that there is no default value.")
 
@@ -501,16 +500,6 @@ if we are not in SBCL."
 
 (defmethod (setf proto-slot) (slot (field field-descriptor))
   (setf (proto-value field) slot))
-
-(defgeneric empty-default-p (field)
-  (:documentation
-   "Returns true iff the default for the field is empty, ie, was not supplied.")
-  (:method ((field field-descriptor))
-    (let ((default (proto-default field)))
-      (or (eq default $empty-default)
-          ;; Special handling for imported CLOS classes
-          (and (not (eq (proto-label field) :optional))
-               (or (null default) (equalp default #())))))))
 
 (defclass extension-descriptor (abstract-descriptor)
   ;; The start of the extension range.
