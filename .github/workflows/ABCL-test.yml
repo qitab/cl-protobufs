@@ -27,8 +27,8 @@ jobs:
 
       - name: Install quicklisp
         run: |
-          ./abcl/abcl --batch --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
-          ./abcl/abcl --batch --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
+          ./abcl/abcl --batch --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\")"
+          ./abcl/abcl --batch --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file))'
 
       - name: Download repo
         uses: actions/checkout@v2
