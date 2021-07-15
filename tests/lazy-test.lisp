@@ -8,9 +8,6 @@
   (:use #:cl
         #:clunit
         #:cl-protobufs.third-party.lisp.cl-protobufs.tests)
-  (:import-from #:cl-protobufs.implementation
-                #:proto-%bytes
-                #:oneof-value)
   (:local-nicknames (#:pi #:cl-protobufs.implementation)
                     (#:proto #:cl-protobufs))
   (:export :run))
@@ -95,14 +92,14 @@ Parameters
            (restored (proto:deserialize-from-bytes 'oneof-lazy bytes))
            (slot 'cl-protobufs.third-party.lisp.cl-protobufs.tests::%lazy-oneof))
       ;; The original proto doesn't have encoded field.
-      (assert-false (proto-%bytes (oneof-value (slot-value proto slot))))
+      (assert-false (pi::proto-%bytes (pi::oneof-value (slot-value proto slot))))
       ;; The deserialized proto does have encoded field.
-      (assert-true (proto-%bytes (oneof-value (slot-value restored slot))))
+      (assert-true (pi::proto-%bytes (pi::oneof-value (slot-value restored slot))))
 
       ;; If the encoded field is deserialized independently, we get the correct result.
       (let ((inner (proto:deserialize-from-bytes
                     'inner
-                    (proto-%bytes (oneof-value (slot-value restored slot))))))
+                    (pi::proto-%bytes (pi::oneof-value (slot-value restored slot))))))
         (assert-eql 42 (value inner)))
       ;; If the field is accessed, it's deserialized lazily.
       (assert-eql 42 (value (inner restored)))

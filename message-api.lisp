@@ -33,9 +33,9 @@ The definition of initialized is all required-fields are set."
 
 (defun is-initialized (object)
   "Returns true if all of the fields of OBJECT are initialized."
-  (let* ((class   (type-of object))
-         (message (find-message-descriptor class :error-p t)))
-    (object-initialized-p object message)))
+  (let* ((class (type-of object))
+         (desc (find-message-descriptor class :error-p t)))
+    (object-initialized-p object desc)))
 
 (defun map-field-equal (map-1 map-2 map-descriptor exact)
   "Returns true if two maps with the same map-descriptor are equal.
