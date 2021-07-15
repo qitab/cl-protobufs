@@ -141,25 +141,17 @@ Parameters:
           (every #'scalar-field-equal object-1 object-2)))
     (t (eql object-1 object-2))))
 
-(defun proto-equal (message-1 message-2 &key (exact nil))
-  "Check if two protobuf messages are equal. By default
-two messages are equal if calling the getter on each
-field would retrieve the same value. This means that a
-message with a field explicitly set to the default value
-is considered the same as a message with that field not
-set.
-
-Parameters:
-  MESSAGE-1: The first protobuf message.
-  MESSAGE-2: The second protobuf message.
-  EXACT: If true consider the messages to be equal
-only if the same fields have been explicitly set."
+(defun proto-equal (message-1 message-2 &key exact)
+  "Check if MESSAGE-1 and MESSAGE-2 are the same. By default two messages are equal if calling the
+   getter on each field would retrieve the same value. This means that a message with a field
+   explicitly set to the default value is considered the same as a message with that field not set.
+   If EXACT is true the messages are considered equal only if the same fields have been explicitly
+   set."
   (let* ((class-1 (type-of message-1))
-         (message (find-message-descriptor class-1)))
-
+         (desc (find-message-descriptor class-1)))
     (and
      ;; Check the messages are the same.
-     message
+     desc
      (eq (type-of message-2) class-1)
 
      ;; Check same fields are set if exact is specified.
@@ -173,7 +165,7 @@ only if the same fields have been explicitly set."
                  (slot-value message-2 '%%bool-values)))
 
      ;; oneofs
-     (loop for oneof in (proto-oneofs message)
+     (loop for oneof in (proto-oneofs desc)
            for slot-value-1
              = (slot-value message-1 (oneof-descriptor-internal-name oneof))
            for slot-value-2
@@ -181,20 +173,21 @@ only if the same fields have been explicitly set."
            always (oneof-field-equal slot-value-1 slot-value-2 oneof exact))
 
      ;; regular fields
-     (loop for field in (proto-fields message)
+     (loop for field in (proto-fields desc)
            for lisp-type = (proto-class field)
+           for boolp = (eq lisp-type 'boolean)
            for slot-value-1
-             = (unless (eq lisp-type 'boolean)
+             = (unless boolp
                  (slot-value message-1 (proto-internal-field-name field)))
            for slot-value-2
-             = (when slot-value-1
+             = (unless boolp
                  (slot-value message-2 (proto-internal-field-name field)))
-           always (or (eql lisp-type 'boolean)
+           always (or boolp
                       (non-bool-field-equal slot-value-1 slot-value-2 field exact))))))
 
 (defgeneric clear (object)
   (:documentation
-   "Initialize all of the fields of 'object' to their default values."))
+   "Initialize all fields of OBJECT to their default values."))
 
 (defun-inline has-field (object field)
   "Check if OBJECT has FIELD set."

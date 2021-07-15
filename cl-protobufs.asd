@@ -323,6 +323,11 @@
     :depends-on ("descriptor-extensions")
     :components ((:protobuf-source-file "vector-proto"
                   :proto-search-path ("../" "../google/protobuf/"))
-                 (:file "vector-test"))))
+                 (:file "vector-test")))
+   (:module "message-api-test"
+    :serial t
+    :pathname ""
+    :depends-on ("root-suite" "google-tests-proto")
+    :components ((:file "message-api-test"))))
   :perform (test-op (o c)
                     (uiop:symbol-call '#:cl-protobufs.test '#:run-all)))

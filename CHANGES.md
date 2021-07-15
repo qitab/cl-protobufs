@@ -2,6 +2,9 @@
 
 ## Version 3.1
 
+*   A bug in `proto-equal` was fixed. Two protos were sometimes considered equal
+    even if they had a repeated field with different values.
+
 *   `map-descriptor` accessor functions have been renamed to match most other
     descriptor accessors. The old names may continue to be used, but will be
     removed in the next major release. The changes are:
