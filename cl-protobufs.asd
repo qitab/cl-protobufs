@@ -4,8 +4,6 @@
 ;;; license that can be found in the LICENSE file or at
 ;;; https://opensource.org/licenses/MIT.
 
-;;; Author: Robert Brown <robert.brown@gmail.com>
-
 #.(unless (or #+asdf3.1 (version<= "3.1" (asdf-version)))
     (error "You need ASDF >= 3.1 to load this system correctly."))
 
@@ -16,7 +14,10 @@
   :licence "MIT-style"
   :maintainer '("Jon Godbout" "Carl Gay" "Ben Kuehnert")
   :description      "Protobufs for Common Lisp"
-  :long-description "Protobufs for Common Lisp"
+  :long-description
+  "This is an implementation of Protocol Buffers for Common Lisp. It supports
+both Protocol Buffer versions 2 and 3. We include the 'Well Known Types'
+and functionality for working with them."
   :defsystem-depends-on (:cl-protobufs.asdf)
   :depends-on (:closer-mop
                ;; For SBCL we'll use its builtin UTF8 encoder/decoder.
