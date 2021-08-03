@@ -696,12 +696,12 @@ The base type from which every generated protobuf message inherits.
 (defun print-text-format (object &key
                                  (indent -2)
                                  (stream *standard-output*)
-                                 (pretty-print t)))
+                                 (pretty-print-p t)))
 ```
 
 Prints a protocol buffer message to a stream. `object` is the protocol buffer
 message, group, or extension to print. `stream` is the stream to print to.
-`pretty-print` may be set to `nil` to minimize textual output by omitting
+`pretty-print-p` may be set to `nil` to minimize textual output by omitting
 most whitespace.
 
 ```lisp
@@ -826,14 +826,13 @@ objects and
 [the canonical JSON encoding](https://developers.google.com/protocol-buffers/docs/proto3#json).
 
 ```lisp
-(defun print-json (message &key (indent 0) (stream *standard-output*)
+(defun print-json (message &key (pretty-print-p t) (stream *standard-output*)
                              (camel-case-p t) numeric-enums-p))
 ```
 
 Takes any protobuf message `message` and prints it as JSON. The parameters are:
 
--   `indent`: Indent the output by `indent` spaces. If `indent` is `nil`, then
-    do not pretty-print the output.
+-   `pretty-print-p`: Indent the output by `indent` spaces and print newlines.
 -   `stream`: The Lisp stream to output to.
 -   `camel-case-p`: Print field names in camelCase. If `nil`, then print field
     names as they appear in the .proto file.
@@ -841,7 +840,7 @@ Takes any protobuf message `message` and prints it as JSON. The parameters are:
     their name.
 
 ```lisp
-(defgeneric parse-json (type &key stream ignore-unknown-fields-p)
+(defun parse-json (type &key stream ignore-unknown-fields-p)
 ```
 
 Parse a JSON encoding and return the parsed protobuf object. The parmeters are:
@@ -860,5 +859,3 @@ meet the Protocol Buffers spec.
 
 *   Groups are not supported within `oneof` fields.
 *   The `[deprecated=true]` field option is not supported.
-*   The JSON output for a message `M` should only include the fields and values
-    contained in `M`. Instead it is wrapped in `M { ... }`.

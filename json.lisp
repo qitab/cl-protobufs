@@ -8,8 +8,11 @@
   (:use #:cl
         #:cl-protobufs
         #:cl-protobufs.implementation)
+  ;; Shadow fmt from cl-protobufs text-format.
+  (:shadow #:fmt)
   (:export #:print-json
-           #:parse-json)
+           #:parse-json
+           #:fmt)
   (:local-nicknames
    (#:pi #:cl-protobufs.implementation)
    (#:google #:cl-protobufs.google.protobuf)
@@ -20,9 +23,24 @@
 ;;; This file implements the protobuf JSON parser and printer.
 ;;; The exported symbols are parse-json and print-json.
 
-(defun print-json (object &key (indent 0) (stream *standard-output*)
-                            (camel-case-p t) (numeric-enums-p nil)
-                            (spliced-p nil))
+(defun print-json (object &key (pretty-print-p t) (stream *standard-output*)
+                          (camel-case-p t) (numeric-enums-p nil))
+  "Prints a protocol buffer message to a stream in JSON format. The parameters
+CAMEL-CASE-P and NUMERIC-ENUMS-P implement optional JSON printing options:
+https://developers.google.com/protocol-buffers/docs/proto3#json_options.
+
+Parameters:
+  OBJECT: The protocol buffer message to print.
+  PRETTY-PRINT-P: When true, generate line breaks and other human readable output
+    in the json. When false, replace line breaks with spaces.
+  STREAM: The stream to print to.
+  CAMEL-CASE-P: If true print proto field names in camelCase.
+  NUMERIC-ENUMS-P: If true, use enum numeric values rather than names."
+  (print-json-impl object (when pretty-print-p 0) stream camel-case-p numeric-enums-p
+                   nil))
+
+(defun print-json-impl (object indent stream camel-case-p numeric-enums-p
+                        spliced-p)
   "Prints a protocol buffer message to a stream in JSON format.
 Parameters:
   OBJECT: The protocol buffer message to print.
@@ -31,14 +49,21 @@ Parameters:
   STREAM: The stream to print to.
   CAMEL-CASE-P: If true print proto field names in camelCase.
   NUMERIC-ENUMS-P: If true, use enum numeric values rather than names.
-  SPLICED-P: If true, print this object inside of an existing JSON object
-    in the stream. This means that no open bracket is printed."
+  SPLICED-P: Prints a protocol buffer object inside of the printing
+    of another protocol buffer object as if they were spliced
+    together. Currently only happens while printing a well-known-type.
+    This happens because we have to print the well-known-type metadata.
+    Example using Any well known type:
+      {
+        \"url\": \"type.googleapis.com/google.protobuf.Struct\",
+        contained-proto
+      }"
   (let* ((type (type-of object))
          (message (find-message-descriptor type :error-p t)))
     ;; If TYPE has a special JSON mapping, use that.
     (when (special-json-p type)
       (print-special-json object type stream indent camel-case-p numeric-enums-p)
-      (return-from print-json))
+      (return-from print-json-impl))
     (unless spliced-p
       (format stream "{")
       (when indent (format stream "~%")))
@@ -118,11 +143,7 @@ Parameters:
       ((pi::scalarp type)
        (print-scalar-to-json value type stream))
       ((typep descriptor 'pi::message-descriptor)
-       (print-json value
-                   :indent indent
-                   :stream stream
-                   :camel-case-p camel-case-p
-                   :numeric-enums-p numeric-enums-p))
+       (print-json-impl value indent stream camel-case-p numeric-enums-p nil))
       ((typep descriptor 'pi::enum-descriptor)
        (print-enum-to-json value type stream numeric-enums-p))
       ((typep descriptor 'pi::map-descriptor)
@@ -190,24 +211,24 @@ Parameters:
 ;;; TODO(cgay): replace all assertions here with something that signals a
 ;;; subtype of protobuf-error and shows current stream position.
 
-(defgeneric parse-json (type &key stream ignore-unknown-fields-p spliced-p)
-  (:documentation
-   "Parses an object message of type TYPE from the stream STREAM using JSON.
-If IGNORE-UNKNOWN-FIELDS-P is true, then skip fields which are not defined in the
-message TYPE. Otherwise, throw an error. If SPLICED-P is true, then do not attempt
-to parse an opening bracket."))
+(defun parse-json (type
+                   &key (stream *standard-input*) ignore-unknown-fields-p)
+  "Parses JSON text into a protobuf messsage of type TYPE.
 
-(defmethod parse-json ((type symbol)
-                       &key (stream *standard-input*) ignore-unknown-fields-p spliced-p)
+Parameters:
+  TYPE: The object type as a symbol.
+  STREAM: The stream to read from.
+  IGNORE-UNKNOWN-FIELDS-P: If true, then skip fields which are not defined in the
+    message TYPE descriptor. Otherwise, throw an error."
+  (declare (type symbol type))
   (let ((message (find-message-descriptor type :error-p t)))
-    (parse-json message :stream stream :spliced-p spliced-p
-                        :ignore-unknown-fields-p ignore-unknown-fields-p)))
+    (parse-json-impl message stream ignore-unknown-fields-p nil)))
 
-(defmethod parse-json ((msg-desc message-descriptor)
-                       &key (stream *standard-input*) ignore-unknown-fields-p spliced-p)
+(defun parse-json-impl (msg-desc stream ignore-unknown-fields-p spliced-p)
   "Parse a JSON formatted message with descriptor MSG-DESC from STREAM. If IGNORE-UNKNOWN-FIELDS-P
 is true, then skip fields which are not defined in MSG-DESC. Otherwise, throw an error. If
 SPLICED-P is true, then do not attempt to parse an opening bracket."
+  (declare (type message-descriptor msg-desc))
   (let ((object #+sbcl (make-instance (or (pi::proto-alias-for msg-desc)
                                           (proto-class msg-desc)))
                 #-sbcl (funcall (pi::get-constructor-name
@@ -216,9 +237,10 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
     (when (special-json-p (proto-class msg-desc))
-      (return-from parse-json (parse-special-json (proto-class msg-desc)
-                                                  stream
-                                                  ignore-unknown-fields-p)))
+      (return-from parse-json-impl
+        (parse-special-json (proto-class msg-desc)
+                            stream
+                            ignore-unknown-fields-p)))
     (unless spliced-p
       (pi::expect-char stream #\{))
     (loop
@@ -263,7 +285,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
                 (null-p nil)
                 (error-p
                  (unknown-field-type type field msg-desc)
-                 (return-from parse-json))
+                 (return-from parse-json-impl))
                 ((eq (pi::proto-kind field) :map)
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
@@ -280,11 +302,11 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
           (dolist (slot rslots)
             (setf (proto-slot-value object slot)
                   (nreverse (proto-slot-value object slot))))
-          (return-from parse-json object))))))
+          (return-from parse-json-impl object))))))
 
 (defun parse-value-from-json (type &key (stream *standard-input*) ignore-unknown-fields-p)
   "Parse a single JSON value of type TYPE from STREAM. IGNORE-UNKNOWN-FIELDS-P is passed
-   to recursive calls to PARSE-JSON."
+   to recursive calls to PARSE-JSON-IMPL."
   (let ((desc (or (find-message-descriptor type)
                   (find-enum-descriptor type)
                   (find-map-descriptor type))))
@@ -311,7 +333,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
                     ret)
                   (pi::parse-signed-int stream)))))
           ((typep desc 'pi::message-descriptor)
-           (parse-json desc :stream stream :ignore-unknown-fields-p ignore-unknown-fields-p))
+           (parse-json-impl desc stream ignore-unknown-fields-p nil))
           ((typep desc 'pi::enum-descriptor)
            (multiple-value-bind (name type-parsed)
                (pi::parse-token-or-string stream)
@@ -428,8 +450,8 @@ be either an array, object, or primitive."
 
 (defun print-special-json (object type stream indent camel-case-p numeric-enums-p)
   "For an OBJECT whose TYPE is a well-known type, print the object's special JSON mapping
-to STREAM. INDENT, CAMEL-CASE-P, and NUMERIC-ENUMS-P are passed recursively to PRINT-JSON
-for any types."
+to STREAM. INDENT, CAMEL-CASE-P, and NUMERIC-ENUMS-P are passed recursively to
+PRINT-JSON-IMPL for any types."
   (declare (type symbol type))
   (case type
     ((google:any)
@@ -450,11 +472,8 @@ for any types."
              (if indent
                  (format stream "~&~V,0T}" indent)
                  (format stream "}")))
-           (print-json packed-message :stream stream
-                                      :indent indent
-                                      :camel-case-p camel-case-p
-                                      :numeric-enums-p numeric-enums-p
-                                      :spliced-p t))))
+           (print-json-impl packed-message indent stream camel-case-p
+                            numeric-enums-p t))))
     ((google:timestamp)
      (let* ((nsec (google:timestamp.nanos object))
             (timestamp (local-time:unix-to-timestamp
@@ -518,7 +537,7 @@ for any types."
 
 (defun parse-special-json (type stream ignore-unknown-fields-p)
   "Parse a well known type TYPE from STREAM. IGNORE-UNKNOWN-FIELDS-P is passed to recursive
-calls to PARSE-JSON."
+calls to PARSE-JSON-IMPL."
   ;; If the stream starts with 'n', then the data is NULL. In which case, return NIL.
   ;; In all cases except the `Value` well-known-type, we return NIL. However, if TYPE is
   ;; GOOGLE:VALUE, then we return the wrapper enum that represents null as per the spec.
@@ -538,9 +557,8 @@ calls to PARSE-JSON."
        (if (not (special-json-p type))
            ;; Parse the remaining elements in the object into a new message, then pack that message.
            (wkt:pack-any
-            (parse-json type :stream stream
-                             :ignore-unknown-fields-p ignore-unknown-fields-p
-                             :spliced-p t))
+            (parse-json-impl (find-message-descriptor type :error-p t)
+                             stream ignore-unknown-fields-p t))
            ;; If URL names a well-known-type, then the next element in the object has key "VALUE",
            ;; and the value is the special JSON format. Parse that and close the object.
            (let (ret)
@@ -652,3 +670,14 @@ calls to PARSE-JSON."
              (value (parse-value-from-json (wrapper-message->type type) :stream stream)))
          (setf (google:value object) value)
          object))))
+
+(defun fmt (stream proto colon-p at-sign-p &optional width &rest other-args)
+  "Format command for protobufs
+   ~/cl-protobufs.json:fmt/ emits a non-pretty-printed protobuf of PROTO to STREAM.
+   ~@/cl-protobufs.json:fmt/ emits a pretty-printed protobuf of PROTO to STREAM.
+   COLON-P and AT-SIGN-P are the usual for format directives.
+   WIDTH and OTHER-ARGS are ignored."
+  (declare (ignore width))
+  (cond (other-args (error "FORMAT directive ~~/cl-protobufs.json:fmt/ takes only one argument."))
+        (colon-p (error "FORMAT directive ~~/cl-protobufs.json:fmt/ does not take colons."))
+        (t (print-json proto :stream stream :pretty-print-p at-sign-p))))

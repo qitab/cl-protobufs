@@ -134,7 +134,7 @@ one_level_nesting {
       (assert-equality #'string= text (first *double-nested-message*)))
 
     ;; Non-pretty print test
-    (proto:print-text-format msg :pretty-print nil :stream out-stream)
+    (proto:print-text-format msg :pretty-print-p nil :stream out-stream)
     (let* ((text (get-output-stream-string out-stream))
            (msg-parse (proto:parse-text-format
                        'test-pb:text-format-test
@@ -185,9 +185,9 @@ one_level_nesting {
                                              :one-level-nesting nested
                                              :oneof-int-field 5))
          (text-msg-pretty (with-output-to-string (s)
-                            (proto:print-text-format msg :stream s :pretty-print t)))
+                            (proto:print-text-format msg :stream s :pretty-print-p t)))
          (text-msg-not (with-output-to-string (s)
-                         (proto:print-text-format msg :stream s :pretty-print nil))))
+                         (proto:print-text-format msg :stream s :pretty-print-p nil))))
     (assert-equality #'string=
         text-msg-pretty (format nil "~@/cl-protobufs:fmt/" msg))
     (assert-equality #'string=

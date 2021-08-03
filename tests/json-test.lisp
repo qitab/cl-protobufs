@@ -96,14 +96,14 @@ Parameters
                       :initial-contents '(3 5 7 112 81))
         (pb:bytes-field msg))))
 
-(defun json-roundtrip (msg &key (pretty-print 0)
+(defun json-roundtrip (msg &key (pretty-print-p t)
                            (camel-case-p t)
                            numeric-enums-p)
   "For a message object MSG, print to JSON, then parse from JSON and assert that
 the result is PROTO-EQUAL with MSG."
   (let* ((text (with-output-to-string (s)
                  (proto:print-json msg
-                                   :indent pretty-print
+                                   :pretty-print-p pretty-print-p
                                    :camel-case-p camel-case-p
                                    :numeric-enums-p numeric-enums-p
                                    :stream s)))
@@ -115,7 +115,11 @@ the result is PROTO-EQUAL with MSG."
 (deftest test-roundtrip-json (json-suite)
   ;; Try several different flags when printing. The parser should handle each one.
   (dolist (key '(t :no-pretty-print :no-camel-case :numeric-enums))
-    (let* ((nested (pb:make-text-format-test.nested-message1 :int-field 2))
+    (let* ((nested (pb:make-text-format-test.nested-message1
+                    :int-field 2
+                    :message-2
+                    (pb:make-text-format-test.nested-message1.nested-message2
+                     :int-field 3)))
            (msg (pb:make-text-format-test
                  :int-field 100
                  :sint-field -1
@@ -135,7 +139,7 @@ the result is PROTO-EQUAL with MSG."
       (setf (pb:text-format-test.map-field-gethash 1 msg) "one")
       (setf (pb:text-format-test.map-field-gethash 2 msg) "two")
       (ecase key
-        (:no-pretty-print (json-roundtrip msg :pretty-print nil))
+        (:no-pretty-print (json-roundtrip msg :pretty-print-p nil))
         (:no-camel-case (json-roundtrip msg :camel-case-p nil))
         (:numeric-enums (json-roundtrip msg :numeric-enums-p t))
         (t (json-roundtrip msg))))))
@@ -281,3 +285,24 @@ the result is PROTO-EQUAL with MSG."
     (test-wrapper-type 'google:int64-value)
     (test-wrapper-type 'google:u-int32-value)
     (test-wrapper-type 'google:u-int64-value)))
+
+(deftest test-format-string (json-suite)
+  (let* ((nested (pb:make-text-format-test.nested-message1 :int-field 2))
+         (msg (pb:make-text-format-test :int-field 100
+                                        :sint-field -1
+                                        :uint-field 1
+                                        :float-field 1.5
+                                        :double-field 1.5d0
+                                        :string-field "A string"
+                                        :string-fields (list "First" "Second")
+                                        :enum-vals (list :none :twenty-one)
+                                        :one-level-nesting nested
+                                        :oneof-int-field 5))
+         (text-msg-pretty (with-output-to-string (s)
+                            (proto:print-json msg :stream s :pretty-print-p t)))
+         (text-msg-not (with-output-to-string (s)
+                         (proto:print-json msg :stream s :pretty-print-p nil))))
+    (assert-equality #'string=
+                     text-msg-pretty (format nil "~@/cl-protobufs.json:fmt/" msg))
+    (assert-equality #'string=
+                     text-msg-not (format nil "~/cl-protobufs.json:fmt/" msg))))

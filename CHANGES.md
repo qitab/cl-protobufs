@@ -2,6 +2,19 @@
 
 ## Version 3.1
 
+*   Improve the API for printing and parsing JSON format.
+
+    -   Have `pretty-print-p` be a parameter to `print-json` instead of
+        indent.
+    -   Turn `parse-json` from a method into a function.
+    -   Remove `spliced-p` as a parameter to `print-json` and `parse-json`.
+
+*   Add format directives for both text-format and JSON printing
+    of protocol buffer messages.
+
+*   Cheange the key parameter `pretty-print` to `pretty-print-p` in
+    `print-text-format` for consistency.
+
 *   A bug in `proto-equal` was fixed. Two protos were sometimes considered equal
     even if they had a repeated field with different values.
 
