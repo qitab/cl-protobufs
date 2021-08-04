@@ -131,7 +131,6 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   printer->Print(")\n");
 
   std::vector<std::string> exports;
-  exports.push_back(schema_name_);
 
   if (file_->enum_type_count() > 0) {
     printer->Print("\n\n;;; Top-Level enums");
