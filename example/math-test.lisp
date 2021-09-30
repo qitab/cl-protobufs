@@ -18,7 +18,7 @@
                     :number1 1
                     :number2 2))
          (response (add-numbers request)))
-    (check (= 3 (add-numbers-response.response response)))))
+    (check (= 3 (add-numbers-response.sum response)))))
 
 (deftest test-set-add-number-request ()
   (let ((request (make-add-numbers-request
@@ -26,11 +26,11 @@
                    :number2 2)))
     (setf (add-numbers-request.number2 request) 3)
     (let ((result (add-numbers request)))
-      (check (= 4 (add-numbers-response.response result))))))
+      (check (= 4 (add-numbers-response.sum result))))))
 
 (deftest test-serialize-add-numbers-response ()
   ;; Create a response object and serialize it.
-  (let* ((response (make-add-numbers-response :response 1))
+  (let* ((response (make-add-numbers-response :sum 1))
          (serialized-response
           (serialize-add-numbers-response response)))
 
@@ -50,4 +50,4 @@
       ;; is the same as when we started.
       (let ((round-trip-response
              (deserialize-from-bytes 'add-numbers-response serialized-response)))
-        (expect (= 1 (add-numbers-response.response round-trip-response)))))))
+        (expect (= 1 (add-numbers-response.sum round-trip-response)))))))

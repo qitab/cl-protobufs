@@ -21,7 +21,7 @@
    Returns: An add-numbers-response protobuf message."
   (let ((number-1 (add-numbers-request.number1 request))
         (number-2 (add-numbers-request.number2 request)))
-    (make-add-numbers-response :response (+ number-1 number-2))))
+    (make-add-numbers-response :sum (+ number-1 number-2))))
 
 (defun serialize-add-numbers-response (response)
   "Serializes an add-numbers-response protobuf message.

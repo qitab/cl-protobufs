@@ -636,15 +636,24 @@ TODO
 
 ### Services
 
-This section describes the API for a protobuf service in a proto file. You must
-have a corresponding RPC Lisp library as well; `cl-protobufs` just generates the
+This section describes the geenrated code API for a protobuf service in a proto file.
+You must have a corresponding RPC library as well; `cl-protobufs` just generates the
 methods.
 
-TODO: open source a Lisp RPC library
+The [gRPC](https://github.com/qitab/grpc) library, or any library containing the following
+form:
+
+```lisp
+(setq cl-protobufs.implementation:*rpc-package* (find-package "package")
+      cl-protobufs.implementation:*rpc-call-function* 'start-call)
+```
+
+can be used as the underlying RPC mechanism. We will show examples with the expectation
+that you are using gRPC.
 
 The following example service definition is used throughout this section.
 
-```protocol-buffer
+```protobuf
 lisp_package = "math";
 
 message AddNumbersRequest {
@@ -653,7 +662,7 @@ message AddNumbersRequest {
 }
 
 message AddNumbersResponse {
-  optional int32 AddNumbersResponse = 1;
+  optional int32 sum = 1;
 }
 
 Service MyService
@@ -661,12 +670,41 @@ Service MyService
 }
 ```
 
+The `cl-protobufs` `protoc` plugin generates two packages:
+
+* `cl-protobufs.math`
+* `cl-protobufs.math-rpc`
+
+The package `cl-protobufs.math` contains the `add-numbers-request` and `add-numbers-response`
+protocol buffer messages.
+
+#### Client
+
+The package `cl-protobufs.math-rpc` contains a stub for `call-add-numbers`. A message can be
+sent to a server implementing the `Greeter` service with:
+
+```lisp
+  (grpc:with-insecure-channel
+      (channel (concatenate 'string hostname ":" (write-to-string port-number)))
+    (let* ((request (cl-protobufs.testing:make-add-numbers-request
+                     :number-1 1 :number-2 2))
+           (response (cl-protobufs.math-rpc:call-add-numbers channel request)))
+      ...))
+```
+
+#### Server
+
+There is currently no known supported open framework for implementating
+the server portion of Protocol Buffer services in Lisp.
+
+
+
 ```lisp
 (defgeneric add-numbers-impl (channel (request add-numbers-request) rpc))
 ```
 
 A generic function generated for each RPC in the service definition. The name is
-the concatenation of the protobuf service name (in its Lisp form) and the string
+the concatenation of the protobuf method name (in its Lisp form) and the string
 "-impl".
 
 To implement the service define a method for each generic function. The method

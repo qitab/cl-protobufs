@@ -14,5 +14,5 @@ message AddNumbersRequest {
 }
 
 message AddNumbersResponse {
-  optional int32 response = 1;
+  optional int32 sum = 1;
 }
