@@ -147,7 +147,11 @@
    #:clear
    #:has-field
    #:proto-slot-value
-   #:encoded-field))
+   #:encoded-field
+
+   ;; For RPC stubs
+   #:*rpc-call-function*
+   ))
 
 (defpackage #:cl-protobufs.implementation
   (:use :common-lisp :cl-protobufs)
@@ -178,8 +182,4 @@
 
    ;; For ASDF
    #:validate-imports
-
-   ;; For RPC stubs
-   #:*rpc-call-function*
-   #:*rpc-package*
    ))

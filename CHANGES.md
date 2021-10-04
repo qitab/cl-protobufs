@@ -36,6 +36,10 @@
 *   Remove the third returned value, `t`, from `find-option` function when an
     option is found.
 
+*   `*rpc-call-function*` is now exported from `cl-protobufs` rather than from
+    `cl-protobufs.implementation`. (This is more relevant now that Common Lisp
+    support for [gRPC](https://github.com/qitab/grpc) has been released.)
+
 ## Version 3.0
 
 This release is largely for an overhaul of the public API (hence a major version

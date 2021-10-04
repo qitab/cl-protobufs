@@ -1385,12 +1385,10 @@ function) then there is no guarantee on the serialize function working properly.
             (setf (bit bool-values bool-index) 1))
           (values field cslot index (and offset t)))))))
 
-(defparameter *rpc-package* nil
-  "The Lisp package that implements RPC.
-   This should be set when an RPC package that uses CL-Protobufs gets loaded.")
 (defparameter *rpc-call-function* nil
-  "The Lisp function that implements RPC client-side calls.
-   This should be set when an RPC package that uses CL-Protobufs gets loaded.")
+  "The function that implements RPC client-side calls. This function must have a signature
+   matching (channel method request response &key callback). Set this when an RPC package that uses
+   cl-protobufs is loaded.")
 
 (defmacro define-service (type (&key name options source-location) &body method-specs)
   "Define a service named TYPE and a generic function for each method.
@@ -1498,13 +1496,12 @@ function) then there is no guarantee on the serialize function working properly.
                   (declare (values ,output-type))
                   (:method (,vchannel ,vrequest &key ,vcallback ,vresponse)
                     (declare (ignorable ,vchannel ,vcallback))
-                    (let ((call (and *rpc-package* *rpc-call-function*)))
-                      (assert call ()
-                              "There is no RPC package loaded!")
-                      (funcall call ,vchannel ',method ,vrequest ,vresponse
-                               :callback ,vcallback
-                                        ; :type ',input-type
-                               )))))
+                    (assert *rpc-call-function* ()
+                            "There is no RPC package loaded!")
+                    (funcall *rpc-call-function* ,vchannel ',method ,vrequest ,vresponse
+                             :callback ,vcallback
+                             ;; :type ',input-type
+                             ))))
               ;; The server side stub, e.g., 'do-read-air-reservation'.
               ;; The expectation is that the server-side program will implement
               ;; a method with the business logic for this on each kind of channel

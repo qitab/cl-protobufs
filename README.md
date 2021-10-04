@@ -644,8 +644,7 @@ The [gRPC](https://github.com/qitab/grpc) library, or any library containing the
 form:
 
 ```lisp
-(setq cl-protobufs.implementation:*rpc-package* (find-package "package")
-      cl-protobufs.implementation:*rpc-call-function* 'start-call)
+(setq cl-protobufs:*rpc-call-function* 'start-call)
 ```
 
 can be used as the underlying RPC mechanism. We will show examples with the expectation
