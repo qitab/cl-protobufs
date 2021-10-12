@@ -150,8 +150,10 @@
    #:encoded-field
 
    ;; For RPC stubs
+   ;; An RPC library supporting the client functions defined in
+   ;; `define-service` should bind these.
    #:*rpc-call-function*
-   ))
+   #:*rpc-streaming-client-function*))
 
 (defpackage #:cl-protobufs.implementation
   (:use :common-lisp :cl-protobufs)
@@ -181,5 +183,4 @@
    #:serialize-scalar
 
    ;; For ASDF
-   #:validate-imports
-   ))
+   #:validate-imports))

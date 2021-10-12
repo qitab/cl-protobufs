@@ -1390,6 +1390,16 @@ function) then there is no guarantee on the serialize function working properly.
    matching (channel method request response &key callback). Set this when an RPC package that uses
    cl-protobufs is loaded.")
 
+(defparameter *rpc-streaming-client-function* nil
+  "This function should implement the dispatch calls for client side streaming calls. This function
+   must have a signature matching (type &key channel method request call) and have methods for types
+   in :start :send :receive :close :cleanup. Set this when an RPC package that uses cl-protobufs is
+   loaded.")
+
+(defmacro assert-rpc-function-defined (symbol)
+  "Assert that SYMBOL is not NIL, otherwise signal an error."
+  `(assert ,symbol () (format nil "~a is not bound to an RPC function." ',symbol)))
+
 (defmacro define-service (type (&key name options source-location) &body method-specs)
   "Define a service named TYPE and a generic function for each method.
    NAME can be used to override the defaultly generated service name.
@@ -1496,12 +1506,58 @@ function) then there is no guarantee on the serialize function working properly.
                   (declare (values ,output-type))
                   (:method (,vchannel ,vrequest &key ,vcallback ,vresponse)
                     (declare (ignorable ,vchannel ,vcallback))
-                    (assert *rpc-call-function* ()
-                            "There is no RPC package loaded!")
+                    (assert-rpc-function-defined *rpc-call-function*)
                     (funcall *rpc-call-function* ,vchannel ',method ,vrequest ,vresponse
                              :callback ,vcallback
-                             ;; :type ',input-type
+                                        ; :type ',input-type
                              ))))
+              (when (or input-streaming output-streaming)
+                (let ((start-call
+                       (intern (string-upcase (format nil "~A/START" function))
+                               package))
+                      (send-call
+                       (intern (nstring-upcase (format nil "~A/SEND" function))
+                               package))
+                      (receive-call
+                       (intern (nstring-upcase (format nil "~A/RECEIVE" function))
+                               package))
+                      (close-call
+                       (intern (nstring-upcase (format nil "~A/CLOSE" function))
+                               package))
+                      (cleanup-call
+                       (intern (nstring-upcase (format nil "~A/CLEANUP" function))
+                               package))
+                      (call  (gensym "CALL")))
+                  (collect-form
+                   `(defun ,start-call (,vchannel)
+                      (assert-rpc-function-defined *rpc-streaming-client-function*)
+                      (funcall *rpc-streaming-client-function*
+                               :start :channel ,vchannel :method ',method)))
+                  (collect-form
+                   `(defun ,send-call (,call ,vrequest)
+                      (assert-rpc-function-defined *rpc-streaming-client-function*)
+                      (funcall *rpc-streaming-client-function*
+                               :send :call ,call :request ,vrequest)))
+                  (collect-form
+                   `(defun ,receive-call (,call)
+                      (assert-rpc-function-defined *rpc-streaming-client-function*)
+                      (funcall *rpc-streaming-client-function* :receive :call ,call)))
+                  (collect-form
+                   `(defun ,close-call (,call)
+                      (assert-rpc-function-defined *rpc-streaming-client-function*)
+                      (funcall *rpc-streaming-client-function* :close :call ,call)))
+                  (collect-form
+                   `(defun ,cleanup-call (,call)
+                      (assert-rpc-function-defined *rpc-streaming-client-function*)
+                      (funcall *rpc-streaming-client-function* :cleanup :call ,call)))
+                  (collect-form
+                   `(export '(,start-call
+                              ,send-call
+                              ,receive-call
+                              ,close-call
+                              ,cleanup-call)
+                            ,package))))
+
               ;; The server side stub, e.g., 'do-read-air-reservation'.
               ;; The expectation is that the server-side program will implement
               ;; a method with the business logic for this on each kind of channel
