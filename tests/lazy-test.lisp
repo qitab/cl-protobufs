@@ -62,11 +62,11 @@ Parameters
       (assert-eql 10 (value-before restored))
       (assert-eql 20 (value-after restored))
 
-      ;; Ensure that editing a lazy field clears the %BYTES slot.
+      ;; Ensure that editing a lazy field clears the %%BYTES slot.
       (let ((restored (proto:deserialize-from-bytes 'container bytes))
             (inner-slot 'cl-protobufs.third-party.lisp.cl-protobufs.tests::%inner))
         (setf (value (inner restored)) 43)
-        (assert-false (slot-value (slot-value restored inner-slot) 'pi::%bytes))
+        (assert-false (slot-value (slot-value restored inner-slot) 'pi::%%bytes))
         (let* ((reserialized (proto:serialize-to-bytes restored))
                (rerestored (proto:deserialize-from-bytes 'container reserialized)))
           (assert-eql 43 (value (inner rerestored)))))
@@ -92,14 +92,14 @@ Parameters
            (restored (proto:deserialize-from-bytes 'oneof-lazy bytes))
            (slot 'cl-protobufs.third-party.lisp.cl-protobufs.tests::%lazy-oneof))
       ;; The original proto doesn't have encoded field.
-      (assert-false (pi::proto-%bytes (pi::oneof-value (slot-value proto slot))))
+      (assert-false (pi::proto-%%bytes (pi::oneof-value (slot-value proto slot))))
       ;; The deserialized proto does have encoded field.
-      (assert-true (pi::proto-%bytes (pi::oneof-value (slot-value restored slot))))
+      (assert-true (pi::proto-%%bytes (pi::oneof-value (slot-value restored slot))))
 
       ;; If the encoded field is deserialized independently, we get the correct result.
       (let ((inner (proto:deserialize-from-bytes
                     'inner
-                    (pi::proto-%bytes (pi::oneof-value (slot-value restored slot))))))
+                    (pi::proto-%%bytes (pi::oneof-value (slot-value restored slot))))))
         (assert-eql 42 (value inner)))
       ;; If the field is accessed, it's deserialized lazily.
       (assert-eql 42 (value (inner restored)))

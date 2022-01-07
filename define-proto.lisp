@@ -430,13 +430,13 @@ Parameters:
                                :synthetic-p (and synthetic-p t)
                                :fields field-descriptors))))
 
-(defun-inline proto-%bytes (obj)
-  "Returns the %bytes field of the proto object OBJ."
-  (slot-value obj '%bytes))
+(defun-inline proto-%%bytes (obj)
+  "Returns the %%bytes field of the proto object OBJ."
+  (slot-value obj '%%bytes))
 
-(defun-inline (setf proto-%bytes) (new-value obj)
+(defun-inline (setf proto-%%bytes) (new-value obj)
   "Sets the %bytes field of the proto object OBJ with NEW-VALUE."
-  (setf (slot-value obj '%bytes) new-value))
+  (setf (slot-value obj '%%bytes) new-value))
 
 (defstruct field-accessors
   "Structure containing the get, set, and has functions
@@ -680,7 +680,7 @@ Paramters:
                             ,oneof-offset)
                         ,(if (proto-lazy-p field)
                              `(let* ((,field-obj (oneof-value (,hidden-accessor-name ,obj)))
-                                     (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
+                                     (,bytes (and ,field-obj (proto-%%bytes ,field-obj))))
                                 (if ,bytes
                                     (setf (oneof-value (,hidden-accessor-name ,obj))
                                           (%deserialize ',(proto-class field)
@@ -813,22 +813,22 @@ function) then there is no guarantee on the serialize function working properly.
            ,accessor-return-type
            ,(if (not repeated)
                 `(let* ((,field-obj (,hidden-accessor-name ,obj))
-                        (,bytes (and ,field-obj (proto-%bytes ,field-obj))))
+                        (,bytes (and ,field-obj (proto-%%bytes ,field-obj))))
                    (if ,bytes
                        (setf (,hidden-accessor-name ,obj)
-                             ;; Re-create the field object by deserializing its %bytes
+                             ;; Re-create the field object by deserializing its %%bytes
                              ;; field.
                              (%deserialize ',(proto-class field) ,bytes nil nil))
                        ,field-obj))
                 `(let ((,field-obj (,hidden-accessor-name ,obj)))
-                   (if (notany #'proto-%bytes ,field-obj)
+                   (if (notany #'proto-%%bytes ,field-obj)
                        ,field-obj
                        ,(with-gensyms (maybe-deserialize field-element)
                           `(flet ((,maybe-deserialize (,field-element)
-                                    (let ((,bytes (proto-%bytes ,field-element)))
+                                    (let ((,bytes (proto-%%bytes ,field-element)))
                                       (if ,bytes
                                           ;; Re-create the field object by deserializing
-                                          ;; its %bytes field.
+                                          ;; its %%bytes field.
                                           (%deserialize ',(proto-class field) ,bytes nil nil)
                                           ,field-element))))
                              (setf (,hidden-accessor-name ,obj)
@@ -1141,10 +1141,10 @@ function) then there is no guarantee on the serialize function working properly.
       ;; One extra slot for the make-message-with-bytes feature.
       (collect-slot
        (make-field-data
-        :internal-slot-name '%bytes
-        :external-slot-name '%bytes
+        :internal-slot-name '%%bytes
+        :external-slot-name '%%bytes
         :type '(or null (simple-array (unsigned-byte 8)))
-        :initarg :%bytes
+        :initarg :%%bytes
         :initform nil))
 
       (unless (= bool-index -1)

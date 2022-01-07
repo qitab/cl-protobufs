@@ -239,5 +239,5 @@ Parameters:
         (protobuf-error "There is no protobuf field with the name ~S" slot))
       (let ((value (slot-value object (proto-internal-field-name field))))
         (if (eq (proto-label field) :repeated)
-            (map 'list #'proto-%bytes value)
-            (proto-%bytes value))))))
+            (map 'list #'proto-%%bytes value)
+            (proto-%%bytes value))))))

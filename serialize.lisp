@@ -77,8 +77,8 @@
 (defun serialize-to-bytes (object &optional (type (type-of object)))
   "Serializes OBJECT into a new vector of (unsigned-byte 8) using wire format.
    TYPE is a symbol naming a protobuf descriptor class."
-  (or (and (slot-exists-p object '%bytes)
-           (proto-%bytes object))
+  (or (and (slot-exists-p object '%%bytes)
+           (proto-%%bytes object))
       (let ((fast-function
              #-sbcl (get type :serialize)
              #+sbcl (when (fboundp `(:protobuf :serialize ,type))
@@ -111,7 +111,7 @@
    The value returned is the number of octets written to BUFFER."
   (declare (buffer buffer)
            (message-descriptor msg-desc))
-  ;; Check for the %BYTES slot, since groups do not have this slot.
+  ;; Check for the %%BYTES slot, since groups do not have this slot.
   (let ((size 0))
     (dolist (field (proto-fields msg-desc))
       (iincf size (emit-field object field buffer)))
@@ -222,10 +222,10 @@ Parameters:
             ;; To serialize an embedded message, first say that it's
             ;; a string, then encode its size, then serialize its fields.
             (iincf size (encode-uint32 tag buffer))
-            ;; If MSG has %BYTES bound, then it is a lazy field, and BYTES is
+            ;; If MSG has %%BYTES bound, then it is a lazy field, and BYTES is
             ;; the pre-computed serialization of MSG, so output that.
-            (let ((precomputed-bytes (and (slot-exists-p msg '%bytes)
-                                          (proto-%bytes msg)))
+            (let ((precomputed-bytes (and (slot-exists-p msg '%%bytes)
+                                          (proto-%%bytes msg)))
                   (submessage-size 0))
               (with-placeholder (buffer) ; reserve space for submessage-size in buffer
                 (cond (precomputed-bytes
@@ -301,10 +301,10 @@ Parameters:
              (iincf size (emit-field msg f buffer)))
            (i+ size (encode-uint32 tag2 buffer))))
         (t
-         ;; If MSG has %BYTES bound, then it is a lazy field, and %BYTES is
+         ;; If MSG has %%BYTES bound, then it is a lazy field, and %%BYTES is
          ;; the pre-computed serialization of MSG, so output that.
-         (let ((precomputed-bytes (and (slot-exists-p msg '%bytes)
-                                       (proto-%bytes msg)))
+         (let ((precomputed-bytes (and (slot-exists-p msg '%%bytes)
+                                       (proto-%%bytes msg)))
                (custom-serializer (custom-serializer type))
                (tag-size (encode-uint32 (make-wire-tag $wire-type-string field-num) buffer))
                (submessage-size 0))
@@ -759,7 +759,7 @@ Parameters:
                             (deserializer (custom-deserializer type))
                             (obj
                              (cond (lazy-p
-                                    ;; For lazy fields, just store bytes in the %bytes field.
+                                    ;; For lazy fields, just store bytes in the %%bytes field.
                                     (make-message-with-bytes type (subseq buffer start end)))
                                    (deserializer
                                     (funcall deserializer buffer
@@ -977,7 +977,7 @@ Parameters:
           (declare ; maybe allow specification of the type
            #+ignore(type ,(proto-class message) ,vobj)
            (type fixnum ,size))
-          (let ((,bytes (proto-%bytes ,vobj)))
+          (let ((,bytes (proto-%%bytes ,vobj)))
             ;; If BYTES is bound, then VOBJ is a lazy field, and BYTES is the pre-computed
             ;; serialization of VOBJ. So, just output that.
             (cond
@@ -1141,7 +1141,7 @@ Parameters:
                             (setq ,vidx (+ payload-start payload-len))
                             ,(if lazy-p
                                  ;; If this field is declared lazy, then don't deserialize.
-                                 ;; Instead, create a new message with %BYTES field set to
+                                 ;; Instead, create a new message with %%BYTES field set to
                                  ;; the bytes on the wire.
                                  `(push (make-message-with-bytes
                                          ',class (subseq ,vbuf payload-start ,vidx))
@@ -1213,7 +1213,7 @@ Parameters:
                        (decode-uint32 ,vbuf ,vidx)
                      (setq ,vidx (+ payload-start payload-len))
                      ;; If this field is declared lazy, then don't deserialize.
-                     ;; Instead, create a new message with %BYTES field set to
+                     ;; Instead, create a new message with %%BYTES field set to
                      ;; the bytes on the wire.
                      ,(if lazy-p
                           `(setq ,dest (make-message-with-bytes
@@ -1449,7 +1449,7 @@ Parameters:
          (message-name (or (proto-alias-for desc) (proto-class desc)))
          (object #+sbcl (make-instance message-name)
                  #-sbcl (funcall (get-constructor-name message-name))))
-    (setf (proto-%bytes object) buffer)
+    (setf (proto-%%bytes object) buffer)
     object))
 
 #-sbcl
