@@ -47,7 +47,23 @@ Common Lisp.
 
     Make sure the installation directory is on your `PATH`.
 
-## Using `protoc` to Generate Lisp Code
+## Generating the Lisp Code from Proto files
+
+There are two ways of doing this, either using `protoc` or `ASDF`.
+
+### Using `ASDF` to generate Lisp code.
+
+If you add `:defsystem-depends-on (:cl-protobufs.asdf)` to your defsystem,
+`ASDF` can generate Lisp code directly from your .proto files.  For each
+`.proto` file add a component of type `:protobuf-source-file` with a
+`:proto-pathname`.  You may also need to specify `:proto-search-path` to
+help the `protoc` compiler find protos imported by your `.proto` file.
+The pathnames can be relative with respect to the `pathname` of the system
+you are building.
+
+Several examples can be found in `cl-protobufs.asd`.
+
+### Using `protoc` to Generate Lisp Code
 
 To test your build, try generating Lisp code from the
 `cl-protobufs/tests/case-preservation.proto` file with the following command.
@@ -83,7 +99,7 @@ protoc --plugin=protoc-gen-lisp=/usr/local/bin/protoc-gen-lisp \
 The file `/tmp/extend.lisp` should be generated. Note that the `.lisp` file for
 each imported file also needs to be generated separately.
 
-### ASDF
+## ASDF
 
 Build and run the tests with ASDF:
 
