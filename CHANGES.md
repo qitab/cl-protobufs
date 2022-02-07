@@ -12,7 +12,7 @@
 *   Add format directives for both text-format and JSON printing
     of protocol buffer messages.
 
-*   Cheange the key parameter `pretty-print` to `pretty-print-p` in
+*   Change the `pretty-print` keyword parameter to `pretty-print-p` in
     `print-text-format` for consistency.
 
 *   A bug in `proto-equal` was fixed. Two protos were sometimes considered equal
