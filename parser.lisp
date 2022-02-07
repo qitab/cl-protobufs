@@ -28,6 +28,19 @@
         until (or (null ch) (not (proto-whitespace-char-p ch)))
         do (read-char stream nil)))
 
+(defun expect-matching-end (stream start-char)
+  "Expect that the starting block element START-CHAR matches the next element
+   in the STREAM which should end the block, signal an error if there's no match.
+   The return value is the character that was eaten."
+  (let ((end-char (peek-char nil stream nil)))
+    (unless (or (and (eq start-char #\{)
+                     (eq end-char #\}))
+                (and (eq start-char #\<)
+                     (eq end-char #\>)))
+      (protobuf-error "Started with ~S ended with ~S at position ~D"
+                      start-char end-char (file-position stream))))
+  (read-char stream))
+
 (defun expect-char (stream char &optional chars within)
   "Expect to see 'char' as the next character in the stream; signal an error if it's not there.
    Then skip all of the following whitespace.

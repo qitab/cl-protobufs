@@ -22,7 +22,7 @@ Parameters
   (clunit:run-suite 'text-format-suite :use-debugger use-debugger
                                        :signal-condition-on-fail t))
 
-(defparameter *text-format-msg*
+(defconstant +text-format-msg+
 "int_field: 100
 sint_field: -1
 uint_field: 1
@@ -47,8 +47,7 @@ symbol_field: 'nil'
 symbol_field: ':t'
 symbol_field: ':nil'")
 
-
-(defparameter *double-nested-message*
+(defconstant +double-nested-message+
   (list
    "int_field: 0
 one_level_nesting {
@@ -64,7 +63,7 @@ one_level_nesting {
 (deftest test-parse-text-format (text-format-suite)
   (let ((msg (proto:parse-text-format
               'test-pb:text-format-test
-              :stream (make-string-input-stream *text-format-msg*))))
+              :stream (make-string-input-stream +text-format-msg+))))
     (assert-eql 100 (test-pb:int-field msg))
     (assert-eql -1 (test-pb:sint-field msg))
     (assert-eql 1 (test-pb:uint-field msg))
@@ -85,6 +84,36 @@ one_level_nesting {
     (assert-eq nil (test-pb:nth-symbol-field 4 msg))
     (assert-eq :t (test-pb:nth-symbol-field 5 msg))
     (assert-eq :nil (test-pb:nth-symbol-field 6 msg))))
+
+(deftest test-parse-message-field (text-format-suite)
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream
+              (make-string-input-stream "one_level_nesting {int_field: 3}")))
+        (msg-2 (proto:parse-text-format
+                'test-pb:text-format-test
+                :stream
+                (make-string-input-stream "one_level_nesting: {int_field: 3}")))
+        (msg-3 (proto:parse-text-format
+                'test-pb:text-format-test
+                :stream
+                (make-string-input-stream "one_level_nesting: <int_field: 3>")))
+        (my-message (test-pb:make-text-format-test
+                     :one-level-nesting (test-pb:make-text-format-test.nested-message1
+                                         :int-field 3))))
+    (assert-equality #'proto:proto-equal msg my-message)
+    (assert-equality #'proto:proto-equal msg-2 my-message)
+    (assert-equality #'proto:proto-equal msg-3 my-message))
+  (assert-condition proto:protobuf-error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream
+       (make-string-input-stream "one_level_nesting: <int_field: 3}")))
+  (assert-condition proto:protobuf-error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream
+       (make-string-input-stream "one_level_nesting: {int_field: 3>"))))
 
 ; tests a round trip of proto message -> text -> proto.
 (deftest test-roundtrip-text-format (text-format-suite)
@@ -131,7 +160,7 @@ one_level_nesting {
                        'test-pb:text-format-test
                        :stream (make-string-input-stream text))))
       (assert-equality #'proto:proto-equal msg msg-parse)
-      (assert-equality #'string= text (first *double-nested-message*)))
+      (assert-equality #'string= text (first +double-nested-message+)))
 
     ;; Non-pretty print test
     (proto:print-text-format msg :pretty-print-p nil :stream out-stream)
@@ -140,7 +169,7 @@ one_level_nesting {
                        'test-pb:text-format-test
                        :stream (make-string-input-stream text))))
       (assert-equality #'proto:proto-equal msg msg-parse)
-      (assert-equality #'string= text (second *double-nested-message*)))))
+      (assert-equality #'string= text (second +double-nested-message+)))))
 
 
 

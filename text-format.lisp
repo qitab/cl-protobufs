@@ -232,7 +232,8 @@ returns the parsed object."
     (loop
       (skip-whitespace stream)
       (when (or (not (peek-char nil stream nil))
-                (eql (peek-char nil stream nil) #\}))
+                (eql (peek-char nil stream nil) #\})
+                (eql (peek-char nil stream nil) #\>))
         ;; We should respect the order of slots as
         ;; they were in the message.
         (dolist (slot rslots)
@@ -241,7 +242,7 @@ returns the parsed object."
         (return-from parse-text-format-impl object))
       (let* ((name  (parse-token stream))
              (field (and name (find-field-descriptor msg-desc name)))
-             (type  (and field (proto-class field)))
+             (type (and field (proto-class field)))
              (slot  (and field (proto-external-field-name field))))
         (if (null field)
             (error 'unknown-field
@@ -292,11 +293,11 @@ return T as a second value."
            (when (eql (peek-char nil stream nil) #\:)
              (read-char stream))
            (skip-whitespace stream)
-           (expect-char stream #\{)
-           (prog1 (parse-text-format-impl (find-message-descriptor type)
-                                   :stream stream)
-             (skip-whitespace stream)
-             (expect-char stream #\})))
+           (let ((start-char (expect-char stream '(#\{ #\<))))
+             (prog1
+                 (parse-text-format-impl (find-message-descriptor type) :stream stream)
+               (skip-whitespace stream)
+               (expect-matching-end stream start-char))))
           ((typep desc 'enum-descriptor)
            (expect-char stream #\:)
            (let* ((name (parse-token stream))

@@ -40,6 +40,8 @@
     `cl-protobufs.implementation`. (This is more relevant now that Common Lisp
     support for [gRPC](https://github.com/qitab/grpc) has been released.)
 
+*   Support `field: < message-value >` in textproto parsing.
+
 ## Version 3.0
 
 This release is largely for an overhaul of the public API (hence a major version
