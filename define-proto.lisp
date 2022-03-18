@@ -1048,7 +1048,7 @@ function) then there is no guarantee on the serialize function working properly.
  Parameters:
    TYPE - Symbol naming the new type.
    NAME - Optional symbol used to override the defaultly generated protobuf message name.
-     This is supplied automatically by protoc-gen-lisp when TYPE cannot be accurately
+     This is supplied automatically by protoc-gen-cl-pb when TYPE cannot be accurately
      converted back to a camelCase name.
    ALIAS-FOR - If supplied, no Lisp struct is defined. Instead, the message is used
      as an alias for a class that already exists. This feature is intended to be

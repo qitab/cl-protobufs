@@ -19,7 +19,6 @@ jobs:
       - name: Download quicklisp
         run: curl -o quicklisp.lisp 'https://beta.quicklisp.org/quicklisp.lisp'
 
-
       - name: Install quicklisp
         run: |
           sbcl --noinform --non-interactive --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\")"

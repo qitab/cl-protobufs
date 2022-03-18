@@ -10,7 +10,7 @@
 
 
 # Directory into which the Lisp protocol buffer plugin,
-# protoc-gen-lisp, will be installed.
+# protoc-gen-cl-pb, will be installed.
 INSTALL_ROOT ?= /usr/local/bin
 
 # Directory where Google's protocol buffer compiler is installed. This
@@ -25,15 +25,15 @@ OFILES = enum.o field.o file.o generator.o literals.o message.o \
 CXXFLAGS = -std=c++14 -I$(PROTOC_ROOT)/include -I.
 LIBS = -Wl,-L$(PROTOC_ROOT)/lib -Wl,-rpath -Wl,$(PROTOC_ROOT)/lib -lprotoc -lprotobuf -pthread
 
-protoc-gen-lisp: $(OFILES) Makefile
-	$(CXX) $(OFILES) -o protoc-gen-lisp $(LIBS)
+protoc-gen-cl-pb: $(OFILES) Makefile
+	$(CXX) $(OFILES) -o protoc-gen-cl-pb $(LIBS)
 
-install: protoc-gen-lisp
+install: protoc-gen-cl-pb
 	mkdir -p $(INSTALL_ROOT)
-	cp protoc-gen-lisp $(INSTALL_ROOT)/
+	cp protoc-gen-cl-pb $(INSTALL_ROOT)/
 
 clean: .
-	rm -f $(OFILES) protoc_middleman protoc-gen-lisp
+	rm -f $(OFILES) protoc_middleman protoc-gen-cl-pb
 
 # Generate the proto2 descriptor cpp files.
 protoc_middleman: ../google/protobuf/proto2-descriptor-extensions.proto

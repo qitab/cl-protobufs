@@ -20,7 +20,7 @@ Parameters:
 
 (defun add-file-descriptor (pathname symbol)
   "Register the file-descriptor named by SYMBOL under the key PATHNAME.
-   Intended for use by protoc-gen-lisp."
+   Intended for use by protoc-gen-cl-pb."
   (setf (gethash pathname *file-descriptors*) (find-file-descriptor symbol)))
 
 (defstruct message

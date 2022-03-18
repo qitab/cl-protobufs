@@ -2,6 +2,13 @@
 
 ## Version 3.1
 
+*   Change the name of the Lisp `protoc` plugin from `protoc-gen-lisp`
+    to `protoc-gen-cl-pb` to prevent conflict with Robert Browns protocol
+    buffer implementation.
+    See: https://github.com/qitab/cl-protobufs/issues/276.
+
+## Version 3.1
+
 *   Improve the API for printing and parsing JSON format.
 
     -   Have `pretty-print-p` be a parameter to `print-json` instead of

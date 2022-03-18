@@ -124,7 +124,7 @@ to PARENT-PATH."
          ;; that method instead of executing (component-pathname component).
          (output-file (first (output-files operation component)))
          (search-path (cons (directory-namestring source-file) (resolve-search-path component)))
-         (command (format nil "protoc --proto_path=~{~A~^:~} --lisp_out=output-file=~A:~A ~A ~
+         (command (format nil "protoc --proto_path=~{~A~^:~} --cl-pb_out=output-file=~A:~A ~A ~
                                --experimental_allow_proto3_optional"
                           search-path
                           (file-namestring output-file)
