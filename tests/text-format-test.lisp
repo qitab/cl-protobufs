@@ -22,7 +22,7 @@ Parameters
   (clunit:run-suite 'text-format-suite :use-debugger use-debugger
                                        :signal-condition-on-fail t))
 
-(defconstant +text-format-msg+
+(defparameter *text-format-msg*
 "int_field: 100
 sint_field: -1
 uint_field: 1
@@ -47,7 +47,7 @@ symbol_field: 'nil'
 symbol_field: ':t'
 symbol_field: ':nil'")
 
-(defconstant +double-nested-message+
+(defparameter *double-nested-message*
   (list
    "int_field: 0
 one_level_nesting {
@@ -63,7 +63,7 @@ one_level_nesting {
 (deftest test-parse-text-format (text-format-suite)
   (let ((msg (proto:parse-text-format
               'test-pb:text-format-test
-              :stream (make-string-input-stream +text-format-msg+))))
+              :stream (make-string-input-stream *text-format-msg*))))
     (assert-eql 100 (test-pb:int-field msg))
     (assert-eql -1 (test-pb:sint-field msg))
     (assert-eql 1 (test-pb:uint-field msg))
@@ -160,7 +160,7 @@ one_level_nesting {
                        'test-pb:text-format-test
                        :stream (make-string-input-stream text))))
       (assert-equality #'proto:proto-equal msg msg-parse)
-      (assert-equality #'string= text (first +double-nested-message+)))
+      (assert-equality #'string= text (first *double-nested-message*)))
 
     ;; Non-pretty print test
     (proto:print-text-format msg :pretty-print-p nil :stream out-stream)
@@ -169,7 +169,7 @@ one_level_nesting {
                        'test-pb:text-format-test
                        :stream (make-string-input-stream text))))
       (assert-equality #'proto:proto-equal msg msg-parse)
-      (assert-equality #'string= text (second +double-nested-message+)))))
+      (assert-equality #'string= text (second *double-nested-message*)))))
 
 
 
