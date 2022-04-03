@@ -15,6 +15,7 @@
 #include <google/protobuf/extension_set.h>
 #include <google/protobuf/stubs/strutil.h>
 // #include <google/protobuf/stubs/str_join.h>
+#include "third_party/absl/strings/string_view.h"
 #include "proto2-descriptor-extensions.pb.h"
 
 // Copied from ABSL.
@@ -59,7 +60,7 @@ const void StrToLower(std::string* s) {
   }
 }
 
-const std::string DeCamel(const std::string& name, const bool to_lower_case,
+const std::string DeCamel(absl::string_view name, const bool to_lower_case,
                           const bool to_upper_case, const char* sep) {
   // Needs to be kept in sync with class-name->proto.
   std::string result;
