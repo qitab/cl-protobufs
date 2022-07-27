@@ -241,22 +241,29 @@ syntax = "proto2";
 package abc;
 
 message DateRange {
-    optional string min_date = 1;
-    optional string max_date = 2;
+  optional string min_date = 1;
+  optional string max_date = 2;
 }
 ```
+
+**Construct** a `date-range` message:
 
 ```lisp
 (make-date-range :min-date "2020-05-27" :max-date "2020-05-28")
 ```
 
-Construct a `date-range` message.
+**Set** the value of the `max-date` field on an already-constructed `range`
+message:
+
+```
+(setf (date-range.max-date range) "2022-07-29")
+```
+
+**Get** the value of the `min-date` field from the `range` message:
 
 ```lisp
 (date-range.min-date range)
 ```
-
-Get the value of the `min-date` field from the `range` message.
 
 If the field was explicitly set, that value is returned. Otherwise, a default
 value is returned: the default value specified for this field in the `.proto`
@@ -276,29 +283,29 @@ symbols         | `nil`
 
 Note that with nested messages and long message names, field accessor names can
 get pretty long. If speed is not an issue it is also possible to access fields
-via the `cl-protobufs:field` generic function.
+via the `cl-protobufs:field` generic function, which is an alternative (slower,
+but often more concise) way to read a protobuf field's value:
 
 ```lisp
 (cl-protobufs:field range 'min-date)
 ```
 
-An alternative (slower, but often more concise) way to read a protobuf field's
-value.
+**Check** whether the `min-date` field has been set on `range`:
 
 ```lisp
 (date-range.has-min-date range)
 ```
 
-Check whether a field has been set. Returns `t` if the `min-date` field has been
-set, otherwise `nil`.
+_(Returns `t` if the `min-date` field has been set, otherwise `nil`.)_
+
+**Clear** the value of the `min-date` field on `range`:
 
 ```lisp
 (date-range.clear-min-date range)
 ```
 
-Clear the value of a field. After the above call `(date-range.has-min-date
-range)` returns `nil` and `(date-range.min-date range)` returns the default
-value.
+_(After the above call, `(date-range.has-min-date range)` returns `nil` and
+`(date-range.min-date range)` returns the default value.)_
 
 ### Messages (proto3)
 
@@ -339,28 +346,31 @@ message Dictionary {
 
 This creates an associative map with keys of type `int32` and values of type
 `string`. In general, the key type can be any scalar type except `float` and
-`double`. The value type can be any protobuf type. For a message `dict` of type
+`double`. The value type can be any protobuf type.
+
+For a message `dict` of type
 `Dictionary`, the following functions are created to access the map:
+
+
+**`*-gethash`** returns the value associated with `2` in the `map-field` field in `dict`.
+If there is no value explicitly set, this function returns the default value of
+the value type. In this case, the empty string.
 
 ```lisp
 (dictionary.map-field-gethash 2 dict)
 ```
-
-This returns the value associated with `2` in the `map-field` field in `dict`.
-If there is no value explicitly set, this function returns the default value of
-the value type. In this case, the empty string.
+_`gethash`_ can be used with `setf` to set fields as well.
+This associates `1` with the value `"one"` in the `map-field` field in `dict`:
 
 ```lisp
 (setf (dictionary.map-field-gethash 1 dict) "one")
 ```
 
-This associates `1` with the value `"one"` in the `map-field` field in `dict`.
+**`*-remhash`** removes any entry with key `1` in the `map-field` field in `dict`:
 
 ```lisp
 (dictionary.map-field-remhash 1 dict)
 ```
-
-This removes any entry with key `1` in the `map-field` field in `dict`.
 
 Like the other fields, these functions are aliased by methods which are slower
 but more concise. Examples of the methods are: `(map-field-gethash 2 dict)`,
@@ -394,25 +404,30 @@ The above enum defines the Lisp type `day-of-week`, like this:
 Each enum value is represented by a keyword symbol which is mapped to/from its
 numeric equivalent during serialization and deserialization.
 
+Convert a keyword symbol to its numeric value:
+
 ```lisp
 (defun day-of-week-to-int (name) ...)
 ```
 
-Convert a keyword symbol to its numeric value. Example: `(day-of-week-to-int
-:mon) => 1`
+_(Example: `(day-of-week-to-int :mon) => 1`)_
+
+Convert a number to its symbolic name:
 
 ```lisp
 (defun int-to-day-of-week (num) ...)
 ```
 
-Convert a number to its symbolic name. Example: `(int-to-day-of-week 1) => :MON`
+_(Example: `(int-to-day-of-week 1) => :MON`)_
+
+Each numeric enum value is also bound to a constant by the same name but with
+"+" on each side:
 
 ```lisp
 (defconstant +mon+ 1)
 ```
 
-Each numeric enum value is also bound to a constant by the same name but with
-"+" on each side.
+
 
 Note that most enums should have an "undefined" or "unset" field with value `0`
 so that message fields using this enum type have a reasonable default value that
@@ -440,14 +455,15 @@ these definitions:
 ```
 
 
-#### Enum Backward Compatability
+#### Enum Backward Compatibility
 
 For backward compatibility, unrecognized enum values are retained during
 deserialization and are output again when serialized. This allows a client
 that acts as a pass-through for the enum data to function correctly even if
 it uses a different version of the proto than the systems it is communicating with.
 
-Message Schema V1
+Message Schema V1:
+
 ```protocol-buffer
 enum DayOfWeek {
   DAY_UNDEFINED = 0;
@@ -459,7 +475,8 @@ message DayIWillWork {
   optional DayOfWeek workday = 1;
 }
 ```
-Message Schema V2
+Message Schema V2:
+
 ```protocol-buffer
 enum DayOfWeek {
   DAY_UNDEFINED = 0;
@@ -486,7 +503,7 @@ received is 4. Calling `(day-i-will-work.workday v2-proto)`
 will return `:%undefined-4`. Reserialization will add the
 workday enum value to the serialized protobuf message, and
 deserialization on a V2 system will properly add the
-new `:thur` enum value to the new protocol beffer message.
+new `:thur` enum value to the new protocol buffer message.
 
 Trying to call `(setf (day-i-will-work.workday v2-proto) :%undefined-4`
 will signal an error on a V1 or V2 system since `:%undefined-4` isn't a
@@ -513,29 +530,30 @@ are created. For example:
 ```lisp
 (setf (person.age bob) 5)
 ```
+...will set the `age` field of a `Person` object `bob` to `5`.
 
-will set the `age` field of a `Person` object `bob` to `5`. Defining a oneof
-also creates two special functions:
+Defining a oneof also creates two special functions:
+
+**`*-oneof-case`** will return the lisp symbol corresponding to the field which is currently
+set. So, if we set `age` to `5`, then this will return the symbol `AGE`. If no
+field is set, this function will return `nil`.
 
 ```lisp
 (person.age-oneof-case bob)
 ```
 
-This will return the lisp symbol corresponding to the field which is currently
-set. So, if we set `age` to `5`, then this will return the symbol `AGE`. If no
-field is set, this function will return `nil`.
+If we set the `age` field on our _`bob`_ object, then:
 
 ```lisp
-(person.has-age bob)
+(person.has-age bob) => t
+(person.has-birthdate bob) => nil
 ```
 
-returns true.
+To clear all fields inside of the oneof `age-oneof`:
 
 ```lisp
 (person.clear-age-oneof bob)
 ```
-
-This will clear all fields inside of the oneof `age-oneof`.
 
 ### Repeated Fields
 
@@ -558,49 +576,55 @@ The default value is an empty vector which is extendable with a fill pointer.
 The APIs for the list and vector repeated fields are the same.
 There is a minor difference when pushing onto the different types of repeated field.
 
+**`push-*`** pushes a value onto the corresponding list or vector field.
+
+This pushes the integer 1 onto the `my_int_list` field in the `RepeatedProto`:
+
 ```lisp
 (repeated-proto.push-my-int-list 1 my-message)
 ```
 
-This pushes the integer 1 onto the `my_int_list` field in the `RepeatedProto`.
-Since we push onto a list this will push into the front of the list.
+_(Since we push onto a list, this will push into the **front** of the list.)_
+
+This pushes the integer `1` onto the `my_int_vector` field in the `RepeatedProto`:
 
 ```lisp
 (repeated-proto.push-my-int-vector 1 my-message)
 ```
 
-This pushes the integer `1` onto the `my_int_vector` field in the `RepeatedProto`.
-Since we push onto a vector this will push into the back of the vector.
+_(Since we push onto a vector, this will push into the **back** of the vector.)_
+
+The **`has-*`** functions on a repeated field return true if there
+are no elements in the sequence:
 
 ```lisp
 (repeated-proto.has-my-int-list my-message)
 (repeated-proto.has-my-int-vector my-message)
 ```
 
-The `has-*` functions on a repeated field return true if there
-are no elements in the sequence.
+The **`length-of-*`** function returns the number of elements in the repeated field:
 
 ```lisp
 (repeated-proto.length-of-my-int-list my-message)
 (repeated-proto.length-of-my-int-vector my-message)
 ```
 
-The `length-of-*` function returns the number of elements in the repeated field.
+The **`nth-*`** function returns the element at position `n` in the repeated field:
 
 ```lisp
 (repeated-proto.nth-my-int-list n my-message)
 (repeated-proto.nth-my-int-vector n my-message)
 ```
 
-This returns the element at position `n` in the repeated field.
-If the repeated field has length less then `n` we signal an error.
+
+_(If the repeated field has length less than `n`, we signal an error.)_
+
+The **`clear-*`** function clears the repeated field of all elements:
 
 ```lisp
 (repeated-proto.clear-my-int-list my-message)
 (repeated-proto.clear-my-int-vector my-message)
 ```
-
-This clears the repeated field of all elements.
 
 ### Symbols
 
@@ -652,7 +676,7 @@ TODO
 
 ### Services
 
-This section describes the geenrated code API for a protobuf service in a proto file.
+This section describes the generated code API for a protobuf service in a proto file.
 You must have a corresponding RPC library as well; `cl-protobufs` just generates the
 methods.
 
@@ -709,7 +733,7 @@ sent to a server implementing the `Greeter` service with:
 
 #### Server
 
-There is currently no known supported open framework for implementating
+There is currently no known supported open framework for implementing
 the server portion of Protocol Buffer services in Lisp.
 
 
@@ -739,11 +763,16 @@ depending on which transport mechanism (HTTP, TCP, IPC, etc) is being used. The
 
 This section documents the symbols exported from the `cl-protobufs` package.
 
+`message` is the base type from which every generated protobuf message inherits:
+
 ```lisp
 (defstruct message ...)
 ```
 
-The base type from which every generated protobuf message inherits.
+**`print-text-format`** prints a protocol buffer message to a stream. `object` is the protocol buffer
+message, group, or extension to print. `stream` is the stream to print to.
+`pretty-print-p` may be set to `nil` to minimize textual output by omitting
+most whitespace.
 
 ```lisp
 (defun print-text-format (object &key
@@ -752,101 +781,98 @@ The base type from which every generated protobuf message inherits.
                                  (pretty-print-p t)))
 ```
 
-Prints a protocol buffer message to a stream. `object` is the protocol buffer
-message, group, or extension to print. `stream` is the stream to print to.
-`pretty-print-p` may be set to `nil` to minimize textual output by omitting
-most whitespace.
+**`parse-text-format`** parses a protocol buffer message written in text-format.
+`type` is the type of message to parse. `stream` is the stream to read from.
 
 ```lisp
 (defun parse-text-format (type &key (stream *standard-input*)))
 ```
 
-Parses a protocol buffer message written in text-format.
-`type` is the type of message to parse. `stream` is the stream to read from.
-
-```lisp
-(defun is-initialized (object))
-```
-
-Check if `object` has all required fields set, and recursively all of its
+**`is-initialized`** checks if `object` has all required fields set, and recursively all of its
 sub-objects have all of their required fields set. An error may be signaled if
 an attempt is made to serialize a protobuf object that is not initialized.
 Signals an error if `object` is not a protobuf message.
 
 ```lisp
-(defun proto-equal (message-1 message-2 &key exact nil))
+(defun is-initialized (object))
 ```
 
-Check if two protobuf messages are equal. By default, two messages are equal if
+**`proto-equal`** checks if two protobuf messages are equal. By default, two messages are equal if
 calling the getter on each field would retrieve the same value. This means that
 a message with a field explicitly set to the default value is considered equal
 to a message with that field not set.
-
 If `exact` is true, consider the messages to be equal only if the same fields
 have been explicitly set.
-
 `message-1` and `message-2` must both be protobuf messages.
+
+```lisp
+(defun proto-equal (message-1 message-2 &key exact nil))
+```
+
+**`clear`** resets the protobuf message to its initial state:
 
 ```lisp
 (defgeneric clear (object message))
 ```
 
-Resets the protobuf message to its initial state.
+**`has-field`** returns whether `field` has been explicitly set in `object`. `field` is the
+symbol naming the field in the proto message.
 
 ```lisp
 (defun has-field (object field))
 ```
 
-Returns whether `field` has been explicitly set in `object`. `field` is the
-symbol naming the field in the proto message.
-
 ### Serialization
+
+**`byte-vector`**: a vector of unsigned-bytes. In serialization functions, this is often referred to
+as 'buffer'.
 
 ```lisp
 (deftype byte-vector)
 ```
 
-A vector of unsigned-bytes. In serialization functions this is often referred to
-as buffer.
+**`make-byte-vector`**: constructor to make a byte vector. `size` is the size of the underlying vector.
+`adjustable` is a boolean value determining whether the byte-vector can change
+size.
 
 ```lisp
 (defun make-byte-vector (size &key adjustable))
 ```
 
-Constructor to make a byte vector. `size` is the size of the underlying vector.
-`adjustable` is a boolean value determining whether the byte-vector can change
-size.
+**`serialize-to-bytes`** creates a byte-vector and serializes a protobuf message to that byte-vector. The
+`object` is the protobuf message instance to serialize. Optionally use `type` to
+specify the type of object to serialize.
 
 ```lisp
 (defun serialize-to-bytes (object &optional (type (type-of object))))
 ```
 
-Creates a byte-vector and serializes a protobuf message to that byte-vector. The
-`object` is the protobuf message instance to serialize. Optionally use `type` to
+**`serialize-to-stream`**: serialize `object`, a protobuf message, to `stream`. Optionally use `type` to
 specify the type of object to serialize.
 
 ```lisp
 (defun serialize-to-stream (object stream &optional (type (type-of object)))
 ```
 
-Serialize `object`, a protobuf message, to `stream`. Optionally use `type` to
-specify the type of object to serialize.
+**`deserialize-from-bytes`**: deserialize a protobuf message returning the newly created structure.
+
+* `type` is
+the symbol naming the protobuf message to deserialize.
+* `buffer` is the
+byte-vector containing the data to deserialize.
+* `start` (inclusive) and `end`
+(exclusive) delimit the range of bytes to deserialize.
 
 ```lisp
 (defun deserialize-from-bytes (type buffer &optional (start 0) (end (length buffer))))
 ```
 
-Deserialize a protobuf message returning the newly created structure. `type` is
-the symbol naming the protobuf message to deserialize. `buffer` is the
-byte-vector containing the data to deserialize. `start` (inclusive) and `end`
-(exclusive) delimit the range of bytes to deserialize.
+**`deserialize-from-stream`**: deserialize an object of type `type` by reading bytes from `stream`.
+`type` is the symbol naming the protobuf message to deserialize.
 
 ```lisp
 (defun deserialize-from-stream (type stream)
 ```
-
-Deserialize an object of type `type` by reading bytes from `stream`. `type` is
-the symbol naming the protobuf message to deserialize.
 
 
 ## Well Known Types
@@ -855,20 +881,20 @@ Several functions are exported from the `cl-protobufs.well-known-types` package.
 A list of all well known types can be found in the
 [official Protocol Buffers documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf).
 
-```lisp
-(defun unpack-any (any-message))
-```
-
-Takes an `Any` protobuf message `any-message` and turns it into the stored
-protobuf message as long as the qualified-name given in the type-url corresponds
+**`unpack-any`**: takes an `Any` protobuf message `any-message` and turns it into the stored
+protobuf message, as long as the qualified-name given in the type-url corresponds
 to a loaded message type. The type-url must be of the form
 base-url/qualified-name.
 
 ```lisp
-(defun pack-any (message &key (base-url "type.googleapis.com"))
+(defun unpack-any (any-message))
 ```
 
-Creates an `Any` protobuf message given a protobuf `message` and a `base-url`.
+**`pack-any`**: creates an `Any` protobuf message given a protobuf `message` and a `base-url`.
+
+```lisp
+(defun pack-any (message &key (base-url "type.googleapis.com"))
+```
 
 TODO: examples
 
@@ -878,12 +904,7 @@ The `cl-protobufs.json` package exports functions to convert between protobuf
 objects and
 [the canonical JSON encoding](https://developers.google.com/protocol-buffers/docs/proto3#json).
 
-```lisp
-(defun print-json (message &key (pretty-print-p t) (stream *standard-output*)
-                             (camel-case-p t) numeric-enums-p))
-```
-
-Takes any protobuf message `message` and prints it as JSON. The parameters are:
+**`print-json`**: takes any protobuf message `message` and prints it as JSON. The parameters are:
 
 -   `pretty-print-p`: Indent the output by `indent` spaces and print newlines.
 -   `stream`: The Lisp stream to output to.
@@ -893,16 +914,22 @@ Takes any protobuf message `message` and prints it as JSON. The parameters are:
     their name.
 
 ```lisp
-(defun parse-json (type &key stream ignore-unknown-fields-p)
+(defun print-json (message &key (pretty-print-p t) (stream *standard-output*)
+                             (camel-case-p t) numeric-enums-p))
 ```
 
-Parse a JSON encoding and return the parsed protobuf object. The parmeters are:
+**`parse-json`**: parses a JSON encoding and return the parsed protobuf object. The parameters are:
 
 -   `type`: Either the Lisp type or the `message-descriptor` of the object to
     parse.
 -   `stream`: The stream to read from. By default, this is \*standard-input\*.
 -   `ignore-unknown-fields-p`: If true, silently ignore any unrecognized fields
     encountered when parsing. If `nil`, the parser will throw an error.
+
+
+```lisp
+(defun parse-json (type &key stream ignore-unknown-fields-p)
+```
 
 
 ## Known Deficiencies
