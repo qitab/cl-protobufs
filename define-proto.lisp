@@ -287,11 +287,13 @@ message, and of +<value_name>+ when the enum is defined at top-level."
   (let* ((enum-name (symbol-name type))
          (dot (position #\. enum-name :test #'char= :from-end t))
          ;; Use C/C++ enum scope.
-         (scope (and dot (subseq enum-name 0 dot)))
+         (scope enum-name
+                ;; (and dot (subseq enum-name 0 dot))
+                )
          (constants
-          (loop for v in enum-values
-                for c = (fintern "+~@[~A.~]~A+" scope (enum-value-descriptor-name v))
-                collect `(defconstant ,c ,(enum-value-descriptor-value v)))))
+           (loop for v in enum-values
+                 for c = (fintern "+~@[~A.~]~A+" scope (enum-value-descriptor-name v))
+                 collect `(defconstant ,c ,(enum-value-descriptor-value v)))))
     `(progn
        ,@constants
        (export ',(mapcar #'second constants)))))
