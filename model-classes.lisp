@@ -89,14 +89,7 @@ Parameters:
    (imports :type (list-of string)      ; the names of schemas to be imported
             :accessor proto-imports
             :initarg :imports
-            :initform ())
-   ;; TODO(cgay): why is this handled differently than messages, maps, etc, in
-   ;; that it is accessed via a file-descriptor rather than via a hash table?
-   ;; In fact, shouldn't services and messages share a namespace?
-   (services :type (list-of service-descriptor)
-             :accessor proto-services
-             :initarg :services
-             :initform ()))
+            :initform ()))
   (:documentation
    "Model class to describe a protobuf file, sometimes referred to as a schema."))
 
@@ -180,23 +173,6 @@ message-descriptor.")
   "Return a enum-descriptor instance named by TYPE (a symbol)."
   (gethash type *enum-descriptors*))
 
-(defgeneric find-service-descriptor (file-descriptor name)
-  (:documentation
-   "Given a protobuf file-descriptor, returns the service-descriptor with the given NAME.
-    FILE-DESCRIPTOR may be the 'schema name' (a symbol derived from the
-    basename of the file) or the file pathname.  NAME is the service name (a
-    symbol) or the service qualified name (a string)."))
-
-(defmethod find-service-descriptor ((file-desc file-descriptor) (name symbol))
-  (find name (proto-services file-desc) :key #'proto-class))
-
-(defmethod find-service-descriptor ((file-desc file-descriptor) (name string))
-  (find-qualified-name name (proto-services file-desc)))
-
-(defmethod find-service-descriptor (file-desc name)
-  (let ((descriptor (or (find-file-descriptor file-desc)
-                        (protobuf-error "There is no file-descriptor named ~A" file-desc))))
-    (find-service-descriptor descriptor name)))
 
 ;; We accept and store any option, but only act on a few: default, packed,
 ;; optimize_for, lisp_name, lisp_alias
@@ -351,24 +327,6 @@ message-descriptor.")
                    (record-protobuf-object ',message-type msg-desc :message)
                    msg-desc))
               initializer))))
-
-(defun record-protobuf-object (symbol descriptor type)
-  "Record the protobuf-metaobject DESCRIPTOR named by SYMBOL in the
-hash-table indicated by TYPE. Also sets the default constructor on the symbol
-if we are not in SBCL."
-  ;; No need to record an extension, it's already been recorded
-  (ecase type
-    (:enum (setf (gethash symbol *enum-descriptors*) descriptor))
-    (:message
-     (setf (gethash symbol *messages*) descriptor)
-     #-sbcl
-     (setf (get symbol :default-constructor)
-           (intern (nstring-upcase (format nil "%MAKE-~A" symbol))
-                   (symbol-package symbol)))
-     (when (and (slot-boundp descriptor 'qual-name) (proto-qualified-name descriptor))
-       (setf (gethash (proto-qualified-name descriptor) *qualified-messages*)
-             (proto-class descriptor))))
-    (:map (setf (gethash symbol *map-descriptors*) descriptor))))
 
 (defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*
@@ -532,6 +490,12 @@ if we are not in SBCL."
     (format stream "~D - ~D"
             (proto-extension-from e) (proto-extension-to e))))
 
+(defvar *service-descriptors* (make-hash-table)
+  "Maps service names (symbols) to service-descriptor instances.")
+
+(defun find-service-descriptor (name)
+  "Return a service-descriptor instance named by NAME (a symbol)."
+  (gethash name *service-descriptors*))
 
 (defclass service-descriptor (descriptor)
   ((methods :type (list-of method-descriptor)
@@ -558,6 +522,25 @@ if we are not in SBCL."
   (:documentation
    "Given a protobuf service-descriptor and a method name,
     returns the protobuf method having that name."))
+
+(defun record-protobuf-object (symbol descriptor type)
+  "Record the protobuf-metaobject DESCRIPTOR named by SYMBOL in the
+hash-table indicated by TYPE. Also sets the default constructor on the symbol
+if we are not in SBCL."
+  ;; No need to record an extension, it's already been recorded
+  (ecase type
+    (:enum (setf (gethash symbol *enum-descriptors*) descriptor))
+    (:message
+     (setf (gethash symbol *messages*) descriptor)
+     #-sbcl
+     (setf (get symbol :default-constructor)
+           (intern (nstring-upcase (format nil "%MAKE-~A" symbol))
+                   (symbol-package symbol)))
+     (when (and (slot-boundp descriptor 'qual-name) (proto-qualified-name descriptor))
+       (setf (gethash (proto-qualified-name descriptor) *qualified-messages*)
+             (proto-class descriptor))))
+    (:map (setf (gethash symbol *map-descriptors*) descriptor))
+    (:service (setf (gethash symbol *service-descriptors*) descriptor))))
 
 (defmethod find-method-descriptor ((service service-descriptor) (name symbol))
   (find name (proto-methods service) :key #'proto-class))

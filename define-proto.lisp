@@ -1573,5 +1573,5 @@ function) then there is no guarantee on the serialize function working properly.
               (collect-form `(defgeneric ,server-fn (,vchannel ,vrequest ,vrpc)
                                #+(or ccl)
                                (declare (values ,output-type))))))))
-      (collect-form `(appendf (proto-services *current-file-descriptor*) (list ,service)))
+      (collect-form `(record-protobuf-object ',type ,service :service))
       `(progn ,@forms))))

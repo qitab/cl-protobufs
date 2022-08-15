@@ -43,7 +43,8 @@ Parameters:
             (find-by-name "MessageWithCrossPackageExtension" schema))
            (boo (find-by-name-in-list "boo" (proto-fields message-with-cross-package-extension)))
            (service-with-cross-package-input-output
-            (find-by-name-in-list "ServiceWithCrossPackageInputOutput" (proto-services schema)))
+            (find-service-descriptor
+             'cl-protobufs.protobuf-package-unittest1:service-with-cross-package-input-output))
            (bloop (find-by-name-in-list
                    "Bloop" (proto-methods service-with-cross-package-input-output)))
            (beep (find-by-name-in-list
@@ -126,7 +127,8 @@ Parameters:
            (foo (find-by-name "foo" (proto-fields message-with-forward-reference)))
            ;; (bar (find-by-name "bar" (proto-fields message-with-forward-reference)))
            (service-with-forward-reference
-            (find-by-name "ServiceWithForwardReference" (proto-services schema)))
+            (find-service-descriptor
+             'cl-protobufs.protobuf-forward-reference-unittest:service-with-forward-reference))
            (bloop (find-by-name "Bloop" (proto-methods service-with-forward-reference)))
            (beep (find-by-name "Beep" (proto-methods service-with-forward-reference))))
       (assert-equal

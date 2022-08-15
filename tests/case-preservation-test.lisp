@@ -26,7 +26,7 @@ Parameters
 
 
 (deftest case-preservation-test (case-preservation-suite)
-  (let ((service (proto:find-service-descriptor 'pb:case-preservation "QUUXService")))
+  (let ((service (proto:find-service-descriptor 'pb:quux-service)))
     (assert-true service)
     ;; We're reaching into the implementation to verify the objects have
     ;; been properly constructed.
