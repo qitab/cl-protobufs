@@ -563,6 +563,10 @@ if we are not in SBCL."
    (server-fn :type symbol
               :accessor proto-server-stub
               :initarg :server-stub)
+   ;; TODO(jgodbout): Fix internally and delete.
+   (old-server-fn :type symbol
+                  :accessor proto-old-server-stub
+                  :initarg :old-server-stub)
    ;; Lisp name of the input parameter, which must be a message or extension.
    (itype :type symbol
           :accessor proto-input-type

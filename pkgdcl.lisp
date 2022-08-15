@@ -119,8 +119,8 @@
    #:proto-package-name
    #:proto-qualified-name
    #:proto-server-stub
+   #:proto-old-server-stub
    #:proto-service-name
-   #:proto-services
    #:proto-source-location
    #:proto-streams-name
    #:proto-streams-type

@@ -1458,7 +1458,8 @@ function) then there is no guarantee on the serialize function working properly.
                             (or (find-package name)
                                 (make-package name :use '()))))
                  (client-fn (intern (nstring-upcase (format nil "CALL-~A" function)) package))
-                 (server-fn (intern (nstring-upcase (format nil "~A-IMPL" function)) package))
+                 (old-server-fn (intern (nstring-upcase (format nil "~A-IMPL" function)) package))
+                 (server-fn (intern (nstring-upcase (format nil "~A" function)) package))
                  (method  (make-instance
                            'method-descriptor
                            :class function
@@ -1469,6 +1470,8 @@ function) then there is no guarantee on the serialize function working properly.
                            :service-name (proto-name service)
                            :client-stub client-fn
                            :server-stub server-fn
+                           ;; TODO(jgodbout): Remove this.
+                           :old-server-stub old-server-fn
                            :input-type  input-type
                            :input-name  (or input-name qual-input-type)
                            :input-streaming input-streaming
@@ -1486,7 +1489,8 @@ function) then there is no guarantee on the serialize function working properly.
                    (vresponse (intern "RESPONSE" package))
                    (vchannel  (intern "CHANNEL" package))
                    (vcallback (intern "CALLBACK" package))
-                   (vrpc      (intern "RPC" package)))
+                   (vrpc      (intern "RPC" package))
+                   (call  (gensym "CALL")))
               ;; The client side stub, e.g., 'read-air-reservation'.
               ;; The expectation is that the RPC implementation will provide code to make it
               ;; easy to implement a method for this on each kind of channel (HTTP, TCP socket,
@@ -1526,8 +1530,7 @@ function) then there is no guarantee on the serialize function working properly.
                                package))
                       (cleanup-call
                        (intern (nstring-upcase (format nil "~A/CLEANUP" function))
-                               package))
-                      (call  (gensym "CALL")))
+                               package)))
                   (collect-form
                    `(defun ,start-call (,vchannel)
                       (assert-rpc-function-defined *rpc-streaming-client-function*)
@@ -1570,7 +1573,10 @@ function) then there is no guarantee on the serialize function working properly.
               ;; etc, and can be side-effected to indicate success or failure.
               ;; The RPC code provides the channel classes and does (de)serialization, etc.
               ;; The VRPC argument is always of type RPC2:SERVER-RPC.
-              (collect-form `(defgeneric ,server-fn (,vchannel ,vrequest ,vrpc)
+              (collect-form `(defgeneric ,old-server-fn (,vchannel ,vrequest ,vrpc)
+                               #+(or ccl)
+                               (declare (values ,output-type))))
+              (collect-form `(defgeneric ,server-fn (,vrequest ,call)
                                #+(or ccl)
                                (declare (values ,output-type))))))))
       (collect-form `(record-protobuf-object ',type ,service :service))
