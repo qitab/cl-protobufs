@@ -168,7 +168,7 @@ void ServiceGenerator::AddRpcExports(std::vector<std::string>* exports) {
   for (int i = 0; i < descriptor_->method_count(); ++i) {
     const std::string name = ToLispName(descriptor_->method(i)->name());
     exports->push_back("call-" + name);
-    exports->push_back(name + "-impl");
+    exports->push_back(name);
   }
 }
 

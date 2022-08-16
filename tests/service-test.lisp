@@ -30,9 +30,9 @@ Parameters
   (assert-true 'cl-protobufs.protobuf-package-unittest1:service-with-cross-package-input-output))
 
 (deftest test-rpc-method-names-are-exported (services-suite)
-  (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:bloop-impl)
+  (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:bloop)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:call-bloop)
-  (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:beep-impl)
+  (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:beep)
   (assert-true 'cl-protobufs.protobuf-package-unittest1-rpc:call-beep))
 
 (deftest test-camel-spitting-request (services-suite)
