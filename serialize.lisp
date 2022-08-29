@@ -1231,9 +1231,9 @@ Parameters:
                  ;; If ,dest points to the "unset" placeholder, make a new hash-table.
                  (unless (typep ,dest 'hash-table)
                    (setq ,dest
-                         (make-hash-table :test ,(if (eql (proto-key-type msg) 'string)
-                                                     #'equal
-                                                     #'eq))))
+                         (make-hash-table :test #',(if (eql (proto-key-type msg) 'string)
+                                                       'equal
+                                                       'eq))))
                  ;; TODO(benkuehnert): val-data should be the default value
                  ;; of ,key-type instead of nil.
                  (let (val-data map-tag map-len key-data start)
