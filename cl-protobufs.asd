@@ -79,6 +79,8 @@ and functionality for working with them."
       :proto-pathname "google/protobuf/any.proto")
      (:protobuf-source-file "source_context"
       :proto-pathname "google/protobuf/source_context.proto")
+     (:protobuf-source-file "descriptor"
+      :proto-pathname "google/protobuf/descriptor.proto")
      #-ccl
      (:protobuf-source-file "type"
       :proto-pathname "google/protobuf/type.proto"
