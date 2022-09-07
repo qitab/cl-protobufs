@@ -75,7 +75,9 @@ and functionality for working with them."
     :pathname ""
     :depends-on ("models" "misc")
     :components
-    ((:protobuf-source-file "any"
+    ((:protobuf-source-file "descriptor"
+      :proto-pathname "google/protobuf/descriptor.proto")
+     (:protobuf-source-file "any"
       :proto-pathname "google/protobuf/any.proto")
      (:protobuf-source-file "source_context"
       :proto-pathname "google/protobuf/source_context.proto")

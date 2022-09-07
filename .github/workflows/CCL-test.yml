@@ -35,11 +35,29 @@ jobs:
       - name: Add cl-protobufs/protoc to path
         run: echo "::add-path:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
 
+      - name: Install cmake & required tooling
+        run: |
+          sudo apt install -y cmake
+          sudo apt install -y build-essential autoconf libtool pkg-config
+
+      - name: Clone gRPC Github repo
+        run: git clone --recurse-submodules --depth 1 --shallow-submodules https://github.com/grpc/grpc
+
       - name: Download and install protobuf
-        run: git clone --recursive https://github.com/google/protobuf $GITHUB_WORKSPACE/protobuf && cd $GITHUB_WORKSPACE/protobuf && ./autogen.sh && ./configure --prefix=/usr/local && make && sudo make install && sudo ldconfig
+        run: |
+          cd grpc
+          mkdir cmake/build
+          pushd cmake/build
+          cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr/local/ ../..
+          make -j 4
+          sudo make install
+          sudo ldconfig
+          popd
 
       - name: Install protoc plug-in
-        run: cd $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc && PROTOC_ROOT=/usr/local make
+        run: |
+          cd $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc &&
+          PROTOC_ROOT=/usr/local make
 
       - name: Load and run tests
         run: |
