@@ -938,10 +938,6 @@ function) then there is no guarantee on the serialize function working properly.
          (public-non-lazy-slot-names (mapcar #'proto-external-field-name non-lazy-fields))
          (is-set-name (fintern "~A-%%IS-SET" proto-type))
          (clear-is-set-name (fintern "~A.CLEAR-%%IS-SET" proto-type))
-         (is-set-init (field-data-initform
-                       (find-if #'(lambda (el)
-                                    (eq (field-data-internal-slot-name el) '%%is-set))
-                                slots)))
          (additional-slots '(%%is-set))
          (oneof-fields (loop for oneof in oneofs
                              append (coerce (oneof-descriptor-fields oneof) 'list))))
@@ -1024,7 +1020,7 @@ function) then there is no guarantee on the serialize function working properly.
 
          ;; Define clear functions.
          (defun ,clear-is-set-name (,obj)
-           (setf (,is-set-name ,obj) ,is-set-init))
+           (fill (,is-set-name ,obj) 0))
 
          (export '(,public-constructor-name ,is-set-name))
          (defmethod clear ((,obj ,proto-type))
