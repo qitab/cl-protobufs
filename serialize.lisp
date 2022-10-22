@@ -396,6 +396,8 @@ See field-descriptor for the distinction between index, offset, and bool-number.
 ;; direct-mapped by subtracting the "origin" but such usage is uncommon,
 ;; and the performance of the hash-based lookup as a fallback is adequate.
 (defun make-field-map (fields)
+  (declare (inline make-field))
+  #+(and sbcl arena-allocator) (declare (sb-c::tlab :system))
   (let ((count 0) (max 0))
     (dolist (field fields)
       (incf count)
