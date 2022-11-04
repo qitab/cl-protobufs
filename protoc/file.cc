@@ -11,7 +11,6 @@
 #include <memory>
 #include <set>
 
-#include <google/protobuf/io/printer.h>
 #include <google/protobuf/stubs/strutil.h>
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
@@ -19,6 +18,7 @@
 #include "message.h"
 #include "names.h"
 #include "service.h"
+#include <google/protobuf/io/printer.h>
 
 namespace google {
 namespace protobuf {

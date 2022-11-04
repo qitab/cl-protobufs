@@ -8,12 +8,12 @@
 
 #include <cstdint>
 #include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/io/printer.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/stubs/strutil.h>
 #include "literals.h"
 #include "names.h"
+#include <google/protobuf/io/printer.h>
 
 namespace google {
 namespace protobuf {
