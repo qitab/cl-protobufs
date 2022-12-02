@@ -25,7 +25,8 @@ and functionality for working with them."
                :alexandria
                :trivial-garbage
                :cl-base64
-               :local-time)
+               :local-time
+               :float-features)
   :serial t
   :in-order-to ((test-op (test-op :cl-protobufs/tests)))
   :components
@@ -40,7 +41,6 @@ and functionality for working with them."
     :depends-on ("packages")
     :components
     ((:file "utilities")
-     #-(and sbcl 64-bit) (:file "float-bits")
      (:file "model-classes")
      (:file "conditions")))
    (:module "parsing"
