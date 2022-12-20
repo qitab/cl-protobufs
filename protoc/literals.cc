@@ -16,11 +16,11 @@ namespace cl_protobufs {
 const std::string LispSimpleFtoa(float value) {
   std::string result = SimpleFtoa(value);
   if (result == "inf") {
-    GOOGLE_LOG(FATAL) << "single-float-positive-infinity";
+    return "float-features:single-float-positive-infinity";
   } else if (result == "-inf") {
-    GOOGLE_LOG(FATAL) <<  "single-float-negative-infinity";
+    return "float-features:single-float-negative-infinity";
   } else if (result == "nan") {
-    GOOGLE_LOG(FATAL) <<  "single-float-nan";
+    return "float-features:single-float-nan";
   }
 
   std::string::size_type pos = result.find('e', 0);
@@ -34,11 +34,11 @@ const std::string LispSimpleFtoa(float value) {
 const std::string LispSimpleDtoa(double value) {
   std::string result = SimpleDtoa(value);
   if (result == "inf") {
-    GOOGLE_LOG(FATAL) << "double-float-positive-infinity";
+    return "float-features:double-float-positive-infinity";
   } else if (result == "-inf") {
-    GOOGLE_LOG(FATAL) <<  "doubl-float-negative-infinity";
+    return "float-features:double-float-negative-infinity";
   } else if (result == "nan") {
-    GOOGLE_LOG(FATAL) <<  "double-float-nan";
+    return "float-features:double-float-nan";
   }
 
   std::string::size_type pos = result.find('e', 0);
