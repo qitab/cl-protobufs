@@ -1,0 +1,18 @@
+// Copyright 2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package float_test;
+
+message FloatPack {
+  optional float single_float_nan = 1 [default = nan];
+  optional float single_float_positive_infinity = 2 [default = inf];
+  optional float single_float_negative_infinity = 3 [default = -inf];
+  optional double double_float_nan = 4 [default = nan];
+  optional double double_float_positive_infinity = 5 [default = inf];
+  optional double double_float_negative_infinity = 6 [default = -inf];
+}
