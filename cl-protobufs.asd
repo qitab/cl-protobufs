@@ -266,6 +266,12 @@ and functionality for working with them."
     :depends-on ("lisp-alias")
     :components ((:file "lisp-alias-test")))
 
+   (:module "float-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "float")
+                 (:file "float-test")))
+
    (:module "packed-test"
     :serial t
     :pathname ""
