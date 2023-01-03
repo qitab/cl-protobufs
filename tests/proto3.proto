@@ -29,6 +29,8 @@ enum TestEnum {
 
 message TestMessage {
   int32 value = 1;
+  // Here to test for collisions with value.
+  bool has_value = 2;
 }
 
 message OptionalTest {

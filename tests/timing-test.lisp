@@ -60,9 +60,9 @@ Parameters
     (print "Singular Field Test")
     (benchmark:with-timing (iterations)
       (let ((singular-proto (proto3-proto:make-all-singular)))
-        (proto3-proto::all-singular.has-int32-value singular-proto)
+        (proto3-proto::all-singular.%%has-int32-value singular-proto)
         (setf (proto3-proto::all-singular.int32-value singular-proto) 1)
-        (proto3-proto::all-singular.has-int32-value singular-proto)
+        (proto3-proto::all-singular.%%has-int32-value singular-proto)
         (proto3-proto:all-singular.clear-int32-value singular-proto)))
     (assert t)))
 
@@ -146,7 +146,6 @@ Parameters
       (benchmark:with-timing (1000)
         (deserialize-from-bytes (type-of population) buffer)))
     (clear-proto3-serialization-functions)))
-
 
 (defun clear-proto2-serialization-functions ()
   (loop for message in '(serial-proto:population

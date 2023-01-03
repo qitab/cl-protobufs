@@ -952,7 +952,7 @@ Parameters:
               (boundp (if extension-p
                           `(has-extension ,vobj ',field-name)
                           `(,(proto-slot-function-name
-                              (proto-class message) field-name :has)
+                              (proto-class message) field-name :internal-has)
                             ,vobj))))
          (push (generate-field-serializer msg field boundp reader vbuf size)
                serializers)))

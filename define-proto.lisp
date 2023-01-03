@@ -455,7 +455,7 @@ Parameters:
         (make-field-accessors
          :get (proto-slot-function-name message-name field-name :get)
          :set `(setf ,(proto-slot-function-name message-name field-name :get))
-         :has (proto-slot-function-name message-name field-name :has)
+         :has (proto-slot-function-name message-name field-name :internal-has)
          :clear (proto-slot-function-name message-name field-name :clear))))
 
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
@@ -469,7 +469,10 @@ Parameters:
   (let ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
-        (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
+        (internal-has-function-name
+         (proto-slot-function-name proto-type public-slot-name :internal-has))
+        (external-has-function-name
+         (proto-slot-function-name proto-type public-slot-name :has))
         (default-form (get-default-form (proto-type field)
                                         (proto-default field)
                                         (proto-container field)
@@ -501,7 +504,7 @@ Parameters:
         ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
         ;; question: "Is this field set to the default value?". This is done so that the optimized
         ;; serializer can use the has-* function to check if an optional field should be serialized.
-        (defun-inline ,has-function-name (,obj)
+        (defun-inline ,internal-has-function-name (,obj)
           ,(if index
                `(= (bit (,is-set-accessor ,obj) ,index) 1)
                `(let ((,cur-value ,(if bool-index
@@ -516,6 +519,13 @@ Parameters:
                           (cl:hash-table `(> (hash-table-count ,cur-value) 0))
                           ;; Otherwise, the type is integral. EQ suffices to check equality.
                           (t `(not (eq ,cur-value ,default-form)))))))))
+
+        ;; has-* functions are not exported for proto3-style optional fields. They are only for
+        ;; internal usage.
+        ,@(unless (eq (proto-syntax *current-file-descriptor*) :proto3)
+            `((defun-inline ,external-has-function-name (,obj)
+                (,internal-has-function-name ,obj))
+              (export '(,external-has-function-name))))
 
         ;; Clear function
         ;; Map type clear functions are created in make-map-accessor-forms.
@@ -538,11 +548,6 @@ Parameters:
           (setf (,public-accessor-name ,obj) ,new-value))
 
         (set-field-accessor-functions ',proto-type ',public-slot-name)
-
-        ;; has-* functions are not exported for proto3-style optional fields. They are only for
-        ;; internal usage.
-        ,(unless (eq (proto-syntax *current-file-descriptor*) :proto3)
-           `(export '(,has-function-name)))
 
         ,(unless (eq (proto-kind field) :map)
            `(export '(,clear-function-name)))
@@ -625,7 +630,10 @@ Paramters:
          (hidden-slot-name (oneof-descriptor-internal-name oneof))
          (hidden-accessor-name (fintern "~A-~A" proto-type hidden-slot-name))
          (case-function-name (proto-slot-function-name proto-type public-slot-name :case))
-         (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
+         (internal-has-function-name
+          (proto-slot-function-name proto-type public-slot-name :internal-has))
+         (external-has-function-name
+          (proto-slot-function-name proto-type public-slot-name :has))
          (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear)))
     (with-gensyms (obj)
       `(
@@ -640,8 +648,10 @@ Paramters:
                     `(,(proto-oneof-offset field) ',(proto-external-field-name field)))
             ((nil) nil)))
 
-        (defun-inline ,has-function-name (,obj)
+        (defun-inline ,internal-has-function-name (,obj)
           (not (eql (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
+        (defun-inline ,external-has-function-name (,obj)
+          (,internal-has-function-name ,obj))
 
         (defun-inline ,clear-function-name (,obj)
           (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
@@ -649,7 +659,7 @@ Paramters:
 
         ;; Special oneof forms are only created when ONEOF is not synthetic.
         ,(unless (oneof-descriptor-synthetic-p oneof)
-           `(export '(,case-function-name ,has-function-name ,clear-function-name)))
+           `(export '(,case-function-name ,external-has-function-name ,clear-function-name)))
 
         ;; Fields inside of a oneof need special accessors, since they need to consult
         ;; with the oneof struct. This creates those special accessors for each field.
@@ -662,8 +672,10 @@ Paramters:
             (let* ((public-slot-name (proto-external-field-name field))
                    (public-accessor-name (proto-slot-function-name
                                           proto-type public-slot-name :get))
-                   (has-function-name    (proto-slot-function-name
-                                          proto-type public-slot-name :has))
+                   (internal-has-function-name (proto-slot-function-name
+                                                proto-type public-slot-name :internal-has))
+                   (external-has-function-name (proto-slot-function-name
+                                                proto-type public-slot-name :has))
                    (clear-function-name  (proto-slot-function-name
                                           proto-type public-slot-name :clear))
                    (default-form (get-default-form (proto-type field)
@@ -672,6 +684,7 @@ Paramters:
                                                    (proto-kind field)))
                    (field-type (proto-type field))
                    (oneof-offset (proto-oneof-offset field)))
+
               ;; If a field isn't currently set inside of the oneof, just return its
               ;; default value.
               (with-gensyms (obj new-value bytes field-obj)
@@ -694,12 +707,14 @@ Paramters:
                           ,oneof-offset)
                     (setf (oneof-value (,hidden-accessor-name ,obj)) ,new-value))
 
-                  (defun-inline ,has-function-name (,obj)
+                  (defun-inline ,internal-has-function-name (,obj)
                     (eq (oneof-set-field (,hidden-accessor-name ,obj))
                         ,oneof-offset))
+                  (defun-inline ,external-has-function-name (,obj)
+                    (,internal-has-function-name ,obj))
 
                   (defun-inline ,clear-function-name (,obj)
-                    (when (,has-function-name ,obj)
+                    (when (,internal-has-function-name ,obj)
                       (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
                       (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
 
@@ -711,7 +726,7 @@ Paramters:
 
                   (set-field-accessor-functions ',proto-type ',public-slot-name)
 
-                  (export '(,has-function-name
+                  (export '(,external-has-function-name
                             ,clear-function-name
                             ,public-accessor-name))))))))))
 
