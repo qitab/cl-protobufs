@@ -14,7 +14,10 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
 #include <google/protobuf/stubs/strutil.h>
+#include "third_party/absl/strings/ascii.h"
+#include "third_party/absl/strings/numbers.h"
 // #include <google/protobuf/stubs/str_join.h>
+#include "third_party/absl/strings/str_replace.h"
 #include "proto2-descriptor-extensions.pb.h"
 
 // Copied from ABSL.
@@ -103,6 +106,12 @@ const std::string DeCamel(const std::string& name, const bool to_lower_case,
 }
 
 const std::string ToLispName(const std::string& name) {
+  float num;
+  if (CharacterType(name[0]) == separator &&
+      absl::SimpleAtof(name.substr(1), &num)) {
+    return name;
+  }
+
   return DeCamel(name, true, false, "-");
 }
 
@@ -140,6 +149,16 @@ const std::string EnumLispName(const EnumDescriptor* descriptor) {
   } else {
     return lisp_name;
   }
+}
+
+std::string ToLispEnumValue(const std::string& name) {
+  // Enum values are usually uppercase separated by underscore.
+  std::string lower = absl::AsciiStrToLower(name);
+  std::string v = absl::StrReplaceAll(lower, {{"_", "-"}});
+  for (int i = 0; i < v.length(); i++) {
+    if (v[i] != '-') return v.substr(i);
+  }
+  return lower;
 }
 
 const std::string QualifiedEnumLispName(const EnumDescriptor* descriptor,
