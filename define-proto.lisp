@@ -220,54 +220,58 @@ the oneof and its nested fields.
     (setf *current-file-descriptor* descriptor)
     (validate-imports descriptor imports)))
 
-(defgeneric enum-int-to-keyword (enum-type integer &optional default)
+(defgeneric enum-int-to-keyword (enum-type integer)
   (:documentation
    "Converts INTEGER to the corresponding enum keyword.  If there are multiple
 keywords assigned to the same value (i.e., allow_alias = true in the enum
 source) then the first one is returned.  ENUM-TYPE is the enum type name.
-DEFAULT is the value to use if INTEGER is not contained in the enum."))
+If no enum exists for the specified integer return nil."))
 
-(defgeneric enum-keyword-to-int (enum-type keyword &optional default)
+(defgeneric enum-keyword-to-int (enum-type keyword)
   (:documentation
    "Converts a KEYWORD to its corresponding integer value.  ENUM-TYPE is the
-enum-type name.  DEFAULT is the value to use if KEYWORD is a not contained in
-the enum."))
+enum-type name."))
 
-(defun make-enum-conversion-forms (type value-descriptors)
+(defun make-enum-conversion-forms (type open-type value-descriptors)
   "Generates forms for enum <-> integer conversion functions. TYPE is the enum
-type name.  VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
+type name.  OPEN-TYPE is a type including the possibility of unknown enum keywords
+as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
   (let ((key2int (fintern "~A-KEYWORD-TO-INT" type))
         (int2key (fintern "~A-INT-TO-KEYWORD" type)))
     `(progn
-       (defun ,key2int (enum &optional default)
-         (declare (type keyword enum))
+       (defun ,key2int (enum)
+         (declare (type ,open-type enum))
          (let ((int (case enum
                       ,@(loop for desc in value-descriptors
                               collect `(,(enum-value-descriptor-name desc)
-                                        ,(enum-value-descriptor-value desc))))))
-           (or int default)))
+                                        ,(enum-value-descriptor-value desc)))
+                      (t (parse-integer (subseq (symbol-name enum)
+                                                +%undefined--length+)
+                                        :junk-allowed t)))))
+           int))
 
-       (defun ,int2key (numeral &optional default)
+       (defun ,int2key (numeral)
          (declare (type int32 numeral))
-         (let ((key (case numeral
-                      ,@(loop with mapped = (make-hash-table)
-                              for desc in value-descriptors
-                              for int = (enum-value-descriptor-value desc)
-                              for already-set-p = (gethash int mapped)
-                              do (setf (gethash int mapped) t)
-                              unless already-set-p
-                                collect `(,int ,(enum-value-descriptor-name desc))))))
-           (or key default)))
+         (the (or null ,type)
+              (let ((key (case numeral
+                           ,@(loop with mapped = (make-hash-table)
+                                   for desc in value-descriptors
+                                   for int = (enum-value-descriptor-value desc)
+                                   for already-set-p = (gethash int mapped)
+                                   do (setf (gethash int mapped) t)
+                                   unless already-set-p
+                                     collect `(,int ,(enum-value-descriptor-name desc))))))
+                key)))
 
        (setf (get ',type 'enum-int-to-keyword) ',int2key)
        (setf (get ',type 'enum-keyword-to-int) ',key2int)
 
        (defmethod cl-protobufs:enum-keyword-to-int
-           ((e (eql ',type)) keyword &optional default)
-         (,key2int keyword default))
+           ((e (eql ',type)) keyword)
+         (,key2int keyword))
        (defmethod cl-protobufs:enum-int-to-keyword
-           ((e (eql ',type)) numeral &optional default)
-         (,int2key numeral default)))))
+           ((e (eql ',type)) numeral)
+         (,int2key numeral)))))
 
 (defgeneric enum-default-value (enum-type)
   (:documentation
@@ -296,6 +300,25 @@ message, and of +<value_name>+ when the enum is defined at top-level."
        ,@constants
        (export ',(mapcar #'second constants)))))
 
+(defconstant +%undefined--length+ 11
+  "The length of %undefined- which is used frequently below")
+
+(defun keyword-contains-%undefined-int-p (enum-keyword)
+  "An unknown ENUM-KEYWORD will be compiled as :%undefined-{integer} so our type
+predicate must check that."
+  (when (keywordp enum-keyword)
+    (let ((keyword-name (symbol-name enum-keyword)))
+      (and (> (length keyword-name) +%undefined--length+)
+           (starts-with keyword-name "%UNDEFINED-")
+           (parse-integer (subseq keyword-name +%undefined--length+) :junk-allowed t)))))
+
+(defun enum-open-type (type)
+  "We want the deftype of an enum TYPE to be a strict set of the keywords,
+but we want an internal version for the case where we deserialized an unknown
+(newer) version of hte enum with an unknown field."
+  (intern (format nil "%%%%~a" type)
+          (symbol-package type)))
+
 (defmacro define-enum (type (&key name) &body values)
   "Define a Lisp type given the data for a protobuf enum type.
  Also generates conversion functions between enum values and integers:
@@ -306,7 +329,8 @@ message, and of +<value_name>+ when the enum is defined at top-level."
    TYPE: The name of the type.
    NAME: Override for the protobuf enum type name.
    VALUES: The possible values for the enum in the form (name :index value)."
-  (let ((name (or name (class-name->proto type))))
+  (let ((name (or name (class-name->proto type)))
+        (open-type (enum-open-type type)))
     (with-collectors ((names collect-name) ; keyword symbols
                       (forms collect-form)
                       (value-descriptors collect-value-descriptor))
@@ -320,13 +344,17 @@ message, and of +<value_name>+ when the enum is defined at top-level."
       (let ((enum (make-enum-descriptor :class type
                                         :name name
                                         :values value-descriptors)))
+        (collect-form `(deftype ,open-type ()
+                         '(or (member ,@names)
+                           (satisfies keyword-contains-%undefined-int-p))))
         (collect-form `(deftype ,type () '(member ,@names)))
-        (collect-form (make-enum-conversion-forms type value-descriptors))
+        (collect-form (make-enum-conversion-forms type open-type value-descriptors))
         (collect-form (make-enum-constant-forms type value-descriptors))
         ;; The default value is the keyword associated with the first element.
         (collect-form `(defmethod enum-default-value ((e (eql ',type)))
                          ,(enum-value-descriptor-name (car value-descriptors))))
         (collect-form `(record-protobuf-object ',type ,enum :enum))
+        (collect-form `(export '(,open-type)))
         ;; Register it by the full symbol name.
         (record-protobuf-object type enum :enum))
       `(progn ,@forms))))
@@ -770,7 +798,10 @@ function) then there is no guarantee on the serialize function working properly.
 
             `((defun-inline ,public-accessor-name (,new-key ,obj)
                 (declare (type ,key-type ,new-key))
-                (the (values ,(if (eq value-kind :enum) 'keyword val-type) t)
+                (the (values ,(if (eq value-kind :enum)
+                                  (enum-open-type val-type)
+                                  val-type)
+                             t)
                      (multiple-value-bind (val flag)
                          (gethash ,new-key (,hidden-accessor-name ,obj))
                        (if flag
@@ -867,16 +898,13 @@ function) then there is no guarantee on the serialize function working properly.
          (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
          (field-type (proto-type field))
          (accessor-return-type
-          ;; For enum accessors we return either the enum keyword or :%undefined-<n>
-          (let ((structure-field-type (if (eq (proto-kind field) :enum)
-                                          'keyword field-type)))
-            (cond ((eq (proto-container field) :vector)
-                   `(cl-protobufs:vector-of ,structure-field-type))
-                  ((eq (proto-container field) :list)
-                   `(cl-protobufs:list-of ,structure-field-type))
-                  ((member (proto-kind field) '(:message :group :extends))
-                   `(or null ,structure-field-type))
-                  (t structure-field-type)))))
+          (cond ((eq (proto-container field) :vector)
+                 `(cl-protobufs:vector-of ,field-type))
+                ((eq (proto-container field) :list)
+                 `(cl-protobufs:list-of ,field-type))
+                ((member (proto-kind field) '(:message :group :extends))
+                 `(or null ,field-type))
+                (t field-type))))
     (with-gensyms (obj)
       `((defun-inline ,public-accessor-name (,obj)
           (the ,accessor-return-type
@@ -1341,9 +1369,8 @@ function) then there is no guarantee on the serialize function working properly.
                     $empty-default))
                (default (if default-p default $empty-default))
                (cslot (unless alias-for
-                        ;; For enums we have to keep track of unknown
-                        ;; deserialized values so it can't be a strict
-                        ;; member of a set of keywords...
+                        ;; Enum type specifiers might not be loaded.
+                        ;; Seems like this could be fixed...
                         (let ((type (if (eq kind :enum) 'keyword type)))
                           (make-field-data
                            :internal-slot-name internal-slot-name
@@ -1375,7 +1402,7 @@ function) then there is no guarantee on the serialize function working properly.
                (field (make-instance
                        'field-descriptor
                        :name (or name (slot-name->proto slot))
-                       :type (if (eq kind :enum) 'keyword type)
+                       :type (if (eq kind :enum) (enum-open-type type) type)
                        :kind kind
                        :class type
                        :qualified-name (make-qualified-name *current-message-descriptor*

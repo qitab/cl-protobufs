@@ -7,6 +7,8 @@
 (defpackage #:cl-protobufs.test.enum-mapping
   (:use #:cl
         #:clunit)
+  (:import-from #:cl-protobufs.implementation
+                #:keyword-contains-%undefined-int-p)
   (:local-nicknames (#:pb #:cl-protobufs.enum-mapping-test)
                     (#:pi #:cl-protobufs.implementation)
                     (#:proto #:cl-protobufs))
@@ -49,10 +51,7 @@ Parameters
   (assert-eql 42 pb:+my-message.zaphod+)
 
   ;; Error cases.
-  (assert-false (pb:my-message.my-enum-keyword-to-int :some-unknown-keyword))
   (assert-false (pb:my-message.my-enum-int-to-keyword 1234))
-  (assert-eql 10 (pb:my-message.my-enum-keyword-to-int :some-unknown-keyword 10))
-  (assert-eq :bah (pb:my-message.my-enum-int-to-keyword 1234 :bah))
 
   ;;
   ;; Test the enum defined at the top-level.
@@ -75,10 +74,20 @@ Parameters
   (assert-eql 142 pb:+zaphod+)
 
   ;; Error cases.
-  (assert-false (pb:outer-enum-keyword-to-int :some-unknown-keyword))
   (assert-false (pb:outer-enum-int-to-keyword 1234))
-  (assert-eql 10 (pb:outer-enum-keyword-to-int :some-unknown-keyword 10))
-  (assert-eq :bah (pb:outer-enum-int-to-keyword 1234 :bah)))
+  (assert-false (pb:outer-enum-int-to-keyword 1234)))
+
+(deftest test-keyword-contains-%undefined-int-p (enum-mapping-suite)
+  (assert-true (keyword-contains-%undefined-int-p :%undefined-5))
+  (assert-true (keyword-contains-%undefined-int-p :%undefined-100))
+  (assert-true (keyword-contains-%undefined-int-p :%undefined-0))
+  (assert-false (keyword-contains-%undefined-int-p :%undefined-pi))
+  (assert-false (keyword-contains-%undefined-int-p :%undefined-char))
+  (assert-false (keyword-contains-%undefined-int-p :%undefined-))
+  (assert-false (keyword-contains-%undefined-int-p :undefined-6))
+  (assert-false (keyword-contains-%undefined-int-p :%pika-))
+  (assert-false (keyword-contains-%undefined-int-p 1))
+  (assert-false (keyword-contains-%undefined-int-p "%undefined-6")))
 
 (deftest test-enum-mapping-generics (enum-mapping-suite)
   ;;
@@ -107,10 +116,7 @@ Parameters
     (assert-eq :zaphod (proto:enum-int-to-keyword 'pb:my-message.my-enum n42)))
 
   ;; Error cases.
-  (assert-false (proto:enum-keyword-to-int 'pb:my-message.my-enum :some-unknown-keyword))
   (assert-false (proto:enum-int-to-keyword 'pb:my-message.my-enum 1234))
-  (assert-eql 10 (proto:enum-keyword-to-int 'pb:my-message.my-enum :some-unknown-keyword 10))
-  (assert-eq :bah (proto:enum-int-to-keyword 'pb:my-message.my-enum 1234 :bah))
 
   ;;
   ;; Test the enum defined at the top-level.
@@ -127,10 +133,7 @@ Parameters
   (assert-eq :zaphod (proto:enum-int-to-keyword 'pb:outer-enum 142))
 
   ;; Error cases.
-  (assert-false (proto:enum-keyword-to-int 'pb:outer-enum :some-unknown-keyword))
-  (assert-false (proto:enum-int-to-keyword 'pb:outer-enum 1234))
-  (assert-eql 10 (proto:enum-keyword-to-int 'pb:outer-enum :some-unknown-keyword 10))
-  (assert-eq :bah (proto:enum-int-to-keyword 'pb:outer-enum 1234 :bah)))
+  (assert-false (proto:enum-int-to-keyword 'pb:outer-enum 1234)))
 
 (deftest test-enum-keywords (enum-mapping-suite)
   (assert-equal '(:foo :bar :baz :foo-bar :zaphod) (proto:enum-keywords 'pb:my-message.my-enum))
