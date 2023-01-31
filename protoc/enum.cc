@@ -41,8 +41,8 @@ void EnumGenerator::Generate(io::Printer* printer) {
   printer->Outdent();
 
   for (int i = 0; i < descriptor_->value_count(); i++) {
-    printer->Print("\n($name$ :index $number$)", "name",
-                   ToLispName(descriptor_->value(i)->name()), "number",
+    printer->Print("\n(:$name$ :index $number$)", "name",
+                   ToLispEnumValue(descriptor_->value(i)->name()), "number",
                    StrCat(descriptor_->value(i)->number()));
     printer->Annotate("name", descriptor_);
   }

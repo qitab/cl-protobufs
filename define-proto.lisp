@@ -337,9 +337,8 @@ but we want an internal version for the case where we deserialized an unknown
       ;; The middle value is :index, useful for readability of generated code...
       ;; (Except that the value is not actually an index, nor is the slot called index anymore.)
       (loop for (name nil value) in values do
-        (let* ((val-name (kintern (symbol-name name)))
-               (val-desc (make-enum-value-descriptor :value value :name val-name)))
-          (collect-name val-name)
+        (let* ((val-desc (make-enum-value-descriptor :value value :name name)))
+          (collect-name name)
           (collect-value-descriptor val-desc)))
       (let ((enum (make-enum-descriptor :class type
                                         :name name

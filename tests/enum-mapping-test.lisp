@@ -138,7 +138,9 @@ Parameters
 (deftest test-enum-keywords (enum-mapping-suite)
   (assert-equal '(:foo :bar :baz :foo-bar :zaphod) (proto:enum-keywords 'pb:my-message.my-enum))
   (assert-equal '(:foo :bar :baz :zaphod) (proto:enum-keywords 'pb:outer-enum))
-  (assert-equal '(:one :two :three) (proto:enum-keywords 'pb:another-enum)))
+  (assert-equal '(:one :two :three) (proto:enum-keywords 'pb:another-enum))
+  (assert-equal '(:any :-pika :-100 :-300 :-300-100 :-300-char :-mander-400 :char-300mander)
+                (proto:enum-keywords 'pb:make-different-enum-vals)))
 
 (deftest test-enum-forward-declaration (enum-mapping-suite)
   (let ((msg (pb:make-my-other-message :other-enum :baz))
