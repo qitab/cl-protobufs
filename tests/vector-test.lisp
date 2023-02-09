@@ -196,6 +196,75 @@ Parameters
        (assert-eq (repeated-proto.nth-repeated-int32 i vector-proto) i)
        (assert-eq (repeated-list-proto.nth-repeated-int32 (- 9 i) list-proto) i))))
 
+(deftest test-vector-merge-from (vector-suite)
+  (let ((to-vector-proto (make-repeated-proto))
+        (from-vector-proto (make-repeated-proto))
+        (expected-vector-proto (make-repeated-proto)))
+    (loop for i from 1 to 10 do
+      (repeated-proto.push-repeated-int32 i from-vector-proto)
+      (repeated-proto.push-repeated-int32 i expected-vector-proto))
+    (merge-from from-vector-proto to-vector-proto)
+    (assert-true (proto-equal to-vector-proto expected-vector-proto)))
+
+  (let ((to-vector-proto (make-repeated-proto))
+        (from-vector-proto (make-repeated-proto))
+        (expected-vector-proto (make-repeated-proto)))
+    (loop for i from 1 to 10 do
+      (repeated-proto.push-repeated-int32 (+ i 10) from-vector-proto)
+      (repeated-proto.push-repeated-int32 i to-vector-proto))
+    (loop for i from 1 to 20 do
+      (repeated-proto.push-repeated-int32 i expected-vector-proto))
+    (merge-from from-vector-proto to-vector-proto)
+    (assert-true (proto-equal to-vector-proto expected-vector-proto))
+    (dotimes (i 10000)
+      (repeated-proto.push-repeated-int32 (+ i 100) to-vector-proto))))
+
+(deftest test-vector-merge-from-with-message (vector-suite)
+  (let ((to-proto (make-outer-proto))
+        (from-proto (make-outer-proto))
+        (expected-proto (make-outer-proto)))
+    (loop for i from 1 to 10
+          for repeated-proto1 = (make-repeated-proto)
+          for repeated-proto2 = (make-repeated-proto)
+          do
+       (repeated-proto.push-repeated-int32 i repeated-proto1)
+       (repeated-proto.push-repeated-int32 i repeated-proto2)
+       (outer-proto.push-repeated-proto repeated-proto1 expected-proto)
+       (outer-proto.push-repeated-proto repeated-proto2 from-proto))
+
+    (merge-from from-proto to-proto)
+    (assert-true (proto-equal to-proto expected-proto))
+
+    (repeated-proto.push-repeated-int32
+     10
+     (outer-proto.nth-repeated-proto 1 from-proto))
+    (assert-true (proto-equal to-proto expected-proto)))
+
+  (let ((to-proto (make-outer-proto))
+        (from-proto (make-outer-proto))
+        (expected-proto (make-outer-proto)))
+    (loop for i from 1 to 10
+          for repeated-proto1 = (make-repeated-proto)
+          for repeated-proto2 = (make-repeated-proto)
+          do
+       (repeated-proto.push-repeated-int32 i repeated-proto1)
+       (repeated-proto.push-repeated-int32 (+ i 10) repeated-proto2)
+       (outer-proto.push-repeated-proto repeated-proto1 to-proto)
+       (outer-proto.push-repeated-proto repeated-proto2 from-proto))
+    (loop for i from 1 to 20
+          for repeated-proto = (make-repeated-proto)
+          do
+       (repeated-proto.push-repeated-int32 i repeated-proto)
+       (outer-proto.push-repeated-proto repeated-proto expected-proto))
+
+    (merge-from from-proto to-proto)
+    (assert-true (proto-equal to-proto expected-proto))
+
+    (repeated-proto.push-repeated-int32
+     10
+     (outer-proto.nth-repeated-proto 1 from-proto))
+    (assert-true (proto-equal to-proto expected-proto))))
+
 (deftest test-text-output (vector-suite)
   (let ((outer-proto (make-outer-proto))
         (repeated1 (make-repeated-proto))

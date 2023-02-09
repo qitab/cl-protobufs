@@ -261,7 +261,31 @@ Taken from https://github.com/protocolbuffers/protobuf-go/blob/master/proto/merg
            (copy-message (message)
              (let ((new-message (create-message-of-same-type message)))
                (merge-from message new-message)
-               new-message)))
+               new-message))
+           (concatenate-repeated-field (from-field to-field field-container field-type field-kind)
+             (if (eq field-container :vector)
+                 (let ((new-vector (make-array `(,(+ (length from-field)
+                                                     (length to-field)))
+                                               :element-type field-type
+                                               :adjustable t
+                                               :fill-pointer (+ (length from-field)
+                                                                (length to-field)))))
+                   (loop for i from 0
+                         for el across to-field
+                         do
+                      (setf (aref new-vector i) el))
+                   (loop for i from (length to-field)
+                         for el across from-field
+                         do
+                      (setf (aref new-vector i)
+                            (if (member field-kind '(:message :group))
+                                (copy-message el)
+                                el)))
+                   new-vector)
+                 (append to-field (mapcar (if (member field-kind '(:message :group))
+                                              #'copy-message
+                                              #'identity)
+                                          from-field)))))
 
     (let* ((class (type-of from-message))
            (desc (find-message-descriptor class)))
@@ -276,11 +300,11 @@ Taken from https://github.com/protocolbuffers/protobuf-go/blob/master/proto/merg
               (cond
                 ((eq (proto-label field-desc) :repeated)
                  (setf (proto-slot-value to-message field-name)
-                       (append (proto-slot-value to-message field-name)
-                               (if (member (proto-kind field-desc) '(:message :group))
-                                   (mapcar #'copy-message from-field-value)
-                                   from-field-value))))
-
+                       (concatenate-repeated-field from-field-value
+                                                   (proto-slot-value to-message field-name)
+                                                   (proto-container field-desc)
+                                                   (proto-type field-desc)
+                                                   (proto-kind field-desc))))
                 ((member (proto-kind field-desc) '(:message :group))
                  (if (has-field to-message field-name)
                      (merge-from from-field-value
