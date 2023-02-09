@@ -369,3 +369,121 @@ Parameters
         (proto2 (unittest-pb:make-test-all-types :repeated-int32 '())))
     (assert-false (proto:proto-equal proto1 proto2))
     (assert-false (proto:proto-equal proto2 proto1))))
+
+(deftest test-non-map-merge-replace (message-api-suite)
+  (let ((from-message (unittest-pb:make-test-all-types
+                       :optional-int32 1
+                       :optional-float .1
+                       :optional-bool nil
+                       :optional-string "pika"
+                       :repeated-int32 '(1 2 3)
+                       :repeated-bool '(t nil t nil)
+                       :optional-foreign-message (unittest-pb:make-foreign-message :c 1)
+                       :repeated-foreign-message (list (unittest-pb:make-foreign-message :c 2)
+                                                       (unittest-pb:make-foreign-message :c 3))
+                       :repeated-string '("Rowlet" "is" "best")))
+        (to-message (unittest-pb:make-test-all-types)))
+    (proto:merge-from from-message to-message)
+    (assert-true (proto:proto-equal from-message to-message))
+
+    ;; Verifies we made new copies of the underlying message.
+    (setf (unittest-pb:foreign-message.c
+           (unittest-pb:test-all-types.optional-foreign-message from-message))
+          314)
+    (assert-false (proto:proto-equal from-message to-message))))
+
+(deftest test-non-map-merge-concatenate (message-api-suite)
+  ;; Merge semantics say to append to the end of an existing list.
+  (let ((from-message (unittest-pb:make-test-all-types
+                       :repeated-int32 '(1 2 3)
+                       :repeated-bool '(t t t)
+                       :repeated-foreign-message (list (unittest-pb:make-foreign-message :c 2)
+                                                       (unittest-pb:make-foreign-message :c 3))
+                       :repeated-string '("Rowlet" "is" "best")))
+        (to-message (unittest-pb:make-test-all-types
+                     :repeated-int32 '(4 5 6)
+                     :repeated-bool '(nil nil nil)
+                     :repeated-foreign-message (list (unittest-pb:make-foreign-message :c 4)
+                                                     (unittest-pb:make-foreign-message :c 5))
+                     :repeated-string '("Charmander" "is" "better")))
+        (expected-message (unittest-pb:make-test-all-types
+                           :repeated-int32 '(4 5 6 1 2 3)
+                           :repeated-bool '(nil nil nil t t t)
+                           :repeated-foreign-message (list (unittest-pb:make-foreign-message :c 4)
+                                                           (unittest-pb:make-foreign-message :c 5)
+                                                           (unittest-pb:make-foreign-message :c 2)
+                                                           (unittest-pb:make-foreign-message :c 3))
+                           :repeated-string '("Charmander" "is" "better" "Rowlet" "is" "best"))))
+    (proto:merge-from from-message to-message)
+    (assert-true (proto:proto-equal expected-message to-message))
+
+    ;; Verifies we made new copies of the underlying messages.
+    (setf (unittest-pb:foreign-message.c
+           (car (unittest-pb:test-all-types.repeated-foreign-message from-message)))
+          314)
+    (assert-true (proto:proto-equal expected-message to-message))))
+
+(deftest test-merging-with-nonempty-internal-message (message-api-suite)
+  (let ((to-message (unittest-pb:make-test-recursive-message
+                     :a (unittest-pb:make-test-recursive-message
+                         :a (unittest-pb:make-test-recursive-message
+                             :i 10)
+                         :i 11)
+                     :i 12))
+        (from-message (unittest-pb:make-test-recursive-message
+                       :a (unittest-pb:make-test-recursive-message
+                           :a (unittest-pb:make-test-recursive-message
+                               :i 13)
+                           ;; :b not set
+                           )
+                       :i 14))
+        (expected-message (unittest-pb:make-test-recursive-message
+                           :a (unittest-pb:make-test-recursive-message
+                               :a (unittest-pb:make-test-recursive-message
+                                   :i 13)
+                               :i 11)
+                           :i 14)))
+    (proto:merge-from from-message to-message)
+    (assert-true (proto:proto-equal expected-message to-message))
+
+    (setf
+     (unittest-pb:test-recursive-message.i
+      (unittest-pb:test-recursive-message.a
+       (unittest-pb:test-recursive-message.a from-message)))
+     23)
+    (assert-true (proto:proto-equal expected-message to-message))))
+
+(deftest test-map-merge (message-api-suite)
+  (let ((from-message (map-test-pb:make-map-all))
+        (to-message (map-test-pb:make-map-all))
+        (expected-message (map-test-pb:make-map-all))
+        (inner-message-1 (map-test-pb:make-map-all.inner-msg :strval "pop"))
+        (inner-message-2 (map-test-pb:make-map-all.inner-msg :strval "lio"))
+        (inner-message-3 (map-test-pb:make-map-all.inner-msg :strval "litten"))
+        (inner-message-4 (map-test-pb:make-map-all.inner-msg :strval "mew")))
+
+    (setf (map-test-pb:map-all.intmap-gethash 1 from-message) 1
+          (map-test-pb:map-all.intmap-gethash 2 from-message) 2
+
+          (map-test-pb:map-all.intmap-gethash 2 to-message) 4
+          (map-test-pb:map-all.intmap-gethash 3 to-message) 3
+
+          (map-test-pb:map-all.msgmap-gethash 1 from-message) inner-message-1
+          (map-test-pb:map-all.msgmap-gethash 2 from-message) inner-message-2
+
+          (map-test-pb:map-all.msgmap-gethash 2 to-message) inner-message-4
+          (map-test-pb:map-all.msgmap-gethash 3 to-message) inner-message-3
+
+          (map-test-pb:map-all.intmap-gethash 1 expected-message) 1
+          (map-test-pb:map-all.intmap-gethash 2 expected-message) 2
+          (map-test-pb:map-all.intmap-gethash 3 expected-message) 3
+
+          (map-test-pb:map-all.msgmap-gethash 1 expected-message) inner-message-1
+          (map-test-pb:map-all.msgmap-gethash 2 expected-message) inner-message-2
+          (map-test-pb:map-all.msgmap-gethash 3 expected-message) inner-message-3)
+
+    (proto:merge-from from-message to-message)
+    (assert-true (proto:proto-equal expected-message to-message))
+
+    (setf (map-test-pb:strval inner-message-1) "Raichu")
+    (assert-false (proto:proto-equal expected-message to-message))))

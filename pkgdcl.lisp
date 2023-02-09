@@ -148,6 +148,7 @@
    #:has-field
    #:proto-slot-value
    #:encoded-field
+   #:merge-from
 
    ;; For RPC stubs
    ;; An RPC library supporting the client functions defined in

@@ -241,3 +241,63 @@ Parameters:
         (if (eq (proto-label field) :repeated)
             (map 'list #'proto-%%bytes value)
             (proto-%%bytes value))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun merge-from (from-message to-message)
+  "Merge messages.
+Taken from https://github.com/protocolbuffers/protobuf-go/blob/master/proto/merge.go:
+ Populated scalar fields in FROM-MESSAGE are copied to TO-MESSAGE, while populated
+   singular messages in FROM-MESSAGE are merged into TO-MESSAGE by recursively calling Merge.
+ The elements of every list field in FROM-MESSAGE is appended to the corresponded
+   list fields in TO-MESSAGE. The entries of every map field in FROM-MESSAGE is copied into
+   the corresponding map field in TO-MESSAGE, possibly replacing existing entries."
+  (labels ((create-message-of-same-type (message)
+             (let ((class (find-class (type-of message))))
+               (funcall (get-constructor-name
+                         #+sbcl class
+                         #-sbcl (class-name class)))))
+           (copy-message (message)
+             (let ((new-message (create-message-of-same-type message)))
+               (merge-from message new-message)
+               new-message)))
+
+    (let* ((class (type-of from-message))
+           (desc (find-message-descriptor class)))
+      ;; Check the messages are the same.
+      (and desc (eq (type-of to-message) class)
+
+           (loop :for field-desc :in (proto-fields desc)
+                 :for field-name = (proto-external-field-name field-desc)
+                 :for from-field-value = (proto-slot-value from-message field-name)
+                 :when (has-field from-message field-name)
+                   :do
+              (cond
+                ((eq (proto-label field-desc) :repeated)
+                 (setf (proto-slot-value to-message field-name)
+                       (append (proto-slot-value to-message field-name)
+                               (if (member (proto-kind field-desc) '(:message :group))
+                                   (mapcar #'copy-message from-field-value)
+                                   from-field-value))))
+
+                ((member (proto-kind field-desc) '(:message :group))
+                 (if (has-field to-message field-name)
+                     (merge-from from-field-value
+                                 (proto-slot-value to-message field-name))
+                     (setf (proto-slot-value to-message field-name)
+                           (copy-message from-field-value))))
+
+                ((eq (proto-kind field-desc) :map)
+                 (loop with map-descriptor = (find-map-descriptor (proto-class field-desc))
+                       with to-hash-map = (proto-slot-value to-message field-name)
+                       for key being the hash-keys of from-field-value
+                         using (hash-value from-value)
+                       do
+                    (setf (gethash key to-hash-map)
+                          (if (eq (proto-value-kind map-descriptor) :message)
+                              (copy-message from-value)
+                              from-value))))
+
+                (t (setf (proto-slot-value to-message field-name)
+                         from-field-value))))))))

@@ -230,4 +230,3 @@
       (assert-true (proto-equal test2 (round-trip test2)))
       (assert-true (proto-equal test3 (round-trip test3)))
       (assert-true (proto-equal test4 (round-trip test4))))))
-
