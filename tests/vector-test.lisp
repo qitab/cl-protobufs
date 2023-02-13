@@ -204,7 +204,7 @@ Parameters
       (repeated-proto.push-repeated-int32 i from-vector-proto)
       (repeated-proto.push-repeated-int32 i expected-vector-proto))
     (merge-from from-vector-proto to-vector-proto)
-    (assert-true (proto-equal to-vector-proto expected-vector-proto)))
+    (assert-true (proto-equal to-vector-proto expected-vector-proto :exact t)))
 
   (let ((to-vector-proto (make-repeated-proto))
         (from-vector-proto (make-repeated-proto))
@@ -215,7 +215,7 @@ Parameters
     (loop for i from 1 to 20 do
       (repeated-proto.push-repeated-int32 i expected-vector-proto))
     (merge-from from-vector-proto to-vector-proto)
-    (assert-true (proto-equal to-vector-proto expected-vector-proto))
+    (assert-true (proto-equal to-vector-proto expected-vector-proto :exact t))
     (dotimes (i 10000)
       (repeated-proto.push-repeated-int32 (+ i 100) to-vector-proto))))
 
@@ -233,12 +233,12 @@ Parameters
        (outer-proto.push-repeated-proto repeated-proto2 from-proto))
 
     (merge-from from-proto to-proto)
-    (assert-true (proto-equal to-proto expected-proto))
+    (assert-true (proto-equal to-proto expected-proto :exact t))
 
     (repeated-proto.push-repeated-int32
      10
      (outer-proto.nth-repeated-proto 1 from-proto))
-    (assert-true (proto-equal to-proto expected-proto)))
+    (assert-true (proto-equal to-proto expected-proto :exact t)))
 
   (let ((to-proto (make-outer-proto))
         (from-proto (make-outer-proto))
@@ -258,12 +258,12 @@ Parameters
        (outer-proto.push-repeated-proto repeated-proto expected-proto))
 
     (merge-from from-proto to-proto)
-    (assert-true (proto-equal to-proto expected-proto))
+    (assert-true (proto-equal to-proto expected-proto :exact t))
 
     (repeated-proto.push-repeated-int32
      10
      (outer-proto.nth-repeated-proto 1 from-proto))
-    (assert-true (proto-equal to-proto expected-proto))))
+    (assert-true (proto-equal to-proto expected-proto :exact t))))
 
 (deftest test-text-output (vector-suite)
   (let ((outer-proto (make-outer-proto))

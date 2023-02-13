@@ -384,13 +384,13 @@ Parameters
                        :repeated-string '("Rowlet" "is" "best")))
         (to-message (unittest-pb:make-test-all-types)))
     (proto:merge-from from-message to-message)
-    (assert-true (proto:proto-equal from-message to-message))
+    (assert-true (proto:proto-equal from-message to-message :exact t))
 
     ;; Verifies we made new copies of the underlying message.
     (setf (unittest-pb:foreign-message.c
            (unittest-pb:test-all-types.optional-foreign-message from-message))
           314)
-    (assert-false (proto:proto-equal from-message to-message))))
+    (assert-false (proto:proto-equal from-message to-message :exact t))))
 
 (deftest test-non-map-merge-concatenate (message-api-suite)
   ;; Merge semantics say to append to the end of an existing list.
@@ -415,13 +415,13 @@ Parameters
                                                            (unittest-pb:make-foreign-message :c 3))
                            :repeated-string '("Charmander" "is" "better" "Rowlet" "is" "best"))))
     (proto:merge-from from-message to-message)
-    (assert-true (proto:proto-equal expected-message to-message))
+    (assert-true (proto:proto-equal expected-message to-message :exact t))
 
     ;; Verifies we made new copies of the underlying messages.
     (setf (unittest-pb:foreign-message.c
            (car (unittest-pb:test-all-types.repeated-foreign-message from-message)))
           314)
-    (assert-true (proto:proto-equal expected-message to-message))))
+    (assert-true (proto:proto-equal expected-message to-message :exact t))))
 
 (deftest test-merging-with-nonempty-internal-message (message-api-suite)
   (let ((to-message (unittest-pb:make-test-recursive-message
@@ -444,14 +444,14 @@ Parameters
                                :i 11)
                            :i 14)))
     (proto:merge-from from-message to-message)
-    (assert-true (proto:proto-equal expected-message to-message))
+    (assert-true (proto:proto-equal expected-message to-message :exact t))
 
     (setf
      (unittest-pb:test-recursive-message.i
       (unittest-pb:test-recursive-message.a
        (unittest-pb:test-recursive-message.a from-message)))
      23)
-    (assert-true (proto:proto-equal expected-message to-message))))
+    (assert-true (proto:proto-equal expected-message to-message :exact t))))
 
 (deftest test-map-merge (message-api-suite)
   (let ((from-message (map-test-pb:make-map-all))
@@ -483,7 +483,61 @@ Parameters
           (map-test-pb:map-all.msgmap-gethash 3 expected-message) inner-message-3)
 
     (proto:merge-from from-message to-message)
-    (assert-true (proto:proto-equal expected-message to-message))
+    (assert-true (proto:proto-equal expected-message to-message :exact t))
 
     (setf (map-test-pb:strval inner-message-1) "Raichu")
-    (assert-false (proto:proto-equal expected-message to-message))))
+    (assert-false (proto:proto-equal expected-message to-message :exact t))))
+
+(deftest test-merge-bools (message-api-suite)
+  (let ((from-message (unittest-pb:make-test-all-types :optional-bool t))
+        (to-message (unittest-pb:make-test-all-types))
+        (expected-message (unittest-pb:make-test-all-types :optional-bool t)))
+    (proto:merge-from from-message to-message)
+    (assert-true (unittest-pb:test-all-types.has-optional-bool to-message))
+    (assert-true (unittest-pb:test-all-types.optional-bool to-message))
+    (assert-true (proto:proto-equal expected-message to-message :exact t)))
+
+  (let ((from-message (unittest-pb:make-test-all-types :optional-bool nil))
+        (to-message (unittest-pb:make-test-all-types))
+        (expected-message (unittest-pb:make-test-all-types :optional-bool nil)))
+    (proto:merge-from from-message to-message)
+    (assert-true (unittest-pb:test-all-types.has-optional-bool to-message))
+    (assert-false (unittest-pb:test-all-types.optional-bool to-message))
+    (assert-true (proto:proto-equal expected-message to-message :exact t)))
+
+  (let ((from-message (unittest-pb:make-test-all-types))
+        (to-message (unittest-pb:make-test-all-types :optional-bool t))
+        (expected-message (unittest-pb:make-test-all-types :optional-bool t)))
+    (proto:merge-from from-message to-message)
+    (assert-true (unittest-pb:test-all-types.has-optional-bool to-message))
+    (assert-true (unittest-pb:test-all-types.optional-bool to-message))
+    (assert-true (proto:proto-equal expected-message to-message :exact t)))
+
+  (let ((from-message (unittest-pb:make-test-all-types))
+        (to-message (unittest-pb:make-test-all-types :optional-bool nil))
+        (expected-message (unittest-pb:make-test-all-types :optional-bool nil)))
+    (proto:merge-from from-message to-message)
+    (assert-true (unittest-pb:test-all-types.has-optional-bool to-message))
+    (assert-false (unittest-pb:test-all-types.optional-bool to-message))
+    (assert-true (proto:proto-equal expected-message to-message :exact t)))
+
+  (let ((from-message (unittest-pb:make-test-all-types :optional-bool t))
+        (to-message (unittest-pb:make-test-all-types :optional-bool nil))
+        (expected-message (unittest-pb:make-test-all-types :optional-bool t)))
+    (proto:merge-from from-message to-message)
+    (assert-true (unittest-pb:test-all-types.has-optional-bool to-message))
+    (assert-true (unittest-pb:test-all-types.optional-bool to-message))
+    (assert-true (proto:proto-equal expected-message to-message :exact t)))
+
+  (let ((from-message (unittest-pb:make-test-all-types :optional-bool nil))
+        (to-message (unittest-pb:make-test-all-types :optional-bool t))
+        (expected-message (unittest-pb:make-test-all-types :optional-bool nil)))
+    (proto:merge-from from-message to-message)
+    (assert-true (unittest-pb:test-all-types.has-optional-bool to-message))
+    (assert-false (unittest-pb:test-all-types.optional-bool to-message))
+    (assert-true (proto:proto-equal expected-message to-message :exact t)))
+
+  (let ((from-message (unittest-pb:make-test-all-types))
+        (to-message (unittest-pb:make-test-all-types)))
+    (proto:merge-from from-message to-message)
+    (assert-false (unittest-pb:test-all-types.has-optional-bool to-message))))
