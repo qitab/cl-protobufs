@@ -11,21 +11,21 @@ import "package_test2.proto"; // Test proto
 package protobuf_package_unittest1;
 
 message MessageDefinedInBothPackages {
-  required string boom = 1;
+  optional string boom = 1;
 }
 
 message MessageWithCrossPackageReference {
-  required protobuf_package_unittest2.MessageInOtherPackage baz = 1;
-  required protobuf_package_unittest2.EnumInOtherPackage bonk = 2;
-  required MessageDefinedInBothPackages bam = 3;
-  required protobuf_package_unittest2.MessageDefinedInBothPackages bing = 5;
+  optional protobuf_package_unittest2.MessageInOtherPackage baz = 1;
+  optional protobuf_package_unittest2.EnumInOtherPackage bonk = 2;
+  optional MessageDefinedInBothPackages bam = 3;
+  optional protobuf_package_unittest2.MessageDefinedInBothPackages bing = 5;
 }
 
 message MessageWithCrossPackageExtension {
   extend protobuf_package_unittest2.MessageInOtherPackage {
     optional int32 baa = 1000;
   }
-  required protobuf_package_unittest2.MessageInOtherPackage boo = 1;
+  optional protobuf_package_unittest2.MessageInOtherPackage boo = 1;
 }
 
 service ServiceWithCrossPackageInputOutput {
