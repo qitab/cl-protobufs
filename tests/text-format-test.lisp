@@ -221,3 +221,28 @@ one_level_nesting {
         text-msg-pretty (format nil "~@/cl-protobufs:fmt/" msg))
     (assert-equality #'string=
         text-msg-not (format nil "~/cl-protobufs:fmt/" msg))))
+
+
+(deftest test-parse-text-format-with-# (text-format-suite)
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream "
+
+# Beginning rowlet
+int_field: 100
+sint_field:
+ # moo
+-1
+uint_field: # pika
+1
+float_field: 1.5 # toga
+# final rowlet
+
+"))))
+    (assert-eql 100 (test-pb:int-field msg))
+    (assert-eql -1 (test-pb:sint-field msg))
+    (assert-eql 1 (test-pb:uint-field msg))
+    (assert-eql 1.5 (test-pb:float-field msg))))
+
+"
+"

@@ -12,6 +12,10 @@
   (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\space #\tab #\return #\newline))))
 
+(defun-inline proto-hash-char-p (ch)
+  (declare #.*optimize-fast-unsafe*)
+  (and ch (eq ch #\#)))
+
 (defun-inline proto-eol-char-p (ch)
   (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\return #\newline))))
@@ -22,11 +26,24 @@
               (digit-char-p ch)
               (member ch '(#\_ #\.)))))
 
+(defun skip-whitespace-and-comments (stream)
+  "Skip all whitespace characters and text-format comments that
+are coming up in the STREAM."
+  (loop for ch = (peek-char nil stream nil)
+        until (or (null ch)
+                  (and (not (proto-whitespace-char-p ch))
+                       (not (proto-hash-char-p ch))))
+        do
+     (if (proto-whitespace-char-p ch)
+         (read-char stream nil)
+         (read-line stream nil))))
+
 (defun skip-whitespace (stream)
   "Skip all the whitespace characters that are coming up in the stream."
   (loop for ch = (peek-char nil stream nil)
         until (or (null ch) (not (proto-whitespace-char-p ch)))
-        do (read-char stream nil)))
+        do
+     (read-char stream nil)))
 
 (defun expect-matching-end (stream start-char)
   "Expect that the starting block element START-CHAR matches the next element
@@ -67,12 +84,12 @@
 (defun maybe-skip-chars (stream chars)
   "Skip some optional characters in the stream,
    then skip all of the following whitespace."
-  (skip-whitespace stream)
+  (skip-whitespace-and-comments stream)
   (when chars
     (loop
       (let ((ch (peek-char nil stream nil)))
         (when (or (null ch) (not (member ch chars)))
-          (skip-whitespace stream)
+          (skip-whitespace-and-comments stream)
           (return-from maybe-skip-chars)))
       (read-char stream))))
 
@@ -168,7 +185,7 @@
           do (setq ch (unescape-char stream))
         collect ch into string
         finally (progn
-                  (skip-whitespace stream)
+                  (skip-whitespace-and-comments stream)
                   (if (eql (peek-char nil stream nil) ch0)
                     ;; If the next character is a quote character, that means
                     ;; we should go parse another string and concatenate it
@@ -267,7 +284,7 @@ to the end of the parsed numerical string."
           (or (digit-char-p ch) (member ch '(#\- #\+ #\.))))
     (let ((token (parse-token stream '(#\- #\+ #\.))))
       (when token
-        (skip-whitespace stream)
+        (skip-whitespace-and-comments stream)
         (if append-d0
             (parse-numeric-string (concatenate 'string token "d0"))
             (parse-numeric-string token))))))

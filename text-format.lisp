@@ -230,7 +230,7 @@ returns the parsed object."
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
     (loop
-      (skip-whitespace stream)
+      (skip-whitespace-and-comments stream)
       (when (or (not (peek-char nil stream nil))
                 (eql (peek-char nil stream nil) #\})
                 (eql (peek-char nil stream nil) #\>))
@@ -292,11 +292,11 @@ return T as a second value."
           ((typep desc 'message-descriptor)
            (when (eql (peek-char nil stream nil) #\:)
              (read-char stream))
-           (skip-whitespace stream)
+           (skip-whitespace-and-comments stream)
            (let ((start-char (expect-char stream '(#\{ #\<))))
              (prog1
                  (parse-text-format-impl (find-message-descriptor type) :stream stream)
-               (skip-whitespace stream)
+               (skip-whitespace-and-comments stream)
                (expect-matching-end stream start-char))))
           ((typep desc 'enum-descriptor)
            (expect-char stream #\:)
@@ -312,10 +312,10 @@ return T as a second value."
                         (expect-char stream #\{)
                         (assert (string= "key" (parse-token stream)))
                         (setf key (parse-field key-type :stream stream))
-                        (skip-whitespace stream)
+                        (skip-whitespace-and-comments stream)
                         (assert (string= "value" (parse-token stream)))
                         (setf val (parse-field val-type :stream stream))
-                        (skip-whitespace stream)
+                        (skip-whitespace-and-comments stream)
                         (expect-char stream #\})
                         (cons key val))))
                (case (peek-char nil stream nil)
@@ -324,17 +324,17 @@ return T as a second value."
                   (expect-char stream #\[)
                   (loop
                      with pairs = ()
-                     do (skip-whitespace stream)
+                     do (skip-whitespace-and-comments stream)
                        (push (parse-map-entry key-type val-type stream)
                              pairs)
                        (if (eql (peek-char nil stream nil) #\,)
                            (read-char stream)
                            (progn
-                             (skip-whitespace stream)
+                             (skip-whitespace-and-comments stream)
                              (expect-char stream #\])
                              (return pairs)))))
                  (t
-                  (skip-whitespace stream)
+                  (skip-whitespace-and-comments stream)
                   (list (parse-map-entry key-type val-type stream)))))))
           ;; Parsing failed, return t as a second vlaue to indicate failure.
           (t (values nil t)))))
