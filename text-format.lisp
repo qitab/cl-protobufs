@@ -230,7 +230,7 @@ returns the parsed object."
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
     (loop
-      (skip-whitespace-and-comments stream)
+      (skip-whitespace-comments-and-chars stream)
       (when (or (not (peek-char nil stream nil))
                 (eql (peek-char nil stream nil) #\})
                 (eql (peek-char nil stream nil) #\>))
@@ -243,22 +243,33 @@ returns the parsed object."
       (let* ((name  (parse-token stream))
              (field (and name (find-field-descriptor msg-desc name)))
              (type (and field (proto-class field)))
-             (slot  (and field (proto-external-field-name field))))
+             (slot  (and field (proto-external-field-name field)))
+             (repeated-p (and field (eql :repeated (proto-label field)))))
         (if (null field)
             (error 'unknown-field
                    :format-control "unknown field ~S, while parsing message of type ~A"
                    :format-arguments (list name msg-desc))
             (multiple-value-bind (val error-p)
-                (parse-field type :stream stream)
+                (parse-field type :stream stream :repeated-p repeated-p)
               (cond
                 (error-p
                  (unknown-field-type type field msg-desc))
-                ((eq (proto-label field) :repeated)
+                (repeated-p
                  ;; If slot is NIL, then this field doesn't exist in the message
                  ;; so we skip it.
                  (when slot
                    (pushnew slot rslots)
-                   (push val (proto-slot-value object slot))))
+                   ;; Brief note on val: VAL should be a list.
+                   ;; In the case of repeated symbol slot, we may have
+                   ;; symbol: nil
+                   ;; in which case we want the symbol nil, which happens to
+                   ;; also be a list...  since for a repeated field foo
+                   ;; foo:  # no value defined for foo
+                   ;; is invalid, we aren't going to have collisions.
+                   (if (and (listp val) val)
+                       (dolist (el val)
+                         (push el (proto-slot-value object slot)))
+                       (push val (proto-slot-value object slot)))))
                 ((eq (proto-kind field) :map)
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
@@ -267,77 +278,96 @@ returns the parsed object."
                  (when slot
                    (setf (proto-slot-value object slot) val))))))))))
 
-(defun parse-field (type &key (stream *standard-input*))
+(defun parse-field (type &key (stream *standard-input*) repeated-p)
   "Parse data of type TYPE from STREAM. This function returns
-the object parsed. If the parsing fails, the function will
+the object parsed. We need to know if hte field is REPEATED-P.
+If the parsing fails, the function will
 return T as a second value."
   (let ((desc (or (find-message-descriptor type)
                   (find-enum-descriptor type)
                   (find-map-descriptor type))))
-    (cond ((scalarp type)
-           (expect-char stream #\:)
-           (case type
-             ((float) (parse-float stream))
-             ((double-float) (parse-double stream))
-             ((string) (parse-string stream))
-             ((symbol) (make-lisp-symbol (parse-string stream) t))
-             ((boolean) (let ((token (parse-token stream)))
-                          (cond ((string= token "true") t)
-                                ((string= token "false") nil)
-                                ;; Parsing failed, so return T as
-                                ;; a second value to indicate a
-                                ;; failure.
-                                (t (values nil t)))))
-             (otherwise (parse-signed-int stream))))
-          ((typep desc 'message-descriptor)
-           (when (eql (peek-char nil stream nil) #\:)
-             (read-char stream))
-           (skip-whitespace-and-comments stream)
-           (let ((start-char (expect-char stream '(#\{ #\<))))
-             (prog1
-                 (parse-text-format-impl (find-message-descriptor type) :stream stream)
-               (skip-whitespace-and-comments stream)
-               (expect-matching-end stream start-char))))
-          ((typep desc 'enum-descriptor)
-           (expect-char stream #\:)
-           (let* ((name (parse-token stream))
-                  (enum (find (keywordify name) (enum-descriptor-values desc)
-                              :key #'enum-value-descriptor-name)))
-             (and enum (enum-value-descriptor-name enum))))
-          ((typep desc 'map-descriptor)
-           (let ((key-type (proto-key-type desc))
-                 (val-type (proto-value-type desc)))
-             (flet ((parse-map-entry (key-type val-type stream)
-                      (let (key val)
-                        (expect-char stream #\{)
-                        (assert (string= "key" (parse-token stream)))
-                        (setf key (parse-field key-type :stream stream))
-                        (skip-whitespace-and-comments stream)
-                        (assert (string= "value" (parse-token stream)))
-                        (setf val (parse-field val-type :stream stream))
-                        (skip-whitespace-and-comments stream)
-                        (expect-char stream #\})
-                        (cons key val))))
-               (case (peek-char nil stream nil)
-                 ((#\:)
-                  (expect-char stream #\:)
-                  (expect-char stream #\[)
-                  (loop
-                     with pairs = ()
-                     do (skip-whitespace-and-comments stream)
-                       (push (parse-map-entry key-type val-type stream)
-                             pairs)
-                       (if (eql (peek-char nil stream nil) #\,)
-                           (read-char stream)
-                           (progn
-                             (skip-whitespace-and-comments stream)
-                             (expect-char stream #\])
-                             (return pairs)))))
-                 (t
-                  (skip-whitespace-and-comments stream)
-                  (list (parse-map-entry key-type val-type stream)))))))
-          ;; Parsing failed, return t as a second vlaue to indicate failure.
-          (t (values nil t)))))
+    (flet ((parse-message ()
+             (skip-whitespace-comments-and-chars stream)
+             (let ((start-char (expect-char stream '(#\{ #\<))))
+               (prog1
+                   (parse-text-format-impl (find-message-descriptor type) :stream stream)
+                 (skip-whitespace-comments-and-chars stream)
+                 (expect-matching-end stream start-char))))
+           (parse-scalar ()
+             (case type
+               ((float) (parse-float stream))
+               ((double-float) (parse-double stream))
+               ((string) (parse-string stream))
+               ((symbol) (make-lisp-symbol (parse-string stream) t))
+               ((boolean) (let ((token (parse-token stream)))
+                            (cond ((string= token "true") t)
+                                  ((string= token "false") nil)
+                                  ;; Parsing failed, so return T as
+                                  ;; a second value to indicate a
+                                  ;; failure.
+                                  (t (values nil t)))))
+               (otherwise (parse-signed-int stream))))
+           (parse (parse-function)
+             (when (eql (peek-char nil stream nil) #\:)
+               (read-char stream))
+             (skip-whitespace-comments-and-chars stream)
+             (if (and repeated-p
+                      (eq (peek-char nil stream nil) #\[))
+                 (progn
+                   (read-char stream)
+                   (skip-whitespace-comments-and-chars stream :chars #\,)
+                   (let ((element-list (loop until (eq (peek-char nil stream nil) #\])
+                                             collect (funcall parse-function)
+                                             do
+                                          (skip-whitespace-comments-and-chars stream :chars #\,))))
+                     (read-char stream)
+                     element-list))
+                 (funcall parse-function))))
+
+      (cond ((scalarp type)
+             (parse #'parse-scalar))
+            ((typep desc 'message-descriptor)
+             (parse #'parse-message))
+            ((typep desc 'enum-descriptor)
+             (expect-char stream #\:)
+             (let* ((name (parse-token stream))
+                    (enum (find (keywordify name) (enum-descriptor-values desc)
+                                :key #'enum-value-descriptor-name)))
+               (and enum (enum-value-descriptor-name enum))))
+            ((typep desc 'map-descriptor)
+             (let ((key-type (proto-key-type desc))
+                   (val-type (proto-value-type desc)))
+               (flet ((parse-map-entry (key-type val-type stream)
+                        (let (key val)
+                          (expect-char stream #\{)
+                          (assert (string= "key" (parse-token stream)))
+                          (setf key (parse-field key-type :stream stream))
+                          (skip-whitespace-comments-and-chars stream)
+                          (assert (string= "value" (parse-token stream)))
+                          (setf val (parse-field val-type :stream stream))
+                          (skip-whitespace-comments-and-chars stream)
+                          (expect-char stream #\})
+                          (cons key val))))
+                 (case (peek-char nil stream nil)
+                   ((#\:)
+                    (expect-char stream #\:)
+                    (expect-char stream #\[)
+                    (loop
+                        with pairs = ()
+                        do (skip-whitespace-comments-and-chars stream)
+                           (push (parse-map-entry key-type val-type stream)
+                                 pairs)
+                           (if (eql (peek-char nil stream nil) #\,)
+                               (read-char stream)
+                               (progn
+                                 (skip-whitespace-comments-and-chars stream)
+                                 (expect-char stream #\])
+                                 (return pairs)))))
+                   (t
+                    (skip-whitespace-comments-and-chars stream)
+                    (list (parse-map-entry key-type val-type stream)))))))
+            ;; Parsing failed, return t as a second vlaue to indicate failure.
+            (t (values nil t))))))
 
 (defun fmt (stream proto colon-p at-sign-p &optional width &rest other-args)
   "Format command for protobufs
