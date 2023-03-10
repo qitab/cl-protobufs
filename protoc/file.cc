@@ -52,7 +52,7 @@ FileGenerator::FileGenerator(const FileDescriptor* file) :
     case FileDescriptor::Syntax::SYNTAX_PROTO3:
       syntax_ = ":proto3";
       break;
-    case FileDescriptor::Syntax::SYNTAX_UNKNOWN:
+    default:
       GOOGLE_LOG(FATAL) << "Unknown syntax for file: " << file->DebugString();
       break;
   }
