@@ -18,6 +18,7 @@
 #include "message.h"
 #include "names.h"
 #include "service.h"
+#include "third_party/protobuf/descriptor_legacy.h"
 #include <google/protobuf/io/printer.h>
 
 namespace google {
@@ -45,11 +46,11 @@ FileGenerator::FileGenerator(const FileDescriptor* file) :
     services_[i] = std::make_unique<ServiceGenerator>(file->service(i));
   }
 
-  switch (file_->syntax()) {
-    case FileDescriptor::Syntax::SYNTAX_PROTO2:
+  switch (FileDescriptorLegacy(file_).syntax()) {
+    case FileDescriptorLegacy::Syntax::SYNTAX_PROTO2:
       syntax_ = ":proto2";
       break;
-    case FileDescriptor::Syntax::SYNTAX_PROTO3:
+    case FileDescriptorLegacy::Syntax::SYNTAX_PROTO3:
       syntax_ = ":proto3";
       break;
     default:
