@@ -13,9 +13,9 @@
 #include <vector>
 
 #include <cstdint>
-#include <google/protobuf/descriptor.h>
 #include "enum.h"
-#include <google/protobuf/io/printer.h>
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/io/printer.h"
 
 namespace google {
 namespace protobuf {

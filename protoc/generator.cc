@@ -10,10 +10,11 @@
 #include <unordered_set>
 #include <vector>
 
-#include <google/protobuf/descriptor.h>
+#include "absl/log/absl_check.h"
 #include "file.h"
-#include <google/protobuf/io/printer.h>
-#include <google/protobuf/io/zero_copy_stream.h>
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/io/printer.h"
+#include "google/protobuf/io/zero_copy_stream.h"
 
 namespace google {
 namespace protobuf {
@@ -59,7 +60,7 @@ bool LispGenerator::Generate(const FileDescriptor* file,
   if (annotate) {
     std::unique_ptr<io::ZeroCopyOutputStream> meta(
         output_directory->Open(file_name + ".meta"));
-    GOOGLE_CHECK(annotations.SerializeToZeroCopyStream(meta.get()));
+    ABSL_CHECK(annotations.SerializeToZeroCopyStream(meta.get()));
   }
 
   return true;
@@ -132,7 +133,7 @@ bool LispGenerator::GenerateAll(const std::vector<const FileDescriptor*>& files,
   if (annotate) {
     std::unique_ptr<io::ZeroCopyOutputStream> meta(
       context->Open(file_name + ".meta"));
-    GOOGLE_CHECK(annotations.SerializeToZeroCopyStream(meta.get()));
+    ABSL_CHECK(annotations.SerializeToZeroCopyStream(meta.get()));
   }
   return true;
 }

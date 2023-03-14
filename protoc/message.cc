@@ -13,15 +13,15 @@
 #include <set>
 #include <unordered_set>
 
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/extension_set.h>
-#include <google/protobuf/stubs/strutil.h>
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"
 #include "names.h"
-#include <google/protobuf/io/printer.h>
+#include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/extension_set.h"
+#include "google/protobuf/io/printer.h"
 
 namespace google {
 namespace protobuf {
@@ -160,12 +160,12 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
       const Descriptor::ExtensionRange* range = descriptor_->extension_range(i);
       printer->Print(
           "\n(pi:define-extension $start$ $end$)", "start",
-          StrCat(range->start),
+          absl::StrCat(range->start),
           // The end is inclusive in cl_protobufs.
           // For some reason, the extension number is generated as
           // 0x7ffffffe when specified as 'max', but the max must be
           // (2^29 - 1).
-          "end", StrCat(std::min(kMaxExtensionNumber, range->end - 1)));
+          "end", absl::StrCat(std::min(kMaxExtensionNumber, range->end - 1)));
     }
   }
 
@@ -194,7 +194,7 @@ void MessageGenerator::AddPackages(std::set<std::string>* packages) {
     const std::string alias = descriptor_->options().GetExtension(lisp_alias);
     const size_t colon = alias.find(':');
     if (colon != std::string::npos && colon > 0) {
-      packages->insert(ToUpper(alias.substr(0, colon)));
+      packages->insert(absl::AsciiStrToUpper(alias.substr(0, colon)));
     }
   }
   for (int i = 0; i < descriptor_->nested_type_count(); ++i) {

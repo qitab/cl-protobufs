@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include <google/protobuf/compiler/code_generator.h>
+#include "google/protobuf/compiler/code_generator.h"
 
 namespace google {
 class FileDescriptor;
