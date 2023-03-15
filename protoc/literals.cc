@@ -6,22 +6,32 @@
 
 #include "literals.h"
 
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/strutil.h>
+#include <float.h>
+
+#include "absl/log/absl_check.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "google/protobuf/io/strtod.h"
 
 namespace google {
 namespace protobuf {
 namespace cl_protobufs {
 
-const std::string LispSimpleFtoa(float value) {
-  std::string result = SimpleFtoa(value);
-  if (result == "inf") {
+std::string LispSimpleFtoa(float value) {
+  constexpr int kFloatToBufferSize = 24;
+  if (value == std::numeric_limits<double>::infinity()) {
     return "float-features:single-float-positive-infinity";
-  } else if (result == "-inf") {
+  } else if (value == -std::numeric_limits<double>::infinity()) {
     return "float-features:single-float-negative-infinity";
-  } else if (result == "nan") {
+  } else if (std::isnan(value)) {
     return "float-features:single-float-nan";
   }
+
+  char buffer[kFloatToBufferSize];
+  int snprintf_result =
+      absl::SNPrintF(buffer, kFloatToBufferSize, "%.*g", FLT_DIG, value);
+  ABSL_DCHECK(snprintf_result > 0 && snprintf_result < kFloatToBufferSize);
+  std::string result = buffer;
 
   std::string::size_type pos = result.find('e', 0);
   if (pos != std::string::npos) {
@@ -31,15 +41,21 @@ const std::string LispSimpleFtoa(float value) {
   return result + "f0";
 }
 
-const std::string LispSimpleDtoa(double value) {
-  std::string result = SimpleDtoa(value);
-  if (result == "inf") {
-    return "float-features:double-float-positive-infinity";
-  } else if (result == "-inf") {
-    return "float-features:double-float-negative-infinity";
-  } else if (result == "nan") {
-    return "float-features:double-float-nan";
+std::string LispSimpleDtoa(double value) {
+  constexpr int kDoubleToBufferSize = 32;
+  if (value == std::numeric_limits<double>::infinity()) {
+    return "float-features:single-float-positive-infinity";
+  } else if (value == -std::numeric_limits<double>::infinity()) {
+    return "float-features:single-float-negative-infinity";
+  } else if (std::isnan(value)) {
+    return "float-features:single-float-nan";
   }
+
+  char buffer[kDoubleToBufferSize];
+  int snprintf_result =
+      absl::SNPrintF(buffer, kDoubleToBufferSize, "%.*g", DBL_DIG, value);
+  ABSL_DCHECK(snprintf_result > 0 && snprintf_result < kDoubleToBufferSize);
+  std::string result = buffer;
 
   std::string::size_type pos = result.find('e', 0);
   if (pos != std::string::npos) {
@@ -50,7 +66,7 @@ const std::string LispSimpleDtoa(double value) {
   return result + "d0";
 }
 
-const std::string LispEscapeString(const std::string& str) {
+std::string LispEscapeString(const std::string& str) {
   std::string lisp;
   lisp.append(1, '"');
   for (char c : str) {
@@ -61,16 +77,16 @@ const std::string LispEscapeString(const std::string& str) {
   return lisp;
 }
 
-const std::string StringOctets(const std::string& str) {
+std::string StringOctets(const std::string& str) {
   std::string octets;
   for (char c : str) {
     if (!octets.empty()) octets += " ";
-    octets += StrCat(c & 0xff);
+    octets += absl::StrCat(c & 0xff);
   }
   return octets;
 }
 
-const std::string LispBool(bool value) { return value ? "cl:t" : "cl:nil"; }
+std::string LispBool(bool value) { return value ? "cl:t" : "cl:nil"; }
 
 }  // namespace cl_protobufs
 }  // namespace protobuf
