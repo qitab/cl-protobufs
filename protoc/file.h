@@ -31,9 +31,9 @@ class FileGenerator {
 
  private:
   const FileDescriptor* file_;
+  FileDescriptorProto file_proto_;
   std::string lisp_package_name_;
   std::string schema_name_;
-  std::string syntax_;
 
   std::vector<std::unique_ptr<EnumGenerator>> enums_;
   std::vector<std::unique_ptr<MessageGenerator>> messages_;

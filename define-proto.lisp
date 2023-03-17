@@ -176,11 +176,11 @@ the oneof and its nested fields.
       (unless imported
         (protobuf-error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
-(defun define-schema (type &key name syntax package import
+(defun define-schema (type &key name syntax edition package import
                            optimize options)
   "Define a schema named TYPE, corresponding to a .proto file of that name.
    NAME can be used to override the defaultly generated Protobufs name.
-   SYNTAX and PACKAGE are as they would be in a .proto file.
+   SYNTAX, EDITION, and PACKAGE are as they would be in a .proto file.
    IMPORT is a list of pathname strings to be imported.
    OPTIMIZE can be either :space (the default) or :speed; if it is :speed, the
    serialization code will be much faster, but much less compact.
@@ -202,9 +202,10 @@ the oneof and its nested fields.
                       'file-descriptor
                       :class    type
                       :name     name
-                      ;; CCL requires syntax to be OR'd  with :proto2 or :proto3
+                      ;; CCL requires syntax to be OR'd  with :proto2, :proto3, or :editions
                       ;; in case syntax is NIL.
-                      :syntax   (or syntax :proto2 :proto3)
+                      :syntax   (or syntax :proto2 :proto3 :editions)
+                      :edition  edition
                       :package  package
                       :imports  imports
                       :options  (if optimize

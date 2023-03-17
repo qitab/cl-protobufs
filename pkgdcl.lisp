@@ -99,6 +99,7 @@
    #:proto-client-stub
    #:proto-container
    #:proto-default
+   #:proto-edition
    #:proto-external-field-name
    #:proto-fields
    #:proto-imports
@@ -124,7 +125,6 @@
    #:proto-source-location
    #:proto-streams-name
    #:proto-streams-type
-   #:proto-syntax
    #:proto-type
    #:proto-value
 

@@ -79,9 +79,12 @@ Parameters:
 
 
 (defclass file-descriptor (descriptor)
-  ((syntax :type (member :proto2 :proto3)
+  ((syntax :type (member :proto2 :proto3 :editions)
            :accessor proto-syntax
            :initarg :syntax)
+   (edition :type (or null string)
+            :accessor proto-edition
+            :initarg :edition)
    (package :type (or null string)
             :accessor proto-package-name
             :initarg :package
