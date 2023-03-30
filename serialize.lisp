@@ -621,7 +621,7 @@ Parameters:
                ;; we have no idea if MAKE-INSTANCE will actually work.
                ;; And for #+sbcl, passing the CLASS rather than its name avoids
                ;; an unecessary detour through the global name->class mapping.
-               (apply (get-constructor-name #+sbcl class #-sbcl (class-name class))
+               (apply (get-constructor-name (class-name class))
                       initargs-final)))
 
           ;; Most fields in a proto are set above.
@@ -1304,11 +1304,9 @@ Parameters:
           `(,vbuf ,vidx ,vlim &optional (,vendtag 0))
           `((declare #.$optimize-serialization)
             (declare (ignore ,vbuf ,vlim ,vendtag ,old-index))
-            (values #+sbcl (make-instance ',(or (proto-alias-for message)
-                                                (proto-class message)))
-                    #-sbcl (funcall (get-constructor-name
-                                     ',(or (proto-alias-for message)
-                                           (proto-class message)))))
+            (values (funcall (get-constructor-name
+                              ',(or (proto-alias-for message)
+                                    (proto-class message)))))
             ,vidx))))
     (with-collectors ((deserializers collect-deserializer)
                       ;; Nonrepeating slots
@@ -1392,8 +1390,7 @@ Parameters:
                        ;; after we cons it.
                        (let ((struct
                               (,@(if constructor (list constructor)
-                                     #+sbcl`(make-instance ',lisp-type)
-                                     #-sbcl`(funcall (get-constructor-name ',lisp-type)))
+                                     `(funcall (get-constructor-name ',lisp-type)))
                                ;; oneofs
                                ,@(loop for temp in oneof-slots
                                        for mtemp = (slot-value-to-slot-name-symbol temp)
@@ -1449,8 +1446,7 @@ Parameters:
    object through without ever needing to deserialize it."
   (let* ((desc (find-message-descriptor type :error-p t))
          (message-name (or (proto-alias-for desc) (proto-class desc)))
-         (object #+sbcl (make-instance message-name)
-                 #-sbcl (funcall (get-constructor-name message-name))))
+         (object (funcall (get-constructor-name message-name))))
     (setf (proto-%%bytes object) buffer)
     object))
 
@@ -1462,13 +1458,14 @@ Parameters:
   (get class-name :default-constructor))
 ;;; NB: the #-sbcl definition takes a CLASS-NAME, but #+sbcl takes a CLASS
 #+sbcl
-(defun get-constructor-name (class)
+(defun get-constructor-name (class-name)
   "Get the constructor function name for a structure-class
 by reading its defstruct description
 Parameters:
-  CLASS: The structure-class proto."
-  (macrolet ((wrapper-dd (x)
-               `(,(or (find-symbol "WRAPPER-DD" "SB-KERNEL")
-                      (find-symbol "LAYOUT-INFO" "SB-KERNEL"))
-                 ,x)))
-    (sb-kernel:dd-default-constructor (wrapper-dd (sb-pcl::class-wrapper class)))))
+  CLASS-NAME: The name of the structure-class proto."
+  (let ((class (find-class class-name)))
+    (macrolet ((wrapper-dd (x)
+                 `(,(or (find-symbol "WRAPPER-DD" "SB-KERNEL")
+                        (find-symbol "LAYOUT-INFO" "SB-KERNEL"))
+                   ,x)))
+      (sb-kernel:dd-default-constructor (wrapper-dd (sb-pcl::class-wrapper class))))))

@@ -222,11 +222,9 @@ Parameters:
   "Parse a protobuf message with descriptor MSG-DESC from STREAM. This method
 returns the parsed object."
   (declare (type message-descriptor msg-desc))
-  (let ((object #+sbcl (make-instance (or (proto-alias-for msg-desc)
-                                          (proto-class msg-desc)))
-                #-sbcl (funcall (get-constructor-name
-                                 (or (proto-alias-for msg-desc)
-                                     (proto-class msg-desc)))))
+  (let ((object (funcall (get-constructor-name
+                          (or (proto-alias-for msg-desc)
+                              (proto-class msg-desc)))))
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
     (loop

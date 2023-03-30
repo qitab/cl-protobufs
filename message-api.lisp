@@ -256,8 +256,7 @@ Taken from https://github.com/protocolbuffers/protobuf-go/blob/master/proto/merg
   (labels ((create-message-of-same-type (message)
              (let ((class (find-class (type-of message))))
                (funcall (get-constructor-name
-                         #+sbcl class
-                         #-sbcl (class-name class)))))
+                         (class-name class)))))
            (copy-message (message)
              (let ((new-message (create-message-of-same-type message)))
                (merge-from message new-message)
