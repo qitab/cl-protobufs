@@ -181,19 +181,21 @@ are coming up in the STREAM."
 (defun parse-string (stream)
   "Parse the next quoted string in the stream, then skip the following whitespace.
    The returned value is the string, without the quotation marks."
-  (loop with ch0 = (read-char stream nil)
-        for ch = (read-char stream nil)
-        until (or (null ch) (char= ch ch0))
-        when (eql ch #\\)
-          do (setq ch (unescape-char stream))
-        collect ch into string
-        finally (progn
-                  (skip-whitespace-comments-and-chars stream)
-                  (if (eql (peek-char nil stream nil) ch0)
-                    ;; If the next character is a quote character, that means
-                    ;; we should go parse another string and concatenate it
-                    (return (strcat (coerce string 'string) (parse-string stream)))
-                    (return (coerce string 'string))))))
+  (let ((ch0 (read-char stream nil)))
+    (unless (member ch0 '(#\' #\"))
+      (protobuf-error "Starting string character ~c should be \' or \"." ch0))
+    (loop for ch = (read-char stream nil)
+          until (or (null ch) (char= ch ch0))
+          when (eql ch #\\)
+            do (setq ch (unescape-char stream))
+          collect ch into string
+          finally (progn
+                    (skip-whitespace-comments-and-chars stream)
+                    (if (eql (peek-char nil stream nil) ch0)
+                        ;; If the next character is a quote character, that means
+                        ;; we should go parse another string and concatenate it
+                        (return (strcat (coerce string 'string) (parse-string stream)))
+                        (return (coerce string 'string)))))))
 
 (defun unescape-char (stream)
   "Parse the next \"escaped\" character from the stream."

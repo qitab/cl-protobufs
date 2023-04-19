@@ -267,3 +267,36 @@ symbol_field: ['nil']")))
                        :int-vals '(1 2 3 4)
                        :symbol-field '(nil))))
     (assert-true (proto:proto-equal msg test-message :exact t))))
+
+(deftest test-unquoted-string (text-format-suite)
+  (assert-condition error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+string_field: rowlet
+repeated_message: [{int_field: 1}, {int_field: 2}]")))
+
+  (assert-condition error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+string_fields: ['pika', chu]
+repeated_message: [{int_field: 1}, {int_field: 2}]")))
+
+  (assert-condition error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+string_fields: ['pika', chu]
+string_fields: #litten
+repeated_message: [{int_field: 1}, {int_field: 2}]")))
+
+  (assert-condition error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+string_fields:
+  \"There were\"
+  five
+  \"Charmanders in the field\"
+repeated_message: [{int_field: 1}, {int_field: 2}]"))))
