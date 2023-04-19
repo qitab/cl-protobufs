@@ -13,11 +13,11 @@ namespace google {
 namespace protobuf {
 namespace cl_protobufs {
 
-const std::string LispSimpleFtoa(float value);
-const std::string LispSimpleDtoa(double value);
-const std::string LispEscapeString(const std::string& str);
-const std::string StringOctets(const std::string& str);
-const std::string LispBool(bool value);
+std::string LispSimpleFtoa(float value);
+std::string LispSimpleDtoa(double value);
+std::string LispEscapeString(const std::string& str);
+std::string StringOctets(const std::string& str);
+std::string LispBool(bool value);
 
 }  // namespace cl_protobufs
 }  // namespace protobuf

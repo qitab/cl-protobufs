@@ -39,7 +39,14 @@ jobs:
         run: echo "::add-path:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
 
       - name: Download and install protobuf
-        run: git clone --recursive https://github.com/google/protobuf $GITHUB_WORKSPACE/protobuf && cd $GITHUB_WORKSPACE/protobuf && ./autogen.sh && ./configure --prefix=/usr/local && make && sudo make install && sudo ldconfig
+        run: |
+          set -ex
+          git clone --recursive https://github.com/google/protobuf $GITHUB_WORKSPACE/protobuf
+          cd $GITHUB_WORKSPACE/protobuf
+          cmake . -Dprotobuf_WITH_ZLIB=OFF -Dprotobuf_BUILD_CONFORMANCE=OFF -Dprotobuf_BUILD_EXAMPLES=OFF -Dprotobuf_BUILD_TESTS=OFF -DCMAKE_CXX_STANDARD=14
+          make -j20
+          sudo make install
+          sudo ldconfig
 
       - name: Install protoc plug-in
         run: cd $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc && PROTOC_ROOT=/usr/local make
