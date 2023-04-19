@@ -11,14 +11,14 @@
 #include <memory>
 #include <set>
 
-#include <google/protobuf/stubs/strutil.h>
+#include "absl/log/absl_log.h"
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"
 #include "message.h"
 #include "names.h"
 #include "service.h"
-#include <google/protobuf/io/printer.h>
+#include "google/protobuf/io/printer.h"
 
 namespace google {
 namespace protobuf {

@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT.
 
-#include <google/protobuf/compiler/plugin.h>
 #include "generator.h"
+#include "google/protobuf/compiler/plugin.h"
 
 int main(int argc, char* argv[]) {
   google::protobuf::cl_protobufs::LispGenerator generator;
