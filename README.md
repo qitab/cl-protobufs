@@ -39,7 +39,7 @@ Common Lisp.
     you have any problems please see the [protobuf installation instructions](https://github.com/protocolbuffers/protobuf/blob/21.x/src/README.md).
 
     ```shell
-    $ git clone --recursive https://github.com/google/protobuf
+    $ git clone --recursive -b 21.x https://github.com/google/protobuf
     $ cd protobuf
     $ ./autogen.sh
     $ ./configure --prefix=/usr/local
