@@ -19,22 +19,24 @@ Common Lisp.
     `protoc`, the protocol buffer compiler. The plug-in is written in C++ and
     requires Google's protocol buffer compiler as well as the development headers.
 
-    **Warning**
-    Due to `protoc`'s dependence on Abseil in v22, the headers required to install
-    the lisp plugin are no longer included. We are actively working on fixing
-    this dependency (#402). Until then, you will need to install a version of
-    protobuf older than v22, but at least v3.15.
+    >**Warning** <br />
+    >Due to `protoc`'s dependence on Abseil in v22, the headers required to install
+    >the lisp plugin are no longer included. We are actively working on fixing
+    >this dependency ([#402](https://github.com/qitab/cl-protobufs/issues/402)).
+    >Until then, you will need to install a version of protobuf **older than v22,
+    >but at least v3.15**.
 
-    The compiler and development headers can be installed via package manager.
+    The compiler and development headers can be installed via package manager or
+    compiled from source.
+    
     ### Ubuntu 22.04
     ```shell
     sudo apt install protobuf-compiler libprotobuf-dev libprotoc-dev
     ```
 
     ### From source
-    To install from source, rough instructions are included here to install
-    protoc v21 on Unix systems. If you have any problems please see the
-    [protobuf installation instructions](https://github.com/protocolbuffers/protobuf/blob/21.x/src/README.md).
+    Rough instructions are included here to install protoc v21 on Unix systems. If
+    you have any problems please see the [protobuf installation instructions](https://github.com/protocolbuffers/protobuf/blob/21.x/src/README.md).
 
     ```shell
     $ git clone --recursive https://github.com/google/protobuf
@@ -57,7 +59,7 @@ Common Lisp.
 
     ```shell
     $ cd cl-protobufs/protoc
-    $ PROTOC_ROOT=/usr/local make
+    $ PROTOC_ROOT=/usr/local make     # value of --prefix, above
     $ sudo cp protoc-gen-cl-pb /usr/local/bin/
     ```
 
