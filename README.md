@@ -24,7 +24,7 @@ Common Lisp.
     >the lisp plugin are no longer included. We are actively working on fixing
     >this dependency ([#402](https://github.com/qitab/cl-protobufs/issues/402)).
     >Until then, you will need to install a version of protobuf **older than v22,
-    >but at least v3.15**.
+    >but at least v3.12**.
 
     The compiler and development headers can be installed via package manager or
     compiled from source.
