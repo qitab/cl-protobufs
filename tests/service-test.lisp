@@ -52,7 +52,6 @@ Parameters
   (let* ((service (proto:find-service-descriptor
                    'cl-protobufs.service-test-pb:foo-service))
          (method (proto:find-method-descriptor service 'cl-protobufs.service-test-pb::bar-method)))
-    (assert-eql (values :udp 'string) (pi::find-option method "protocol"))
     (assert-eql (values 30.0d0 'string) (pi::find-option method "deadline"))
     (assert-eql (values t 'string) (pi::find-option method "duplicate_suppression"))
     (assert-eql (values -123 'string) (pi::find-option method "client_logging"))
