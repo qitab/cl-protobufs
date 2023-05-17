@@ -158,14 +158,15 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
     printer->Print("\n;; Extension ranges");
     for (int i = 0; i < descriptor_->extension_range_count(); ++i) {
       const Descriptor::ExtensionRange* range = descriptor_->extension_range(i);
+      int start = range->start;
+      int end = range->end;
       printer->Print(
-          "\n(pi:define-extension $start$ $end$)", "start",
-          StrCat(range->start),
+          "\n(pi:define-extension $start$ $end$)", "start", StrCat(start),
           // The end is inclusive in cl_protobufs.
           // For some reason, the extension number is generated as
           // 0x7ffffffe when specified as 'max', but the max must be
           // (2^29 - 1).
-          "end", StrCat(std::min(kMaxExtensionNumber, range->end - 1)));
+          "end", StrCat(std::min(kMaxExtensionNumber, end - 1)));
     }
   }
 
