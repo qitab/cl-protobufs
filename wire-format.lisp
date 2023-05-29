@@ -920,7 +920,7 @@
    Watch out, this function turns off all type checking and array bounds checking."
     (declare #.$optimize-serialization)
     (declare (type single-float val))
-    (let ((bits (single-float-bits val)))
+    (let ((bits (float-features:single-float-bits val)))
       (declare (type (signed-byte 32) bits))
       (buffer-ensure-space buffer 4)
       (loop repeat 4 doing
@@ -940,20 +940,12 @@
    Watch out, this function turns off all type checking and array bounds checking."
     (declare #.$optimize-serialization)
     (declare (type double-float val))
-    (multiple-value-bind (low high)
-        (double-float-bits val)
-      (declare (type (unsigned-byte 32) low)
-               (type (signed-byte 32) high))
-      (buffer-ensure-space buffer 8)
-      (loop repeat 4 doing
-        (let ((byte (ldb (byte 8 0) low)))
+    (buffer-ensure-space buffer 8)
+    (let ((bits (float-features:double-float-bits val)))
+      (loop repeat 8 doing
+        (let ((byte (ldb (byte 8 0) bits)))
           (declare (type (unsigned-byte 8) byte))
-          (setf low (ash low -8))
-          (fast-octet-out buffer byte)))
-      (loop repeat 4 doing
-        (let ((byte (ldb (byte 8 0) high)))
-          (declare (type (unsigned-byte 8) byte))
-          (setf high (ash high -8))
+          (setf byte (ash bits -8))
           (fast-octet-out buffer byte)))
       8)))
 
@@ -1045,7 +1037,7 @@
           do (setq bits (logior bits (ash byte places))))
     (when (i= (ldb (byte 1 31) bits) 1)             ;sign bit set, so negative value
       (decf bits #.(ash 1 32)))
-    (values (make-single-float bits) index)))
+    (values (float-features:bits-single-float bits) index)))
 
 (defun decode-double (buffer index)
   "Decodes the next double float in the buffer at the given index.
@@ -1059,20 +1051,13 @@
           (i+ index 8))
   #-sbcl
   ;; Eight bits at a time, least significant bits first
-  (let ((low  0)
-        (high 0))
-    (loop repeat 4
+  (let ((val  0))
+    (declare (type (unsigned-byte 64) val)
+    (loop repeat 8
           for places fixnum upfrom 0 by 8
           for byte fixnum = (prog1 (aref buffer index) (iincf index))
-          do (setq low (logior low (ash byte places))))
-    (loop repeat 4
-          for places fixnum upfrom 0 by 8
-          for byte fixnum = (prog1 (aref buffer index) (iincf index))
-          do (setq high (logior high (ash byte places))))
-    ;; High bits are signed, but low bits are unsigned
-    (when (i= (ldb (byte 1 31) high) 1)             ;sign bit set, so negative value
-      (decf high #.(ash 1 32)))
-    (values (make-double-float low high) index)))
+          do (setq val (logior val (ash byte places))))
+    (values (float-features:bits-double-float val) index))))
 
 (defun decode-string (buffer index)
   "Decodes the next UTF-8 encoded string in the buffer at the given index.

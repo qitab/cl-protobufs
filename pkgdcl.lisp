@@ -99,6 +99,7 @@
    #:proto-client-stub
    #:proto-container
    #:proto-default
+   #:proto-edition
    #:proto-external-field-name
    #:proto-fields
    #:proto-imports
@@ -119,12 +120,11 @@
    #:proto-package-name
    #:proto-qualified-name
    #:proto-server-stub
+   #:proto-old-server-stub
    #:proto-service-name
-   #:proto-services
    #:proto-source-location
    #:proto-streams-name
    #:proto-streams-type
-   #:proto-syntax
    #:proto-type
    #:proto-value
 
@@ -148,6 +148,7 @@
    #:has-field
    #:proto-slot-value
    #:encoded-field
+   #:merge-from
 
    ;; For RPC stubs
    ;; An RPC library supporting the client functions defined in

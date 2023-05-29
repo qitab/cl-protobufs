@@ -15,6 +15,7 @@
 #include <google/protobuf/extension_set.h>
 #include <google/protobuf/stubs/strutil.h>
 // #include <google/protobuf/stubs/str_join.h>
+// #include <google/protobuf/stubs/str_replace.h>
 #include "proto2-descriptor-extensions.pb.h"
 
 // Copied from ABSL.
@@ -140,6 +141,13 @@ const std::string EnumLispName(const EnumDescriptor* descriptor) {
   } else {
     return lisp_name;
   }
+}
+
+const std::string ToLispEnumValue(const std::string& name) {
+  // Enum values are usually uppercase separated by underscore.
+  std::string v = StringReplace(name, "_", "-", true);
+  LowerString(&v);
+  return v;
 }
 
 const std::string QualifiedEnumLispName(const EnumDescriptor* descriptor,

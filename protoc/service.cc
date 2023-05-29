@@ -8,12 +8,12 @@
 
 #include <cstdint>
 #include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/io/printer.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/stubs/strutil.h>
 #include "literals.h"
 #include "names.h"
+#include <google/protobuf/io/printer.h>
 
 namespace google {
 namespace protobuf {
@@ -168,7 +168,7 @@ void ServiceGenerator::AddRpcExports(std::vector<std::string>* exports) {
   for (int i = 0; i < descriptor_->method_count(); ++i) {
     const std::string name = ToLispName(descriptor_->method(i)->name());
     exports->push_back("call-" + name);
-    exports->push_back(name + "-impl");
+    exports->push_back(name);
   }
 }
 

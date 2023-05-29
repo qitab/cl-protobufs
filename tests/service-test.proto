@@ -16,7 +16,6 @@ message BarResponse {
 
 service FooService {
   rpc BarMethod(BarRequest) returns (BarResponse) {
-    option protocol = UDP;
     option deadline = 30.0;
     option duplicate_suppression = true;
     option client_logging = -123;

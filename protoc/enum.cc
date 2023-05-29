@@ -6,10 +6,10 @@
 
 #include "enum.h"
 
-#include <google/protobuf/io/printer.h>
 #include <google/protobuf/stubs/strutil.h>
 #include "proto2-descriptor-extensions.pb.h"
 #include "names.h"
+#include <google/protobuf/io/printer.h>
 
 namespace google {
 namespace protobuf {
@@ -41,8 +41,8 @@ void EnumGenerator::Generate(io::Printer* printer) {
   printer->Outdent();
 
   for (int i = 0; i < descriptor_->value_count(); i++) {
-    printer->Print("\n($name$ :index $number$)", "name",
-                   ToLispName(descriptor_->value(i)->name()), "number",
+    printer->Print("\n(:$name$ :index $number$)", "name",
+                   ToLispEnumValue(descriptor_->value(i)->name()), "number",
                    StrCat(descriptor_->value(i)->number()));
     printer->Annotate("name", descriptor_);
   }

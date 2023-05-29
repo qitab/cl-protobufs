@@ -176,11 +176,11 @@ the oneof and its nested fields.
       (unless imported
         (protobuf-error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
-(defun define-schema (type &key name syntax package import
+(defun define-schema (type &key name syntax edition package import
                            optimize options)
   "Define a schema named TYPE, corresponding to a .proto file of that name.
    NAME can be used to override the defaultly generated Protobufs name.
-   SYNTAX and PACKAGE are as they would be in a .proto file.
+   SYNTAX, EDITION, and PACKAGE are as they would be in a .proto file.
    IMPORT is a list of pathname strings to be imported.
    OPTIMIZE can be either :space (the default) or :speed; if it is :speed, the
    serialization code will be much faster, but much less compact.
@@ -202,9 +202,10 @@ the oneof and its nested fields.
                       'file-descriptor
                       :class    type
                       :name     name
-                      ;; CCL requires syntax to be OR'd  with :proto2 or :proto3
+                      ;; CCL requires syntax to be OR'd  with :proto2, :proto3, or :editions
                       ;; in case syntax is NIL.
-                      :syntax   (or syntax :proto2 :proto3)
+                      :syntax   (or syntax :proto2 :proto3 :editions)
+                      :edition  edition
                       :package  package
                       :imports  imports
                       :options  (if optimize
@@ -220,54 +221,58 @@ the oneof and its nested fields.
     (setf *current-file-descriptor* descriptor)
     (validate-imports descriptor imports)))
 
-(defgeneric enum-int-to-keyword (enum-type integer &optional default)
+(defgeneric enum-int-to-keyword (enum-type integer)
   (:documentation
    "Converts INTEGER to the corresponding enum keyword.  If there are multiple
 keywords assigned to the same value (i.e., allow_alias = true in the enum
 source) then the first one is returned.  ENUM-TYPE is the enum type name.
-DEFAULT is the value to use if INTEGER is not contained in the enum."))
+If no enum exists for the specified integer return nil."))
 
-(defgeneric enum-keyword-to-int (enum-type keyword &optional default)
+(defgeneric enum-keyword-to-int (enum-type keyword)
   (:documentation
    "Converts a KEYWORD to its corresponding integer value.  ENUM-TYPE is the
-enum-type name.  DEFAULT is the value to use if KEYWORD is a not contained in
-the enum."))
+enum-type name."))
 
-(defun make-enum-conversion-forms (type value-descriptors)
+(defun make-enum-conversion-forms (type open-type value-descriptors)
   "Generates forms for enum <-> integer conversion functions. TYPE is the enum
-type name.  VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
+type name.  OPEN-TYPE is a type including the possibility of unknown enum keywords
+as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
   (let ((key2int (fintern "~A-KEYWORD-TO-INT" type))
         (int2key (fintern "~A-INT-TO-KEYWORD" type)))
     `(progn
-       (defun ,key2int (enum &optional default)
-         (declare (type keyword enum))
+       (defun ,key2int (enum)
+         (declare (type ,open-type enum))
          (let ((int (case enum
                       ,@(loop for desc in value-descriptors
                               collect `(,(enum-value-descriptor-name desc)
-                                        ,(enum-value-descriptor-value desc))))))
-           (or int default)))
+                                        ,(enum-value-descriptor-value desc)))
+                      (t (parse-integer (subseq (symbol-name enum)
+                                                +%undefined--length+)
+                                        :junk-allowed t)))))
+           int))
 
-       (defun ,int2key (numeral &optional default)
+       (defun ,int2key (numeral)
          (declare (type int32 numeral))
-         (let ((key (case numeral
-                      ,@(loop with mapped = (make-hash-table)
-                              for desc in value-descriptors
-                              for int = (enum-value-descriptor-value desc)
-                              for already-set-p = (gethash int mapped)
-                              do (setf (gethash int mapped) t)
-                              unless already-set-p
-                                collect `(,int ,(enum-value-descriptor-name desc))))))
-           (or key default)))
+         (the (or null ,type)
+              (let ((key (case numeral
+                           ,@(loop with mapped = (make-hash-table)
+                                   for desc in value-descriptors
+                                   for int = (enum-value-descriptor-value desc)
+                                   for already-set-p = (gethash int mapped)
+                                   do (setf (gethash int mapped) t)
+                                   unless already-set-p
+                                     collect `(,int ,(enum-value-descriptor-name desc))))))
+                key)))
 
        (setf (get ',type 'enum-int-to-keyword) ',int2key)
        (setf (get ',type 'enum-keyword-to-int) ',key2int)
 
        (defmethod cl-protobufs:enum-keyword-to-int
-           ((e (eql ',type)) keyword &optional default)
-         (,key2int keyword default))
+           ((e (eql ',type)) keyword)
+         (,key2int keyword))
        (defmethod cl-protobufs:enum-int-to-keyword
-           ((e (eql ',type)) numeral &optional default)
-         (,int2key numeral default)))))
+           ((e (eql ',type)) numeral)
+         (,int2key numeral)))))
 
 (defgeneric enum-default-value (enum-type)
   (:documentation
@@ -298,6 +303,25 @@ message, and of +<value_name>+ when the enum is defined at top-level."
        ,@constants
        (export ',(mapcar #'second constants)))))
 
+(defconstant +%undefined--length+ 11
+  "The length of %undefined- which is used frequently below")
+
+(defun keyword-contains-%undefined-int-p (enum-keyword)
+  "An unknown ENUM-KEYWORD will be compiled as :%undefined-{integer} so our type
+predicate must check that."
+  (when (keywordp enum-keyword)
+    (let ((keyword-name (symbol-name enum-keyword)))
+      (and (> (length keyword-name) +%undefined--length+)
+           (starts-with keyword-name "%UNDEFINED-")
+           (parse-integer (subseq keyword-name +%undefined--length+) :junk-allowed t)))))
+
+(defun enum-open-type (type)
+  "We want the deftype of an enum TYPE to be a strict set of the keywords,
+but we want an internal version for the case where we deserialized an unknown
+(newer) version of hte enum with an unknown field."
+  (intern (format nil "%%%%~a" type)
+          (symbol-package type)))
+
 (defmacro define-enum (type (&key name) &body values)
   "Define a Lisp type given the data for a protobuf enum type.
  Also generates conversion functions between enum values and integers:
@@ -308,27 +332,31 @@ message, and of +<value_name>+ when the enum is defined at top-level."
    TYPE: The name of the type.
    NAME: Override for the protobuf enum type name.
    VALUES: The possible values for the enum in the form (name :index value)."
-  (let ((name (or name (class-name->proto type))))
+  (let ((name (or name (class-name->proto type)))
+        (open-type (enum-open-type type)))
     (with-collectors ((names collect-name) ; keyword symbols
                       (forms collect-form)
                       (value-descriptors collect-value-descriptor))
       ;; The middle value is :index, useful for readability of generated code...
       ;; (Except that the value is not actually an index, nor is the slot called index anymore.)
       (loop for (name nil value) in values do
-        (let* ((val-name (kintern (symbol-name name)))
-               (val-desc (make-enum-value-descriptor :value value :name val-name)))
-          (collect-name val-name)
+        (let* ((val-desc (make-enum-value-descriptor :value value :name name)))
+          (collect-name name)
           (collect-value-descriptor val-desc)))
       (let ((enum (make-enum-descriptor :class type
                                         :name name
                                         :values value-descriptors)))
+        (collect-form `(deftype ,open-type ()
+                         '(or (member ,@names)
+                           (satisfies keyword-contains-%undefined-int-p))))
         (collect-form `(deftype ,type () '(member ,@names)))
-        (collect-form (make-enum-conversion-forms type value-descriptors))
+        (collect-form (make-enum-conversion-forms type open-type value-descriptors))
         (collect-form (make-enum-constant-forms type value-descriptors))
         ;; The default value is the keyword associated with the first element.
         (collect-form `(defmethod enum-default-value ((e (eql ',type)))
                          ,(enum-value-descriptor-name (car value-descriptors))))
         (collect-form `(record-protobuf-object ',type ,enum :enum))
+        (collect-form `(export '(,open-type)))
         ;; Register it by the full symbol name.
         (record-protobuf-object type enum :enum))
       `(progn ,@forms))))
@@ -457,7 +485,7 @@ Parameters:
         (make-field-accessors
          :get (proto-slot-function-name message-name field-name :get)
          :set `(setf ,(proto-slot-function-name message-name field-name :get))
-         :has (proto-slot-function-name message-name field-name :has)
+         :has (proto-slot-function-name message-name field-name :internal-has)
          :clear (proto-slot-function-name message-name field-name :clear))))
 
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
@@ -471,7 +499,10 @@ Parameters:
   (let ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
         (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
-        (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
+        (internal-has-function-name
+         (proto-slot-function-name proto-type public-slot-name :internal-has))
+        (external-has-function-name
+         (proto-slot-function-name proto-type public-slot-name :has))
         (default-form (get-default-form (proto-type field)
                                         (proto-default field)
                                         (proto-container field)
@@ -503,7 +534,7 @@ Parameters:
         ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
         ;; question: "Is this field set to the default value?". This is done so that the optimized
         ;; serializer can use the has-* function to check if an optional field should be serialized.
-        (defun-inline ,has-function-name (,obj)
+        (defun-inline ,internal-has-function-name (,obj)
           ,(if index
                `(= (bit (,is-set-accessor ,obj) ,index) 1)
                `(let ((,cur-value ,(if bool-index
@@ -518,6 +549,13 @@ Parameters:
                           (cl:hash-table `(> (hash-table-count ,cur-value) 0))
                           ;; Otherwise, the type is integral. EQ suffices to check equality.
                           (t `(not (eq ,cur-value ,default-form)))))))))
+
+        ;; has-* functions are not exported for proto3-style optional fields. They are only for
+        ;; internal usage.
+        ,@(unless (eq (proto-syntax *current-file-descriptor*) :proto3)
+            `((defun-inline ,external-has-function-name (,obj)
+                (,internal-has-function-name ,obj))
+              (export '(,external-has-function-name))))
 
         ;; Clear function
         ;; Map type clear functions are created in make-map-accessor-forms.
@@ -540,11 +578,6 @@ Parameters:
           (setf (,public-accessor-name ,obj) ,new-value))
 
         (set-field-accessor-functions ',proto-type ',public-slot-name)
-
-        ;; has-* functions are not exported for proto3-style optional fields. They are only for
-        ;; internal usage.
-        ,(unless (eq (proto-syntax *current-file-descriptor*) :proto3)
-           `(export '(,has-function-name)))
 
         ,(unless (eq (proto-kind field) :map)
            `(export '(,clear-function-name)))
@@ -627,7 +660,10 @@ Paramters:
          (hidden-slot-name (oneof-descriptor-internal-name oneof))
          (hidden-accessor-name (fintern "~A-~A" proto-type hidden-slot-name))
          (case-function-name (proto-slot-function-name proto-type public-slot-name :case))
-         (has-function-name (proto-slot-function-name proto-type public-slot-name :has))
+         (internal-has-function-name
+          (proto-slot-function-name proto-type public-slot-name :internal-has))
+         (external-has-function-name
+          (proto-slot-function-name proto-type public-slot-name :has))
          (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear)))
     (with-gensyms (obj)
       `(
@@ -642,8 +678,10 @@ Paramters:
                     `(,(proto-oneof-offset field) ',(proto-external-field-name field)))
             ((nil) nil)))
 
-        (defun-inline ,has-function-name (,obj)
+        (defun-inline ,internal-has-function-name (,obj)
           (not (eql (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
+        (defun-inline ,external-has-function-name (,obj)
+          (,internal-has-function-name ,obj))
 
         (defun-inline ,clear-function-name (,obj)
           (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
@@ -651,7 +689,7 @@ Paramters:
 
         ;; Special oneof forms are only created when ONEOF is not synthetic.
         ,(unless (oneof-descriptor-synthetic-p oneof)
-           `(export '(,case-function-name ,has-function-name ,clear-function-name)))
+           `(export '(,case-function-name ,external-has-function-name ,clear-function-name)))
 
         ;; Fields inside of a oneof need special accessors, since they need to consult
         ;; with the oneof struct. This creates those special accessors for each field.
@@ -664,8 +702,10 @@ Paramters:
             (let* ((public-slot-name (proto-external-field-name field))
                    (public-accessor-name (proto-slot-function-name
                                           proto-type public-slot-name :get))
-                   (has-function-name    (proto-slot-function-name
-                                          proto-type public-slot-name :has))
+                   (internal-has-function-name (proto-slot-function-name
+                                                proto-type public-slot-name :internal-has))
+                   (external-has-function-name (proto-slot-function-name
+                                                proto-type public-slot-name :has))
                    (clear-function-name  (proto-slot-function-name
                                           proto-type public-slot-name :clear))
                    (default-form (get-default-form (proto-type field)
@@ -674,6 +714,7 @@ Paramters:
                                                    (proto-kind field)))
                    (field-type (proto-type field))
                    (oneof-offset (proto-oneof-offset field)))
+
               ;; If a field isn't currently set inside of the oneof, just return its
               ;; default value.
               (with-gensyms (obj new-value bytes field-obj)
@@ -696,12 +737,14 @@ Paramters:
                           ,oneof-offset)
                     (setf (oneof-value (,hidden-accessor-name ,obj)) ,new-value))
 
-                  (defun-inline ,has-function-name (,obj)
+                  (defun-inline ,internal-has-function-name (,obj)
                     (eq (oneof-set-field (,hidden-accessor-name ,obj))
                         ,oneof-offset))
+                  (defun-inline ,external-has-function-name (,obj)
+                    (,internal-has-function-name ,obj))
 
                   (defun-inline ,clear-function-name (,obj)
-                    (when (,has-function-name ,obj)
+                    (when (,internal-has-function-name ,obj)
                       (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
                       (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
 
@@ -713,7 +756,7 @@ Paramters:
 
                   (set-field-accessor-functions ',proto-type ',public-slot-name)
 
-                  (export '(,has-function-name
+                  (export '(,external-has-function-name
                             ,clear-function-name
                             ,public-accessor-name))))))))))
 
@@ -757,7 +800,10 @@ function) then there is no guarantee on the serialize function working properly.
 
             `((defun-inline ,public-accessor-name (,new-key ,obj)
                 (declare (type ,key-type ,new-key))
-                (the (values ,(if (eq value-kind :enum) 'keyword val-type) t)
+                (the (values ,(if (eq value-kind :enum)
+                                  (enum-open-type val-type)
+                                  val-type)
+                             t)
                      (multiple-value-bind (val flag)
                          (gethash ,new-key (,hidden-accessor-name ,obj))
                        (if flag
@@ -854,16 +900,13 @@ function) then there is no guarantee on the serialize function working properly.
          (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
          (field-type (proto-type field))
          (accessor-return-type
-          ;; For enum accessors we return either the enum keyword or :%undefined-<n>
-          (let ((structure-field-type (if (eq (proto-kind field) :enum)
-                                          'keyword field-type)))
-            (cond ((eq (proto-container field) :vector)
-                   `(cl-protobufs:vector-of ,structure-field-type))
-                  ((eq (proto-container field) :list)
-                   `(cl-protobufs:list-of ,structure-field-type))
-                  ((member (proto-kind field) '(:message :group :extends))
-                   `(or null ,structure-field-type))
-                  (t structure-field-type)))))
+          (cond ((eq (proto-container field) :vector)
+                 `(cl-protobufs:vector-of ,field-type))
+                ((eq (proto-container field) :list)
+                 `(cl-protobufs:list-of ,field-type))
+                ((member (proto-kind field) '(:message :group :extends))
+                 `(or null ,field-type))
+                (t field-type))))
     (with-gensyms (obj)
       `((defun-inline ,public-accessor-name (,obj)
           (the ,accessor-return-type
@@ -940,10 +983,6 @@ function) then there is no guarantee on the serialize function working properly.
          (public-non-lazy-slot-names (mapcar #'proto-external-field-name non-lazy-fields))
          (is-set-name (fintern "~A-%%IS-SET" proto-type))
          (clear-is-set-name (fintern "~A.CLEAR-%%IS-SET" proto-type))
-         (is-set-init (field-data-initform
-                       (find-if #'(lambda (el)
-                                    (eq (field-data-internal-slot-name el) '%%is-set))
-                                slots)))
          (additional-slots '(%%is-set))
          (oneof-fields (loop for oneof in oneofs
                              append (coerce (oneof-descriptor-fields oneof) 'list))))
@@ -1026,7 +1065,7 @@ function) then there is no guarantee on the serialize function working properly.
 
          ;; Define clear functions.
          (defun ,clear-is-set-name (,obj)
-           (setf (,is-set-name ,obj) ,is-set-init))
+           (fill (,is-set-name ,obj) 0))
 
          (export '(,public-constructor-name ,is-set-name))
          (defmethod clear ((,obj ,proto-type))
@@ -1332,9 +1371,8 @@ function) then there is no guarantee on the serialize function working properly.
                     $empty-default))
                (default (if default-p default $empty-default))
                (cslot (unless alias-for
-                        ;; For enums we have to keep track of unknown
-                        ;; deserialized values so it can't be a strict
-                        ;; member of a set of keywords...
+                        ;; Enum type specifiers might not be loaded.
+                        ;; Seems like this could be fixed...
                         (let ((type (if (eq kind :enum) 'keyword type)))
                           (make-field-data
                            :internal-slot-name internal-slot-name
@@ -1366,7 +1404,7 @@ function) then there is no guarantee on the serialize function working properly.
                (field (make-instance
                        'field-descriptor
                        :name (or name (slot-name->proto slot))
-                       :type (if (eq kind :enum) 'keyword type)
+                       :type (if (eq kind :enum) (enum-open-type type) type)
                        :kind kind
                        :class type
                        :qualified-name (make-qualified-name *current-message-descriptor*
@@ -1460,7 +1498,8 @@ function) then there is no guarantee on the serialize function working properly.
                             (or (find-package name)
                                 (make-package name :use '()))))
                  (client-fn (intern (nstring-upcase (format nil "CALL-~A" function)) package))
-                 (server-fn (intern (nstring-upcase (format nil "~A-IMPL" function)) package))
+                 (old-server-fn (intern (nstring-upcase (format nil "~A-IMPL" function)) package))
+                 (server-fn (intern (nstring-upcase (format nil "~A" function)) package))
                  (method  (make-instance
                            'method-descriptor
                            :class function
@@ -1471,6 +1510,8 @@ function) then there is no guarantee on the serialize function working properly.
                            :service-name (proto-name service)
                            :client-stub client-fn
                            :server-stub server-fn
+                           ;; TODO(jgodbout): Remove this.
+                           :old-server-stub old-server-fn
                            :input-type  input-type
                            :input-name  (or input-name qual-input-type)
                            :input-streaming input-streaming
@@ -1488,7 +1529,8 @@ function) then there is no guarantee on the serialize function working properly.
                    (vresponse (intern "RESPONSE" package))
                    (vchannel  (intern "CHANNEL" package))
                    (vcallback (intern "CALLBACK" package))
-                   (vrpc      (intern "RPC" package)))
+                   (vrpc      (intern "RPC" package))
+                   (call  (gensym "CALL")))
               ;; The client side stub, e.g., 'read-air-reservation'.
               ;; The expectation is that the RPC implementation will provide code to make it
               ;; easy to implement a method for this on each kind of channel (HTTP, TCP socket,
@@ -1528,8 +1570,7 @@ function) then there is no guarantee on the serialize function working properly.
                                package))
                       (cleanup-call
                        (intern (nstring-upcase (format nil "~A/CLEANUP" function))
-                               package))
-                      (call  (gensym "CALL")))
+                               package)))
                   (collect-form
                    `(defun ,start-call (,vchannel)
                       (assert-rpc-function-defined *rpc-streaming-client-function*)
@@ -1572,8 +1613,11 @@ function) then there is no guarantee on the serialize function working properly.
               ;; etc, and can be side-effected to indicate success or failure.
               ;; The RPC code provides the channel classes and does (de)serialization, etc.
               ;; The VRPC argument is always of type RPC2:SERVER-RPC.
-              (collect-form `(defgeneric ,server-fn (,vchannel ,vrequest ,vrpc)
+              (collect-form `(defgeneric ,old-server-fn (,vchannel ,vrequest ,vrpc)
+                               #+(or ccl)
+                               (declare (values ,output-type))))
+              (collect-form `(defgeneric ,server-fn (,vrequest ,call)
                                #+(or ccl)
                                (declare (values ,output-type))))))))
-      (collect-form `(appendf (proto-services *current-file-descriptor*) (list ,service)))
+      (collect-form `(record-protobuf-object ',type ,service :service))
       `(progn ,@forms))))

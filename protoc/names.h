@@ -27,6 +27,8 @@ const std::string ToLispName(const std::string& name);
 
 // Provides a name for the Enum described by the descriptor.
 const std::string EnumLispName(const EnumDescriptor* descriptor);
+// Provides a name for the Lisp Enum Value that turns into a keyword.
+const std::string ToLispEnumValue(const std::string& name);
 
 // Provides a name for the Message described by the descriptor.
 // Uses lisp_name extension.

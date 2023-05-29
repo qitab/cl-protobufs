@@ -12,6 +12,10 @@
   (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\space #\tab #\return #\newline))))
 
+(defun-inline proto-hash-char-p (ch)
+  (declare #.*optimize-fast-unsafe*)
+  (and ch (eq ch #\#)))
+
 (defun-inline proto-eol-char-p (ch)
   (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\return #\newline))))
@@ -22,11 +26,27 @@
               (digit-char-p ch)
               (member ch '(#\_ #\.)))))
 
+(defun skip-whitespace-comments-and-chars (stream &key chars)
+  "Skip all whitespace characters, text-format comments and elements of CHARS
+are coming up in the STREAM."
+  (loop for ch = (peek-char nil stream nil)
+        until (or (null ch)
+                  (and (not (proto-whitespace-char-p ch))
+                       (not (proto-hash-char-p ch))
+                       (not (if (listp chars)
+                                (member ch chars)
+                                (eql ch chars)))))
+        do
+     (if (proto-hash-char-p ch)
+         (read-line stream nil)
+         (read-char stream nil))))
+
 (defun skip-whitespace (stream)
   "Skip all the whitespace characters that are coming up in the stream."
   (loop for ch = (peek-char nil stream nil)
         until (or (null ch) (not (proto-whitespace-char-p ch)))
-        do (read-char stream nil)))
+        do
+     (read-char stream nil)))
 
 (defun expect-matching-end (stream start-char)
   "Expect that the starting block element START-CHAR matches the next element
@@ -67,12 +87,12 @@
 (defun maybe-skip-chars (stream chars)
   "Skip some optional characters in the stream,
    then skip all of the following whitespace."
-  (skip-whitespace stream)
+  (skip-whitespace-comments-and-chars stream)
   (when chars
     (loop
       (let ((ch (peek-char nil stream nil)))
         (when (or (null ch) (not (member ch chars)))
-          (skip-whitespace stream)
+          (skip-whitespace-comments-and-chars stream)
           (return-from maybe-skip-chars)))
       (read-char stream))))
 
@@ -161,19 +181,21 @@
 (defun parse-string (stream)
   "Parse the next quoted string in the stream, then skip the following whitespace.
    The returned value is the string, without the quotation marks."
-  (loop with ch0 = (read-char stream nil)
-        for ch = (read-char stream nil)
-        until (or (null ch) (char= ch ch0))
-        when (eql ch #\\)
-          do (setq ch (unescape-char stream))
-        collect ch into string
-        finally (progn
-                  (skip-whitespace stream)
-                  (if (eql (peek-char nil stream nil) ch0)
-                    ;; If the next character is a quote character, that means
-                    ;; we should go parse another string and concatenate it
-                    (return (strcat (coerce string 'string) (parse-string stream)))
-                    (return (coerce string 'string))))))
+  (let ((ch0 (read-char stream nil)))
+    (unless (member ch0 '(#\' #\"))
+      (protobuf-error "Starting string character ~c should be \' or \"." ch0))
+    (loop for ch = (read-char stream nil)
+          until (or (null ch) (char= ch ch0))
+          when (eql ch #\\)
+            do (setq ch (unescape-char stream))
+          collect ch into string
+          finally (progn
+                    (skip-whitespace-comments-and-chars stream)
+                    (if (eql (peek-char nil stream nil) ch0)
+                        ;; If the next character is a quote character, that means
+                        ;; we should go parse another string and concatenate it
+                        (return (strcat (coerce string 'string) (parse-string stream)))
+                        (return (coerce string 'string)))))))
 
 (defun unescape-char (stream)
   "Parse the next \"escaped\" character from the stream."
@@ -267,7 +289,7 @@ to the end of the parsed numerical string."
           (or (digit-char-p ch) (member ch '(#\- #\+ #\.))))
     (let ((token (parse-token stream '(#\- #\+ #\.))))
       (when token
-        (skip-whitespace stream)
+        (skip-whitespace-comments-and-chars stream)
         (if append-d0
             (parse-numeric-string (concatenate 'string token "d0"))
             (parse-numeric-string token))))))

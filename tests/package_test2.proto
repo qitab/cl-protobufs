@@ -9,7 +9,7 @@ syntax = "proto2";
 package protobuf_package_unittest2;
 
 message MessageInOtherPackage {
-  required int32 foo = 1;
+  optional int32 foo = 1;
   extensions 1000 to max;
 }
 
@@ -18,5 +18,5 @@ enum EnumInOtherPackage {
 }
 
 message MessageDefinedInBothPackages {
-  required string bang = 1;
+  optional string bang = 1;
 }

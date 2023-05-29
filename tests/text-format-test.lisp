@@ -221,3 +221,82 @@ one_level_nesting {
         text-msg-pretty (format nil "~@/cl-protobufs:fmt/" msg))
     (assert-equality #'string=
         text-msg-not (format nil "~/cl-protobufs:fmt/" msg))))
+
+
+(deftest test-parse-text-format-with-# (text-format-suite)
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream "
+
+# Beginning rowlet
+int_field: 100
+sint_field:
+ # moo
+-1
+uint_field: # pika
+1
+float_field: 1.5 # toga
+# final rowlet
+
+"))))
+    (assert-eql 100 (test-pb:int-field msg))
+    (assert-eql -1 (test-pb:sint-field msg))
+    (assert-eql 1 (test-pb:uint-field msg))
+    (assert-eql 1.5 (test-pb:float-field msg))))
+
+(deftest test-repeated-message (text-format-suite)
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream "
+string_fields: 'row'
+repeated_message: [{int_field: 1}, {int_field: 2}]
+repeated_message: {int_field: 3}
+int_vals: 1
+int_vals: [2, 3]
+int_vals: 4
+string_fields: ['pika', 'chu']
+string_fields: 'let'
+string_fields: '#litten'
+symbol_field: ['nil']")))
+        (test-message (test-pb:make-text-format-test
+                       :string-fields '("row" "pika" "chu" "let" "#litten")
+                       :repeated-message
+                       (list (test-pb:make-text-format-test.nested-message1 :int-field 1)
+                             (test-pb:make-text-format-test.nested-message1 :int-field 2)
+                             (test-pb:make-text-format-test.nested-message1 :int-field 3))
+                       :int-vals '(1 2 3 4)
+                       :symbol-field '(nil))))
+    (assert-true (proto:proto-equal msg test-message :exact t))))
+
+(deftest test-unquoted-string (text-format-suite)
+  (assert-condition error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+string_field: rowlet
+repeated_message: [{int_field: 1}, {int_field: 2}]")))
+
+  (assert-condition error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+string_fields: ['pika', chu]
+repeated_message: [{int_field: 1}, {int_field: 2}]")))
+
+  (assert-condition error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+string_fields: ['pika', chu]
+string_fields: #litten
+repeated_message: [{int_field: 1}, {int_field: 2}]")))
+
+  (assert-condition error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+string_fields:
+  \"There were\"
+  five
+  \"Charmanders in the field\"
+repeated_message: [{int_field: 1}, {int_field: 2}]"))))

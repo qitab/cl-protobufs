@@ -746,7 +746,9 @@ and rewind BUFFER so that it is empty."
              (:conc-name octet-stream-)
              ;; Maybe Todo: supply a BOUT (byte-out) handler function.
              (:include sb-kernel:ansi-stream
-                       (out #'octet-stream-char-out)
+                       ;; "OUT" is the old slot name, "COUT" is the modern name
+                       (#.(if (find-symbol "ANSI-STREAM-OUT" "SB-KERNEL") 'out 'cout)
+                        #'octet-stream-char-out)
                        (sout #'octet-stream-string-out))
              (:constructor make-octet-output-stream (buffer)))
   ;; How many characters should the character producer be permitted to write
@@ -774,9 +776,13 @@ and rewind BUFFER so that it is empty."
          (decf (octet-stream-space-available stream))
          (octet-out (octet-stream-buffer stream) (char-code character)))))
 
+(macrolet ((ansi-stream-char-out-method (x)
+             `(,(or (find-symbol "ANSI-STREAM-COUT" "SB-KERNEL")
+                    (find-symbol "ANSI-STREAM-OUT" "SB-KERNEL"))
+               ,x)))
 (defun octet-stream-string-out (stream string start end)
   (declare (string string) (array-index start end))
-  (let ((f (sb-kernel:ansi-stream-out stream)))
+  (let ((f (ansi-stream-char-out-method stream)))
     (sb-kernel:with-array-data ((string string) (start start) (end end))
       (loop for i fixnum from start below end
             do (funcall f stream (char string i))))))
@@ -797,7 +803,7 @@ and rewind BUFFER so that it is empty."
     ;; Setting the space to 0 ensures we can't call the 'limited'
     ;; char out function without getting an obvious failure.
     (setf (octet-stream-space-available stream) 0
-          (sb-kernel:ansi-stream-out stream) #'octet-stream-char-out)
+          (ansi-stream-char-out-method stream) #'octet-stream-char-out)
     stream))
 
 ;; Return a stream that accepts a tiny string. 1 byte is reserved for the length.
@@ -806,7 +812,7 @@ and rewind BUFFER so that it is empty."
   (fast-octet-out buffer 0) ; easy way to leave a 1-byte space
   (let ((stream (%get-buffer-stream buffer)))
     (setf (octet-stream-space-available stream) 127
-          (sb-kernel:ansi-stream-out stream) #'octet-stream-limited-char-out)
+          (ansi-stream-char-out-method stream) #'octet-stream-limited-char-out)
     stream))
 
 ;; Return a stream that accepts a known-length string. The length gets encoded first.
@@ -814,8 +820,9 @@ and rewind BUFFER so that it is empty."
   (encode-uint32 n-chars buffer) ; emit the variable-length length prefix
   (let ((stream (%get-buffer-stream buffer)))
     (setf (octet-stream-space-available stream) n-chars
-          (sb-kernel:ansi-stream-out stream) #'octet-stream-limited-char-out)
+          (ansi-stream-char-out-method stream) #'octet-stream-limited-char-out)
     stream))
+)
 
 ;; WITH-BUFFER-AS-STREAM binds STREAM to a character output stream that when written to
 ;; places ASCII characters into BUFFER. There are three cases, listed here

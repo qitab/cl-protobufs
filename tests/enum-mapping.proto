@@ -4,6 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT.
 
+// LINT: LEGACY_NAMES
+
 syntax = "proto2";
 
 package enum_mapping_test;
@@ -15,6 +17,7 @@ message MyOtherMessage {
 message MyMessage {
   enum MyEnum {
     option allow_alias = true;
+
     FOO = 1;
     BAR = 2;
     BAZ = 2;
@@ -25,6 +28,7 @@ message MyMessage {
 
 enum OuterEnum {
   option allow_alias = true;
+
   FOO = 11;
   BAR = 12;
   BAZ = 12;
@@ -35,4 +39,15 @@ enum AnotherEnum {
   ONE = 1;
   TWO = 2;
   THREE = 3;
+}
+
+enum MakeDifferentEnumVals {
+  ANY = 0;
+  _PIKA = 1;
+  _100 = 2;
+  _300 = 3;
+  _300_100 = 4;
+  _300_CHAR = 5;
+  _MANDER_400 = 6;
+  CHAR_300MANDER = 7;
 }

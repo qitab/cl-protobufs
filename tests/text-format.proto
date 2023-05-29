@@ -55,4 +55,5 @@ message TextFormatTest {
   repeated int32 int_vals = 28;
   repeated string symbol_field = 29 [(lisp_type) = "CL:SYMBOL"];
   optional string symbol_field2 = 30 [(lisp_type) = "CL:SYMBOL"];
+  repeated NestedMessage1 repeated_message = 31;
 }

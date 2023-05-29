@@ -25,7 +25,8 @@ and functionality for working with them."
                :alexandria
                :trivial-garbage
                :cl-base64
-               :local-time)
+               :local-time
+               :float-features)
   :serial t
   :in-order-to ((test-op (test-op :cl-protobufs/tests)))
   :components
@@ -40,7 +41,6 @@ and functionality for working with them."
     :depends-on ("packages")
     :components
     ((:file "utilities")
-     #-(and sbcl 64-bit) (:file "float-bits")
      (:file "model-classes")
      (:file "conditions")))
    (:module "parsing"
@@ -75,7 +75,9 @@ and functionality for working with them."
     :pathname ""
     :depends-on ("models" "misc")
     :components
-    ((:protobuf-source-file "any"
+    ((:protobuf-source-file "descriptor"
+      :proto-pathname "google/protobuf/descriptor.proto")
+     (:protobuf-source-file "any"
       :proto-pathname "google/protobuf/any.proto")
      (:protobuf-source-file "source_context"
       :proto-pathname "google/protobuf/source_context.proto")
@@ -265,6 +267,12 @@ and functionality for working with them."
     :pathname ""
     :depends-on ("lisp-alias")
     :components ((:file "lisp-alias-test")))
+
+   (:module "float-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "float")
+                 (:file "float-test")))
 
    (:module "packed-test"
     :serial t

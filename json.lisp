@@ -229,11 +229,9 @@ Parameters:
 is true, then skip fields which are not defined in MSG-DESC. Otherwise, throw an error. If
 SPLICED-P is true, then do not attempt to parse an opening bracket."
   (declare (type message-descriptor msg-desc))
-  (let ((object #+sbcl (make-instance (or (pi::proto-alias-for msg-desc)
-                                          (proto-class msg-desc)))
-                #-sbcl (funcall (pi::get-constructor-name
-                                 (or (pi::proto-alias-for msg-desc)
-                                     (proto-class msg-desc)))))
+  (let ((object (funcall (pi::get-constructor-name
+                          (or (pi::proto-alias-for msg-desc)
+                              (proto-class msg-desc)))))
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
     (when (special-json-p (proto-class msg-desc))
@@ -665,8 +663,7 @@ calls to PARSE-JSON-IMPL."
        (t (google:make-value :number-value (pi::parse-double stream :append-d0 t)))))
 
     ;; Otherwise, the well known type is a wrapper type.
-    (t (let ((object #+sbcl (make-instance type)
-                     #-sbcl (funcall (pi::get-constructor-name type)))
+    (t (let ((object (funcall (pi::get-constructor-name type)))
              (value (parse-value-from-json (wrapper-message->type type) :stream stream)))
          (setf (google:value object) value)
          object))))

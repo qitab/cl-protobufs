@@ -10,10 +10,10 @@
 #include <unordered_set>
 #include <vector>
 
-#include <google/protobuf/io/printer.h>
-#include <google/protobuf/io/zero_copy_stream.h>
 #include <google/protobuf/descriptor.h>
 #include "file.h"
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/io/zero_copy_stream.h>
 
 namespace google {
 namespace protobuf {
