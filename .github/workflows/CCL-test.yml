@@ -1,43 +1,64 @@
 # @file CCL-test.yml
 ---
 name: CCL-Tests
+
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Update apt package list
-        run: sudo apt update
-
       - name: Download ccl
         run: |
           curl -o ccl.tar.gz --location 'https://github.com/Clozure/ccl/releases/download/v1.12/ccl-1.12-linuxx86.tar.gz'
           tar -xzf ccl.tar.gz
+
       - name: Download quicklisp
         run: curl -o quicklisp.lisp 'https://beta.quicklisp.org/quicklisp.lisp'
+
 
       - name: Install quicklisp
         run: |
           ./ccl/lx86cl64 --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
           ./ccl/lx86cl64 --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
+
       - name: Download repo
         uses: actions/checkout@v2
         with:
           path: quicklisp/local-projects/cl-protobufs
+
       - name: Add cl-protobufs/protoc to path
         run: echo "::add-path:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
 
+      - name: Install cmake & required tooling
+        run: |
+          sudo apt install -y cmake
+          sudo apt install -y build-essential autoconf libtool pkg-config
+
+      - name: Clone gRPC Github repo
+        run: git clone --recurse-submodules --depth 1 --shallow-submodules https://github.com/grpc/grpc
+
       - name: Download and install protobuf
-        run: sudo apt install -y protobuf-compiler libprotobuf-dev libprotoc-dev
+        run: |
+          cd grpc
+          mkdir cmake/build
+          pushd cmake/build
+          cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr/local/ ../..
+          make -j 4
+          sudo make install
+          sudo ldconfig
+          popd
+
       - name: Install protoc plug-in
         run: |
           cd $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc &&
-          PROTOC_ROOT=/usr make
+          PROTOC_ROOT=/usr/local make
+
       - name: Load and run tests
         run: |
           export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
