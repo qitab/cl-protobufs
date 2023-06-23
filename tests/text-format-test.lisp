@@ -300,3 +300,22 @@ string_fields:
   five
   \"Charmanders in the field\"
 repeated_message: [{int_field: 1}, {int_field: 2}]"))))
+
+;; Test print-object
+(deftest print-object-test (text-format-suite)
+  (let* ((msg (proto:parse-text-format
+                     'test-pb:text-format-test
+                     :stream (make-string-input-stream "
+string_fields: 'row'
+repeated_message: [{int_field: 1}, {int_field: 2}]
+repeated_message: {int_field: 3}
+int_vals: 1
+int_vals: [2, 3]
+int_vals: 4
+string_fields: ['pika', 'chu']
+string_fields: 'let'
+string_fields: '#litten'
+symbol_field: ['nil']"))))
+
+    (assert-equalp "#<TEXT-FORMAT-TEST string_fields: \"row\" string_fields: \"pika\" string_fields: \"chu\" string_fields: \"let\" string_fields: \"#litten\" int_vals: 1 int_vals: 2 int_vals: 3 int_vals: 4 symbol_field: \"NIL\" repeated_message { int_field: 1 } repeated_message { int_field: 2 } repeated_message { int_field: 3 } >"
+        (format nil "~A" msg))))
