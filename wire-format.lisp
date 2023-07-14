@@ -959,7 +959,7 @@
                (sb-impl::get-external-format-or-lose :utf-8)))
              string start end 0))
   #-sbcl
-  (babel:string-to-octets string))
+  (babel:string-to-octets string :encoding :utf-8))
 
 ;; The number of bytes to reserve to write a 'uint32' for the length of
 ;; a sub-message. In theory a uint32 should reserve 5 bytes,
