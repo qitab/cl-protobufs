@@ -238,31 +238,28 @@ enum-type name."))
 type name.  OPEN-TYPE is a type including the possibility of unknown enum keywords
 as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
   (let ((key2int (fintern "~A-KEYWORD-TO-INT" type))
-        (int2key (fintern "~A-INT-TO-KEYWORD" type)))
+         (int2key (fintern "~A-INT-TO-KEYWORD" type))
+         (enum-to-int (make-hash-table))
+         (int-to-enum (make-hash-table)))
+
+    (loop for desc in value-descriptors do
+      (let ((enum (enum-value-descriptor-name desc))
+            (value (enum-value-descriptor-value desc)))
+        (unless (gethash enum enum-to-int)
+          (setf (gethash enum enum-to-int) value))
+        (unless (gethash value int-to-enum)
+          (setf (gethash value int-to-enum) enum))))
     `(progn
        (defun ,key2int (enum)
          (declare (type ,open-type enum))
-         (let ((int (case enum
-                      ,@(loop for desc in value-descriptors
-                              collect `(,(enum-value-descriptor-name desc)
-                                        ,(enum-value-descriptor-value desc)))
-                      (t (parse-integer (subseq (symbol-name enum)
-                                                +%undefined--length+)
-                                        :junk-allowed t)))))
-           int))
+         (or (gethash enum ,enum-to-int)
+             (parse-integer (subseq (symbol-name enum) +%undefined--length+)
+                            :junk-allowed t)))
 
        (defun ,int2key (numeral)
          (declare (type int32 numeral))
          (the (or null ,type)
-              (let ((key (case numeral
-                           ,@(loop with mapped = (make-hash-table)
-                                   for desc in value-descriptors
-                                   for int = (enum-value-descriptor-value desc)
-                                   for already-set-p = (gethash int mapped)
-                                   do (setf (gethash int mapped) t)
-                                   unless already-set-p
-                                     collect `(,int ,(enum-value-descriptor-name desc))))))
-                key)))
+              (values (gethash numeral ,int-to-enum))))
 
        (setf (get ',type 'enum-int-to-keyword) ',int2key)
        (setf (get ',type 'enum-keyword-to-int) ',key2int)
