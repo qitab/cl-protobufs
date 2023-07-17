@@ -38,6 +38,7 @@ message TextFormatTest {
       optional int32 int_field = 2;
     }
     optional NestedMessage2 message_2 = 2;
+    repeated NestedMessage1 repeated_message = 4;
   }
 
   optional NestedMessage1 one_level_nesting = 18;

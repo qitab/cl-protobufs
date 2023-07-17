@@ -319,3 +319,163 @@ symbol_field: ['nil']"))))
 
     (assert-equalp "#<TEXT-FORMAT-TEST string_fields: \"row\" string_fields: \"pika\" string_fields: \"chu\" string_fields: \"let\" string_fields: \"#litten\" int_vals: 1 int_vals: 2 int_vals: 3 int_vals: 4 symbol_field: \"NIL\" repeated_message { int_field: 1 } repeated_message { int_field: 2 } repeated_message { int_field: 3 } >"
         (format nil "~A" msg))))
+
+;; Test print-text-format
+(deftest print-text-format-test (text-format-suite)
+  (let* ((msg (proto:parse-text-format
+               'test-pb:text-format-test
+               :stream (make-string-input-stream "
+repeated_message: {
+   int_field: 11
+   message_2: {
+     int_field: 22
+   }
+}
+repeated_message: {
+  int_field: 23
+  message_2: {
+    int_field: 33
+  }
+}
+string_fields: 'child1'
+int_vals: [1, 2, 3, 4, 5]
+")))
+         (out (with-output-to-string (s)
+                (proto:print-text-format
+                 msg :stream s :print-length 3 :print-level 1))))
+    (assert-equalp
+"string_fields: \"child1\"
+int_vals: 1
+int_vals: 2
+int_vals: 3
+...
+repeated_message {
+  int_field: 11
+  message_2: {...}
+}
+repeated_message {
+  int_field: 23
+  message_2: {...}
+}
+" out)
+))
+
+(deftest print-text-format-test-nil (text-format-suite)
+  (let* ((msg (proto:parse-text-format
+               'test-pb:text-format-test
+               :stream (make-string-input-stream "
+repeated_message: {
+   int_field: 11
+   message_2: {
+     int_field: 22
+   }
+}
+repeated_message: {
+  int_field: 23
+  message_2: {
+    int_field: 33
+  }
+}
+string_fields: 'child1'
+int_vals: [1, 2, 3, 4, 5]
+")))
+         (out (with-output-to-string (s)
+                (proto:print-text-format
+                 msg :stream s))))
+    (assert-equalp
+"string_fields: \"child1\"
+int_vals: 1
+int_vals: 2
+int_vals: 3
+int_vals: 4
+int_vals: 5
+repeated_message {
+  int_field: 11
+  message_2 {
+    int_field: 22
+  }
+}
+repeated_message {
+  int_field: 23
+  message_2 {
+    int_field: 33
+  }
+}
+" out)
+))
+
+(deftest print-text-format-test-minusp (text-format-suite)
+  (let* ((msg (proto:parse-text-format
+               'test-pb:text-format-test
+               :stream (make-string-input-stream "
+repeated_message: {
+   int_field: 11
+   message_2 {
+     int_field: 22
+   }
+}
+repeated_message: {
+  int_field: 23
+  message_2 {
+    int_field: 33
+  }
+}
+string_fields: 'child1'
+int_vals: [1, 2, 3, 4, 5]
+")))
+         (out (with-output-to-string (s)
+                (proto:print-text-format
+                 msg :stream s :print-length 3 :print-level -1))))
+    (assert-equalp
+"string_fields: \"child1\"
+int_vals: 1
+int_vals: 2
+int_vals: 3
+...
+repeated_message: {...}
+repeated_message: {...}
+" out)
+))
+
+(deftest test-nested-repeated-message (text-format-suite)
+  (let* ((msg (proto:parse-text-format
+               'test-pb:text-format-test
+               :stream (make-string-input-stream "
+repeated_message: {
+  int_field: 111
+  message_2: {
+    int_field: 222
+  }
+  repeated_message: {
+    int_field: 555
+    message_2: {
+      int_field: 666
+    }
+  }
+}
+string_fields: 'test1'
+int_vals: [10, 20, 30, 40]
+")))
+         (out (with-output-to-string (s)
+                (proto:print-text-format
+                 msg :stream s))))
+    (assert-equalp
+"string_fields: \"test1\"
+int_vals: 10
+int_vals: 20
+int_vals: 30
+int_vals: 40
+repeated_message {
+  int_field: 111
+  message_2 {
+    int_field: 222
+  }
+  repeated_message {
+    int_field: 555
+    message_2 {
+      int_field: 666
+    }
+  }
+}
+" out)
+))

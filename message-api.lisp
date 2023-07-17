@@ -327,4 +327,8 @@ Taken from https://github.com/protocolbuffers/protobuf-go/blob/master/proto/merg
 
 (defmethod print-object ((message message) stream)
   (print-unreadable-object (message stream :type t)
-    (print-text-format message :stream stream :pretty-print-p nil)))
+    (print-text-format message
+                       :stream stream
+                       :pretty-print-p nil
+                       :print-length *print-length*
+                       :print-level *print-level*)))

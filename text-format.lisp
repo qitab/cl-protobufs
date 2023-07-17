@@ -10,30 +10,26 @@
 ;;; The exported symbols are parse-text-format and print-text-format.
 
 (defun print-text-format (object &key
+                                 (indent 0)
                                  (stream *standard-output*)
-                                 (pretty-print-p t))
-    "Prints a protocol buffer message to a stream.
-Parameters:
-  OBJECT: The protocol buffer message to print.
-  STREAM: The stream to print to.
-  PRETTY-PRINT-P: When true, generate line breaks and other human readable output
-    in the text format. When false, replace line breaks with spaces."
-  (print-text-format-impl object :stream stream
-                                 :pretty-print-p pretty-print-p))
-
-(defun print-text-format-impl (object &key
-                                      (indent 0)
-                                      (stream *standard-output*)
-                                      (pretty-print-p t))
+                                 (pretty-print-p t)
+                                 (print-length nil)
+                                 (print-level nil))
   "Prints a protocol buffer message to a stream.
 Parameters:
   OBJECT: The protocol buffer message to print.
   INDENT: Indent the output by INDENT spaces. Only used for pretty-printing.
   STREAM: The stream to print to.
   PRETTY-PRINT-P: When true, generate line breaks and other human readable output
-    in the text format. When false, replace line breaks with spaces."
+    in the text format. When false, replace line breaks with spaces.
+  PRINT-LENGTH: Limit the number of elements in a repeated field to print.
+    Default is nil (print all).
+  PRINT-LEVEL: Limit the recursion depth in nested messages.
+    Default is nil (unlimited)."
   (let* ((type (type-of object))
-         (message (find-message-descriptor type :error-p t)))
+         (message (find-message-descriptor type :error-p t))
+         (print-level (1- (or print-level most-positive-fixnum)))
+         (print-length (or print-length most-positive-fixnum)))
     (dolist (field (proto-fields message))
       (when (if (eq (slot-value field 'kind) :extends)
                 (has-extension object (slot-value field 'external-field-name))
@@ -42,35 +38,52 @@ Parameters:
                 (if (eq (slot-value field 'kind) :extends)
                     (get-extension object (slot-value field 'external-field-name))
                     (proto-slot-value object (slot-value field 'external-field-name)))))
-          (if (eq (proto-label field) :repeated)
-              (doseq (val value)
-                     (print-field val
-                                  (proto-class field)
-                                  (proto-name field)
-                                  :indent indent
-                                  :stream stream
-                                  :pretty-print-p pretty-print-p))
-              (print-field value
-                           (proto-class field)
-                           (proto-name field)
-                           :indent indent
-                           :stream stream
-                           :pretty-print-p pretty-print-p)))))
+          (flet ((print-value (v)
+                   (%print-field v
+                                (proto-class field)
+                                (proto-name field)
+                                indent
+                                stream
+                                pretty-print-p
+                                print-length
+                                print-level)))
+            (cond
+             ((not (eq (proto-label field) :repeated))
+              (print-value value))
+             ((listp value)
+              (loop
+               :for element :in value
+               :for i :from 0 :below print-length
+               :do (print-value element)
+               :finally
+               (when (>= i print-length)
+                 (princ "..." stream))))
+             ((arrayp value)
+              (loop
+               :for element :across value
+               :for i :from 0 :below print-length
+               :do (print-value element)
+               :finally
+               (when (>= i print-length)
+                 (princ "..." stream))))
+             (t
+              (princ "ERROR: unknown type of repeated field." stream)))))))
     (dolist (oneof (proto-oneofs message))
       (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
              (set-field (oneof-set-field oneof-data)))
         (when set-field
           (let ((field-desc (aref (oneof-descriptor-fields oneof) set-field)))
-            (print-field (oneof-value oneof-data)
+            (%print-field (oneof-value oneof-data)
                          (proto-class field-desc)
                          (proto-name field-desc)
-                         :indent indent
-                         :stream stream
-                         :pretty-print-p pretty-print-p)))))
+                         indent
+                         stream
+                         pretty-print-p
+                         print-length
+                         print-level)))))
     nil))
 
-(defun print-field (value type name
-                    &key (indent 0) (stream *standard-output*) (pretty-print-p t))
+(defun %print-field (value type name indent stream pretty-print-p print-length print-level)
   "Print the text format of a single field which is not repeated.
 Parameters:
   VALUE: The value in the field to print.
@@ -80,10 +93,12 @@ Parameters:
   INDENT: If supplied, indent the text by INDENT spaces.
   STREAM: The stream to output to.
   PRINT-NAME: Whether or not to print the name of the field.
-  PRETTY-PRINT-P: When true, print newlines and indentation."
-  ;; If VALUE is NIL and the type is not boolean, there is nothing to do.
+  PRETTY-PRINT-P: When true, print newlines and indentation.
+  PRINT-LENGTH: Limit the number of elements in a repeated field to print.
+  PRINT-LEVEL: Limit the recursion depth in nested messages."
+;; If VALUE is NIL and the type is not boolean, there is nothing to do.
   (unless (or value (eq type 'boolean) (eq type 'symbol))
-    (return-from print-field nil))
+    (return-from %print-field nil))
   (let (desc)
     (cond
       ((scalarp type)
@@ -93,22 +108,33 @@ Parameters:
                              (find-enum-descriptor type)
                              (find-map-descriptor type)))
               'message-descriptor)
-       (print-message-brace t name pretty-print-p indent stream)
-       (print-text-format-impl value :indent (+ indent 2)
-                                     :stream stream
-                                     :pretty-print-p pretty-print-p)
-       (print-message-brace nil name pretty-print-p indent stream))
+       (cond ((>= print-level 0)
+             (print-message-brace t name pretty-print-p indent stream)
+             (print-text-format value :indent (+ indent 2)
+                                      :stream stream
+                                      :pretty-print-p pretty-print-p
+                                      :print-length print-length
+                                      :print-level print-level)
+             (print-message-brace nil name pretty-print-p indent stream))
+       (pretty-print-p
+          (format stream "~&~V,0T~A: {...}~%" indent name))
+       (t
+          (format stream "~A: {...} " name))))
       ((typep desc 'enum-descriptor)
        (print-enum value desc name stream (and pretty-print-p indent)))
       ((typep desc 'map-descriptor)
        (loop for k being the hash-keys of value using (hash-value v)
+             for i from 0 below print-length
              do (if pretty-print-p
                     (format stream "~&~V,0T~A { " indent name)
                     (format stream "~A { " name))
                 (print-scalar k (proto-key-type desc) "key" stream nil)
-                (print-field v (proto-value-type desc) "value"
-                             :stream stream
-                             :pretty-print-p nil)
+                (%print-field v (proto-value-type desc) "value"
+                              (+ indent 2)
+                              stream
+                              pretty-print-p
+                              print-length
+                              print-level)
                 (format stream "}")
                 (when pretty-print-p
                   (format stream "~%"))))
@@ -376,4 +402,8 @@ return T as a second value."
   (declare (ignore width))
   (cond (other-args (error "FORMAT directive ~~/cl-protobufs:fmt/ takes only one argument."))
         (colon-p (error "FORMAT directive ~~/cl-protobufs:fmt/ does not take colons."))
-        (t (print-text-format proto :stream stream :pretty-print-p at-sign-p))))
+        (t (print-text-format proto
+                              :stream stream
+                              :pretty-print-p at-sign-p
+                              :print-length *print-length*
+                              :print-level *print-level*))))
