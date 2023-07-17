@@ -951,13 +951,7 @@
 
 (defun-inline fast-utf8-encode (string)
   #+sbcl
-  (sb-kernel:with-array-data ((string string) (start 0) (end nil)
-                              :check-fill-pointer t)
-    ;; This avoids calling GET-EXTERNAL-FORMAT at runtime.
-    (funcall (load-time-value
-              (sb-impl::ef-string-to-octets-fun
-               (sb-impl::get-external-format-or-lose :utf-8)))
-             string start end 0))
+  (sb-ext:string-to-octets string :external-format :utf-8)
   #-sbcl
   (babel:string-to-octets string :encoding :utf-8))
 
@@ -1079,7 +1073,8 @@
                   (if (< byte 128)
                       (setf (aref str dst-idx) (code-char byte))
                       (return
-                        (sb-impl::utf8->string-aref buffer idx (i+ idx len)))))))
+                        (sb-ext:octets-to-string buffer :start idx :end (i+ idx len)
+                                                 :external-format :utf-8))))))
             #-sbcl
             (babel:octets-to-string buffer :start idx :end (i+ idx len) :encoding :utf-8)
             (i+ idx len))))
