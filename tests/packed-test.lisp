@@ -8,8 +8,8 @@
 
 (defpackage #:cl-protobufs.test.packed
   (:use #:cl
-        #:clunit
-        #:cl-protobufs.protobuf-unittest) ; from unittest.proto
+        #:cl-protobufs.protobuf-unittest
+        #:clunit) ; from unittest.proto
   (:local-nicknames (#:pi #:cl-protobufs.implementation)
                     (#:proto #:cl-protobufs))
   (:export :run))

@@ -6,9 +6,9 @@
 
 (defpackage #:cl-protobufs.test.map
   (:use #:cl
-        #:clunit
+        #:cl-protobufs
         #:cl-protobufs.map-test
-        #:cl-protobufs)
+        #:clunit)
   (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 

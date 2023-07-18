@@ -5,8 +5,8 @@
 ;;; https://opensource.org/licenses/MIT.
 
 (defpackage #:cl-protobufs.math-test
-  (:use #:cl
-        #:ace.test
+  (:use #:ace.test
+        #:cl
         #:cl-protobufs
         #:cl-protobufs.math
         #:cl-protobufs.math-example))

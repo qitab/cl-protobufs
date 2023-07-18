@@ -1,8 +1,8 @@
 (defpackage #:cl-protobufs.test.fast-serializers
   (:use #:cl
-        #:clunit
+        #:cl-protobufs
         #:cl-protobufs.map-test
-        #:cl-protobufs)
+        #:clunit)
   (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 

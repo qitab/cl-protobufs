@@ -157,7 +157,7 @@
    #:*rpc-streaming-client-function*))
 
 (defpackage #:cl-protobufs.implementation
-  (:use :common-lisp :cl-protobufs)
+  (:use :cl-protobufs :common-lisp)
   (:import-from :alexandria #:define-constant)
   (:export
    ;; Exported for use by generated code. These shouldn't be called directly.

@@ -8,9 +8,9 @@
 
 (defpackage #:cl-protobufs.test.serialize
   (:use #:cl
-        #:clunit
         #:cl-protobufs
-        #:cl-protobufs.serialization-test)
+        #:cl-protobufs.serialization-test
+        #:clunit)
   (:export :run))
 
 (in-package #:cl-protobufs.test.serialize)

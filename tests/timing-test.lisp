@@ -6,8 +6,8 @@
 
 (defpackage #:cl-protobufs.test.timing
   (:use #:cl
-        #:clunit
-        #:cl-protobufs)
+        #:cl-protobufs
+        #:clunit)
   (:local-nicknames
    (#:serial-proto #:cl-protobufs.serialization-test)
    (#:oneof-proto #:cl-protobufs.oneof-test)

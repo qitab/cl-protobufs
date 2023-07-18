@@ -6,8 +6,8 @@
 
 (defpackage #:cl-protobufs.test.lazy
   (:use #:cl
-        #:clunit
-        #:cl-protobufs.third-party.lisp.cl-protobufs.tests)
+        #:cl-protobufs.third-party.lisp.cl-protobufs.tests
+        #:clunit)
   (:local-nicknames (#:pi #:cl-protobufs.implementation)
                     (#:proto #:cl-protobufs))
   (:export :run))

@@ -6,11 +6,11 @@
 
 (defpackage #:cl-protobufs.test.services
   (:use #:cl
-        #:clunit
         #:cl-protobufs.protobuf-package-unittest1
         #:cl-protobufs.protobuf-package-unittest1-rpc
         #:cl-protobufs.service-test-pb
-        #:cl-protobufs.service-test-pb-rpc)
+        #:cl-protobufs.service-test-pb-rpc
+        #:clunit)
   (:local-nicknames (#:pi #:cl-protobufs.implementation)
                     (#:proto #:cl-protobufs))
   (:export :run))

@@ -5,10 +5,10 @@
 ;;; https://opensource.org/licenses/MIT.
 
 (defpackage #:cl-protobufs.test.full
-  (:use #:cl
-        #:clunit
+  (:use #:alexandria
+        #:cl
         #:cl-protobufs
-        #:alexandria)
+        #:clunit)
   (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 

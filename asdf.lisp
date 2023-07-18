@@ -16,8 +16,8 @@
 
 (defpackage #:protobuf-system
   (:documentation "System definitions for protocol buffer code.")
-  (:use #:common-lisp
-        #:asdf
+  (:use #:asdf
+        #:common-lisp
         #:protobuf-config)
   (:export #:protobuf-source-file
            #:proto-pathname

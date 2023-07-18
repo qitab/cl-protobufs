@@ -6,9 +6,9 @@
 
 (defpackage #:cl-protobufs.test.serialization
   (:use #:cl
-        #:clunit
         #:cl-protobufs
-        #:cl-protobufs.serialization-test)
+        #:cl-protobufs.serialization-test
+        #:clunit)
   (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 

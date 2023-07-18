@@ -5,11 +5,11 @@
 ;;; https://opensource.org/licenses/MIT.
 
 (defpackage #:cl-protobufs.test.zigzag
-  (:use #:cl
-        #:clunit
+  (:use #:alexandria
+        #:cl
         #:cl-protobufs
-        #:alexandria
-        #:cl-protobufs.zigzag-test)
+        #:cl-protobufs.zigzag-test
+        #:clunit)
   (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 

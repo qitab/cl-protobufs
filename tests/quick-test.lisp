@@ -6,8 +6,8 @@
 
 (defpackage #:cl-protobufs.test.quick
   (:use #:cl
-        #:clunit
-        #:cl-protobufs)
+        #:cl-protobufs
+        #:clunit)
   (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 

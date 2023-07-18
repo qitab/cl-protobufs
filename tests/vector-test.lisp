@@ -6,9 +6,9 @@
 
 (defpackage #:cl-protobufs.test.vector
   (:use #:cl
-        #:clunit
+        #:cl-protobufs
         #:cl-protobufs.repeated-proto
-        #:cl-protobufs)
+        #:clunit)
   (:export :run))
 
 (in-package #:cl-protobufs.test.vector)

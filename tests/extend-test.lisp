@@ -8,9 +8,9 @@
 
 (defpackage #:cl-protobufs.test.extend
   (:use #:cl
-        #:clunit
         #:cl-protobufs
-        #:cl-protobufs.extend-test)
+        #:cl-protobufs.extend-test
+        #:clunit)
   (:export :run))
 
 (in-package #:cl-protobufs.test.extend)

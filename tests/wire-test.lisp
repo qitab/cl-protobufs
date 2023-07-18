@@ -6,8 +6,8 @@
 
 (defpackage #:cl-protobufs.test.wire-format
   (:use #:cl
-        #:clunit
-        #:cl-protobufs)
+        #:cl-protobufs
+        #:clunit)
   (:import-from #:cl-protobufs.implementation
                 #:make-octet-buffer
                 #:concatenate-blocks

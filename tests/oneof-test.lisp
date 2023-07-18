@@ -6,9 +6,9 @@
 
 (defpackage #:cl-protobufs.test.oneof
   (:use #:cl
-        #:clunit
+        #:cl-protobufs
         #:cl-protobufs.oneof-test
-        #:cl-protobufs)
+        #:clunit)
   (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
