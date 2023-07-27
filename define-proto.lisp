@@ -233,33 +233,61 @@ If no enum exists for the specified integer return nil."))
    "Converts a KEYWORD to its corresponding integer value.  ENUM-TYPE is the
 enum-type name."))
 
+(defconstant +threshold-enum-mapping+ 10
+  "Threshold for using optimized enum mapping.")
+
 (defun make-enum-conversion-forms (type open-type value-descriptors)
   "Generates forms for enum <-> integer conversion functions. TYPE is the enum
 type name.  OPEN-TYPE is a type including the possibility of unknown enum keywords
 as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
   (let ((key2int (fintern "~A-KEYWORD-TO-INT" type))
-         (int2key (fintern "~A-INT-TO-KEYWORD" type))
-         (enum-to-int (make-hash-table))
-         (int-to-enum (make-hash-table)))
-
-    (loop for desc in value-descriptors do
-      (let ((enum (enum-value-descriptor-name desc))
-            (value (enum-value-descriptor-value desc)))
-        (unless (gethash enum enum-to-int)
-          (setf (gethash enum enum-to-int) value))
-        (unless (gethash value int-to-enum)
-          (setf (gethash value int-to-enum) enum))))
+        (int2key (fintern "~A-INT-TO-KEYWORD" type)))
     `(progn
-       (defun ,key2int (enum)
-         (declare (type ,open-type enum))
-         (or (gethash enum ,enum-to-int)
-             (parse-integer (subseq (symbol-name enum) +%undefined--length+)
-                            :junk-allowed t)))
+       ,(if (> (length value-descriptors) +threshold-enum-mapping+)
+            `(progn
+               (defun ,key2int (enum)
+                 (declare (type ,open-type enum))
+                 (let ((int (case enum
+                              ,@(loop for desc in value-descriptors
+                                      collect `(,(enum-value-descriptor-name desc)
+                                                ,(enum-value-descriptor-value desc)))
+                              (t (parse-integer (subseq (symbol-name enum)
+                                                        +%undefined--length+)
+                                                :junk-allowed t)))))
+                   int))
 
-       (defun ,int2key (numeral)
-         (declare (type int32 numeral))
-         (the (or null ,type)
-              (values (gethash numeral ,int-to-enum))))
+               (defun ,int2key (numeral)
+                 (declare (type int32 numeral))
+                 (the (or null ,type)
+                      (let ((key (case numeral
+                                   ,@(loop with mapped = (make-hash-table)
+                                           for desc in value-descriptors
+                                           for int = (enum-value-descriptor-value desc)
+                                           for already-set-p = (gethash int mapped)
+                                           do (setf (gethash int mapped) t)
+                                           unless already-set-p
+                                             collect `(,int ,(enum-value-descriptor-name desc))))))
+                        key))))
+            (let ((enum-to-int (make-hash-table))
+                  (int-to-enum (make-hash-table)))
+              (loop for desc in value-descriptors do
+                (let ((enum (enum-value-descriptor-name desc))
+                      (value (enum-value-descriptor-value desc)))
+                  (unless (gethash enum enum-to-int)
+                    (setf (gethash enum enum-to-int) value))
+                  (unless (gethash value int-to-enum)
+                    (setf (gethash value int-to-enum) enum))))
+              `(progn
+                 (defun ,key2int (enum)
+                   (declare (type ,open-type enum))
+                   (or (gethash enum ,enum-to-int)
+                       (parse-integer (subseq (symbol-name enum) +%undefined--length+)
+                                      :junk-allowed t)))
+
+                 (defun ,int2key (numeral)
+                   (declare (type int32 numeral))
+                   (the (or null ,type)
+                        (values (gethash numeral ,int-to-enum)))))))
 
        (setf (get ',type 'enum-int-to-keyword) ',int2key)
        (setf (get ',type 'enum-keyword-to-int) ',key2int)

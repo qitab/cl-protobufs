@@ -147,3 +147,22 @@ Parameters
         (msg-2 (pb:make-my-other-message)))
     (assert-eq (pb:my-other-message.other-enum msg) :baz)
     (assert-eq (pb:my-other-message.other-enum msg-2) :foo)))
+
+(deftest large-enum-mapping-test (enum-mapping-suite)
+  (assert-equal '(:b2 :c3 :d4 :e5 :f6 :g7 :h8 :i9 :j10 :k11 :l12 :m13 :n14 :o15)
+                (proto:enum-keywords 'pb:large-dense-enum))
+  (assert-equal '(:p16 :p17 :p18 :p19 :p20 :p21 :p22 :alias-one :alias-two :-p23 :p24 :p35)
+                (proto:enum-keywords 'pb:large-sparse-enum)))
+
+(deftest large-enum-mapping-test-2 (enum-mapping-suite)
+  (assert-equal 0 (pb:make-different-enum-vals-keyword-to-int :any))
+  (assert-equal 1 (pb:make-different-enum-vals-keyword-to-int :-pika))
+  (assert-equal 7 (pb:make-different-enum-vals-keyword-to-int :char-300mander))
+
+  (assert-equal 1 (pb:large-dense-enum-keyword-to-int :b2))
+  (assert-equal 13 (pb:large-dense-enum-keyword-to-int :n14))
+  (assert-equal 14 (pb:large-dense-enum-keyword-to-int :o15))
+
+  (assert-equal 2 (pb:large-sparse-enum-keyword-to-int :p16))
+  (assert-equal 25 (pb:large-sparse-enum-keyword-to-int :p22))
+  (assert-equal 128 (pb:large-sparse-enum-keyword-to-int :p35)))

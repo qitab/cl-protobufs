@@ -51,3 +51,37 @@ enum MakeDifferentEnumVals {
   _MANDER_400 = 6;
   CHAR_300MANDER = 7;
 }
+
+enum LargeDenseEnum {
+  B2 = 1;
+  C3 = 2;
+  D4 = 3;
+  E5 = 4;
+  F6 = 5;
+  G7 = 6;
+  H8 = 7;
+  I9 = 8;
+  J10 = 9;
+  K11 = 10;
+  L12 = 11;
+  M13 = 12;
+  N14 = 13;
+  O15 = 14;
+}
+
+enum LargeSparseEnum {
+  option allow_alias = true;
+
+  P16 = 2;
+  P17 = 4;
+  P18 = 8;
+  P19 = 16;
+  P20 = 5;
+  P21 = 20;
+  P22 = 25;
+  ALIAS_ONE = 1;
+  ALIAS_TWO = 2;
+  _P23 = 6;
+  P24 = 7;
+  P35 = 128;
+}
