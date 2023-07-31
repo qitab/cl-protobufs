@@ -69,19 +69,44 @@ enum LargeDenseEnum {
   O15 = 14;
 }
 
+enum SmallDenseEnum {
+  BB2 = 1;
+  CC3 = 2;
+  DD4 = 3;
+  EE5 = 4;
+  FF6 = 5;
+  GG7 = 6;
+  HH8 = 7;
+  II9 = 8;
+}
+
 enum LargeSparseEnum {
   option allow_alias = true;
 
-  P16 = 2;
-  P17 = 4;
-  P18 = 8;
-  P19 = 16;
-  P20 = 5;
-  P21 = 20;
-  P22 = 25;
-  ALIAS_ONE = 1;
-  ALIAS_TWO = 2;
-  _P23 = 6;
-  P24 = 7;
-  P35 = 128;
+  P16 = 20000;
+  Q17 = 40000;
+  R18 = 80000;
+  S19 = 160000;
+  T20 = 5000;
+  U21 = 200000;
+  V22 = 250000;
+  ALIAS_ONE = 10000;
+  ALIAS_TWO = 20000;
+  _W23 = 60000;
+  X24 = 70000;
+  Y25 = 1280000;
+}
+
+enum SmallSparseEnum {
+  option allow_alias = true;
+
+  PP16 = 200000;
+  RR18 = 800000;
+  TT20 = 50000;
+  UU21 = 2000000;
+  VV22 = 2500000;
+  ALIAS_THREE = 100000;
+  ALIAS_FOUR = 200000;
+  _WW23 = 600000;
+  YY25 = 12800000;
 }
