@@ -479,3 +479,44 @@ repeated_message {
 }
 " out)
 ))
+
+(deftest count-lines-test (text-format-suite)
+  (handler-case
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+one_level_nesting: <
+  int_field: 3
+}
+"))
+    (proto:protobuf-error (err)
+      (let ((err-string (princ-to-string err)))
+        (assert (search "Line 3: }" err-string))))))
+
+(deftest count-lines-test-2 (text-format-suite)
+  (handler-case
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+one_level_nesting: {
+  int_field: 3
+  int_field: 4
+>
+"))
+    (proto:protobuf-error (err)
+      (let ((err-string (princ-to-string err)))
+        (assert (search "Line 4: >" err-string))))))
+
+(deftest count-lines-test-3 (text-format-suite)
+  (handler-case
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "
+one_level_nesting {
+  int_field: 3
+  int_field: 4
+
+"))
+    (proto:protobuf-error (err)
+      (let ((err-string (princ-to-string err)))
+        (assert (search "Line 4:" err-string))))))

@@ -67,7 +67,10 @@ Parameters:
                (when (>= i print-length)
                  (princ "..." stream))))
              (t
-              (princ "ERROR: unknown type of repeated field." stream)))))))
+              (error 'unknown-repeated
+                     :format-control
+ "unexpected representation of type '~A' for repeated field '~A' in protocol buffer message."
+                      :format-arguments (type-of value) (proto-name field))))))))
     (dolist (oneof (proto-oneofs message))
       (let* ((oneof-data (slot-value object (oneof-descriptor-internal-name oneof)))
              (set-field (oneof-set-field oneof-data)))
@@ -142,7 +145,8 @@ Parameters:
       ;; doesn't support it above.
       (t
        (error 'unknown-type
-              :format-control "unknown type ~S, while printing non-repeated field ~S"
+              :format-control
+"unsupported field type ~S, while printing non-repeated field ~S."
               :format-arguments (list type name))))))
 
 (defun print-scalar (val type name stream indent)

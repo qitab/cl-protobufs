@@ -48,6 +48,31 @@ are coming up in the STREAM."
         do
      (read-char stream nil)))
 
+(defun report-error-with-line (stream error-message)
+ "It determines the position of an error in the STREAM
+ and reports it along with the ERROR-MESSAGE, line number, the content of the line and a
+caret string that visually marks the error position in the line."
+  (let ((error-pos (file-position stream))
+        error-line
+        error-line-number
+        error-line-start-pos)
+    (file-position stream 0)
+    (loop
+      :for start-pos = (file-position stream)
+      :for line = (read-line stream nil)
+      :for line-number from 0
+      :until (or (null line) (> start-pos error-pos))
+      :do (setf
+            error-line line
+            error-line-number line-number
+            error-line-start-pos start-pos))
+    (let* ((error-column (- error-pos error-line-start-pos))
+           (indent (length (format nil "Line ~D: " error-line-number)))
+           (padding-string (format nil "~A^" (make-string (+ indent error-column)
+           :initial-element #\Space))))
+      (protobuf-error (format nil "~A~%Line ~D: ~A~%~A"
+      error-message error-line-number error-line padding-string)))))
+
 (defun expect-matching-end (stream start-char)
   "Expect that the starting block element START-CHAR matches the next element
    in the STREAM which should end the block, signal an error if there's no match.
@@ -57,9 +82,10 @@ are coming up in the STREAM."
                      (eq end-char #\}))
                 (and (eq start-char #\<)
                      (eq end-char #\>)))
-      (protobuf-error "Started with ~S ended with ~S at position ~D"
-                      start-char end-char (file-position stream))))
-  (read-char stream))
+      (report-error-with-line stream (format nil
+"Opening character ~S doesn't have a matching closing character, found ~S instead."
+                                                start-char end-char)))
+      (read-char stream)))
 
 (defun expect-char (stream char &optional chars within)
   "Expect to see 'char' as the next character in the stream; signal an error if it's not there.
