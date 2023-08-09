@@ -315,7 +315,7 @@ as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
                 (defun ,int2key (numeral)
                   (declare (type int32 numeral))
                   (the (or null ,type)
-                       (gethash numeral ,int-to-enum)))))))
+                       (values (gethash numeral ,int-to-enum))))))))
        (setf (get ',type 'enum-int-to-keyword) ',int2key)
        (setf (get ',type 'enum-keyword-to-int) ',key2int)
        (defmethod cl-protobufs:enum-keyword-to-int
