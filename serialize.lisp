@@ -147,7 +147,7 @@ Parameters:
            (field-num  (proto-index field))
            (value  (cond ((eq kind :extends)
                           (get-extension object (slot-value field 'external-field-name)))
-                         ((proto-lazy-p field)
+                         ((or (proto-lazy-p field) (eq (proto-kind field) :enum))
                           (slot-value object (slot-value field 'internal-field-name)))
                          (t
                           (proto-slot-value object (slot-value field 'external-field-name))))))
@@ -183,11 +183,11 @@ Parameters:
            (emit-repeated-message-field desc value type field-num kind buffer))
           ((setq desc (find-enum-descriptor type))
            (if packed-p
-               (serialize-packed-enum value (enum-descriptor-values desc) field-num buffer)
+               (serialize-packed-enum value field-num buffer)
                (let ((tag (make-wire-tag $wire-type-varint field-num))
                      (size 0))
-                 (doseq (name value)
-                   (iincf size (serialize-enum name (enum-descriptor-values desc) tag buffer)))
+                 (doseq (val value)
+                   (iincf size (serialize-enum val tag buffer)))
                  size))))))
 
 (defun emit-repeated-message-field (msg-desc messages type field-num kind buffer)
@@ -250,7 +250,7 @@ Parameters:
     KIND: The kind of field being emitted. See `proto-kind'.
     BUFFER: The buffer to write to.
   Returns: The number of bytes output to BUFFER, or NIL on error."
-  (declare (field-number field-num)
+ (declare (field-number field-num)
            (buffer buffer))
   (let (desc)
     (cond ((scalarp type)
@@ -258,9 +258,7 @@ Parameters:
           ((setq desc (find-message-descriptor type))
            (emit-non-repeated-message-field desc value type field-num kind buffer))
           ((setq desc (find-enum-descriptor type))
-           (serialize-enum value (enum-descriptor-values desc)
-                           (make-wire-tag $wire-type-varint field-num)
-                           buffer))
+           (serialize-enum value (make-wire-tag $wire-type-varint field-num) buffer))
           ((setq desc (find-map-descriptor type))
            (let* ((tag (make-wire-tag $wire-type-string field-num))
                   (key-type (proto-key-type desc))
@@ -730,13 +728,11 @@ Parameters:
          (if enum
              (cond ((length-encoded-tag-p tag)
                     (multiple-value-bind (data new-index)
-                      (deserialize-packed-enum (enum-descriptor-values enum)
-                                               buffer index)
+                      (deserialize-packed-enum buffer index)
                     (values (nreconc data (car cell)) new-index)))
                    (t
                     (multiple-value-bind (data new-index)
-                      (deserialize-enum (enum-descriptor-values enum)
-                                        buffer index)
+                      (deserialize-enum buffer index)
                       (values (if repeated-p (cons data (car cell)) data)
                               new-index))))
              (let* ((submessage (find-message-descriptor type :error-p t))
@@ -806,7 +802,7 @@ Parameters:
                ;; The end tag for a group is the field index shifted and
                ;; and-ed with a constant.
                (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                     (tag2 (make-wire-tag $wire-type-end-group   index)))
+                     (tag2 (make-wire-tag $wire-type-end-group index)))
                  `(when ,boundp
                     (,iterator (,vval ,reader)
                                (iincf ,size (encode-uint32 ,tag1 ,vbuf))
@@ -823,14 +819,10 @@ Parameters:
           ((typep msg 'enum-descriptor)
            (let ((tag (make-wire-tag $wire-type-varint index)))
              (if packed-p
-                 `(iincf ,size
-                         (serialize-packed-enum ,reader '(,@(enum-descriptor-values msg))
-                                                ,index ,vbuf))
+                 `(iincf ,size (serialize-packed-enum ,reader ,index ,vbuf))
                  `(when ,boundp
                     (,iterator (,vval ,reader)
-                               (iincf ,size (serialize-enum
-                                             ,vval '(,@(enum-descriptor-values msg))
-                                             ,tag ,vbuf))))))))))
+                               (iincf ,size (serialize-enum ,vval ,tag ,vbuf))))))))))
 
 (defun generate-non-repeated-field-serializer (class kind field-num boundp reader vbuf size)
   "Generate the field serializer for a non-repeated field
@@ -844,58 +836,56 @@ Parameters:
   VBUF: Symbol naming the buffer to write to.
   SIZE: Symbol naming the variable which keeps track of the serialized length."
   (declare (type field-number field-num))
-  (let ((vval (gensym "VAL"))
-        (msg (and class
-                  (not (scalarp class))
-                  (or (find-message-descriptor class)
-                      (find-enum-descriptor class)
-                      (find-map-descriptor class)))))
-    (cond ((scalarp class)
-           (let ((tag (make-tag class field-num)))
-             `(when ,boundp
-                (let ((,vval ,reader))
-                  (iincf ,size (serialize-scalar ,vval ',class ,tag ,vbuf))))))
-          ((typep msg 'message-descriptor)
-           (if (eq kind :group)
-               (let ((tag1 (make-wire-tag $wire-type-start-group field-num))
-                     (tag2 (make-wire-tag $wire-type-end-group   field-num)))
-                 `(let ((,vval ,reader))
-                    (when ,vval
-                      (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-                      (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
-                      (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
-               (let ((tag (make-wire-tag $wire-type-string field-num)))
-                 `(let ((,vval ,reader))
-                    (when ,vval
-                      (iincf ,size (encode-uint32 ,tag ,vbuf))
-                      (with-placeholder (,vbuf)
-                        (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
-                          (iincf ,size (i+ len (backpatch len))))))))))
-          ((typep msg 'enum-descriptor)
-           (let ((tag (make-wire-tag $wire-type-varint field-num)))
-             `(when ,boundp
-                (let ((,vval ,reader))
-                  (iincf ,size (serialize-enum
-                                ,vval '(,@(enum-descriptor-values msg))
-                                ,tag ,vbuf))))))
-          ((typep msg 'map-descriptor)
-           (let* ((tag      (make-wire-tag $wire-type-string field-num))
-                  (key-type (proto-key-type msg)))
-             `(when ,boundp
-                (let ((,vval ,reader))
-                  (flet ((serialize-pair (k v)
-                           (let ((ret-len (encode-uint32 ,tag ,vbuf))
-                                 (map-len 0))
-                             (with-placeholder (,vbuf)
-                               (iincf map-len (serialize-scalar k ',key-type
-                                                                ,(make-tag `,key-type 1)
-                                                                ,vbuf))
-                               ,(generate-non-repeated-field-serializer
-                                 `,(proto-value-type msg) (proto-value-kind msg)
-                                 2 'v 'v vbuf 'map-len)
-                               (i+ ret-len (i+ map-len (backpatch map-len)))))))
-                    (iincf ,size (loop for k being the hash-keys of ,vval using (hash-value v)
-                                       sum (serialize-pair k v)))))))))))
+    (let ((vval (gensym "VAL"))
+          (msg (and class
+                    (not (scalarp class))
+                    (or (find-message-descriptor class)
+                        (find-enum-descriptor class)
+                        (find-map-descriptor class)))))
+      (cond ((scalarp class)
+            (let ((tag (make-tag class field-num)))
+              `(when ,boundp
+                  (let ((,vval ,reader))
+                    (iincf ,size (serialize-scalar ,vval ',class ,tag ,vbuf))))))
+            ((typep msg 'message-descriptor)
+            (if (eq kind :group)
+                (let ((tag1 (make-wire-tag $wire-type-start-group field-num))
+                      (tag2 (make-wire-tag $wire-type-end-group   field-num)))
+                  `(let ((,vval ,reader))
+                      (when ,vval
+                        (iincf ,size (encode-uint32 ,tag1 ,vbuf))
+                        (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
+                        (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
+                (let ((tag (make-wire-tag $wire-type-string field-num)))
+                  `(let ((,vval ,reader))
+                      (when ,vval
+                        (iincf ,size (encode-uint32 ,tag ,vbuf))
+                        (with-placeholder (,vbuf)
+                          (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
+                            (iincf ,size (i+ len (backpatch len))))))))))
+            ((typep msg 'enum-descriptor)
+            (let ((tag (make-wire-tag $wire-type-varint field-num)))
+              `(when ,boundp
+                  (let ((,vval ,reader))
+                    (iincf ,size (serialize-enum ,vval ,tag ,vbuf))))))
+            ((typep msg 'map-descriptor)
+            (let* ((tag      (make-wire-tag $wire-type-string field-num))
+                    (key-type (proto-key-type msg)))
+              `(when ,boundp
+                  (let ((,vval ,reader))
+                    (flet ((serialize-pair (k v)
+                            (let ((ret-len (encode-uint32 ,tag ,vbuf))
+                                  (map-len 0))
+                              (with-placeholder (,vbuf)
+                                (iincf map-len (serialize-scalar k ',key-type
+                                                                  ,(make-tag `,key-type 1)
+                                                                  ,vbuf))
+                                ,(generate-non-repeated-field-serializer
+                                  `,(proto-value-type msg) (proto-value-kind msg)
+                                  2 'v 'v vbuf 'map-len)
+                                (i+ ret-len (i+ map-len (backpatch map-len)))))))
+                      (iincf ,size (loop for k being the hash-keys of ,vval using (hash-value v)
+                                        sum (serialize-pair k v)))))))))))
 
 ;;; Compile-time generation of serializers
 ;;; Type-checking is done at the top-level methods specialized on 'symbol',
@@ -1155,14 +1145,11 @@ Parameters:
              (let* ((tag (make-wire-tag $wire-type-varint index))
                     (packed-tag (packed-tag index))
                     (non-packed-form `(multiple-value-bind (x idx)
-                                          (deserialize-enum
-                                           '(,@(enum-descriptor-values msg)) ,vbuf ,vidx)
+                                          (deserialize-enum ,vbuf ,vidx)
                                         (setq ,vidx idx)
                                         (push x ,dest)))
                     (packed-form `(multiple-value-bind (x idx)
-                                      (deserialize-packed-enum
-                                       '(,@(enum-descriptor-values msg))
-                                       ,vbuf ,vidx)
+                                      (deserialize-packed-enum ,vbuf ,vidx)
                                     (setq ,vidx idx)
                                     ;; The reason for nreversing here is that a field that
                                     ;; is repeated+packed may be transmitted as several
@@ -1225,7 +1212,7 @@ Parameters:
             ((typep msg 'enum-descriptor)
              (values
               `(multiple-value-setq (,dest ,vidx)
-                 (deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
+                 (deserialize-enum ,vbuf ,vidx))
               (make-wire-tag $wire-type-varint index)))
             ((typep msg 'map-descriptor)
              (values

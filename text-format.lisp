@@ -208,9 +208,9 @@ Parameters:
       (format stream "~&~V,0T" indent))
     (when name
       (format stream "~A: " name))
-    (let* ((e (find (keywordify val)
+    (let* ((e (find val
                     (enum-descriptor-values enum)
-                    :key #'enum-value-descriptor-name))
+                    :key #'enum-value-descriptor-value))
            (value (and e (enum-value-descriptor-name e)))
            (proto-keyword-value (substitute #\_ #\- (string value))))
       (format stream "~A" proto-keyword-value)
@@ -308,7 +308,7 @@ returns the parsed object."
 
 (defun parse-field (type &key (stream *standard-input*) repeated-p)
   "Parse data of type TYPE from STREAM. This function returns
-the object parsed. We need to know if hte field is REPEATED-P.
+the object parsed. We need to know if the field is REPEATED-P.
 If the parsing fails, the function will
 return T as a second value."
   (let ((desc (or (find-message-descriptor type)
@@ -361,7 +361,7 @@ return T as a second value."
              (let* ((name (parse-token stream))
                     (enum (find (keywordify name) (enum-descriptor-values desc)
                                 :key #'enum-value-descriptor-name)))
-               (and enum (enum-value-descriptor-name enum))))
+               (and enum (enum-value-descriptor-value enum))))
             ((typep desc 'map-descriptor)
              (let ((key-type (proto-key-type desc))
                    (val-type (proto-value-type desc)))

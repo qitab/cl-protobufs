@@ -63,7 +63,7 @@ Parameters
             (test3  (make-basic-test3 :recval test1))
             (test4  (make-basic-test4 :recval test2))
             (test5  (make-basic-test5
-                     :color :red :intvals '(2 3 5 7)
+                     :color +basic-test5.red+ :intvals '(2 3 5 7)
                      :strvals '("two" "three" "five" "seven")))
             (test6  (make-basic-test6
                      :intvals '(2 3 5 7)
@@ -149,7 +149,7 @@ Parameters
          (test3  (make-basic-test3 :recval test1))
          (test4  (make-basic-test4 :recval test2))
          (test5  (make-basic-test5
-                  :color :red :intvals '(2 3 5 7)
+                  :color +basic-test5.red+ :intvals '(2 3 5 7)
                   :strvals '("two" "three" "five" "seven")))
          (test6  (make-basic-test6
                   :intvals '(2 3 5 7)
@@ -329,7 +329,7 @@ Parameters
          (color2 (make-auto-color :r-value 100 :g-value 0 :b-value 100))
          (car2   (make-automobile :model "Audi" :color color2))
          (request-2  (make-buy-car-request :auto car2)))
-    (setf (paint-type color2) :metallic)
+    (setf (paint-type color2) +metallic+)
     (let ((ser1 (serialize-to-bytes request-1 'buy-car-request))
           (ser2 (serialize-to-bytes request-2 'buy-car-request)))
       (assert-false (equal ser1 ser2))
@@ -381,7 +381,7 @@ Parameters
          (color2 (make-auto-color :r-value 100 :g-value 0 :b-value 100))
          (car2   (make-automobile :model "Audi" :color color2))
          (request-2  (make-buy-car-request :auto car2)))
-    (setf (paint-type color2) :metallic)
+    (setf (paint-type color2) +metallic+)
     (let ((ser1 (serialize-to-bytes request-1 'buy-car-request))
           (ser2 (serialize-to-bytes request-2 'buy-car-request)))
       (assert-false (equal ser1 ser2))
@@ -503,17 +503,17 @@ Parameters
             (eval (pi::generate-deserializer message))
             (eval (pi::generate-serializer message))))))
 
-    (let* ((message-v2 (make-message-v2 :e :baz :e2 :baz
-                                        :e3 '(:baz) :e4 '(:baz)
-                                        :e5 :auto))
+    (let* ((message-v2 (make-message-v2 :e +baz+ :e2 +baz+
+                                        :e3 (list +baz+) :e4 (list +baz+)
+                                        :e5 +auto+))
            (v2-bytes (serialize-to-bytes message-v2))
            (message-v1 (deserialize-from-bytes 'message-v1 v2-bytes)))
       (assert-true message-v1)
-      (assert-eq (message-v1.e message-v1) :%undefined-1)
-      (assert-eq (message-v1.e2 message-v1) :%undefined-1)
-      (assert-equal (message-v1.e3 message-v1) '(:%undefined-1))
-      (assert-equal (message-v1.e4 message-v1) '(:%undefined-1))
-      (assert-eq (message-v1.e5 message-v1) :default)
+      (assert-eq (message-v1.e message-v1) 1)
+      (assert-eq (message-v1.e2 message-v1) 1)
+      (assert-equal (message-v1.e3 message-v1) '(1))
+      (assert-equal (message-v1.e4 message-v1) '(1))
+      (assert-eq (message-v1.e5 message-v1) +default+)
       (let* ((reserialized-proto-octets (serialize-to-bytes message-v1))
              (should-be-original-proto
               (deserialize-from-bytes 'message-v2 reserialized-proto-octets)))

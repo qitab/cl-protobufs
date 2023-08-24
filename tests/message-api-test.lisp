@@ -60,7 +60,7 @@ Parameters
 
       ;; Set thirteen
       (setf (unittest-pb:test-protocol.thirteen.fourteen thirteen)
-            :enum-whatever)
+            unittest-pb:+test-protocol.enum-whatever+)
       (assert-true (pi::object-initialized-p
                     p (proto:find-message-descriptor 'unittest-pb:test-protocol)))
 
@@ -76,7 +76,7 @@ Parameters
     (setf (map-test-pb:map-all.intmap-gethash 1 test-1) 1
           (map-test-pb:map-all.stringmap-gethash 1 test-1) "one"
           (map-test-pb:map-all.msgmap-gethash 1 test-1) inner-message-1
-          (map-test-pb:map-all.enummap-gethash 1 test-1) :one)
+          (map-test-pb:map-all.enummap-gethash 1 test-1) map-test-pb:+map-enum.one+)
     (assert-false (proto:proto-equal test-1 test-2))
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.intmap test-1)
@@ -106,11 +106,11 @@ Parameters
     (setf (map-test-pb:map-all.intmap-gethash 1 test-1) 1
           (map-test-pb:map-all.stringmap-gethash 1 test-1) "one"
           (map-test-pb:map-all.msgmap-gethash 1 test-1) inner-message-1
-          (map-test-pb:map-all.enummap-gethash 1 test-1) :one
+          (map-test-pb:map-all.enummap-gethash 1 test-1) map-test-pb:+map-enum.one+
           (map-test-pb:map-all.intmap-gethash 1 test-2) 1
           (map-test-pb:map-all.stringmap-gethash 1 test-2) "one"
           (map-test-pb:map-all.msgmap-gethash 1 test-2) inner-message-1
-          (map-test-pb:map-all.enummap-gethash 1 test-2) :one)
+          (map-test-pb:map-all.enummap-gethash 1 test-2) map-test-pb:+map-enum.one+)
     (assert-true (proto:proto-equal test-1 test-2))
     (assert-true (pi::map-field-equal
                    (map-test-pb:map-all.intmap test-1)
@@ -141,11 +141,11 @@ Parameters
     (setf (map-test-pb:map-all.intmap-gethash 1 test-1) 1
           (map-test-pb:map-all.stringmap-gethash 1 test-1) "one"
           (map-test-pb:map-all.msgmap-gethash 1 test-1) inner-message-1
-          (map-test-pb:map-all.enummap-gethash 1 test-1) :one
+          (map-test-pb:map-all.enummap-gethash 1 test-1) map-test-pb:+map-enum.one+
           (map-test-pb:map-all.intmap-gethash 1 test-2) 2
           (map-test-pb:map-all.stringmap-gethash 1 test-2) "two"
           (map-test-pb:map-all.msgmap-gethash 1 test-2) inner-message-2
-          (map-test-pb:map-all.enummap-gethash 1 test-2) :two)
+          (map-test-pb:map-all.enummap-gethash 1 test-2) map-test-pb:+map-enum.two+)
     (assert-false (proto:proto-equal test-1 test-2))
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.intmap test-1)
@@ -348,7 +348,8 @@ Parameters
       (assert-false (proto:proto-equal p q :exact t))
 
       ;; enum-whatever is the default so still equivalent
-      (setf (unittest-pb:test-protocol.thirteen.fourteen thirteen-2) :enum-whatever)
+      (setf (unittest-pb:test-protocol.thirteen.fourteen thirteen-2)
+            unittest-pb:+test-protocol.enum-whatever+)
       (assert-true (proto:proto-equal p q))))
 
   (let* ((g-1 (unittest-pb:make-time-protocol.g :v1 1))

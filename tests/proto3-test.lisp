@@ -49,7 +49,7 @@ Parameters
                  :bytes-value (make-byte-vector 0 :adjustable t)
                  :double-value 0.0d0
                  :float-value 0.0
-                 :enum-value :default))
+                 :enum-value +default+))
            (serialized (serialize-to-bytes msg))
            (text (with-output-to-string (s) (print-text-format msg :stream s)))
            (json (with-output-to-string (s) (print-json msg :stream s))))

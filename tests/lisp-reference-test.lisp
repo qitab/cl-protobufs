@@ -92,7 +92,7 @@ Parameters:
           (boom bam1) "bomb"
           (cl-protobufs.protobuf-package-unittest2:bang bing) "gun"
           (baz orig1) extended1
-          (bonk orig1) :bar
+          (bonk orig1) cl-protobufs.protobuf-package-unittest2:+bar+
           (bam orig1) bam1
           (bing orig1) bing)
 
@@ -109,7 +109,7 @@ Parameters:
       (assert-true (typep (baz new1)
                           'cl-protobufs.protobuf-package-unittest2:message-in-other-package))
       (assert-equal 123 (cl-protobufs.protobuf-package-unittest2:foo (baz new1)))
-      (assert-equal :bar (bonk new1))
+      (assert-equal cl-protobufs.protobuf-package-unittest2:+bar+ (bonk new1))
       (assert-equal "bomb" (boom (bam new1)))
       (assert-equal "gun" (cl-protobufs.protobuf-package-unittest2:bang (bing new1)))
       (assert-true (typep (boo new2)
@@ -160,7 +160,8 @@ Parameters:
           (cl-protobufs.protobuf-forward-reference-unittest::make-msg-w-overridden-lisp-class)))
 
     (setf (cl-protobufs.protobuf-forward-reference-unittest::foo orig) foo
-          (cl-protobufs.protobuf-forward-reference-unittest::bar orig) :baa
+          (cl-protobufs.protobuf-forward-reference-unittest::bar orig)
+          cl-protobufs.protobuf-forward-reference-unittest:+baa+
           (cl-protobufs.protobuf-forward-reference-unittest::baz foo) 123)
 
     (let* ((bytes
@@ -174,4 +175,5 @@ Parameters:
                      'cl-protobufs.protobuf-forward-reference-unittest::msg-w-overridden-lisp-class))
       (assert-true (equal 123 (cl-protobufs.protobuf-forward-reference-unittest:baz
                           (cl-protobufs.protobuf-forward-reference-unittest:foo new))))
-    (assert-true (equal :baa (cl-protobufs.protobuf-forward-reference-unittest:bar new))))))
+      (assert-true (equal cl-protobufs.protobuf-forward-reference-unittest:+baa+
+                          (cl-protobufs.protobuf-forward-reference-unittest:bar new))))))

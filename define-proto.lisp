@@ -221,109 +221,8 @@ the oneof and its nested fields.
     (setf *current-file-descriptor* descriptor)
     (validate-imports descriptor imports)))
 
-(defgeneric enum-int-to-keyword (enum-type integer)
-  (:documentation
-   "Converts INTEGER to the corresponding enum keyword.  If there are multiple
-keywords assigned to the same value (i.e., allow_alias = true in the enum
-source) then the first one is returned.  ENUM-TYPE is the enum type name.
-If no enum exists for the specified integer return nil."))
-
-(defgeneric enum-keyword-to-int (enum-type keyword)
-  (:documentation
-   "Converts a KEYWORD to its corresponding integer value.  ENUM-TYPE is the
-enum-type name."))
-
 (defconstant +threshold-enum-mapping+ 10
   "Threshold for using optimized enum mapping.")
-
-(defun make-enum-conversion-forms (type open-type value-descriptors)
-  "Generates forms for enum <-> integer conversion functions. TYPE is the enum
-type name. OPEN-TYPE is a type including the possibility of unknown enum keywords
-as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
-  (let* ((key2int (fintern "~A-KEYWORD-TO-INT" type))
-         (int2key (fintern "~A-INT-TO-KEYWORD" type))
-         (values (sort (copy-seq value-descriptors) #'<
-                        :key #'enum-value-descriptor-value))
-         (min-value (enum-value-descriptor-value (first values)))
-         (max-value (enum-value-descriptor-value (car (last values))))
-         (range (- max-value min-value))
-         (sequence-length (length values)))
-    `(progn
-       ,(cond
-          ;; Use array for dense sequences
-          ((<= range (* sequence-length 2))
-           (let ((array (make-array (+ 1 range)))
-                 (enum-to-int (make-hash-table)))
-             (loop for desc in values do
-                   (let ((enum (enum-value-descriptor-name desc))
-                         (value (enum-value-descriptor-value desc)))
-                     (setf (aref array (- value min-value)) enum)
-                     (setf (gethash enum enum-to-int) value)))
-             `(progn
-                (defun ,key2int (enum)
-                  (declare (type ,open-type enum))
-                  (or (gethash enum ,enum-to-int)
-                      (parse-integer (subseq (symbol-name enum) +%undefined--length+)
-                                     :junk-allowed t)))
-                (defun ,int2key (numeral)
-                  (declare (type int32 numeral))
-                  (when (<= ,min-value numeral ,max-value)
-                  (values (aref ,array (- numeral ,min-value))))))))
-          ;; Use case for small but sparse sequences
-          ((< sequence-length +threshold-enum-mapping+)
-           `(progn
-              (defun ,key2int (enum)
-                (declare (type ,open-type enum))
-                (let ((int (case enum
-                             ,@(loop for desc in values
-                                     collect `(,(enum-value-descriptor-name desc)
-                                               ,(enum-value-descriptor-value desc)))
-                             (t (parse-integer (subseq (symbol-name enum)
-                                                       +%undefined--length+)
-                                               :junk-allowed t)))))
-                  int))
-              (defun ,int2key (numeral)
-                (declare (type int32 numeral))
-                (the (or null ,type)
-                     (let ((key (case numeral
-                                  ,@(loop with mapped = (make-hash-table)
-                                          for desc in values
-                                          for int = (enum-value-descriptor-value desc)
-                                          for already-set-p = (gethash int mapped)
-                                          do (setf (gethash int mapped) t)
-                                          unless already-set-p
-                                            collect
-                                            `(,int ,(enum-value-descriptor-name desc))))))
-                       key)))))
-          ;; Use hash table as fallback
-          (t
-           (let ((enum-to-int (make-hash-table))
-                 (int-to-enum (make-hash-table)))
-             (loop for desc in values do
-                   (let ((enum (enum-value-descriptor-name desc))
-                         (value (enum-value-descriptor-value desc)))
-                     (unless (gethash enum enum-to-int)
-                       (setf (gethash enum enum-to-int) value))
-                     (unless (gethash value int-to-enum)
-                       (setf (gethash value int-to-enum) enum))))
-             `(progn
-                (defun ,key2int (enum)
-                  (declare (type ,open-type enum))
-                  (or (gethash enum ,enum-to-int)
-                      (parse-integer (subseq (symbol-name enum) +%undefined--length+)
-                                     :junk-allowed t)))
-                (defun ,int2key (numeral)
-                  (declare (type int32 numeral))
-                  (the (or null ,type)
-                       (values (gethash numeral ,int-to-enum))))))))
-       (setf (get ',type 'enum-int-to-keyword) ',int2key)
-       (setf (get ',type 'enum-keyword-to-int) ',key2int)
-       (defmethod cl-protobufs:enum-keyword-to-int
-           ((e (eql ',type)) keyword)
-         (,key2int keyword))
-       (defmethod cl-protobufs:enum-int-to-keyword
-           ((e (eql ',type)) numeral)
-         (,int2key numeral)))))
 
 (defgeneric enum-default-value (enum-type)
   (:documentation
@@ -355,22 +254,6 @@ message, and of +<value_name>+ when the enum is defined at top-level."
 (defconstant +%undefined--length+ 11
   "The length of %undefined- which is used frequently below")
 
-(defun keyword-contains-%undefined-int-p (enum-keyword)
-  "An unknown ENUM-KEYWORD will be compiled as :%undefined-{integer} so our type
-predicate must check that."
-  (when (keywordp enum-keyword)
-    (let ((keyword-name (symbol-name enum-keyword)))
-      (and (> (length keyword-name) +%undefined--length+)
-           (starts-with keyword-name "%UNDEFINED-")
-           (parse-integer (subseq keyword-name +%undefined--length+) :junk-allowed t)))))
-
-(defun enum-open-type (type)
-  "We want the deftype of an enum TYPE to be a strict set of the keywords,
-but we want an internal version for the case where we deserialized an unknown
-(newer) version of hte enum with an unknown field."
-  (intern (format nil "%%%%~a" type)
-          (symbol-package type)))
-
 (defmacro define-enum (type (&key name) &body values)
   "Define a Lisp type given the data for a protobuf enum type.
  Also generates conversion functions between enum values and integers:
@@ -381,31 +264,25 @@ but we want an internal version for the case where we deserialized an unknown
    TYPE: The name of the type.
    NAME: Override for the protobuf enum type name.
    VALUES: The possible values for the enum in the form (name :index value)."
-  (let ((name (or name (class-name->proto type)))
-        (open-type (enum-open-type type)))
-    (with-collectors ((names collect-name) ; keyword symbols
+  (let ((name (or name (class-name->proto type))))
+    (with-collectors ((enum-values collect-enum-values)
                       (forms collect-form)
                       (value-descriptors collect-value-descriptor))
       ;; The middle value is :index, useful for readability of generated code...
       ;; (Except that the value is not actually an index, nor is the slot called index anymore.)
       (loop for (name nil value) in values do
         (let* ((val-desc (make-enum-value-descriptor :value value :name name)))
-          (collect-name name)
+          (collect-enum-values value)
           (collect-value-descriptor val-desc)))
       (let ((enum (make-enum-descriptor :class type
                                         :name name
                                         :values value-descriptors)))
-        (collect-form `(deftype ,open-type ()
-                         '(or (member ,@names)
-                           (satisfies keyword-contains-%undefined-int-p))))
-        (collect-form `(deftype ,type () '(member ,@names)))
-        (collect-form (make-enum-conversion-forms type open-type value-descriptors))
+        (collect-form `(deftype ,type () '(member ,@enum-values)))
         (collect-form (make-enum-constant-forms type value-descriptors))
         ;; The default value is the keyword associated with the first element.
         (collect-form `(defmethod enum-default-value ((e (eql ',type)))
                          ,(enum-value-descriptor-name (car value-descriptors))))
         (collect-form `(record-protobuf-object ',type ,enum :enum))
-        (collect-form `(export '(,open-type)))
         ;; Register it by the full symbol name.
         (record-protobuf-object type enum :enum))
       `(progn ,@forms))))
@@ -575,10 +452,10 @@ Parameters:
           (declare (type ,field-type ,new-value))
           ,(when index
              `(setf (bit (,is-set-accessor ,obj) ,index) 1))
-          ,(if bool-index
-               `(setf (bit (,bit-field-name ,obj) ,bool-index)
-                      (if ,new-value 1 0))
-               `(setf (,hidden-accessor-name ,obj) ,new-value)))
+          ,(cond (bool-index
+                  `(setf (bit (,bit-field-name ,obj) ,bool-index)
+                         (if ,new-value 1 0)))
+                 (t `(setf (,hidden-accessor-name ,obj) ,new-value))))
 
         ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
         ;; question: "Is this field set to the default value?". This is done so that the optimized
@@ -749,65 +626,65 @@ Paramters:
             for field across (oneof-descriptor-fields oneof)
             append
             (let* ((public-slot-name (proto-external-field-name field))
-                   (public-accessor-name (proto-slot-function-name
+                  (public-accessor-name (proto-slot-function-name
                                           proto-type public-slot-name :get))
-                   (internal-has-function-name (proto-slot-function-name
+                  (internal-has-function-name (proto-slot-function-name
                                                 proto-type public-slot-name :internal-has))
-                   (external-has-function-name (proto-slot-function-name
+                  (external-has-function-name (proto-slot-function-name
                                                 proto-type public-slot-name :has))
-                   (clear-function-name  (proto-slot-function-name
+                  (clear-function-name  (proto-slot-function-name
                                           proto-type public-slot-name :clear))
-                   (default-form (get-default-form (proto-type field)
-                                                   (proto-default field)
-                                                   (proto-container field)
-                                                   (proto-kind field)))
-                   (field-type (proto-type field))
-                   (oneof-offset (proto-oneof-offset field)))
+                  (default-form (get-default-form (proto-type field)
+                                                  (proto-default field)
+                                                  (proto-container field)
+                                                  (proto-kind field)))
+                  (field-type (proto-type field))
+                  (oneof-offset (proto-oneof-offset field)))
 
               ;; If a field isn't currently set inside of the oneof, just return its
               ;; default value.
               (with-gensyms (obj new-value bytes field-obj)
-                `((defun-inline ,public-accessor-name (,obj)
-                    (if (eq (oneof-set-field (,hidden-accessor-name ,obj))
-                            ,oneof-offset)
-                        ,(if (proto-lazy-p field)
-                             `(let* ((,field-obj (oneof-value (,hidden-accessor-name ,obj)))
-                                     (,bytes (and ,field-obj (proto-%%bytes ,field-obj))))
-                                (if ,bytes
-                                    (setf (oneof-value (,hidden-accessor-name ,obj))
-                                          (%deserialize ',(proto-class field)
-                                                        ,bytes nil nil))))
-                             `(oneof-value (,hidden-accessor-name ,obj)))
-                        ,default-form))
+                      `((defun-inline ,public-accessor-name (,obj)
+                          (if (eq (oneof-set-field (,hidden-accessor-name ,obj))
+                                  ,oneof-offset)
+                              ,(if (proto-lazy-p field)
+                                  `(let* ((,field-obj (oneof-value (,hidden-accessor-name ,obj)))
+                                          (,bytes (and ,field-obj (proto-%%bytes ,field-obj))))
+                                      (if ,bytes
+                                          (setf (oneof-value (,hidden-accessor-name ,obj))
+                                                (%deserialize ',(proto-class field)
+                                                              ,bytes nil nil))))
+                                  `(oneof-value (,hidden-accessor-name ,obj)))
+                              ,default-form))
 
-                  (defun-inline (setf ,public-accessor-name) (,new-value ,obj)
-                    (declare (type ,field-type ,new-value))
-                    (setf (oneof-set-field (,hidden-accessor-name ,obj))
-                          ,oneof-offset)
-                    (setf (oneof-value (,hidden-accessor-name ,obj)) ,new-value))
+                        (defun-inline (setf ,public-accessor-name) (,new-value ,obj)
+                          (declare (type ,field-type ,new-value))
+                          (setf (oneof-set-field (,hidden-accessor-name ,obj))
+                                ,oneof-offset)
+                          (setf (oneof-value (,hidden-accessor-name ,obj)) ,new-value))
 
-                  (defun-inline ,internal-has-function-name (,obj)
-                    (eq (oneof-set-field (,hidden-accessor-name ,obj))
-                        ,oneof-offset))
-                  (defun-inline ,external-has-function-name (,obj)
-                    (,internal-has-function-name ,obj))
+                        (defun-inline ,internal-has-function-name (,obj)
+                          (eq (oneof-set-field (,hidden-accessor-name ,obj))
+                              ,oneof-offset))
+                        (defun-inline ,external-has-function-name (,obj)
+                          (,internal-has-function-name ,obj))
 
-                  (defun-inline ,clear-function-name (,obj)
-                    (when (,internal-has-function-name ,obj)
-                      (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
-                      (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
+                        (defun-inline ,clear-function-name (,obj)
+                          (when (,internal-has-function-name ,obj)
+                            (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
+                            (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
 
-                  (defmethod ,public-slot-name ((,obj ,proto-type))
-                    (,public-accessor-name ,obj))
+                        (defmethod ,public-slot-name ((,obj ,proto-type))
+                          (,public-accessor-name ,obj))
 
-                  (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
-                    (setf (,public-accessor-name ,obj) ,new-value))
+                        (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
+                          (setf (,public-accessor-name ,obj) ,new-value))
 
-                  (set-field-accessor-functions ',proto-type ',public-slot-name)
+                        (set-field-accessor-functions ',proto-type ',public-slot-name)
 
-                  (export '(,external-has-function-name
-                            ,clear-function-name
-                            ,public-accessor-name))))))))))
+                        (export '(,external-has-function-name
+                                  ,clear-function-name
+                                  ,public-accessor-name))))))))))
 
 (defun make-map-accessor-forms (proto-type public-slot-name slot-name field)
   "This creates forms that define map accessors which are type safe. Using these will
@@ -832,13 +709,13 @@ function) then there is no guarantee on the serialize function working properly.
          (value-kind (proto-value-kind map-descriptor))
          (val-default-form
           (get-default-form value-type (proto-default field) nil value-kind)))
-
     (with-gensyms (obj new-val new-key)
       `(
         (defun-inline (setf ,public-accessor-name) (,new-val ,new-key ,obj)
           (declare (type ,key-type ,new-key)
                    (type ,value-type ,new-val))
-          (setf (gethash ,new-key (,hidden-accessor-name ,obj)) ,new-val))
+          (setf (gethash ,new-key (,hidden-accessor-name ,obj))
+                ,new-val))
 
         ;; If the map's value type is a message, then the default value returned
         ;; should be nil. However, we do not want to allow the user to insert nil
@@ -849,10 +726,7 @@ function) then there is no guarantee on the serialize function working properly.
 
             `((defun-inline ,public-accessor-name (,new-key ,obj)
                 (declare (type ,key-type ,new-key))
-                (the (values ,(if (eq value-kind :enum)
-                                  (enum-open-type val-type)
-                                  val-type)
-                             t)
+                (the (values ,val-type t)
                      (multiple-value-bind (val flag)
                          (gethash ,new-key (,hidden-accessor-name ,obj))
                        (if flag
@@ -938,10 +812,10 @@ function) then there is no guarantee on the serialize function working properly.
 (defun make-structure-class-forms-non-lazy (proto-type field public-slot-name)
   "Makes forms for the non-lazy fields of a proto message.
 
- Parameters:
-  PROTO-TYPE: The Lisp type name of the proto message.
-  FIELD: The field definition for which to define accessors.
-  PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix)."
+  Parameters:
+    PROTO-TYPE: The Lisp type name of the proto message.
+    FIELD: The field definition for which to define accessors.
+    PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix)."
   (let* ((slot-name (proto-internal-field-name field))
          (public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
          (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
@@ -1089,11 +963,11 @@ function) then there is no guarantee on the serialize function working properly.
              ,@(mapcan
                 (lambda (field)
                   (let* ((type (proto-type field))
-                         (public-slot-name (proto-external-field-name field))
-                         (set-check (if (eq type 'cl:boolean)
+                        (public-slot-name (proto-external-field-name field))
+                        (set-check (if (eq type 'cl:boolean)
                                         `(eq ,public-slot-name :%unset)
                                         `(or (eq ,public-slot-name :%unset)
-                                             (not ,public-slot-name)))))
+                                            (not ,public-slot-name)))))
                     (let ((public-accessor-name
                             (proto-slot-function-name proto-type public-slot-name :get)))
                       `((unless ,set-check
@@ -1422,7 +1296,7 @@ function) then there is no guarantee on the serialize function working properly.
                (cslot (unless alias-for
                         ;; Enum type specifiers might not be loaded.
                         ;; Seems like this could be fixed...
-                        (let ((type (if (eq kind :enum) 'keyword type)))
+                        (let ((type (if (eq kind :enum) 'fixnum type)))
                           (make-field-data
                            :internal-slot-name internal-slot-name
                            :external-slot-name slot
@@ -1453,7 +1327,7 @@ function) then there is no guarantee on the serialize function working properly.
                (field (make-instance
                        'field-descriptor
                        :name (or name (slot-name->proto slot))
-                       :type (if (eq kind :enum) (enum-open-type type) type)
+                       :type (if (eq kind :enum) 'fixnum type)
                        :kind kind
                        :class type
                        :qualified-name (make-qualified-name *current-message-descriptor*
