@@ -520,3 +520,27 @@ one_level_nesting {
     (proto:protobuf-error (err)
       (let ((err-string (princ-to-string err)))
         (assert (search "Line 4:" err-string))))))
+
+(defparameter *message-with-nonrepeated-field-and-comma* "
+repeated_message: {
+   int_field: 11,
+   message_2 {
+     int_field: 22
+   }
+}
+")
+
+
+(deftest message-with-nonrepeated-field-and-comma (text-format-suite)
+  (handler-case
+      (with-input-from-string (s *message-with-nonrepeated-field-and-comma*)
+        (proto:parse-text-format 'test-pb:text-format-test :stream s))
+    (proto:protobuf-error (error)
+      (let ((error-string (princ-to-string error)))
+        (assert (string=
+                 (format nil
+                         "Unable to find next field for message of type ~S
+Line 2:    int_field: 11,
+                        ^"
+                         'test-pb:text-format-test.nested-message1)
+                 error-string))))))

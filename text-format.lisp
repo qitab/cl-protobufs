@@ -274,9 +274,12 @@ returns the parsed object."
              (slot  (and field (proto-external-field-name field)))
              (repeated-p (and field (eql :repeated (proto-label field)))))
         (if (null field)
-            (error 'unknown-field
-                   :format-control "unknown field ~S, while parsing message of type ~A"
-                   :format-arguments (list name msg-desc))
+            (report-error-with-line
+             stream
+             (if name
+                 (format nil "Unknown field ~S, while parsing message of type ~A"
+                         name  msg-desc)
+                 (format nil "Unable to find next field for message of type ~A" msg-desc)))
             (multiple-value-bind (val error-p)
                 (parse-field type :stream stream :repeated-p repeated-p)
               (cond

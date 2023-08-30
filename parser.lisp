@@ -49,7 +49,7 @@ are coming up in the STREAM."
      (read-char stream nil)))
 
 (defun report-error-with-line (stream error-message)
- "It determines the position of an error in the STREAM
+  "It determines the position of an error in the STREAM
  and reports it along with the ERROR-MESSAGE, line number, the content of the line and a
 caret string that visually marks the error position in the line."
   (let ((error-pos (file-position stream))
@@ -58,20 +58,20 @@ caret string that visually marks the error position in the line."
         error-line-start-pos)
     (file-position stream 0)
     (loop
-      :for start-pos = (file-position stream)
-      :for line = (read-line stream nil)
-      :for line-number from 0
-      :until (or (null line) (> start-pos error-pos))
-      :do (setf
-            error-line line
-            error-line-number line-number
-            error-line-start-pos start-pos))
+        :for start-pos = (file-position stream)
+        :for line = (read-line stream nil)
+        :for line-number from 0
+        :until (or (null line) (> start-pos error-pos))
+        :do (setf
+             error-line line
+             error-line-number line-number
+             error-line-start-pos start-pos))
     (let* ((error-column (- error-pos error-line-start-pos))
            (indent (length (format nil "Line ~D: " error-line-number)))
            (padding-string (format nil "~A^" (make-string (+ indent error-column)
-           :initial-element #\Space))))
+                                                          :initial-element #\Space))))
       (protobuf-error (format nil "~A~%Line ~D: ~A~%~A"
-      error-message error-line-number error-line padding-string)))))
+                              error-message error-line-number error-line padding-string)))))
 
 (defun expect-matching-end (stream start-char)
   "Expect that the starting block element START-CHAR matches the next element
