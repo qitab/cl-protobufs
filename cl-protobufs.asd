@@ -12,7 +12,7 @@
   :author "Scott McKay"
   :version "2.0"
   :licence "MIT-style"
-  :maintainer '("Jon Godbout" "Carl Gay" "Ben Kuehnert")
+  :maintainer ("Jon Godbout" "Carl Gay" "Ben Kuehnert")
   :description      "Protobufs for Common Lisp"
   :long-description
   "This is an implementation of Protocol Buffers for Common Lisp. It supports
@@ -113,7 +113,7 @@ and functionality for working with them."
   :author "Scott McKay"
   :version "2.0"
   :licence "MIT-style"
-  :maintainer '("Jon Godbout" "Carl Gay" "Ben Kuehnert")
+  :maintainer ("Jon Godbout" "Carl Gay" "Ben Kuehnert")
   :description      "Test code for Protobufs for Common Lisp"
   :long-description "Test code for Protobufs for Common Lisp"
   :defsystem-depends-on (:cl-protobufs.asdf)
