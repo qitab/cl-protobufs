@@ -819,9 +819,12 @@
                   ;; Don't worry about unaligned writes - they're still faster than
                   ;; looping. Todo: featurize for non-x86 and other than SBCL.
                   (if (buffer-ensure-space buffer ,n-bytes)
-                      (let ((index (buffer-index buffer)))
-                        (setf (,accessor (buffer-sap buffer) index) val
-                              (buffer-index buffer) (+ index ,n-bytes))
+                      (let ((index (buffer-index buffer))
+                            (block (buffer-block buffer)))
+                        (sb-sys:with-pinned-objects (block)
+                          (setf (,accessor (sb-sys:vector-sap block) index) val
+                                (buffer-index buffer) (+ index ,n-bytes)))
+                        #+ubsan (sb-vm:%unpoison-range block index (buffer-index buffer))
                         ,n-bytes)
                       (let ((scratchpad (octet-buffer-scratchpad buffer)))
                         (setf (,accessor (sb-sys:vector-sap scratchpad) 0) val)
