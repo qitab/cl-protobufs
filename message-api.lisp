@@ -7,8 +7,8 @@
 (in-package #:cl-protobufs.implementation)
 
 (defun object-initialized-p (object message)
-  "Check if OBJECT with proto-message MESSAGE is initialized.
-The definition of initialized is all required-fields are set."
+  "Check if OBJECT with message-descriptor MESSAGE is initialized.
+The definition of initialized is that all required fields are set."
   (loop for field in (proto-fields message)
         when (eq (proto-label field) :required)
           do (when (= (bit (slot-value object '%%is-set)
@@ -61,7 +61,7 @@ only if the same fields have been explicitly set."
                               :exact exact)))))
 
 (defun oneof-field-equal (oneof-1 oneof-2 oneof-descriptor exact)
-    "Returns true if two maps with the same map-descriptor are equal.
+    "Returns true if two oneofs with the same descriptor are equal.
 Parameters:
   ONEOF-1: The first oneof to compare.
   ONEOF-2: The second oneof to compare.
@@ -245,15 +245,15 @@ Parameters:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;   Taken from https://github.com/protocolbuffers/protobuf-go/blob/master/proto/merge.go
 (defun merge-from (from-message to-message)
-  "Merge messages.
-Taken from https://github.com/protocolbuffers/protobuf-go/blob/master/proto/merge.go:
- Populated scalar fields in FROM-MESSAGE are copied to TO-MESSAGE, while populated
-   singular messages in FROM-MESSAGE are merged into TO-MESSAGE by recursively calling Merge.
- The elements of every list field in FROM-MESSAGE is appended to the corresponded
-   list fields in TO-MESSAGE. The entries of every map field in FROM-MESSAGE is copied into
-   the corresponding map field in TO-MESSAGE, possibly replacing existing entries.
- Returns the updated TO-MESSAGE."
+  "Merge FROM-MESSAGE into TO-MESSAGE and return TO-MESSAGE.
+   Populated scalar fields in FROM-MESSAGE are copied to TO-MESSAGE, while
+   populated message-typed fields in FROM-MESSAGE are merged into TO-MESSAGE by
+   recursively calling merge-from.  The elements of every repeated field in
+   FROM-MESSAGE are appended to the corresponding repeated field in TO-MESSAGE.
+   The entries of every map field in FROM-MESSAGE are added to the corresponding
+   map field in TO-MESSAGE, possibly replacing existing entries."
   (labels ((create-message-of-same-type (message)
              (let ((class (find-class (type-of message))))
                (funcall (get-constructor-name
