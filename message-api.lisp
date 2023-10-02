@@ -252,7 +252,8 @@ Taken from https://github.com/protocolbuffers/protobuf-go/blob/master/proto/merg
    singular messages in FROM-MESSAGE are merged into TO-MESSAGE by recursively calling Merge.
  The elements of every list field in FROM-MESSAGE is appended to the corresponded
    list fields in TO-MESSAGE. The entries of every map field in FROM-MESSAGE is copied into
-   the corresponding map field in TO-MESSAGE, possibly replacing existing entries."
+   the corresponding map field in TO-MESSAGE, possibly replacing existing entries.
+ Returns the updated TO-MESSAGE."
   (labels ((create-message-of-same-type (message)
              (let ((class (find-class (type-of message))))
                (funcall (get-constructor-name
@@ -323,7 +324,8 @@ Taken from https://github.com/protocolbuffers/protobuf-go/blob/master/proto/merg
                               from-value))))
 
                 (t (setf (proto-slot-value to-message field-name)
-                         from-field-value))))))))
+                         from-field-value)))))))
+  to-message)
 
 (defmethod print-object ((message message) stream)
   (print-unreadable-object (message stream :type t)
