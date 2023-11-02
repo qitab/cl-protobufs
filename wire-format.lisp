@@ -949,11 +949,26 @@
           (fast-octet-out buffer byte)))
       8)))
 
+#+sbcl
+(eval-when (:compile-toplevel :execute)
+  ;; this can't really be based on VERSION>= because the cutover to the new logic
+  ;; did not occur exactly at a particular release.
+  (when (= (length (sb-kernel:%simple-fun-arglist #'sb-impl::utf8->string-aref)) 3)
+    (pushnew :old-sbcl-ef-logic *features*)))
+
 (defun-inline fast-utf8-encode (string)
-  #+sbcl
+  #+(and sbcl old-sbcl-ef-logic)
   (sb-ext:string-to-octets string :external-format :utf-8)
+  #+(and sbcl (not old-sbcl-ef-logic))
+  (sb-kernel:with-array-data ((string string) (start 0) (end nil)
+                              :check-fill-pointer t)
+    ;; This avoids calling GET-EXTERNAL-FORMAT at runtime.
+    (funcall (load-time-value
+              (sb-impl::ef-string-to-octets-fun
+               (sb-impl::get-external-format-or-lose :utf-8)))
+             string start end 0 nil))
   #-sbcl
-  (babel:string-to-octets string :encoding :utf-8))
+  (babel:string-to-octets string))
 
 ;; The number of bytes to reserve to write a 'uint32' for the length of
 ;; a sub-message. In theory a uint32 should reserve 5 bytes,
@@ -1073,8 +1088,8 @@
                   (if (< byte 128)
                       (setf (aref str dst-idx) (code-char byte))
                       (return
-                        (sb-ext:octets-to-string buffer :start idx :end (i+ idx len)
-                                                 :external-format :utf-8))))))
+                        (sb-impl::utf8->string-aref buffer idx (i+ idx len)
+                                                    #-old-sbcl-ef-logic nil))))))
             #-sbcl
             (babel:octets-to-string buffer :start idx :end (i+ idx len) :encoding :utf-8)
             (i+ idx len))))
