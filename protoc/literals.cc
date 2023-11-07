@@ -7,14 +7,14 @@
 #include "literals.h"
 
 #include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/io/strtod.h>
 
 namespace google {
 namespace protobuf {
 namespace cl_protobufs {
 
 const std::string LispSimpleFtoa(float value) {
-  std::string result = SimpleFtoa(value);
+  std::string result = io::SimpleFtoa(value);
   if (result == "inf") {
     return "float-features:single-float-positive-infinity";
   } else if (result == "-inf") {
@@ -32,7 +32,7 @@ const std::string LispSimpleFtoa(float value) {
 }
 
 const std::string LispSimpleDtoa(double value) {
-  std::string result = SimpleDtoa(value);
+  std::string result = io::SimpleDtoa(value);
   if (result == "inf") {
     return "float-features:double-float-positive-infinity";
   } else if (result == "-inf") {

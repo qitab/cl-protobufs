@@ -6,7 +6,6 @@
 
 #include "enum.h"
 
-#include <google/protobuf/stubs/strutil.h>
 #include "proto2-descriptor-extensions.pb.h"
 #include "names.h"
 #include <google/protobuf/io/printer.h>
