@@ -8,12 +8,12 @@
 
 syntax = "proto2";
 
-import "extend-base.proto"; // Test proto
-
 package extend_test;
 
+import "extend-base.proto"; // Test proto
+
 message Foo {
-  extensions 200 to 299;
+  extensions 200 to 299 [verification = UNVERIFIED];
 }
 
 message Bar {

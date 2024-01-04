@@ -26,7 +26,6 @@ message MessageWithFloats {
   optional double test_double = 2;
 }
 
-
 message RepeatedMessage {
   repeated int32 repeated_no_default = 1;
 }
@@ -131,8 +130,7 @@ message AddColor2 {
   required Color2 color = 2;
 }
 
-message SpeedEmpty {
-}
+message SpeedEmpty {}
 
 message SpeedOptional {
   optional SpeedEmpty foo = 1;
@@ -142,8 +140,7 @@ message SpeedRepeated {
   repeated SpeedEmpty foo = 1;
 }
 
-message SpaceEmpty {
-}
+message SpaceEmpty {}
 
 message SpaceOptional {
   optional SpaceEmpty foo = 1;
@@ -170,8 +167,8 @@ message Address {
 
 message Person {
   required int64 id = 1;
-  required string name =  2;
-  optional Address home =  3;
+  required string name = 2;
+  optional Address home = 3;
   optional Person spouse = 4;
   optional bool odd_p = 5;
 }
@@ -179,7 +176,6 @@ message Person {
 message Population {
   repeated Person people = 1;
 }
-
 
 enum EnumV1 {
   default = 0;
@@ -196,17 +192,17 @@ message MessageV1 {
     EnumV1 e2 = 2;
   }
   repeated EnumV1 e3 = 3;
-  repeated EnumV1 e4 = 4 [packed=true];
+  repeated EnumV1 e4 = 4 [packed = true];
   optional EnumV1 e5 = 5;
 }
 
 message MessageV2 {
   optional EnumV2 e = 1;
   oneof OneofEnum {
-    EnumV2 e2= 2;
+    EnumV2 e2 = 2;
   }
   repeated EnumV2 e3 = 3;
-  repeated EnumV2 e4 = 4 [packed=true];
+  repeated EnumV2 e4 = 4 [packed = true];
   optional EnumV2 e5 = 5;
 }
 
@@ -236,7 +232,7 @@ message AutoColor {
   optional int32 r_value = 2;
   optional int32 g_value = 3;
   optional int32 b_value = 4;
-  extensions 1000 to 2000;
+  extensions 1000 to 2000 [verification = UNVERIFIED];
 }
 
 extend AutoColor {

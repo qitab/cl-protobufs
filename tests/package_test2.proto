@@ -10,7 +10,8 @@ package protobuf_package_unittest2;
 
 message MessageInOtherPackage {
   optional int32 foo = 1;
-  extensions 1000 to max;
+  extensions 1000 to max
+  [verification = UNVERIFIED];
 }
 
 enum EnumInOtherPackage {

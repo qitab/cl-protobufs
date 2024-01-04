@@ -9,12 +9,11 @@ syntax = "proto2";
 package extend_base;
 
 message Foo {
-  extensions 100 to 199;
+  extensions 100 to 199 [verification = UNVERIFIED];
 }
 
-message Bar {
-}
+message Bar {}
 
 message Baz {
-  extensions 300 to 399;
+  extensions 300 to 399 [verification = UNVERIFIED];
 }
