@@ -294,13 +294,14 @@ Arguments:
                  Finally, it can be :case for the special oneof function."
   (declare (type symbol proto-type slot)
            (type (member :has :internal-has :get :clear :map-get :map-rem
-                         :case :push :length-of :nth)
+                         :case :push :length-of :nth :internal-get)
                  function-type))
   (let ((f-symbol (ecase function-type
                     (:has 'has)
                     (:internal-has '%%has)
                     (:clear 'clear)
                     (:get nil)
+                    (:internal-get '%)
                     (:map-get 'gethash)
                     (:map-rem 'remhash)
                     (:case 'case)
@@ -312,6 +313,12 @@ Arguments:
                                            (symbol-name proto-type)
                                            (symbol-name slot)
                                            f-symbol))
+                   (symbol-package proto-type)))
+          ((eql f-symbol '%)
+           (intern (nstring-upcase (format nil "~a-~a~a"
+                                           (symbol-name proto-type)
+                                           f-symbol
+                                           (symbol-name slot)))
                    (symbol-package proto-type)))
           (f-symbol
            (intern (nstring-upcase (format nil "~a.~a-~a"

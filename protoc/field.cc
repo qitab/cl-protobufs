@@ -192,7 +192,7 @@ const std::string FieldLispDefault(const FieldDescriptor* field) {
       return LispBool(field->default_value_bool());
     case FieldDescriptor::CPPTYPE_ENUM: {
       const EnumValueDescriptor* value = field->default_value_enum();
-      return StrCat(":", ToLispName(value->name()));
+      return StrCat(value->number());
     }
     case FieldDescriptor::CPPTYPE_INT32:
       return StrCat(field->default_value_int32());

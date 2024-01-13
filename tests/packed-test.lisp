@@ -68,9 +68,9 @@ Parameters
 
 (deftest packed-enum-encoding-test (packed-suite)
   (let ((m1 (make-test-packed-types)))
-    (push :foreign-foo (packed-enum m1))
-    (push :foreign-bar (packed-enum m1))
-    (push :foreign-baz (packed-enum m1))
+    (push +foreign-foo+ (packed-enum m1))
+    (push +foreign-bar+ (packed-enum m1))
+    (push +foreign-baz+ (packed-enum m1))
     (assert-eql 3 (length (packed-enum m1)))
     (let* ((bytes (cl-protobufs:serialize-to-bytes m1))
            (m2 (cl-protobufs:deserialize-from-bytes 'test-packed-types bytes))
@@ -81,14 +81,14 @@ Parameters
       ;; (format t "~A~%" bytes) ; =>
       ;; #(186 6 3 6 5 4)
       (assert-eql 6 (length bytes))
-      (assert-equalp '(:foreign-baz :foreign-bar :foreign-foo) (packed-enum m2))
-      (assert-equalp '(:foreign-baz :foreign-bar :foreign-foo) (unpacked-enum unpacked)))))
+      (assert-equalp (list +foreign-baz+ +foreign-bar+ +foreign-foo+) (packed-enum m2))
+      (assert-equalp (list +foreign-baz+ +foreign-bar+ +foreign-foo+) (unpacked-enum unpacked)))))
 
 (deftest unpacked-enum-encoding-test (packed-suite)
   (let ((m1 (make-test-unpacked-types)))
-    (push :foreign-foo (unpacked-enum m1))
-    (push :foreign-bar (unpacked-enum m1))
-    (push :foreign-baz (unpacked-enum m1))
+    (push +foreign-foo+ (unpacked-enum m1))
+    (push +foreign-bar+ (unpacked-enum m1))
+    (push +foreign-baz+ (unpacked-enum m1))
     (assert-eql 3 (length (unpacked-enum m1)))
     (let* ((bytes (cl-protobufs:serialize-to-bytes m1))
            (m2 (cl-protobufs:deserialize-from-bytes 'test-unpacked-types bytes))
@@ -99,8 +99,8 @@ Parameters
       ;; (format t "~A~%" bytes) ; =>
       ;; #(184 6 6 184 6 5 184 6 4)
       (assert-eql 9 (length bytes))
-      (assert-equalp '(:foreign-baz :foreign-bar :foreign-foo) (unpacked-enum m2))
-      (assert-equalp '(:foreign-baz :foreign-bar :foreign-foo) (packed-enum packed)))))
+      (assert-equalp (list +foreign-baz+ +foreign-bar+ +foreign-foo+) (unpacked-enum m2))
+      (assert-equalp (list +foreign-baz+ +foreign-bar+ +foreign-foo+) (packed-enum packed)))))
 
 (deftest inner-packed-fast-function-test (packed-suite)
   (dolist (class '(test-packed-inner test-packed-outer))
@@ -129,9 +129,9 @@ Parameters
 
   (let* ((packed (make-test-packed-inner))
          (outer1 (make-test-packed-outer :packed packed)))
-    (push :foreign-foo (packed-enum packed))
-    (push :foreign-bar (packed-enum packed))
-    (push :foreign-baz (packed-enum packed))
+    (push +foreign-foo+ (packed-enum packed))
+    (push +foreign-bar+ (packed-enum packed))
+    (push +foreign-baz+ (packed-enum packed))
     (let* ((bytes (cl-protobufs:serialize-to-bytes outer1))
            (outer2 (cl-protobufs:deserialize-from-bytes 'test-packed-outer bytes)))
       ;; 10: tag  6: length of the inner message.
@@ -139,7 +139,7 @@ Parameters
       ;; The tag is (186 6), here, rather than (184 6), because it's packed, so the 0 in the lower 3
       ;; bits is replaced by a 2
       (assert-equalp #(10 6 186 6 3 6 5 4) bytes)
-      (assert-equalp '(:foreign-baz :foreign-bar :foreign-foo) (packed-enum (packed outer2))))))
+      (assert-equalp (list +foreign-baz+ +foreign-bar+ +foreign-foo+) (packed-enum (packed outer2))))))
 
 (deftest deserialize-unpacked-packed (packed-suite)
   "If a field is declared as packed, but it was serialized unpacked, we should still be able to

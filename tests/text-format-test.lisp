@@ -71,7 +71,7 @@ one_level_nesting {
     (assert-eql 1.5d0 (test-pb:double-field msg))
     (assert-equal "A string" (test-pb:string-field msg))
     (assert-equal '("First" "Second")  (test-pb:string-fields msg))
-    (assert-equal '(:NONE :TWENTY-ONE) (test-pb:enum-vals msg))
+    (assert-equal  (list test-pb:+none+ test-pb:+twenty-one+) (test-pb:enum-vals msg))
     (assert-equal 2 (test-pb:int-field (test-pb:two-level-nesting msg)))
     (assert-true (string= (test-pb:text-format-test.map-field-gethash 1 msg) "one"))
     (assert-true (string= (test-pb:text-format-test.map-field-gethash 2 msg) "two"))
@@ -125,7 +125,8 @@ one_level_nesting {
                                              :double-field 1.5d0
                                              :string-field "A string"
                                              :string-fields (list "First" "Second")
-                                             :enum-vals (list :none :twenty-one)
+                                             :enum-vals  (list test-pb:+none+
+                                                               test-pb:+twenty-one+)
                                              :one-level-nesting nested
                                              :oneof-int-field 5))
          (out-stream (make-string-output-stream)))
@@ -136,6 +137,7 @@ one_level_nesting {
            (msg-parse (proto:parse-text-format
                        'test-pb:text-format-test
                        :stream (make-string-input-stream text))))
+      (print text)
       (assert-true (test-pb:text-format-test.has-map-field msg-parse))
       (assert-equality #'proto:proto-equal msg msg-parse))))
 

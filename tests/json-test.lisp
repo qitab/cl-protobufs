@@ -81,7 +81,7 @@ Parameters
     (assert-eql 1.5d0 (pb:double-field msg))
     (assert-equal "A string" (pb:string-field msg))
     (assert-equal '("First" "Second")  (pb:string-fields msg))
-    (assert-equal '(:NONE :TWENTY-ONE) (pb:enum-vals msg))
+    (assert-equal '(+none+ +twenty-one+) (pb:enum-vals msg))
     (assert-eql 2 (pb:int-field (pb:two-level-nesting msg)))
     (assert-equal (values "one" t) (pb:map-field-gethash 1 msg))
     (assert-equal (values "two" t) (pb:map-field-gethash 2 msg))
@@ -128,7 +128,7 @@ the result is PROTO-EQUAL with MSG."
                  :double-field 1.5d0
                  :string-field "A string"
                  :string-fields (list "First" "Second")
-                 :enum-vals (list :none :twenty-one)
+                 :enum-vals (list +none+ +twenty-one+)
                  :one-level-nesting nested
                  :oneof-int-field 5
                  :bytes-field (make-array 5 :element-type '(unsigned-byte 8)
@@ -295,7 +295,7 @@ the result is PROTO-EQUAL with MSG."
                                         :double-field 1.5d0
                                         :string-field "A string"
                                         :string-fields (list "First" "Second")
-                                        :enum-vals (list :none :twenty-one)
+                                        :enum-vals (list +none+ +twenty-one+)
                                         :one-level-nesting nested
                                         :oneof-int-field 5))
          (text-msg-pretty (with-output-to-string (s)

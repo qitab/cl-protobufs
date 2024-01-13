@@ -270,62 +270,36 @@
                  (i+ tag-len prefix-len payload-len)))))
       form))
 
-(defun-inline find-enum-value (name value-descriptors)
-  "Find the enum value corresponding to NAME by searching for it in
-   VALUE-DESCRIPTORS."
-  (declare (type keyword name))
-  (let* ((desc (find name value-descriptors :key #'enum-value-descriptor-name)))
-    (the sfixed32
-         (if desc
-             (enum-value-descriptor-value desc)
-             (parse-integer (cadr (split-string (symbol-name name))))))))
-
-
-(defun-inline find-enum-name (value value-descriptors)
-  "Find the enum name corresponding to VALUE by searching for it in
-   VALUE-DESCRIPTORS."
-  (declare (type sfixed32 value))
-  (let* ((desc (find value value-descriptors :key #'enum-value-descriptor-value)))
-    (the keyword
-         (if desc
-             (enum-value-descriptor-name desc)
-             (kintern "~a-~a" "%UNDEFINED" value)))))
-
-(defun serialize-enum (name value-descriptors tag buffer)
-  "Serializes the protobuf enum value corresponding to NAME (a keyword symbol)
-   into BUFFER.  The enum values are in VALUE-DESCRIPTORS. Modifies BUFFER in
-   place, and returns the new index into the buffer. TAG is the protobuf field
-   number with wire-type tag bits added. Watch out, this function turns off
-   most type checking and all array bounds checking."
-  (declare (type list value-descriptors)
+(defun serialize-enum (value tag buffer)
+  "Serializes the protobuf enum VALUE (a fixnum) into BUFFER.
+   Modifies BUFFER in place and returns the new index into the buffer. TAG is
+   the protobuf field number with wire-type tag bits added. Watch out,
+   this function turns off most type checking and all array bounds checking."
+  (declare (type fixnum value)
            (type (unsigned-byte 32) tag))
   (locally (declare #.$optimize-serialization)
-    (let ((val (find-enum-value name value-descriptors)))
-      (declare (type (unsigned-byte 32) val))
-      (i+ (encode-uint32 tag buffer) (encode-uint32 val buffer)))))
+    (i+ (encode-uint32 tag buffer) (encode-uint32 value buffer))))
 
-(defun serialize-packed-enum (names value-descriptors index buffer)
-  "Serializes protobuf enum values corresponding to NAMES (keyword symbols)
-   into BUFFER at the given INDEX. The enum value descriptors are in
-   VALUE-DESCRIPTORS.  Modifies BUFFER in place, and returns the new index into
-   the buffer.  Watch out, this function turns off most type checking and all
-   array bounds checking."
-  (declare (type list value-descriptors)
+(defun serialize-packed-enum (values index buffer)
+  "Serializes protobuf enum VALUES (a list of fixnums) into BUFFER
+   at the given INDEX. Modifies BUFFER in place, and returns the new
+   index into the buffer. Watch out, this function turns off most type
+   checking and all array bounds checking."
+   (declare (type list values)
            (type (unsigned-byte 32) index))
-  (when (zerop (length names))
+  (when (zerop (length values))
     (return-from serialize-packed-enum 0))
   (locally (declare #.$optimize-serialization)
     (let* ((tag-len (encode-uint32 (packed-tag index) buffer))
-           (payload-len (packed-enum-size names value-descriptors))
+           (payload-len (packed-enum-size values))
            (prefix-len (encode-uint32 payload-len buffer))
            (sum 0)) ; for double-check
       (declare (type fixnum sum))
       (map nil
-           (lambda (name)
-             (let ((val (find-enum-value name value-descriptors)))
-               (declare (type (unsigned-byte 32) val))
-               (iincf sum (encode-uint32 (ldb (byte 32 0) val) buffer))))
-           names)
+           (lambda (value)
+             (declare (type (unsigned-byte 32) value))
+             (iincf sum (encode-uint32 (ldb (byte 32 0) value) buffer)))
+           values)
       (assert (= sum payload-len))
       (i+ tag-len prefix-len payload-len))))
 
@@ -697,28 +671,21 @@
                      (setq idx nidx))))))))
       form))
 
-(defun deserialize-enum (value-descriptors buffer index)
-  "Deserializes the next enum value taken from VALUE-DESCRIPTORS.
-   Deserializes from the byte vector BUFFER starting at INDEX.
-   Returns the enum value name (a keyword symbol) and the new index into the buffer.
+(defun deserialize-enum (buffer index)
+  "Deserializes the next enum value from the byte vector BUFFER starting at INDEX.
+   Returns the enum value as a fixnum and the new index into the buffer.
    Watch out, this function turns off most type checking and all array bounds checking."
-  (declare (type list value-descriptors)
-           (type (simple-array (unsigned-byte 8) (*)) buffer)
+  (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
            (array-index index))
   (locally (declare #.$optimize-serialization)
-    (multiple-value-bind (val idx)
-        (decode-int32 buffer index)
-      (let ((name (find-enum-name val value-descriptors)))
-        (values (the keyword name) idx)))))
+    (decode-int32 buffer index)))
 
-(defun deserialize-packed-enum (value-descriptors buffer index)
-  "Deserializes the next packed enum value given in VALUE-DESCRIPTORS.
-   Deserializes from the byte vector BUFFER starting at INDEX.  Returns the
-   enum value name (a keyword symbol) and the new index into the buffer.  Watch
-   out, this function turns off most type checking and all array bounds
-   checking."
-  (declare (type list value-descriptors)
-           (type (simple-array (unsigned-byte 8) (*)) buffer)
+(defun deserialize-packed-enum (buffer index)
+  "Deserializes a sequence of packed enum values from the byte vector BUFFER
+   starting at INDEX. Returns a list of enum values (as fixnums) and the new
+   index into the buffer. Watch out, this function turns off most type checking
+   and all array bounds checking."
+    (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
            (array-index index))
   (locally (declare #.$optimize-serialization)
     (multiple-value-bind (len idx)
@@ -727,13 +694,14 @@
                (type fixnum idx))
       (let ((end (i+ idx len)))
         (declare (type (unsigned-byte 32) end))
-        (with-collectors ((names collect-name))
+        (with-collectors ((values collect-value))
           (loop
             (when (>= idx end)
-              (return-from deserialize-packed-enum (values names idx)))
+              (return-from deserialize-packed-enum
+                (values values idx)))
             (multiple-value-bind (val nidx)
                 (decode-int32 buffer idx)
-              (collect-name (find-enum-name val value-descriptors))
+              (collect-value val)
               (setq idx nidx))))))))
 
 (defun packed-size (values type &optional vectorp)
@@ -782,18 +750,16 @@
              sum))
         form)))
 
-(defun packed-enum-size (names value-descriptors)
-  "Returns the size in bytes that the enum values corresponding to
-   NAMES (keyword symbols) will take when serialized. VALUE-DESCRIPTORS are the
-   enum-value-descriptor objects for the enum."
-  (declare (type list value-descriptors))
+(defun packed-enum-size (values)
+   "Returns the size in bytes that the enum VALUES (as fixnums)
+   will take when serialized. The values are directly represented as integers."
+  (declare (type list values))
   (let ((sum 0))
     (declare (type fixnum sum))
     (map nil
-         (lambda (name)
-           (let ((val (find-enum-value name value-descriptors)))
-             (iincf sum (length32 (ldb (byte 32 0) val)))))
-         names)
+         (lambda (val)
+           (iincf sum (length32 (ldb (byte 32 0) val))))
+         values)
     sum))
 
 ;;; Wire-level encoders
