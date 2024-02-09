@@ -10,10 +10,12 @@
 
 #include <ctype.h>
 
-#include <google/protobuf/stubs/macros.h>
+#include <absl/strings/ascii.h>
+#include <absl/strings/str_join.h>
+#include <absl/strings/str_replace.h>
+#include <absl/strings/str_split.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
-#include <google/protobuf/stubs/strutil.h>
 // #include <google/protobuf/stubs/str_join.h>
 // #include <google/protobuf/stubs/str_replace.h>
 #include "proto2-descriptor-extensions.pb.h"
@@ -47,6 +49,11 @@ CharType CharacterType(const char c) {
   } else {
     return unknown;
   }
+}
+
+const std::string ToUpper(std::string s) {
+  absl::AsciiStrToUpper(&s);
+  return s;
 }
 
 const std::string NonDestructiveStrToLower(std::string s) {
@@ -145,8 +152,8 @@ const std::string EnumLispName(const EnumDescriptor* descriptor) {
 
 const std::string ToLispEnumValue(const std::string& name) {
   // Enum values are usually uppercase separated by underscore.
-  std::string v = StringReplace(name, "_", "-", true);
-  LowerString(&v);
+  std::string v = absl::StrReplaceAll(name, {{"_", "-"}});
+  StrToLower(&v);
   return v;
 }
 
@@ -222,8 +229,8 @@ bool CamelIsSpitting(const std::string& name) {
 }
 
 const std::string ToLispAliasSymbolName(const std::string& symbol_name) {
-  auto splitter = Split(symbol_name, ":", true);
-  return NonDestructiveStrToLower(Join(splitter, "::"));
+  auto splitter = absl::StrSplit(symbol_name, ":");
+  return NonDestructiveStrToLower(absl::StrJoin(splitter, "::"));
 }
 
 }  // namespace cl_protobufs

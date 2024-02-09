@@ -18,6 +18,7 @@ namespace google {
 namespace protobuf {
 namespace cl_protobufs {
 
+const std::string ToUpper(std::string s);
 const std::string NonDestructiveStrToLower(std::string s);
 
 const void StrToLower(std::string* s);
