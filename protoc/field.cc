@@ -263,7 +263,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
     vars["type"] = FieldLispType(field);
     vars["kind"] = FieldLispKind(field);
     vars["label"] = FieldLispLabel(field);
-    vars["packed"] = field->options().packed() ? " :packed cl:t" : "";
+    vars["packed"] = field->is_packed() ? " :packed cl:t" : "";
     vars["lazy"] = field->options().lazy() ? " :lazy cl:t" : "";
     vars["default"] = field->has_default_value() ||
                       (field->cpp_type() == FieldDescriptor::CPPTYPE_ENUM &&
