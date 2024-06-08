@@ -59,7 +59,7 @@ bool LispGenerator::Generate(const FileDescriptor* file,
   if (annotate) {
     std::unique_ptr<io::ZeroCopyOutputStream> meta(
         output_directory->Open(file_name + ".meta"));
-    GOOGLE_CHECK(annotations.SerializeToZeroCopyStream(meta.get()));
+    ABSL_CHECK(annotations.SerializeToZeroCopyStream(meta.get()));
   }
 
   return true;
@@ -132,7 +132,7 @@ bool LispGenerator::GenerateAll(const std::vector<const FileDescriptor*>& files,
   if (annotate) {
     std::unique_ptr<io::ZeroCopyOutputStream> meta(
       context->Open(file_name + ".meta"));
-    GOOGLE_CHECK(annotations.SerializeToZeroCopyStream(meta.get()));
+    ABSL_CHECK(annotations.SerializeToZeroCopyStream(meta.get()));
   }
   return true;
 }
