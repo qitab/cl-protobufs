@@ -45,10 +45,10 @@ Parameters
   (assert-true (eq :zaphod (pb:my-message.my-enum-int-to-keyword 42)))
 
   ;; constants
-  (assert-eql 1 pb:+my-message.foo+)
-  (assert-eql 2 pb:+my-message.bar+)
-  (assert-eql 2 pb:+my-message.baz+)
-  (assert-eql 42 pb:+my-message.zaphod+)
+  (assert-eql 1 pb:+my-message.my-enum.foo+)
+  (assert-eql 2 pb:+my-message.my-enum.bar+)
+  (assert-eql 2 pb:+my-message.my-enum.baz+)
+  (assert-eql 42 pb:+my-message.my-enum.zaphod+)
 
   ;; Error cases.
   (assert-false (pb:my-message.my-enum-int-to-keyword 1234))
@@ -68,10 +68,10 @@ Parameters
   (assert-eq :zaphod (pb:outer-enum-int-to-keyword 142))
 
   ;; constants
-  (assert-eql 11 pb:+foo+)
-  (assert-eql 12 pb:+bar+)
-  (assert-eql 12 pb:+baz+)
-  (assert-eql 142 pb:+zaphod+)
+  (assert-eql 11 pb:+outer-enum.foo+)
+  (assert-eql 12 pb:+outer-enum.bar+)
+  (assert-eql 12 pb:+outer-enum.baz+)
+  (assert-eql 142 pb:+outer-enum.zaphod+)
 
   ;; Error cases.
   (assert-false (pb:outer-enum-int-to-keyword 1234))
