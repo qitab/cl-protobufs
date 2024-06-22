@@ -13,6 +13,7 @@
 #include <set>
 #include <unordered_set>
 
+#include "absl/strings/str_cat.h"
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
 #include <google/protobuf/io/strtod.h>
@@ -157,8 +158,8 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
     printer->Print("\n;; Extension ranges");
     for (int i = 0; i < descriptor_->extension_range_count(); ++i) {
       const Descriptor::ExtensionRange* range = descriptor_->extension_range(i);
-      int start = range->start_;
-      int end = range->end_;
+      int start = range->start_number();
+      int end = range->end_number();
       printer->Print(
           "\n(pi:define-extension $start$ $end$)", "start", absl::StrCat(start),
           // The end is inclusive in cl_protobufs.

@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT.
 
 #include "literals.h"
+#include <absl/strings/str_cat.h>
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/io/strtod.h>
 

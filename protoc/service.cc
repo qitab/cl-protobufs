@@ -7,6 +7,8 @@
 #include "service.h"
 
 #include <cstdint>
+
+#include <absl/strings/str_cat.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/message.h>
 #include "literals.h"
