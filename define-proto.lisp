@@ -221,17 +221,17 @@ the oneof and its nested fields.
     (setf *current-file-descriptor* descriptor)
     (validate-imports descriptor imports)))
 
-(defgeneric enum-int-to-keyword (enum-type integer)
-  (:documentation
-   "Converts INTEGER to the corresponding enum keyword.  If there are multiple
-keywords assigned to the same value (i.e., allow_alias = true in the enum
-source) then the first one is returned.  ENUM-TYPE is the enum type name.
-If no enum exists for the specified integer return nil."))
+(defun enum-keyword-to-int (enum-type keyword)
+  "Converts a KEYWORD to its corresponding integer value.  ENUM-TYPE is the
+enum-type name."
+  (let ((conversion (get enum-type 'enum-keyword-to-int)))
+    (funcall conversion keyword)))
 
-(defgeneric enum-keyword-to-int (enum-type keyword)
-  (:documentation
-   "Converts a KEYWORD to its corresponding integer value.  ENUM-TYPE is the
-enum-type name."))
+(defun enum-int-to-keyword (enum-type keyword)
+  "Converts an int to its corresponding KEYWORD value. ENUM-TYPE is the
+enum-type name."
+  (let ((conversion (get enum-type 'enum-int-to-keyword)))
+    (funcall conversion keyword)))
 
 (defconstant +threshold-enum-mapping+ 10
   "Threshold for using optimized enum mapping.")
@@ -317,22 +317,14 @@ as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
                   (the (or null ,type)
                        (values (gethash numeral ,int-to-enum))))))))
        (setf (get ',type 'enum-int-to-keyword) ',int2key)
-       (setf (get ',type 'enum-keyword-to-int) ',key2int)
-       (defmethod cl-protobufs:enum-keyword-to-int
-           ((e (eql ',type)) keyword)
-         (,key2int keyword))
-       (defmethod cl-protobufs:enum-int-to-keyword
-           ((e (eql ',type)) numeral)
-         (,int2key numeral)))))
+       (setf (get ',type 'enum-keyword-to-int) ',key2int))))
 
-(defgeneric enum-default-value (enum-type)
-  (:documentation
-   "Get the default enum value for ENUM-TYPE"))
-
-(defmethod enum-default-value (enum-type)
-  "If no default enum value function can be found for a specific ENUM-TYPE
-return nil."
-  nil)
+(defun enum-default-value (enum-type)
+  "Get the default enum value for ENUM-TYPE, nil if none is found."
+  (let* ((descriptor (find-enum-descriptor enum-type)))
+    (and descriptor
+         (enum-value-descriptor-name (car (enum-descriptor-values
+                                           descriptor))))))
 
 (defun make-enum-constant-forms (type enum-values)
   "Generates forms for defining a constant for each enum value in ENUM-VALUES.
@@ -383,6 +375,7 @@ but we want an internal version for the case where we deserialized an unknown
    VALUES: The possible values for the enum in the form (name :index value)."
   (let ((name (or name (class-name->proto type)))
         (open-type (enum-open-type type)))
+
     (with-collectors ((names collect-name) ; keyword symbols
                       (forms collect-form)
                       (value-descriptors collect-value-descriptor))
@@ -402,8 +395,6 @@ but we want an internal version for the case where we deserialized an unknown
         (collect-form (make-enum-conversion-forms type open-type value-descriptors))
         (collect-form (make-enum-constant-forms type value-descriptors))
         ;; The default value is the keyword associated with the first element.
-        (collect-form `(defmethod enum-default-value ((e (eql ',type)))
-                         ,(enum-value-descriptor-name (car value-descriptors))))
         (collect-form `(record-protobuf-object ',type ,enum :enum))
         (collect-form `(export '(,open-type)))
         ;; Register it by the full symbol name.
