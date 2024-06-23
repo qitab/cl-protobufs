@@ -22,8 +22,8 @@ PROTOC      ?= $(PROTOC_ROOT)/bin/protoc
 OFILES = enum.o field.o file.o generator.o literals.o message.o \
 	names.o service.o proto2-descriptor-extensions.o main.o
 
-CXXFLAGS = -std=c++14 -I$(PROTOC_ROOT)/include -I.
-LIBS = -Wl,-L$(PROTOC_ROOT)/lib -Wl,-rpath -Wl,$(PROTOC_ROOT)/lib -lprotoc -lprotobuf -pthread
+CXXFLAGS = -std=c++17 -I$(PROTOC_ROOT)/include -I.
+LIBS = -Wl,-L$(PROTOC_ROOT)/lib -Wl,-rpath -Wl,$(PROTOC_ROOT)/lib -lprotoc -pthread $(shell pkg-config --libs absl_strings absl_absl_log absl_absl_check protobuf)
 
 protoc-gen-cl-pb: $(OFILES) Makefile
 	$(CXX) $(OFILES) -o protoc-gen-cl-pb $(LIBS)
@@ -41,7 +41,7 @@ protoc_middleman: ../google/protobuf/proto2-descriptor-extensions.proto
 	@touch protoc_middleman
 
 proto2-descriptor-extensions.o: protoc_middleman
-	$(CXX) $(CXXFLAGS) $(LIBS) -c -o proto2-descriptor-extensions.o proto2-descriptor-extensions.pb.cc
+	$(CXX) $(CXXFLAGS) -c -o proto2-descriptor-extensions.o proto2-descriptor-extensions.pb.cc $(LIBS)
 
 names.o: names.h
 enum.o: enum.h enum.cc protoc_middleman

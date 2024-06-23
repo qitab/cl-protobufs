@@ -39,7 +39,7 @@ jobs:
         run: echo "::add-path:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
 
       - name: Download and install protobuf
-        run: sudo apt install -y protobuf-compiler libprotobuf-dev libprotoc-dev
+        run: sudo apt install -y protobuf-compiler libprotobuf-dev libprotoc-dev libabsl-dev
 
       - name: Install protoc plug-in
         run: cd $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc && PROTOC_ROOT=/usr make
