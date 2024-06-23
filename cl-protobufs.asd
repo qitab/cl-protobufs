@@ -71,36 +71,24 @@ and functionality for working with them."
     :components
     ((:file "message-api")))
    (:module "well-known-types"
-    :serial t
     :pathname ""
     :depends-on ("models" "misc")
     :components
-    ((:protobuf-source-file "descriptor"
-      :proto-pathname "google/protobuf/descriptor.proto")
-     (:protobuf-source-file "any"
-      :proto-pathname "google/protobuf/any.proto")
-     (:protobuf-source-file "source_context"
-      :proto-pathname "google/protobuf/source_context.proto")
+    ((:protobuf-source-file "google/protobuf/descriptor")
+     (:protobuf-source-file "google/protobuf/any")
+     (:protobuf-source-file "google/protobuf/source_context")
      #-ccl
-     (:protobuf-source-file "type"
-      :proto-pathname "google/protobuf/type.proto"
+     (:protobuf-source-file "google/protobuf/type"
+      :depends-on ("google/protobuf/any" "google/protobuf/source_context")
       :proto-search-path ("google/protobuf/"))
      #-ccl
-     (:protobuf-source-file "api"
-      :proto-pathname "google/protobuf/api.proto"
-      :proto-search-path ("google/protobuf/"))
-     (:protobuf-source-file "duration"
-      :proto-pathname "google/protobuf/duration.proto")
-     (:protobuf-source-file "empty"
-      :proto-pathname "google/protobuf/empty.proto")
-     (:protobuf-source-file "field_mask"
-      :proto-pathname "google/protobuf/field_mask.proto")
-     (:protobuf-source-file "timestamp"
-      :proto-pathname "google/protobuf/timestamp.proto")
-     (:protobuf-source-file "wrappers"
-      :proto-pathname "google/protobuf/wrappers.proto")
-     (:protobuf-source-file "struct"
-      :proto-pathname "google/protobuf/struct.proto")
+     (:protobuf-source-file "google/protobuf/api")
+     (:protobuf-source-file "google/protobuf/duration")
+     (:protobuf-source-file "google/protobuf/empty")
+     (:protobuf-source-file "google/protobuf/field_mask")
+     (:protobuf-source-file "google/protobuf/timestamp")
+     (:protobuf-source-file "google/protobuf/wrappers")
+     (:protobuf-source-file "google/protobuf/struct")
      (:file "well-known-types")))
    (:module "json"
     :serial t
