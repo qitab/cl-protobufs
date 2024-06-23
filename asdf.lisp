@@ -109,7 +109,7 @@ to PARENT-PATH."
               search-path))))
 
 (defun get-search-paths (protobuf-source-file)
-  "For a given protobuf-source-file, generate the default saerch paths that should be used."
+  "For a given protobuf-source-file, generate the default search paths that should be used."
   (cons
     (if (proto-pathname protobuf-source-file)
           ;; If there's a pathname specified, just use the absolute directory of the pathname.
@@ -140,7 +140,7 @@ to PARENT-PATH."
                           search-path
                           (file-namestring output-file)
                           (directory-namestring output-file)
-                          source-file-argument))) 
+                          source-file-argument)))
     (multiple-value-bind (output error-output status)
         (uiop:run-program command :output '(:string :stripped t) :error-output :output :ignore-error-status t)
       (declare (ignore error-output))
