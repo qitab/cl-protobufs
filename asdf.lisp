@@ -129,7 +129,11 @@ to PARENT-PATH."
 (defmethod perform ((operation proto-to-lisp) (component protobuf-source-file))
   (let* ((source-file (first (input-files operation component)))
          (source-file-argument (if (proto-pathname component)
+                                   ;; If a PROTO-PATHNAME is specified in the component, use only the
+                                   ;; filename and type as the argument to protoc.
                                    (file-namestring source-file)
+                                   ;; If a PROTO-PATHNAME is not specified in the component, use the
+                                   ;; entire PROTOBUF-SOURCE-FILE + .proto as the argument to protoc.
                                    (namestring source-file)))
          ;; Around methods on output-file may globally redirect output products, so we must call
          ;; that method instead of executing (component-pathname component).
