@@ -337,6 +337,16 @@ and functionality for working with them."
     :serial t
     :pathname ""
     :depends-on ("root-suite" "google-tests-proto")
-    :components ((:file "message-api-test"))))
+    :components ((:file "message-api-test")))
+   (:module "deep-import"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "deep-import-test-1")
+                 (:protobuf-source-file "deep-import/deep-import-test-2")
+                 (:protobuf-source-file "deep-import-test-3"
+                  :proto-pathname "deep-import/deep-import-test-3.proto")
+                 (:protobuf-source-file "deep-import-proto"
+                  :proto-search-path ("deep-import/"))
+                 (:file "deep-import-test"))))
   :perform (test-op (o c)
                     (uiop:symbol-call '#:cl-protobufs.test '#:run-all)))

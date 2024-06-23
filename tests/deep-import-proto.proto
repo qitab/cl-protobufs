@@ -1,0 +1,19 @@
+// Copyright 2020 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package third_party.lisp.cl_protobufs.tests;
+
+import "deep-import-test-1.proto"; // Test proto
+import "deep-import/deep-import-test-2.proto"; // Test proto
+import "deep-import-test-3.proto"; // Test proto
+
+message DeepImportTest {
+  optional DeepImport1 import1 = 1;
+  optional DeepImport2 import2 = 2;
+  optional DeepImport3 import3 = 3;
+}
