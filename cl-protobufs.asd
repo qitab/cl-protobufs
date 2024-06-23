@@ -79,8 +79,7 @@ and functionality for working with them."
      (:protobuf-source-file "google/protobuf/source_context")
      #-ccl
      (:protobuf-source-file "google/protobuf/type"
-      :depends-on ("google/protobuf/any" "google/protobuf/source_context")
-      :proto-search-path ("google/protobuf/"))
+      :depends-on ("google/protobuf/any" "google/protobuf/source_context"))
      #-ccl
      (:protobuf-source-file "google/protobuf/api")
      (:protobuf-source-file "google/protobuf/duration")
