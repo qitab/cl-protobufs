@@ -13,7 +13,7 @@
 #include <set>
 #include <unordered_set>
 
-#include "absl/strings/str_cat.h"
+#include <absl/strings/str_cat.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
 #include <google/protobuf/io/strtod.h>
