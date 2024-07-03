@@ -70,6 +70,7 @@ and functionality for working with them."
     :depends-on ("models" "parsing" "schema" "serialization")
     :components
     ((:file "message-api")))
+   ;; TODO(michaeldelago) Update well-known types to use their full path (ie google/protobuf/descriptor).
    (:module "well-known-types"
     :serial t
     :pathname ""
