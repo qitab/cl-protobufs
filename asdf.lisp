@@ -109,22 +109,22 @@ to PARENT-PATH."
               search-path))))
 
 (defun get-search-paths (protobuf-source-file)
-  "For a given protobuf-source-file, generate the search paths that should be used.
-To do this, it generates a search path from the component, as well as the
-PROTO-SEACH-PATH specified in the asd component.
+  "For a given PROTOBUF-SOURCE-FILE, generate the search paths that should be used.
+To do this, it creates a search path from the component, as well as the
+:proto-search-path specified in the asd component.
 
-If there's a PROTO-PATHNAME specified in the component, the generated search
-path will be the absolute directory of the PROTO-PATHNAME.
-If there's not a PROTO-PATHNAME specified in the component, the generated
+If there's a :proto-pathname specified in the component, the generated search
+path will be the absolute directory of the :proto-pathname.
+If there's not a :proto-pathname specified in the component, the generated
 search path will be the directory of the parent component."
   (cons
-    (if (proto-pathname protobuf-source-file)
-          ;; If there's a pathname specified, use the absolute directory of the pathname.
-          (directory-namestring (proto-input protobuf-source-file))
-          ;; If there's no pathname, use the directory of the parent component.
-          (asdf/component:component-parent-pathname protobuf-source-file))
-    ;; Attach the other search paths on the back
-    (resolve-search-path protobuf-source-file)))
+   (if (proto-pathname protobuf-source-file)
+       ;; If there's a pathname specified, use the absolute directory of the pathname.
+       (directory-namestring (proto-input protobuf-source-file))
+       ;; If there's no pathname, use the directory of the parent component.
+       (asdf/component:component-parent-pathname protobuf-source-file))
+   ;; Attach the other search paths on the back
+   (resolve-search-path protobuf-source-file)))
 
 (define-condition protobuf-compile-failed (compile-failed-error)
   ()

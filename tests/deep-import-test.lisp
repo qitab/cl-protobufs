@@ -24,7 +24,7 @@ Parameters
                                        :signal-condition-on-fail t))
 
 (deftest test-all-imports-are-included (deep-import-suite)
-  "Ensure file imports of the parent structure are properly read and stored with it's file descriptor."
+  "Ensure file imports of the parent structure are properly read and stored with its file descriptor."
   (let* ((descriptor (cl-protobufs:find-file-descriptor 'pb:deep-import-proto))
          (imports (pi::proto-imports descriptor)))
     ;; Confirms there are in-fact 3 imports on the testing deep-import-proto.
@@ -41,9 +41,9 @@ Parameters
 (deftest test-file-descriptors (deep-import-suite)
   "Ensure generated lisp files add their PROTO-SOURCE-FILE to CL-PROTOBUFS.IMPLEMENTATION."
   (assert-true 
-    (cl-protobufs:find-file-descriptor #P"deep-import/deep-import-test-2.proto"))
-  (assert-true 
-    (cl-protobufs:find-file-descriptor #P"deep-import-test-3.proto")))
+   (cl-protobufs:find-file-descriptor #P"deep-import/deep-import-test-2.proto"))
+  (assert-true
+   (cl-protobufs:find-file-descriptor #P"deep-import-test-3.proto")))
 
 (deftest test-make-sub-structures (deep-import-suite)
   "Ensure imported sub-structure can be made."
