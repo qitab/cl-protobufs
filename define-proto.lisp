@@ -502,7 +502,7 @@ Parameters:
 
 (defun-inline proto-%%bytes (obj)
   "Returns the %%bytes field of the proto object OBJ."
-  (slot-value obj '%%bytes))
+  (the (or (simple-array (unsigned-byte 8) 1) null) (slot-value obj '%%bytes)))
 
 (defun-inline (setf proto-%%bytes) (new-value obj)
   "Sets the %bytes field of the proto object OBJ with NEW-VALUE."
