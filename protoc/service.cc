@@ -10,7 +10,7 @@
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/message.h>
-#include <google/protobuf/stubs/strutil.h>
+#include "absl/strings/str_cat.h"
 #include "literals.h"
 #include "names.h"
 #include <google/protobuf/io/printer.h>
@@ -56,13 +56,13 @@ std::string MethodOptionValue(const MethodOptions& method_options,
   const Reflection* reflection = method_options.GetReflection();
   switch (field->cpp_type()) {
     case FieldDescriptor::CPPTYPE_INT32:
-      return StrCat(reflection->GetInt32(method_options, field));
+      return absl::StrCat(reflection->GetInt32(method_options, field));
     case FieldDescriptor::CPPTYPE_INT64:
-      return StrCat(reflection->GetInt64(method_options, field));
+      return absl::StrCat(reflection->GetInt64(method_options, field));
     case FieldDescriptor::CPPTYPE_UINT32:
-      return StrCat(reflection->GetUInt32(method_options, field));
+      return absl::StrCat(reflection->GetUInt32(method_options, field));
     case FieldDescriptor::CPPTYPE_UINT64:
-      return StrCat(reflection->GetUInt64(method_options, field));
+      return absl::StrCat(reflection->GetUInt64(method_options, field));
     case FieldDescriptor::CPPTYPE_DOUBLE:
       return LispSimpleDtoa(reflection->GetDouble(method_options, field));
     case FieldDescriptor::CPPTYPE_FLOAT:
@@ -72,7 +72,7 @@ std::string MethodOptionValue(const MethodOptions& method_options,
     case FieldDescriptor::CPPTYPE_ENUM: {
       const EnumValueDescriptor* value =
           reflection->GetEnum(method_options, field);
-      return StrCat(":", ToLispName(value->name()));
+      return absl::StrCat(":", ToLispName(value->name()));
     }
     case FieldDescriptor::CPPTYPE_STRING:
       return LispEscapeString(reflection->GetString(method_options, field));

@@ -13,7 +13,7 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/extension_set.h>
-#include <google/protobuf/stubs/strutil.h>
+#include "absl/strings/str_cat.h"
 #include "proto2-descriptor-extensions.pb.h"
 #include "literals.h"
 #include "names.h"
@@ -192,20 +192,20 @@ const std::string FieldLispDefault(const FieldDescriptor* field) {
       return LispBool(field->default_value_bool());
     case FieldDescriptor::CPPTYPE_ENUM: {
       const EnumValueDescriptor* value = field->default_value_enum();
-      return StrCat(":", ToLispName(value->name()));
+      return absl::StrCat(":", ToLispName(value->name()));
     }
     case FieldDescriptor::CPPTYPE_INT32:
-      return StrCat(field->default_value_int32());
+      return absl::StrCat(field->default_value_int32());
     case FieldDescriptor::CPPTYPE_UINT32:
-      return StrCat(field->default_value_uint32());
+      return absl::StrCat(field->default_value_uint32());
     case FieldDescriptor::CPPTYPE_INT64:
-      return StrCat(field->default_value_int64());
+      return absl::StrCat(field->default_value_int64());
     case FieldDescriptor::CPPTYPE_UINT64:
-      return StrCat(field->default_value_uint64());
+      return absl::StrCat(field->default_value_uint64());
     case FieldDescriptor::CPPTYPE_STRING: {
       switch (field->type()) {
         case FieldDescriptor::TYPE_BYTES:
-          return StrCat(
+          return absl::StrCat(
               "(cl:make-array ", field->default_value_string().size(),
               " :element-type '(cl:unsigned-byte 8)", " :initial-contents '(",
               StringOctets(field->default_value_string()), "))");
@@ -241,7 +241,7 @@ const std::string FieldLispName(const FieldDescriptor* field) {
 void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   std::map<std::string, std::string> vars;
   vars["name"] = FieldLispName(field);
-  vars["tag"] = StrCat(field->number());
+  vars["tag"] = absl::StrCat(field->number());
   vars["json-name"] = field->json_name();
   if (field->is_map()) {
     vars["key-type"] = FieldLispType(field->message_type()->field(0));
@@ -250,7 +250,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
     vars["val-default"]
         = field->message_type()->field(1)->cpp_type()
         == FieldDescriptor::CPPTYPE_ENUM ?
-        StrCat("\n     :val-default ",
+        absl::StrCat("\n     :val-default ",
                      FieldLispDefault(field->message_type()->field(1))) : "";
     printer->Print(vars,
                    "\n(pi:define-map $name$\n"
@@ -268,7 +268,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
     vars["default"] = field->has_default_value() ||
                       (field->cpp_type() == FieldDescriptor::CPPTYPE_ENUM &&
                        field->label() != FieldDescriptor::Label::LABEL_REPEATED)
-                      ? StrCat(" :default ", FieldLispDefault(field))
+                      ? absl::StrCat(" :default ", FieldLispDefault(field))
         : "";
     printer->Print(vars,
                    "\n($name$\n"
