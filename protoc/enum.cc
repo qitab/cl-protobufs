@@ -6,7 +6,6 @@
 
 #include "enum.h"
 
-#include <google/protobuf/stubs/strutil.h>
 #include "proto2-descriptor-extensions.pb.h"
 #include "names.h"
 #include <google/protobuf/io/printer.h>
@@ -43,7 +42,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
   for (int i = 0; i < descriptor_->value_count(); i++) {
     printer->Print("\n(:$name$ :index $number$)", "name",
                    ToLispEnumValue(descriptor_->value(i)->name()), "number",
-                   StrCat(descriptor_->value(i)->number()));
+                   absl::StrCat(descriptor_->value(i)->number()));
     printer->Annotate("name", descriptor_);
   }
   printer->Print(")");

@@ -13,10 +13,9 @@
 #include <set>
 #include <unordered_set>
 
-#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
-#include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/io/strtod.h>
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"
@@ -158,15 +157,15 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
     printer->Print("\n;; Extension ranges");
     for (int i = 0; i < descriptor_->extension_range_count(); ++i) {
       const Descriptor::ExtensionRange* range = descriptor_->extension_range(i);
-      int start = range->start;
-      int end = range->end;
+      int start = range->start_;
+      int end = range->end_;
       printer->Print(
-          "\n(pi:define-extension $start$ $end$)", "start", StrCat(start),
+          "\n(pi:define-extension $start$ $end$)", "start", absl::StrCat(start),
           // The end is inclusive in cl_protobufs.
           // For some reason, the extension number is generated as
           // 0x7ffffffe when specified as 'max', but the max must be
           // (2^29 - 1).
-          "end", StrCat(std::min(kMaxExtensionNumber, end - 1)));
+          "end", absl::StrCat(std::min(kMaxExtensionNumber, end - 1)));
     }
   }
 

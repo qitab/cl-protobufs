@@ -1,5 +1,5 @@
 protoc/*.o
 protoc/*.cc
 protoc/*.h
-protoc/protoc-gen-lisp
+protoc/protoc-gen-cl-pb
 protoc/protoc_middleman
