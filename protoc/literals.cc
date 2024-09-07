@@ -6,15 +6,14 @@
 
 #include "literals.h"
 
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/strutil.h>
+#include "absl/strings/str_cat.h"
 
 namespace google {
 namespace protobuf {
 namespace cl_protobufs {
 
 const std::string LispSimpleFtoa(float value) {
-  std::string result = SimpleFtoa(value);
+  std::string result = absl::StrCat(value);
   if (result == "inf") {
     return "float-features:single-float-positive-infinity";
   } else if (result == "-inf") {
@@ -32,7 +31,7 @@ const std::string LispSimpleFtoa(float value) {
 }
 
 const std::string LispSimpleDtoa(double value) {
-  std::string result = SimpleDtoa(value);
+  std::string result = absl::StrCat(value);
   if (result == "inf") {
     return "float-features:double-float-positive-infinity";
   } else if (result == "-inf") {
@@ -65,7 +64,7 @@ const std::string StringOctets(const std::string& str) {
   std::string octets;
   for (char c : str) {
     if (!octets.empty()) octets += " ";
-    octets += StrCat(c & 0xff);
+    octets += absl::StrCat(c & 0xff);
   }
   return octets;
 }
