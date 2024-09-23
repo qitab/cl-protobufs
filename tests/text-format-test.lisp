@@ -222,7 +222,6 @@ one_level_nesting {
     (assert-equality #'string=
         text-msg-not (format nil "~/cl-protobufs:fmt/" msg))))
 
-
 (deftest test-parse-text-format-with-# (text-format-suite)
   (let ((msg (proto:parse-text-format
               'test-pb:text-format-test
@@ -301,6 +300,28 @@ double_field: -infinity
     (assert-eql float-features:single-float-negative-infinity (test-pb:float-field msg))
     (assert-eql float-features:double-float-negative-infinity (test-pb:double-field msg))))
 
+(deftest test-float-round-trip (text-format-suite)
+  (let* ((msg-string "float_field: 0.33333334
+double_field: 0.3333333432674408
+")
+         (msg (proto:parse-text-format
+               'test-pb:text-format-test
+               :stream (make-string-input-stream msg-string))))
+    (assert-eql (/ 1 3.0) (test-pb:float-field msg))
+    (assert-eql 0.3333333432674408d0 (test-pb:double-field msg))
+    (assert-equality #'string=
+        msg-string (format nil "~@/cl-protobufs:fmt/" msg)))
+
+  (let* ((msg-string "float_field: -0.33333334
+double_field: -0.3333333432674408
+")
+         (msg (proto:parse-text-format
+               'test-pb:text-format-test
+               :stream (make-string-input-stream msg-string))))
+    (assert-eql (/ -1 3.0) (test-pb:float-field msg))
+    (assert-eql -0.3333333432674408d0 (test-pb:double-field msg))
+    (assert-equality #'string=
+        msg-string (format nil "~@/cl-protobufs:fmt/" msg))))
 
 (deftest test-repeated-message (text-format-suite)
   (let ((msg (proto:parse-text-format

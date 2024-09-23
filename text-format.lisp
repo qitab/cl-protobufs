@@ -204,7 +204,7 @@ Parameters:
         ((float-features:float-nan-p val)
          (format stream "nan"))
         (t
-         (format stream "~D" val))))
+         (format stream "~F" val))))
 
 (defun print-enum (val enum name stream indent)
   "Print enum to stream
