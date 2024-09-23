@@ -244,6 +244,64 @@ float_field: 1.5 # toga
     (assert-eql 1 (test-pb:uint-field msg))
     (assert-eql 1.5 (test-pb:float-field msg))))
 
+(deftest test-parse-float-nan-inf (text-format-suite)
+  (let* ((msg-string
+          "float_field: nan
+double_field: nan
+")
+         (msg (proto:parse-text-format
+               'test-pb:text-format-test
+               :stream (make-string-input-stream msg-string))))
+    (assert-eql float-features:single-float-nan (test-pb:float-field msg))
+    (assert-eql float-features:double-float-nan (test-pb:double-field msg))
+    (assert-equality #'string=
+        msg-string (format nil "~@/cl-protobufs:fmt/" msg)))
+
+  (let* ((msg-string
+          "float_field: inf
+double_field: inf
+")
+         (msg (proto:parse-text-format
+               'test-pb:text-format-test
+               :stream (make-string-input-stream msg-string))))
+    (assert-eql float-features:single-float-positive-infinity (test-pb:float-field msg))
+    (assert-eql float-features:double-float-positive-infinity (test-pb:double-field msg))
+    (assert-equality #'string=
+        msg-string (format nil "~@/cl-protobufs:fmt/" msg)))
+
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream "
+# Beginning rowlet
+float_field: infinity
+double_field: infinity
+"))))
+    (assert-eql float-features:single-float-positive-infinity (test-pb:float-field msg))
+    (assert-eql float-features:double-float-positive-infinity (test-pb:double-field msg)))
+
+  (let* ((msg-string
+          "float_field: -inf
+double_field: -inf
+")
+        (msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream msg-string))))
+    (assert-eql float-features:single-float-negative-infinity (test-pb:float-field msg))
+    (assert-eql float-features:double-float-negative-infinity (test-pb:double-field msg))
+    (assert-equality #'string=
+        msg-string (format nil "~@/cl-protobufs:fmt/" msg)))
+
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream "
+# Beginning rowlet
+float_field: -infinity
+double_field: -infinity
+"))))
+    (assert-eql float-features:single-float-negative-infinity (test-pb:float-field msg))
+    (assert-eql float-features:double-float-negative-infinity (test-pb:double-field msg))))
+
+
 (deftest test-repeated-message (text-format-suite)
   (let ((msg (proto:parse-text-format
               'test-pb:text-format-test

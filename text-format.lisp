@@ -179,7 +179,7 @@ Parameters:
       ((boolean)
        (format stream "~A" (if val "true" "false")))
       ((float double-float)
-       (format stream "~D" val))
+       (print-double-or-float val stream))
       ;; A few of our homegrown types
       ((symbol)
        (format stream "\"~A\"" (lisp-symbol-string val)))
@@ -188,6 +188,23 @@ Parameters:
     (if indent
         (format stream "~%")
         (format stream " "))))
+
+(defun print-double-or-float (val stream)
+  "Print a double or float to the stream.
+
+Parameters:
+  VAL: The double or float.
+  STREAM: The stream to print to."
+  (cond ((or (eql val float-features:double-float-positive-infinity)
+             (eql val float-features:single-float-positive-infinity))
+         (format stream "inf"))
+        ((or (eql val float-features:double-float-negative-infinity)
+             (eql val float-features:single-float-negative-infinity))
+         (format stream "-inf"))
+        ((float-features:float-nan-p val)
+         (format stream "nan"))
+        (t
+         (format stream "~D" val))))
 
 (defun print-enum (val enum name stream indent)
   "Print enum to stream

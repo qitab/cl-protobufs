@@ -295,35 +295,53 @@ caret string that visually marks the error position in the line."
 (defun parse-float (stream)
   "Parse the next token in the STREAM as a float, then skip the following whitespace.
    The returned value is the float."
-  (let ((number (parse-number stream)))
+  (let ((number (parse-number stream :allow-inf-nan t)))
     (when number
-      (coerce number 'float))))
+      (case number
+        (:infinity float-features:single-float-positive-infinity)
+        (:-infinity float-features:single-float-negative-infinity)
+        (:nan float-features:single-float-nan)
+        (t (coerce number 'float))))))
 
 (defun parse-double (stream &key append-d0)
   "Parse the next token in the STREAM as a double, then skip the following whitespace.
 If APPEND-D0 is true, then append 'd0' to the parsed number before attempting to convert
 to a double. This is necessary in order to parse doubles from the stream which do not
 already have the 'd0' suffix. The returned value is the double-float."
-  (let ((number (parse-number stream :append-d0 append-d0)))
+  (let ((number (parse-number stream :append-d0 append-d0 :allow-inf-nan t)))
     (when number
-      (coerce number 'double-float))))
+      (case number
+        (:infinity float-features:double-float-positive-infinity)
+        (:-infinity float-features:double-float-negative-infinity)
+        (:nan float-features:DOUBLE-FLOAT-NAN )
+        (t (coerce number 'double-float))))))
 
-(defun parse-number (stream &key append-d0)
+(defun parse-number (stream &key append-d0 allow-inf-nan)
   "Parse a number from STREAM. If APPEND-D0 is true, append \"d0\"
-to the end of the parsed numerical string."
-  (when (let ((ch (peek-char nil stream nil)))
-          (or (digit-char-p ch) (member ch '(#\- #\+ #\.))))
-    (let ((token (parse-token stream '(#\- #\+ #\.))))
-      (when token
-        (skip-whitespace-comments-and-chars stream)
-        (if append-d0
-            (parse-numeric-string (concatenate 'string token "d0"))
-            (parse-numeric-string token))))))
+to the end of the parsed numerical string. If ALLOW-INF-NAN is
+true, allow inifinty or nan values."
+  (let ((ch (peek-char nil stream nil)))
+    (when (or (digit-char-p ch)
+              (member ch '(#\- #\+ #\.))
+              (and allow-inf-nan
+                   (member ch '(#\i #\n))))
+      (let ((token (parse-token stream '(#\- #\+ #\.))))
+        (when token
+          (skip-whitespace-comments-and-chars stream)
+
+          (if append-d0
+              (parse-numeric-string (concatenate 'string token "d0"))
+              (parse-numeric-string token)))))))
 
 (defun parse-numeric-string (string)
   (cond ((starts-with string "0x")
          (parse-integer (subseq string 2) :radix 16))
         ((starts-with string "-0x")
          (- (parse-integer (subseq string 3) :radix 16)))
+        ((member string '("nan") :test #'string-equal) :nan)
+        ((member string '("inf" "infinity") :test #'string-equal)
+         :infinity)
+        ((member string '("-inf" "-infinity") :test #'string-equal)
+         :-infinity)
         (t
          (read-from-string string))))
