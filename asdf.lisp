@@ -136,11 +136,12 @@ search path will be the directory of the parent component."
 (defmethod perform ((operation proto-to-lisp) (component protobuf-source-file))
   (let* ((source-file (first (input-files operation component)))
          (source-file-argument (if (proto-pathname component)
-                                   ;; If a PROTO-PATHNAME is specified in the component, use only the
-                                   ;; filename and type as the argument to protoc.
+                                   ;; If a PROTO-PATHNAME is specified in the component, use
+                                   ;; only the filename and type as the argument to protoc.
                                    (file-namestring source-file)
-                                   ;; If a PROTO-PATHNAME is not specified in the component, use the
-                                   ;; entire PROTOBUF-SOURCE-FILE + .proto as the argument to protoc.
+                                   ;; If a PROTO-PATHNAME is not specified in the component,
+                                   ;; use the entire PROTOBUF-SOURCE-FILE + .proto as the
+                                   ;; argument to protoc.
                                    (namestring source-file)))
          ;; Around methods on output-file may globally redirect output products, so we must call
          ;; that method instead of executing (component-pathname component).
@@ -153,11 +154,14 @@ search path will be the directory of the parent component."
                           (directory-namestring output-file)
                           source-file-argument)))
     (multiple-value-bind (output error-output status)
-        (uiop:run-program command :output '(:string :stripped t) :error-output :output :ignore-error-status t)
+        (uiop:run-program command :output '(:string :stripped t)
+                                  :error-output :output
+                                  :ignore-error-status t)
       (declare (ignore error-output))
       (unless (zerop status)
         (error 'protobuf-compile-failed
-               :description (format nil "Failed to compile proto file.  Command: ~S Error: ~S" command output)
+               :description (format nil "Failed to compile proto file. Command: ~S Error: ~S"
+                                    command output)
                :context-format "~/asdf-action::format-action/"
                :context-arguments `((,operation . ,component)))))))
 
