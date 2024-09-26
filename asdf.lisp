@@ -108,6 +108,24 @@ to PARENT-PATH."
                 (resolve-relative-pathname path parent-path))
               search-path))))
 
+(defun get-search-paths (protobuf-source-file)
+  "For a given PROTOBUF-SOURCE-FILE, generate the search paths that should be used.
+To do this, it creates a search path from the component, as well as the
+:proto-search-path specified in the asd component.
+
+If there's a :proto-pathname specified in the component, the generated search
+path will be the absolute directory of the :proto-pathname.
+If there's not a :proto-pathname specified in the component, the generated
+search path will be the directory of the parent component."
+  (cons
+   (if (proto-pathname protobuf-source-file)
+       ;; If there's a pathname specified, use the absolute directory of the pathname.
+       (directory-namestring (proto-input protobuf-source-file))
+       ;; If there's no pathname, use the directory of the parent component.
+       (asdf/component:component-parent-pathname protobuf-source-file))
+   ;; Attach the other search paths on the back
+   (resolve-search-path protobuf-source-file)))
+
 (define-condition protobuf-compile-failed (compile-failed-error)
   ()
   (:documentation "Condition signalled when translating a .proto file into Lisp code fails."))
@@ -117,13 +135,18 @@ to PARENT-PATH."
 
 (defmethod perform ((operation proto-to-lisp) (component protobuf-source-file))
   (let* ((source-file (first (input-files operation component)))
-         (source-file-argument (if *protoc-relative-path*
+         (source-file-argument (if (proto-pathname component)
+                                   ;; If a PROTO-PATHNAME is specified in the component, use
+                                   ;; only the filename and type as the argument to protoc.
                                    (file-namestring source-file)
+                                   ;; If a PROTO-PATHNAME is not specified in the component,
+                                   ;; use the entire PROTOBUF-SOURCE-FILE + .proto as the
+                                   ;; argument to protoc.
                                    (namestring source-file)))
          ;; Around methods on output-file may globally redirect output products, so we must call
          ;; that method instead of executing (component-pathname component).
          (output-file (first (output-files operation component)))
-         (search-path (cons (directory-namestring source-file) (resolve-search-path component)))
+         (search-path (get-search-paths component))
          (command (format nil "protoc --proto_path=~{~A~^:~} --cl-pb_out=output-file=~A:~A ~A ~
                                --experimental_allow_proto3_optional"
                           search-path
@@ -131,11 +154,14 @@ to PARENT-PATH."
                           (directory-namestring output-file)
                           source-file-argument)))
     (multiple-value-bind (output error-output status)
-        (uiop:run-program command :output t :error-output :output :ignore-error-status t)
-      (declare (ignore output error-output))
+        (uiop:run-program command :output '(:string :stripped t)
+                                  :error-output :output
+                                  :ignore-error-status t)
+      (declare (ignore error-output))
       (unless (zerop status)
         (error 'protobuf-compile-failed
-               :description (format nil "Failed to compile proto file.  Command: ~S" command)
+               :description (format nil "Failed to compile proto file. Command: ~S Error: ~S"
+                                    command output)
                :context-format "~/asdf-action::format-action/"
                :context-arguments `((,operation . ,component)))))))
 
