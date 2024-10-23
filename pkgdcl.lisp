@@ -158,7 +158,6 @@
 
 (defpackage #:cl-protobufs.implementation
   (:use :common-lisp :cl-protobufs)
-  (:import-from :alexandria #:define-constant)
   (:export
    ;; Exported for use by generated code. These shouldn't be called directly.
    #:define-schema
