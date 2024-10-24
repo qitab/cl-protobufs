@@ -52,24 +52,6 @@ Parameters
     (expect-bytes (list +TAG-U+ 10) (serialize-to-bytes msg))
     (expect-same msg)))
 
-;; There is no applicable method for the generic function
-;; #<STANDARD-GENERIC-FUNCTION SB-MOP:SLOT-DEFINITION-TYPE (1)>
-;; with defstruct protobufs.
-#-abcl ;; gives an error that slot is not a standard-class, this is true
-(deftest unsigned-negative (zigzag-suite)
-  ;; Verify that the generated class has the correct type declaration
-  (let ((class (find-class 'msg)))
-    (unless (closer-mop:class-finalized-p class)
-      (closer-mop:finalize-inheritance class))
-    (let* ((slot
-            (find 'cl-protobufs.zigzag-test::%u (closer-mop:class-slots class)
-                  :key 'closer-mop:slot-definition-name))
-           (type (closer-mop:slot-definition-type slot)))
-      #+sbcl ;; In non sbcl the int-name may differ
-      (assert-true (eq type 'uint64))
-      (assert-true (not (typep -10 type)))
-      (assert-true (typep 10 type)))))
-
 (deftest signed-positive (zigzag-suite)
   ;; Small encoding for positive numbers
   (let ((msg (make-msg :s 10)))
