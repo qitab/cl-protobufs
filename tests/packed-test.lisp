@@ -30,6 +30,21 @@ Parameters
   (assert-eql #b10010 (pi::packed-tag 2))
   (assert-eql #b11010 (pi::packed-tag 3)))
 
+#+nil(deftest packed-encoding-test-2023 (packed-suite)
+  (let ((player (cl-protobufs.com.example:make-player)))
+    (push 10 (cl-protobufs.com.example:packed-scores player))
+    (push 20 (cl-protobufs.com.example:packed-scores player))
+    (push 30 (cl-protobufs.com.example:packed-scores player))
+    (assert-eql 3 (length (cl-protobufs.com.example:packed-scores player)))
+    (let* ((bytes (cl-protobufs:serialize-to-bytes player))
+           (deserialized-player (cl-protobufs:deserialize-from-bytes
+                                 'cl-protobufs.com.example:player bytes)))
+      ;; (format t "~A~%" bytes) ; =>
+      ;; #(34 3 30 20 10)
+      (assert-eql 5 (length bytes))
+      (assert-equalp '(30 20 10)
+                     (cl-protobufs.com.example:packed-scores deserialized-player)))))
+
 (deftest packed-encoding-test (packed-suite)
   (let ((m1 (make-test-packed-types)))
     (push 10 (packed-int32 m1))
