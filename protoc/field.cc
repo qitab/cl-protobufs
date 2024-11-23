@@ -229,7 +229,8 @@ const std::string FieldLispDefault(const FieldDescriptor* field) {
 const std::string FieldLispName(const FieldDescriptor* field) {
   if (field->options().HasExtension(lisp_slot)) {
     return field->options().GetExtension(lisp_slot);
-  } else if (field->type() == FieldDescriptor::TYPE_GROUP) {
+  } else if (field->type() == FieldDescriptor::TYPE_GROUP &&
+             internal::cpp::IsGroupLike(*field)) {
     // For groups the field name and message name are derived from the same
     // string. For "group FooBar {" the field name is "foobar" so we use the
     // message name instead, to get the correct hyphenation.
