@@ -402,7 +402,7 @@ but we want an internal version for the case where we deserialized an unknown
       `(progn ,@forms))))
 
 (defmacro define-map (field-name &key key-type value-type json-name index
-                                 value-kind val-default)
+                                 value-kind val-default field-presence)
   "Define a Lisp type given the data for a protobuf map type.
 
  Parameters:
@@ -414,7 +414,8 @@ but we want an internal version for the case where we deserialized an unknown
     field name.
   VALUE-KIND: Category of the value type: :scalar, :message, :enum, etc.
   INDEX: Message field number of this map type.
-  VAL-DEFAULT: Default value for the map entries, or nil to use $empty-default."
+  VAL-DEFAULT: Default value for the map entries, or nil to use $empty-default.
+  FIELD-PRESENCE: Should the map has a has-function."
   (assert json-name)
   (assert value-kind)
   (check-type index integer)
@@ -443,7 +444,8 @@ but we want an internal version for the case where we deserialized an unknown
                                 :default (or val-default
                                              $empty-default)
                                 :kind :map
-                                :field-offset nil))
+                                :field-offset nil
+                                :field-presence field-presence))
          (map-desc (make-map-descriptor :key-type key-type
                                         :value-type value-type
                                         :value-kind value-kind)))
@@ -592,7 +594,9 @@ Parameters:
 
         ;; has-* functions are not exported for proto3-style optional fields. They are only for
         ;; internal usage.
-        ,@(unless (eq (proto-syntax *current-file-descriptor*) :proto3)
+        ,@(when (or (eq (proto-field-presence field) :explicit)
+                    (eq (proto-label field) :repeated)
+                    (eq (proto-kind field) :map))
             `((defun-inline ,external-has-function-name (,obj)
                 (,internal-has-function-name ,obj))
               (export '(,external-has-function-name))))
@@ -1393,7 +1397,7 @@ function) then there is no guarantee on the serialize function working properly.
      On exit this vector holds the correct default value for FIELD if it is a
      simple boolean field."
   (destructuring-bind (slot &key type name (default nil default-p) packed lazy
-                            json-name index label kind &allow-other-keys)
+                            json-name index label kind field-presence &allow-other-keys)
       field
     (assert (and json-name index))
     (let* (;; Public accessors and setters for slots should be defined later.
@@ -1402,7 +1406,7 @@ function) then there is no guarantee on the serialize function working properly.
         (let* (;; Proto3 optional fields do not have offsets, as they don't have has-* functions.
                ;; Note that proto2-style optional fields in proto3 files are wrapped in oneofs by
                ;; protoc, and hence process-field is never called.
-               (offset (and (not (eq (proto-syntax *current-file-descriptor*) :proto3))
+               (offset (and (eq field-presence :explicit)
                             (not (eq label :repeated))
                             field-offset))
                (default
@@ -1460,7 +1464,8 @@ function) then there is no guarantee on the serialize function working properly.
                        :packed (and (eq label :repeated) packed t)
                        :container (when (eq label :repeated) repeated-storage-type)
                        :lazy (and lazy t)
-                       :bool-index bool-index)))
+                       :bool-index bool-index
+                       :field-presence field-presence)))
           (when (and bool-index default (not (eq default $empty-default)))
             (setf (bit bool-values bool-index) 1))
           (values field cslot index (and offset t)))))))

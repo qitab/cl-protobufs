@@ -47,7 +47,8 @@ Parameters
   :import 'symbol-imported-schema)
 (pi:define-message symbol-importer-message ()
   (imported-type-field :index 1 :type symbol-imported-message :kind :message
-                       :label (:optional) :json-name "importedTypeField"))
+                       :label (:optional) :json-name "importedTypeField"
+                       :field-presence :explicit))
 
 ;;; We need an actual test to make this test pass. If we can make an instance of the message it must
 ;;; have compiled successfully.

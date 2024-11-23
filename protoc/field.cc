@@ -244,6 +244,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
   vars["name"] = FieldLispName(field);
   vars["tag"] = absl::StrCat(field->number());
   vars["json-name"] = field->json_name();
+  vars["presence"] =  field->has_presence() ? ":explicit" : ":implicit";
   if (field->is_map()) {
     vars["key-type"] = FieldLispType(field->message_type()->field(0));
     vars["val-type"] = FieldLispType(field->message_type()->field(1));
@@ -259,6 +260,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
                    "   :value-type $val-type$\n"
                    "   :json-name \"$json-name$\"\n"
                    "   :value-kind $val-kind$\n"
+                   "   :field-presence $presence$\n"
                    "   :index $tag$$val-default$)");
   } else {
     vars["type"] = FieldLispType(field);
@@ -270,10 +272,11 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
                       (field->cpp_type() == FieldDescriptor::CPPTYPE_ENUM &&
                        field->label() != FieldDescriptor::Label::LABEL_REPEATED)
                       ? absl::StrCat(" :default ", FieldLispDefault(field))
-        : "";
+                      : "";
     printer->Print(vars,
                    "\n($name$\n"
                    " :index $tag$ :type $type$ :kind $kind$ :label $label$"
+                   " :field-presence $presence$"
                    " :json-name \"$json-name$\"$default$$packed$$lazy$)");
   }
   printer->Annotate("name", field);

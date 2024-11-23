@@ -431,7 +431,10 @@ message-descriptor.")
    (bool-index :type (or null integer)      ; For non-repeated boolean fields only, the
                :accessor proto-bool-index   ; index into the bit-vector of boolean field values.
                :initarg :bool-index
-               :initform nil))
+               :initform nil)
+   (field-presence :type (member :implicit :explicit)
+                   :accessor proto-field-presence
+                   :initarg :field-presence))
   (:documentation
    "The model class that represents one field within a Protobufs message."))
 
