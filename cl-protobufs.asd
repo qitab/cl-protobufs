@@ -277,7 +277,8 @@ and functionality for working with them."
     :serial t
     :pathname ""
     :depends-on ("google-tests-proto")
-    :components ((:file "packed-test")))
+    :components ((:protobuf-source-file "editions-2023")
+                 (:file "packed-test")))
 
    (:module "serialize-to-bytes-test"
     :serial t
@@ -348,6 +349,13 @@ and functionality for working with them."
                   :proto-pathname "deep-import/deep-import-test-3.proto")
                  (:protobuf-source-file "deep-import-proto"
                   :proto-search-path ("deep-import/"))
-                 (:file "deep-import-test"))))
+                 (:file "deep-import-test")))
+   (:module "import-test-with-editions"
+    :serial t
+    :pathname ""
+    :depends-on ("root-suite")
+    :components ((:protobuf-source-file "import-proto-with-editions")
+                 (:protobuf-source-file "editions-2023")
+                 (:file "import-test-with-editions"))))
   :perform (test-op (o c)
                     (uiop:symbol-call '#:cl-protobufs.test '#:run-all)))

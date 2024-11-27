@@ -30,7 +30,7 @@ Parameters
   (assert-eql #b10010 (pi::packed-tag 2))
   (assert-eql #b11010 (pi::packed-tag 3)))
 
-#+nil(deftest packed-encoding-test-2023 (packed-suite)
+(deftest packed-encoding-test-2023 (packed-suite)
   (let ((player (cl-protobufs.com.example:make-player)))
     (push 10 (cl-protobufs.com.example:packed-scores player))
     (push 20 (cl-protobufs.com.example:packed-scores player))

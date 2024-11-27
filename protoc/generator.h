@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <google/protobuf/compiler/code_generator.h>
+#include <google/protobuf/descriptor.pb.h>
 
 namespace google {
 class FileDescriptor;
@@ -41,7 +42,15 @@ class LispGenerator : public compiler::CodeGenerator {
 
   // cl-protobufs supports proto3 optional fields.
   uint64_t GetSupportedFeatures() const override {
-    return FEATURE_PROTO3_OPTIONAL;
+    return FEATURE_PROTO3_OPTIONAL | FEATURE_SUPPORTS_EDITIONS;
+  }
+
+  Edition GetMinimumEdition() const override {
+    return Edition::EDITION_PROTO2;
+  }
+
+  Edition GetMaximumEdition() const override {
+    return Edition::EDITION_2023;
   }
 
  private:

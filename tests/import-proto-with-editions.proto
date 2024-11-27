@@ -1,0 +1,19 @@
+// Copyright 2024 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package third_party.lisp.cl_protobufs.tests;
+
+import "import-test-import-1.proto"; // Test proto
+import "import-test-import-2.proto"; // Test proto
+import "editions-2023.proto"; // Test proto
+
+message ImportTestEdition {
+  optional Import1 import1 = 1;
+  optional Import2 import2 = 2;
+  optional com.example.Player player = 3;
+}

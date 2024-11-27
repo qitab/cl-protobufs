@@ -1,0 +1,40 @@
+// Edition version of proto2 file
+edition = "2023";
+
+package com.example;
+
+option features.field_presence = EXPLICIT;
+option features.repeated_field_encoding = PACKED;
+
+message Food {
+  string name = 1;
+}
+
+message Drink {
+  string name = 1;
+}
+
+
+message Player {
+  // fields have explicit presence, so no explicit setting needed
+  string name = 1;
+  // to match the proto2 behavior, LEGACY_REQUIRED is set at the field level
+  // int32 id = 2 [features.field_presence = LEGACY_REQUIRED];
+  // to match the proto2 behavior, EXPANDED is set at the field level
+  repeated int32 scores = 3 [features.repeated_field_encoding = EXPANDED];
+  repeated int32 packed_scores = 4;
+
+  enum Handed {
+    HANDED_UNSPECIFIED = 0;
+    HANDED_LEFT = 1;
+    HANDED_RIGHT = 2;
+    HANDED_AMBIDEXTROUS = 3;
+  }
+
+  Handed handed = 5 [features.field_presence = IMPLICIT];
+  int32 faye = 6;
+  Food lunch = 7 [features.message_encoding = DELIMITED];
+  Drink lunch_drink = 8;
+
+  reserved gender;
+}
