@@ -8,8 +8,11 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <memory>
 #include <set>
+#include <string>
+#include <vector>
 
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"

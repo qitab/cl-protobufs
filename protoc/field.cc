@@ -7,6 +7,7 @@
 #include "field.h"
 
 #include <map>
+#include <string>
 
 #include <cstdint>
 #include "absl/log/absl_log.h"

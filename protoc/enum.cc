@@ -6,6 +6,9 @@
 
 #include "enum.h"
 
+#include <string>
+#include <vector>
+
 #include "absl/strings/str_cat.h"
 #include "proto2-descriptor-extensions.pb.h"
 #include "names.h"
