@@ -6,6 +6,8 @@
 
 #include "literals.h"
 
+#include <string>
+
 #include "absl/strings/str_cat.h"
 
 namespace google {

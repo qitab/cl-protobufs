@@ -11,12 +11,14 @@
 #include <algorithm>
 #include <memory>
 #include <set>
+#include <string>
 #include <unordered_set>
+#include <vector>
 
-#include "absl/strings/str_cat.h"
-#include "absl/strings/ascii.h"
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"

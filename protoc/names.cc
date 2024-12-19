@@ -10,6 +10,8 @@
 
 #include <ctype.h>
 
+#include <string>
+
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
 #include "absl/strings/ascii.h"

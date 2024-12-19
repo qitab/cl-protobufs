@@ -7,7 +7,9 @@
 #include "generator.h"
 
 #include <memory>
+#include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <google/protobuf/descriptor.h>
