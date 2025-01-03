@@ -9,6 +9,8 @@
 #include "names.h"
 
 #include <ctype.h>
+#include <string>
+#include <string_view>
 
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/extension_set.h>
@@ -60,7 +62,7 @@ const void StrToLower(std::string* s) {
   }
 }
 
-const std::string DeCamel(const std::string& name, const bool to_lower_case,
+const std::string DeCamel(std::string_view name, const bool to_lower_case,
                           const bool to_upper_case, const char* sep) {
   // Needs to be kept in sync with class-name->proto.
   std::string result;
@@ -103,21 +105,22 @@ const std::string DeCamel(const std::string& name, const bool to_lower_case,
   return result;
 }
 
-const std::string ToLispName(const std::string& name) {
+const std::string ToLispName(std::string_view name) {
   return DeCamel(name, true, false, "-");
 }
 
-const std::string GetSchemaName(std::string filename) {
-  const size_t slash = filename.find_last_of("\\/");
+const std::string GetSchemaName(std::string_view filename) {
+  std::string schema_name(filename);
+  const size_t slash = schema_name.find_last_of("\\/");
   if (std::string::npos != slash) {
-    filename.erase(0, slash + 1);
+    schema_name.erase(0, slash + 1);
   }
-  const size_t period = filename.rfind('.');
+  const size_t period = schema_name.rfind('.');
   if (std::string::npos != period) {
-    filename.erase(period);
+    schema_name.erase(period);
   }
-  StrToLower(&filename);
-  return filename;
+  StrToLower(&schema_name);
+  return schema_name;
 }
 
 // Namespace prefix for all generated packages.
@@ -143,7 +146,7 @@ const std::string EnumLispName(const EnumDescriptor* descriptor) {
   }
 }
 
-const std::string ToLispEnumValue(const std::string& name) {
+const std::string ToLispEnumValue(std::string_view name) {
   // Enum values are usually uppercase separated by underscore.
   std::string v = absl::StrReplaceAll(name, {{"_", "-"}});
   absl::AsciiStrToLower(&v);
@@ -186,7 +189,7 @@ const std::string QualifiedMessageLispName(const Descriptor* msg,
   }
 }
 
-const std::string ToCamelCase(const std::string& name) {
+const std::string ToCamelCase(std::string_view name) {
   // Needs to be kept in sync with the Lisp function proto->class-name.
   std::string result;
   CharType previous_type = unknown;
@@ -217,11 +220,11 @@ const std::string ToCamelCase(const std::string& name) {
   return result;
 }
 
-bool CamelIsSpitting(const std::string& name) {
+bool CamelIsSpitting(std::string_view name) {
   return ToCamelCase(ToLispName(name)) != name;
 }
 
-const std::string ToLispAliasSymbolName(const std::string& symbol_name) {
+const std::string ToLispAliasSymbolName(std::string_view symbol_name) {
   auto splitter = absl::StrSplit(symbol_name, ":", absl::SkipWhitespace());
   return NonDestructiveStrToLower(absl::StrJoin(splitter, "::"));
 }

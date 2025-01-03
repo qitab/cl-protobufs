@@ -10,6 +10,7 @@
 #define GOOGLE_CL_PROTOBUF_COMPILER_LISP_NAMES_H__
 
 #include <string>
+#include <string_view>
 
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/descriptor.h>
@@ -23,12 +24,12 @@ const std::string NonDestructiveStrToLower(std::string s);
 const void StrToLower(std::string* s);
 
 // Removes camel-case, and puts the name in lower case.
-const std::string ToLispName(const std::string& name);
+const std::string ToLispName(std::string_view name);
 
 // Provides a name for the Enum described by the descriptor.
 const std::string EnumLispName(const EnumDescriptor* descriptor);
 // Provides a name for the Lisp Enum Value that turns into a keyword.
-const std::string ToLispEnumValue(const std::string& name);
+const std::string ToLispEnumValue(std::string_view name);
 
 // Provides a name for the Message described by the descriptor.
 // Uses lisp_name extension.
@@ -44,14 +45,14 @@ const std::string QualifiedMessageLispName(const Descriptor* descriptor,
 
 const std::string FileLispPackage(const FileDescriptor* descriptor);
 
-const std::string GetSchemaName(std::string filename);
+const std::string GetSchemaName(std::string_view filename);
 
-const std::string ToCamelCase(const std::string& name);
+const std::string ToCamelCase(std::string_view name);
 
 // True if the conversion to Lisp name and back differs from original.
-bool CamelIsSpitting(const std::string& name);
+bool CamelIsSpitting(std::string_view name);
 
-const std::string ToLispAliasSymbolName(const std::string& symbol_name);
+const std::string ToLispAliasSymbolName(std::string_view symbol_name);
 
 }  // namespace cl_protobufs
 }  // namespace protobuf

@@ -8,6 +8,7 @@
 #define THIRD_PARTY_LISP_CL_PROTOBUFS_PROTOC_LITERALS_H_
 
 #include <string>
+#include <string_view>
 
 namespace google {
 namespace protobuf {
@@ -15,8 +16,8 @@ namespace cl_protobufs {
 
 const std::string LispSimpleFtoa(float value);
 const std::string LispSimpleDtoa(double value);
-const std::string LispEscapeString(const std::string& str);
-const std::string StringOctets(const std::string& str);
+const std::string LispEscapeString(std::string_view str);
+const std::string StringOctets(std::string_view str);
 const std::string LispBool(bool value);
 
 }  // namespace cl_protobufs

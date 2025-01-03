@@ -5,6 +5,8 @@
 // https://opensource.org/licenses/MIT.
 
 #include "literals.h"
+#include <string>
+#include <string_view>
 
 #include "absl/strings/str_cat.h"
 
@@ -49,7 +51,7 @@ const std::string LispSimpleDtoa(double value) {
   return result + "d0";
 }
 
-const std::string LispEscapeString(const std::string& str) {
+const std::string LispEscapeString(std::string_view str) {
   std::string lisp;
   lisp.append(1, '"');
   for (char c : str) {
@@ -60,7 +62,7 @@ const std::string LispEscapeString(const std::string& str) {
   return lisp;
 }
 
-const std::string StringOctets(const std::string& str) {
+const std::string StringOctets(std::string_view str) {
   std::string octets;
   for (char c : str) {
     if (!octets.empty()) octets += " ";
