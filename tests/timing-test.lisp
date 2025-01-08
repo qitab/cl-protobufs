@@ -13,7 +13,8 @@
    (#:oneof-proto #:cl-protobufs.oneof-test)
    (#:proto3-proto #:cl-protobufs.proto3-test)
    (#:map-proto #:cl-protobufs.map-test)
-   (#:pi #:cl-protobufs.implementation))
+   (#:pi #:cl-protobufs.implementation)
+   (#:benchmark #:org.shirakumo.trivial-benchmark))
   (:export #:run))
 
 (in-package #:cl-protobufs.test.timing)
