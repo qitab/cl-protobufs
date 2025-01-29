@@ -22,5 +22,6 @@ service FooService {
     option security_level = PRIVACY_AND_INTEGRITY;
     option security_label = "admin";
     option legacy_client_initial_tokens = 42;
+    option legacy_token_unit = BYTE;
   }
 }
