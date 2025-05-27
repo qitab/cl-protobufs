@@ -271,7 +271,7 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
     vars["lazy"] = field->options().lazy() ? " :lazy cl:t" : "";
     vars["default"] = field->has_default_value() ||
                       (field->cpp_type() == FieldDescriptor::CPPTYPE_ENUM &&
-                       field->label() != FieldDescriptor::Label::LABEL_REPEATED)
+                       !field->is_repeated())
                       ? absl::StrCat(" :default ", FieldLispDefault(field))
                       : "";
     printer->Print(vars,
