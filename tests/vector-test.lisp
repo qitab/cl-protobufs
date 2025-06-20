@@ -183,8 +183,12 @@ Parameters
 (deftest test-nth-and-length (vector-suite)
   (let ((vector-proto (make-repeated-proto))
         (list-proto (make-repeated-list-proto)))
-    (assert-eq (repeated-proto.length-of-repeated-int32 vector-proto) 0)
-    (assert-eq (repeated-list-proto.length-of-repeated-int32 list-proto) 0)
+    ;; test the overloaded accessors. The first becomes a call to
+    ;;  REPEATED-PROTO.LENGTH-OF-REPEATED-INT32
+    ;; and the second becomes a call to
+    ;;  REPEATED-LIST-PROTO.LENGTH-OF-REPEATED-INT32
+    (assert-eq (length-of-repeated-int32 vector-proto) 0)
+    (assert-eq (length-of-repeated-int32 list-proto) 0)
     (loop for i from 0 to 9
           do
        (repeated-proto.push-repeated-int32 i vector-proto)
