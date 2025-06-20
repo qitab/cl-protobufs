@@ -1343,17 +1343,10 @@ function) then there is no guarantee on the serialize function working properly.
                                     (setf (gethash object ,stable) value))))
                   (defmethod get-extension ((object ,type) (slot (eql ',fname)))
                     (values (gethash object ,stable ,default)))
-                  ;; Set and has need to be defined for sname and fname
-                  ;; for usefulness to reader and serialization
-                  (defmethod set-extension ((object ,type) (slot (eql ',sname)) value)
-                    (setf (gethash object ,stable) value))
                   (defmethod set-extension ((object ,type) (slot (eql ',fname)) value)
                     (setf (gethash object ,stable) value))
                   (defmethod has-extension ((object ,type) (slot (eql ',fname)))
-                    (multiple-value-bind (value foundp)
-                        (gethash object ,stable)
-                      (declare (ignore value))
-                      foundp))
+                    (nth-value 1 (gethash object ,stable)))
                   (defmethod clear-extension ((object ,type) (slot (eql ',fname)))
                     (remhash object ,stable))
                   (defmethod (setf ,reader) (val (object ,type))

@@ -595,7 +595,7 @@ Parameters:
                            (coerce data 'vector) data))))
              (cond ((eq (proto-kind field) :extends)
                     ;; If an extension we'll have to set it manually later...
-                    (push `(,(proto-internal-field-name field) ,(second cell))
+                    (push `(,(proto-external-field-name field) ,(second cell))
                         extension-list))
                    (bool-index
                     (push (cons bool-index (second cell)) bool-map)
