@@ -1054,6 +1054,10 @@ function) then there is no guarantee on the serialize function working properly.
                          (let ((name (oneof-descriptor-internal-name oneof)))
                            `(,name (make-oneof) :type oneof)))
                        oneofs))))
+         ;; Because messages do not have SUBTYPEP relationships - other than everything
+         ;; being a subtype of MESSAGE - the TYPEP test can be reduced to comparison against
+         ;; an expected layout rather than a hierarchical test. Freezing achives that.
+         #+sbcl (declaim (sb-ext:freeze-type ,proto-type))
          ;; Define public accessors for fields.
          ,@(mapcan (lambda (field public-slot-name)
                      (make-structure-class-forms-non-lazy proto-type
