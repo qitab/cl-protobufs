@@ -324,7 +324,12 @@
                            (type-specific-fun-name choice)))
                    choices)
               sym kind)))
-          (remprop sym 'overloads))))))
+          ;; I'd like to remove all compile-time data (not just limited to cl-protobufs) which
+          ;; empirically gets our application at least a 5% reduction in on-disk executable size.
+          ;; But no good deed goes unpunished: removing makes per-file recompilation fail.
+          ;; Perhaps we can confine removal to an optimized build only? Someone will claim to
+          ;; need optimized builds and recompilation support though. Just #+nil it out for now.
+          #+nil (remprop sym 'overloads))))))
 
 (pushnew 'optimize-overloaded-accesssors sb-ext:*save-hooks*)
 (pushnew :cl-protobufs-efficient-function-overloading *features*)
