@@ -6,6 +6,16 @@
 
 (in-package #:cl-protobufs.implementation)
 
+(eval-when (:compile-toplevel :execute)
+  ;; these imports don't need to persist. Just when compiling or in interpreted code
+  (import '(sb-ext:truly-the sb-ext:define-load-time-global sb-ext:*save-hooks*))
+  (import 'sb-kernel::(union-type-p union-type-types specifier-type
+                       type-difference type= classoid classoid-name
+                       fdefn-p fdefn-name fdefn-fun find-or-create-fdefn
+                       instance %instancep %instance-layout
+                       find-layout layout-clos-hash
+                       defstruct-description dsd-index dsd-reader dsd-raw-type dsd-type)))
+
 ;;; Users working with protobuf messages seem to want to access slots of a message
 ;;; without regard for the message type name.  This would be akin to making all
 ;;; DEFSTRUCT forms specify (:CONC-NAME ""). But obviously that won't work if different
@@ -35,35 +45,34 @@
                (let* ((arg-type (sb-c::lvar-type typed-arg))
                       ;; If the type includes (OR NULL), remove that
                       (non-null-type
-                       (if (and (sb-kernel:union-type-p arg-type)
-                                (= (length (sb-kernel:union-type-types arg-type)) 2)
-                                (sb-int:memq (sb-kernel:specifier-type 'null)
-                                             (sb-kernel:union-type-types arg-type)))
-                           (sb-kernel:type-difference arg-type
-                                                      (sb-kernel:specifier-type 'null))
+                       (if (and (union-type-p arg-type)
+                                (= (length (union-type-types arg-type)) 2)
+                                (sb-int:memq (specifier-type 'null)
+                                             (union-type-types arg-type)))
+                           (type-difference arg-type (specifier-type 'null))
                            arg-type)))
-                 (cond ((not (typep non-null-type 'sb-kernel:classoid))
+                 (cond ((not (typep non-null-type 'classoid))
                         (sb-c::give-up-ir1-transform))
                        (t
                         (the (not null)
-                             (assoc (sb-kernel:classoid-name non-null-type) choices))))))))
+                             (assoc (classoid-name non-null-type) choices))))))))
          (delegate ; which function (or pair of functions) operates on the specified type
           ;; CHOICE holds #<fdefn (SETF _name_)> for read/write accessors, so we need
           ;; to extract either the fdefn-name as-is or just _name_, based on FUN-NAME.
-          (if (sb-kernel:fdefn-p choice)
-              (let ((name (sb-kernel:fdefn-name choice)))
+          (if (fdefn-p choice)
+              (let ((name (fdefn-name choice)))
                 (if (atom fun-name) (cadr name) name))
               choice)))
     (if (atom fun-name)
         (ecase variant
-          ((length :standard) `(lambda (obj) (,delegate obj)))
+          ((length standard) `(lambda (obj) (,delegate obj)))
           ((gethash remhash push nth) `(lambda (arg0 obj) (,delegate arg0 obj))))
         ;; SETF
         (ecase variant
-          (:standard `(lambda (val obj) (funcall #',delegate val obj)))
-          (gethash   `(lambda (val key obj) (funcall #',delegate val key obj)))))))
+          (standard `(lambda (val obj) (funcall #',delegate val obj)))
+          (gethash  `(lambda (val key obj) (funcall #',delegate val key obj)))))))
 
-(sb-ext:define-load-time-global *general-overloaded-fun-info*
+(define-load-time-global *general-overloaded-fun-info*
     (let ((info (sb-c::make-fun-info :attributes (sb-c::ir1-attributes)))
           (make-transform
            ;; Compiler removes global definition of sb-c::make-transform
@@ -74,7 +83,7 @@
                           (sb-c::make-transform :type type :function function)))))
       (setf (sb-c::fun-info-transforms info)
             (list (funcall make-transform #'overloaded-accessor-xform
-                           (sb-kernel:specifier-type 'function))))
+                           (specifier-type 'function))))
       info))
 
 (defun ensure-transformed (name kind)
@@ -113,12 +122,12 @@
            (setf data (list impl-name)
                  (get overloaded-name 'overloads) data)))
     (unless (assoc type-name (cdr data))
-      (let ((payload (if (member impl-name '(gethash :standard))
-                         (sb-kernel:find-or-create-fdefn `(setf ,actual-name))
+      (let ((payload (if (member impl-name '(gethash standard))
+                         (find-or-create-fdefn `(setf ,actual-name))
                          actual-name)))
         (nconc data (list (cons type-name payload))))))
   (case impl-name
-    (:standard
+    (standard
      (ensure-transformed overloaded-name :reader)
      (ensure-transformed `(setf ,overloaded-name) :writer))
     (t
@@ -129,7 +138,7 @@
 
 (defmacro define-overloads (variation type-name &rest short->long-name)
   "Define all overloads for <VARIATION, TYPE-NAME, SHORT->LONG-NAME>"
-  (when (eq variation :standard)
+  (when (eq variation 'standard)
     (assert (= (length short->long-name) 2))
     (let ((shortcut (car short->long-name))
           (fullname (cadr short->long-name)))
@@ -150,8 +159,8 @@
              `(let* ((info (get name 'overloads)) ; name -> overloads
                      (impl (cdr (the cons (assoc (type-of obj) (cdr info))))))
                 ,call-expr))
-           (reader () `(the symbol (cadr (sb-kernel:fdefn-name impl))))
-           (writer () `(sb-kernel:fdefn-fun impl)))
+           (reader () `(the symbol (cadr (fdefn-name impl))))
+           (writer () `(fdefn-fun impl)))
 (defun dispatch-slot-writer (name val obj) (with-impl (funcall (writer) val obj)))
 (defun dispatch-slot-reader (name obj) (with-impl (funcall (reader) obj)))
 ;;; sequences
@@ -164,10 +173,112 @@
 (defun dispatch-remhash (name key obj) (with-impl (funcall (the symbol impl) key obj)))
 ) ; end MACROLET
 
+(defun simple-pattern-match (input expect)
+  "Return T if INPUT is similar to EXPECT"
+  (sb-int:collect ((parts))
+    (labels ((descend (input expect)
+               (if (atom expect)
+                   (case expect
+                     (? (parts input) t) ; match anything and save the match
+                     (_ t) ; match anything and ignore it
+                     (t (eq input expect))) ; require a match
+                   (and (consp input)
+                        (descend (car input) (car expect))
+                        (descend (cdr input) (cdr expect))))))
+      (when (descend input expect) ; return the variable parts
+        (or (parts) t))))) ; return T if there were no parts to save
+
+(defun compile-equivalence-based-accessor (choices overloaded-name &aux equiv warn)
+  "Compile an efficient accessor given <CHOICES, OVERLOADED-NAME>"
+  (flet ((infer-dsd (fun-name)
+           (let ((parts
+                  (simple-pattern-match
+                   (sb-c::fun-name-inline-expansion fun-name)
+                   '(lambda (obj_) (block _ (the ? (? obj_))))))) ; NOLINT
+             ;; need to handle boolean fields- (THE BOOLEAN (PLUSP (BIT (fun OBJ_) n)))
+             (when (and (not parts) warn)
+               (warn "function ~S lacks expected inline def" fun-name)) ; NOLINT
+             (when parts
+               (let* ((slot-reader (second parts))
+                      (info (sb-int:info :function :source-transform slot-reader)))
+                 (when (and (not (typep info '(cons defstruct-description))) warn)
+                   (warn "function ~S isn't a dsd-reader" slot-reader)) ; NOLINT
+                 (when (typep info '(cons defstruct-description))
+                   (cdr info)))))) ; a defstruct slot description
+         (dsd-equiv (a b) ; Pick a representative dsd per equiv class
+           (and (= (dsd-index a) (dsd-index b))
+                (eq (dsd-raw-type a) (dsd-raw-type b))
+                (type= (specifier-type (dsd-type a))
+                                 (specifier-type (dsd-type b))))))
+    ;; Create an alist where the car of each pair is a defstruct description
+    ;; and the cdr is list of types to which this pair pertains.
+    (dolist (choice choices)
+      (let* ((fun-name (cadr (fdefn-name (cdr choice))))
+             (dsd (cond ((infer-dsd fun-name))
+                        (t (return-from compile-equivalence-based-accessor nil)))) ; fail
+             (pair (assoc dsd equiv :test #'dsd-equiv))
+             (msgtype (list (car choice))))
+        (if (not pair)
+            (setq equiv (nconc equiv (list (list* dsd msgtype))))
+            (nconc pair msgtype)))))
+  (flet ((install (name lambda-list body)
+           (let ((expr `(sb-int:named-lambda ,name ,lambda-list
+                          ;; word-sized integers produces efficiency notes
+                          (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+                          ,@body)))
+             (compile name expr)))
+         (type-union-expr (equivalence-class &aux (types (cdr equivalence-class)))
+           (if (cdr types) `(or ,@types) (car types))))
+    (case (length equiv)
+      (1 ; best case
+       (let ((dsd (caar equiv)))
+         (install `(setf ,overloaded-name) '(val obj)
+           `((declare (type (or ,@(mapcar 'car choices)) obj))
+             (setf (,(dsd-reader dsd nil) obj ,(dsd-index dsd)) (the ,(dsd-type dsd) val))))
+         (install overloaded-name '(obj)
+           `((declare (type (or ,@(mapcar 'car choices)) obj))
+             (truly-the ,(dsd-type dsd) (,(dsd-reader dsd nil) obj ,(dsd-index dsd))))))
+       (return-from compile-equivalence-based-accessor t)) ; success
+      (2
+       ;; whichever equivalence class is smaller, test TYPEP on it
+       (let ((cl1 (first equiv)) (cl2 (second equiv)))
+         (when (< (length (cdr cl2)) (length (cdr cl1)))
+           (rotatef cl1 cl2))
+         (let* ((dsd1 (car cl1)) (dsd2 (car cl2))
+                ;; type unions (or singleton) for message types
+                (mt1 (type-union-expr cl1)) (mt2 (type-union-expr cl2))
+                ;; field types
+                (ft1 (dsd-type dsd1)) (ft2 (dsd-type dsd2))
+                ;; if the field types in the two equivalence classes are the same,
+                ;; then a single DECLARE suffices, otherwise we assert that VAL
+                ;; is correct for the taken branch of the IF.
+                (ft= (type= (specifier-type ft1) (specifier-type ft2)))
+                (i1 (dsd-index dsd1)) (i2 (dsd-index dsd2)))
+           (install `(setf ,overloaded-name) '(val obj)
+             `(,@(if ft= `((declare (type ,(dsd-type dsd1) val))))
+               (if (typep obj ',mt1)
+                   (setf (,(dsd-reader dsd1 nil) obj ,i1)
+                         ,(if ft= 'val `(the ,ft1 val)))
+                   (setf (,(dsd-reader dsd2 nil) (the ,mt2 obj) ,i2)
+                         ,(if ft= 'val `(the ,ft2 val))))))
+           (install overloaded-name '(obj)
+             (if (not ft=)
+                 `((if (typep obj ',mt1)
+                       (truly-the ,ft1 (,(dsd-reader dsd1 nil) obj ,i1))
+                       (truly-the ,ft2 (,(dsd-reader dsd2 nil) (the ,mt2 obj) ,i2))))
+                 `((truly-the ,ft1
+                    (if (typep obj ',mt1)
+                        (,(dsd-reader dsd1 nil) obj ,i1)
+                        (,(dsd-reader dsd2 nil) (the ,mt2 obj) ,i2))))))))
+       (return-from compile-equivalence-based-accessor t)) ; success
+      (t
+       (when warn (warn "too many equivalence classes: ~A" equiv))))) ; NOLINT
+  nil) ; fail
+
 (defun compile-mph-based-accessor (choices overloaded-name kind)
   "Compile minimal perfect hash for <CHOICES, OVERLOADED-NAME, KIND>"
   (declare (simple-vector choices))
-  (flet ((lhash (layout) (ldb (byte 32 0) (sb-kernel:layout-clos-hash layout))))
+  (flet ((lhash (layout) (ldb (byte 32 0) (layout-clos-hash layout))))
     (let* ((n-choices (length choices))
            (hashes (map '(simple-array (unsigned-byte 32) 1)
                         (lambda (x) (lhash (car x)))
@@ -180,18 +291,18 @@
            (compiled-mph (compile nil mphlambda))
            (layouts (make-array n-choices :initial-element 0))
            (funs (make-array n-choices))
-           (setf-funs (if (eq kind :standard) (make-array n-choices))))
+           (setf-funs (if (eq kind 'standard) (make-array n-choices))))
       ;;
       (sb-int:dovector (choice choices)
         (let ((fun (cdr choice))
               (hash (funcall compiled-mph (lhash (car choice)))))
           (assert (eql (aref layouts hash) 0))
-          (when (eq kind :standard)
+          (when (eq kind 'standard)
             (setf (aref setf-funs hash) (fdefinition `(setf ,fun))))
           (setf (aref funs hash) (fdefinition fun)
                 (aref layouts hash) (car choice))))
       ;;
-      (when (member kind '(gethash :standard))
+      (when (member kind '(gethash standard))
         ;; Compile a thunk that returns a pair of functions sharing a mapper
         ;; from layout to impl function. Then call the thunk to retrieve the
         ;; functions and install them under the appropriate global names.
@@ -201,21 +312,21 @@
                (generator
                 `(lambda ()
                   (flet ((dispatch (obj)
-                           (let* ((L (sb-kernel:%instance-layout obj))
+                           (let* ((L (%instance-layout obj))
                                   (h (,mphlambda
-                                      (ldb (byte 32 0) (sb-kernel:layout-clos-hash L)))))
+                                      (ldb (byte 32 0) (layout-clos-hash L)))))
                              (if (and (< h ,n-choices) (eq (aref ,layouts h) L)) h))))
                     (values (sb-int:named-lambda (setf ,sym) ,setter-args
-                              (declare (sb-kernel:instance obj))
+                              (declare (instance obj))
                               (let ((i (dispatch obj)))
                                 (unless i (error "~S can not be applied to ~S" '(setf ,sym) obj))
-                                (funcall (sb-ext:truly-the function (aref ,setf-funs i))
+                                (funcall (truly-the function (aref ,setf-funs i))
                                          ,@setter-args)))
                             (sb-int:named-lambda ,sym ,getter-args
-                              (declare (sb-kernel:instance obj))
+                              (declare (instance obj))
                               (let ((i (dispatch obj)))
                                 (unless i (error "~S can not be applied to ~S" ',sym obj))
-                                (funcall (sb-ext:truly-the function (aref ,funs i))
+                                (funcall (truly-the function (aref ,funs i))
                                          ,@getter-args))))))))
           (multiple-value-bind (writer reader) (funcall (compile nil generator))
             (setf (fdefinition `(setf ,sym)) writer
@@ -227,11 +338,11 @@
                     (length '(obj)))))
         (compile overloaded-name
          `(sb-int:named-lambda ,overloaded-name ,args
-            (declare (sb-kernel:instance obj))
-            (let* ((L (sb-kernel:%instance-layout obj))
-                   (h (,mphlambda (ldb (byte 32 0) (sb-kernel:layout-clos-hash L)))))
+            (declare (instance obj))
+            (let* ((L (%instance-layout obj))
+                   (h (,mphlambda (ldb (byte 32 0) (layout-clos-hash L)))))
               (if (and (< h ,n-choices) (eq (aref ,layouts h) L))
-                  (funcall (sb-ext:truly-the function (aref ,funs h)) ,@args)
+                  (funcall (truly-the function (aref ,funs h)) ,@args)
                   (error "~S can not be applied to ~S" ',overloaded-name obj)))))))))
 
 ;;; For 2- and 3-way branching overloads, we don't compile anything. For 4 and up we do.
@@ -240,24 +351,24 @@
 (defun optimize-overloaded-accesssors ()
   "Compile all overloaded functions"
   (macrolet ((with-two-choices (lexpr)
-               `(let ((test (sb-kernel:find-layout type-to-test))
+               `(let ((test (find-layout type-to-test))
                       (f1 (fdefinition if-name))
                       (f2 (fdefinition else-name)))
                   (macrolet ((choice ()
-                               '(sb-ext:truly-the function
-                                 (if (and (sb-kernel:%instancep obj)
-                                          (eq (sb-kernel:%instance-layout obj) test)) f1 f2))))
+                               '(truly-the function
+                                 (if (and (%instancep obj)
+                                          (eq (%instance-layout obj) test)) f1 f2))))
                     ,lexpr)))
              (with-three-choices (lexpr)
-               `(let ((test1 (sb-kernel:find-layout type1))
-                      (test2 (sb-kernel:find-layout type2))
+               `(let ((test1 (find-layout type1))
+                      (test2 (find-layout type2))
                       (f1 (fdefinition way1))
                       (f2 (fdefinition way2))
                       (f3 (fdefinition way3)))
                   (macrolet ((choice ()
-                               '(sb-ext:truly-the function
-                                 (let ((L (if (sb-kernel:%instancep obj)
-                                              (sb-kernel:%instance-layout obj))))
+                               '(truly-the function
+                                 (let ((L (if (%instancep obj)
+                                              (%instance-layout obj))))
                                    (if (eq L test1) f1 (if (eq L test2) f2 f3))))))
                     ,lexpr))))
     ;; If 2-way: check if the type is the first choice, and call the IF or ELSE
@@ -276,7 +387,7 @@
              (three-way/3-arg (type1 type2 way1 way2 way3)
                (with-three-choices (lambda (arg0 arg1 obj) (funcall (choice) arg0 arg1 obj))))
              (type-specific-fun-name (pair &aux (val (cdr pair)))
-               (if (sb-kernel:fdefn-p val) (cadr (sb-kernel:fdefn-name val)) val)))
+               (if (fdefn-p val) (cadr (fdefn-name val)) val)))
       (do-all-symbols (sym)
         (sb-int:binding* ((overloads (get sym 'overloads) :exit-if-null)
                           (kind (car overloads))
@@ -287,7 +398,7 @@
             (format t "~&Building ~d-way switch for ~S,~S~%" n-choices sym kind)) ; NOLINT
           (case n-choices
             (1 (let ((impl (type-specific-fun-name (car choices))))
-                 (when (member kind '(gethash :standard))
+                 (when (member kind '(gethash standard))
                    (setf (fdefinition `(setf ,sym)) (fdefinition `(setf ,impl))))
                  (setf (symbol-function sym) (symbol-function impl))))
             ((2 3) ; bind the global name to a 2-way or 3-way chooser
@@ -299,7 +410,7 @@
                     (f3 (type-specific-fun-name choice3)) ; NIL if absent
                     (t1 (car choice1))
                     (t2 (car choice2)))
-               (when (member kind '(gethash :standard))
+               (when (member kind '(gethash standard))
                  (setf (fdefinition `(setf ,sym))
                        (case n-choices
                          (2 (funcall (if (eq kind 'gethash) #'two-way/3-arg #'two-way/2-arg)
@@ -309,21 +420,23 @@
                (setf (symbol-function sym)
                      (case n-choices
                        (2 (funcall (ecase kind
-                                     ((length :standard) #'two-way/1-arg)
+                                     ((length standard) #'two-way/1-arg)
                                      ((push nth gethash remhash) #'two-way/2-arg))
                                    t1 f1 f2))
                        (3 (funcall (ecase kind
-                                     ((length :standard) #'three-way/1-arg)
+                                     ((length standard) #'three-way/1-arg)
                                      ((push nth gethash remhash) #'three-way/2-arg))
                                    t1 t2 f1 f2 f3))))))
             (t
-             (compile-mph-based-accessor
-              (map 'vector
-                   (lambda (choice)
-                     (cons (sb-kernel:find-layout (car choice))
-                           (type-specific-fun-name choice)))
-                   choices)
-              sym kind)))
+             (or (and (eq kind 'standard) ; would be nice to remove this requirement
+                      (compile-equivalence-based-accessor choices sym))
+                 (compile-mph-based-accessor
+                  (map 'vector
+                       (lambda (choice)
+                         (cons (find-layout (car choice))
+                               (type-specific-fun-name choice)))
+                       choices)
+                  sym kind))))
           ;; I'd like to remove all compile-time data (not just limited to cl-protobufs) which
           ;; empirically gets our application at least a 5% reduction in on-disk executable size.
           ;; But no good deed goes unpunished: removing makes per-file recompilation fail.
@@ -331,5 +444,5 @@
           ;; need optimized builds and recompilation support though. Just #+nil it out for now.
           #+nil (remprop sym 'overloads))))))
 
-(pushnew 'optimize-overloaded-accesssors sb-ext:*save-hooks*)
+(pushnew 'optimize-overloaded-accesssors *save-hooks*)
 (pushnew :cl-protobufs-efficient-function-overloading *features*)
