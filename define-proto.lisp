@@ -982,7 +982,8 @@ function) then there is no guarantee on the serialize function working properly.
              proto-type public-slot-name slot-name field))))))
 
 
-(let ((defaults (make-hash-table)))
+(#+sbcl sb-ext:define-load-time-global #-sbcl defvar *g-d-f-default-forms*
+ (let ((defaults (make-hash-table)))
   (loop for type in '(int32 uint32 fixed32 sfixed32 sint32
                       int64 uint64 fixed64 sfixed64 sint64)
         do (setf (gethash type defaults) 0))
@@ -996,8 +997,9 @@ function) then there is no guarantee on the serialize function working properly.
   ;; Home grown types
   (setf (gethash 'cl:keyword defaults) :default-keyword)
   (setf (gethash 'cl:symbol defaults) nil)
+  defaults))
 
-  (defun get-default-form (type default container kind)
+(defun get-default-form (type default container kind)
     "Find the default value for a specified type.
 
   Parameters:
@@ -1007,7 +1009,7 @@ function) then there is no guarantee on the serialize function working properly.
       the type of container to hold the repeated data in.
     KIND: The kind of message this is, one of :group :message :extends
       :enum :scalar."
-    (let ((possible-default (gethash type defaults)))
+    (let ((possible-default (gethash type *g-d-f-default-forms*)))
       (cond
         ((not (member default (list $empty-default nil)))
          default)
@@ -1022,7 +1024,7 @@ function) then there is no guarantee on the serialize function working properly.
          '(make-hash-table))
         ((or possible-default
              (eq type 'cl:boolean))
-         possible-default)))))
+         possible-default))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
   "Makes the definition forms for the define-message macro.
@@ -1128,13 +1130,30 @@ function) then there is no guarantee on the serialize function working properly.
            (fill (,is-set-name ,obj) 0))
 
          (export '(,public-constructor-name ,is-set-name))
-         (defmethod clear ((,obj ,proto-type))
-           (setf (message-%%skipped-bytes ,obj) nil)
-           ,@(mapcan (lambda (name)
-                       (let ((clear-name (fintern "~A.CLEAR-~A" proto-type name)))
-                         `((,clear-name ,obj))))
+         ,@(let ((impl (fintern "CLEAR<~A>" proto-type)))
+             `((defun ,impl (m)
+                 (setf (message-%%skipped-bytes m) nil)
+                 ,@(mapcar
+                     (lambda (name) `(,(fintern "~A.CLEAR-~A" proto-type name) m))
                      (append public-non-lazy-slot-names additional-slots
-                             (mapcar #'oneof-descriptor-external-name oneofs))))))))
+                             (mapcar #'oneof-descriptor-external-name oneofs))))
+               (set-clear-impl ',proto-type ',impl)))))))
+
+(#+sbcl sb-ext:define-load-time-global
+ #-sbcl defvar *clear-impl-funs*  (make-hash-table :test #'eq ))
+(defun actually-clear (msg)
+  "reset slots of MSG to empty"
+  (funcall (or (gethash (type-of msg) *clear-impl-funs*)
+               (error "No method for CLEAR ~S~%" msg))
+           msg))
+(declaim (ftype function clear))
+(defun set-clear-impl (type-name fun-name)
+  "Set FUN-NAME as the implementation of CLEAR for TYPE-NAME"
+  ;; For #+sbcl this dispatch function will be made to use a minimal perfect hash
+  ;; on image save. But if new types are added then CLEAR needs to be deoptimized
+  ;; back to its hash-table-based lookup
+  (setf (symbol-function 'clear) #'actually-clear)
+  (setf (gethash type-name *clear-impl-funs*) fun-name))
 
 (defun non-repeated-bool-field (field)
   "Determine if a field given by a FIELD is a non-repeated boolean."
