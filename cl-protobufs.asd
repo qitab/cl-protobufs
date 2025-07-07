@@ -54,8 +54,7 @@ and functionality for working with them."
     :pathname ""
     :depends-on ("models")
     :components
-    (#+sbcl (:file "optimizer")
-     (:file "define-proto")))
+    ((:file "define-proto")))
    (:module "serialization"
     :serial t
     :pathname ""
