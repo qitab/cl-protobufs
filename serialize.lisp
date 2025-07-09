@@ -1271,51 +1271,6 @@ Parameters:
   MESSAGE-NAME: The symbol-name of a message."
   (generate-deserializer (find-message-descriptor message-name)))
 
-(eval-when (:compile-toplevel :execute)
-  ;; Workaround for https://bugs.launchpad.net/sbcl/+bug/2073544
-  #+sbcl (when (find-symbol "MAKE-PERFECT-HASH-LAMBDA" "SB-C")
-           (pushnew :use-clpb-case-expander *features*)))
-
-;;; This handles only the exact shape of code produced by GENERATE-DESERIALIZER
-(defmacro our-case (expr &rest clauses)
-  "Functionally identical to (CASE EXPR CLAUSES)"
-  #-use-clpb-case-expander `(case ,expr ,@clauses)
-  #+use-clpb-case-expander
-  (let* ((normal-clauses (butlast clauses))
-         (default (car (last clauses)))
-         (keys (mapcar (lambda (x)
-                         (let ((first (car x)))
-                           (assert (sb-int:singleton-p first))
-                           (car first)))
-                       normal-clauses)))
-    (let ((min-key (and keys (reduce #'min keys)))
-          (max-key (and keys (reduce #'max keys)))
-          (nkeys (length keys)))
-      (when (or (not min-key)
-                (not max-key)
-                (< nkeys 4)
-                ;; If at least 89% dense, let's assume SBCL isn't completely terrible
-                ;; at compiling CASE.
-                (>= (/ nkeys (- max-key min-key)) 89/100))
-        (return-from our-case `(case ,expr ,@clauses)))
-      (let ((id-type (if (every (lambda (x) (typep x '(unsigned-byte 16))) keys)
-                         '(unsigned-byte 16)
-                         '(unsigned-byte 32)))
-            (h-expr (sb-c::perfectly-hashable keys)))
-        (assert h-expr)
-        (let ((compiled (sb-c::compile-perfect-hash h-expr (coerce keys 'vector)))
-              (kv (make-array nkeys :element-type id-type)))
-          (dolist (k keys) (setf (aref kv (funcall compiled k)) k))
-          `(let* ((.k. (the (unsigned-byte 32) ,expr))
-                  (.h. (,h-expr .k.)))
-             (if (and (< .h. ,(length kv)) (= .k. (aref ,kv .h.)))
-                 (case .h.
-                   ,@(sort (mapcar (lambda (clause)
-                                     `(,(funcall compiled (caar clause)) ,@(cdr clause)))
-                                   normal-clauses)
-                      #'< :key 'car))
-                 (progn ,@(cdr default)))))))))
-
 ;; Note well: keep this in sync with the main 'deserialize' method above
 (defun generate-deserializer (message &key (name message) constructor
                                       (missing-value :%unset)
@@ -1475,7 +1430,7 @@ Parameters:
                                    (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf))))
                          struct)
                        ,vidx)))
-                  (our-case tag
+                  (case tag
                     ,@deserializers
                     (otherwise
                      ,(if save-skipped-bytes-p
