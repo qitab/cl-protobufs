@@ -530,6 +530,31 @@ Parameters:
          :has (proto-slot-function-name message-name field-name :internal-has)
          :clear (proto-slot-function-name message-name field-name :clear))))
 
+;;; If optimizer.lisp has been loaded, then it provides its own version of this macro.
+;;; Otherwise we use generic functions to implement accessor name overloading.
+#-cl-protobufs-efficient-function-overloading
+(defmacro define-overloads (variation type &rest short->long-name)
+  "Define CLOS-based overloading for VARIATION, TYPE, SHORT->LONG-NAME translation"
+  (ecase variation
+    (standard
+     (destructuring-bind (slot-name accessor) short->long-name
+       `(progn
+          (defmethod (setf ,slot-name) (val (self ,type)) (setf (,accessor self) val))
+          (defmethod ,slot-name ((self ,type)) (,accessor self)))))
+    ;; -FQN means the fully-qualified name
+    (map
+     (destructuring-bind ((getter getter-fqn) (remover remover-fqn)) short->long-name
+       `(progn
+          (defmethod (setf ,getter) (val key (self ,type)) (setf (,getter-fqn key self) val))
+          (defmethod ,getter (key (self ,type)) (,getter-fqn key self))
+          (defmethod ,remover (key (self ,type)) (,remover-fqn key self)))))
+    (sequence
+     (destructuring-bind ((len len-fqn) (nth nth-fqn) (push push-fqn)) short->long-name
+       `(progn
+          (defmethod ,push (elt (self ,type)) (,push-fqn elt self))
+          (defmethod ,len ((self ,type)) (,len-fqn self))
+          (defmethod ,nth (n (self ,type)) (,nth-fqn n self)))))))
+
 (defun make-common-forms-for-structure-class (proto-type public-slot-name slot-name field)
   "Create the common forms needed for all message fields: has, is-set, clear, set.
 
@@ -562,71 +587,72 @@ Parameters:
     ;; This means that the field is proto3-style optional, so checking for field presence must
     ;; be done by checking if the bound value is default.
 
-    (with-gensyms (obj new-value cur-value)
-      `(
-        (defun-inline (setf ,public-accessor-name) (,new-value ,obj)
-          (declare (type ,field-type ,new-value))
+    ;; And by using interned symbol, we can examine the source code of different accessors
+    ;; of same-named slots to decide if they are doing an identical access, thereby reducing
+    ;; inefficiency caused by name overloading. i.e. if one overloaded name delegates
+    ;; to 10 different things, but those 10 are all the same, then the implementation
+    ;; can be buried into the overloaded function, and nobody can tell that it's not
+    ;; invoking 1 of 10 other functions, other than consuming fewer CPU cycles.
+    ;; If users mess with symbols in this package, that's their problem, not ours.
+      `((defun-inline (setf ,public-accessor-name) (val_ obj_)
+          (declare (type ,field-type val_))
           ,(when index
-             `(setf (bit (,is-set-accessor ,obj) ,index) 1))
+             `(setf (bit (,is-set-accessor obj_) ,index) 1))
           ,(if bool-index
-               `(setf (bit (,bit-field-name ,obj) ,bool-index)
-                      (if ,new-value 1 0))
-               `(setf (,hidden-accessor-name ,obj) ,new-value)))
+               `(setf (bit (,bit-field-name obj_) ,bool-index) (if val_ 1 0))
+               `(setf (,hidden-accessor-name obj_) val_)))
 
         ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
         ;; question: "Is this field set to the default value?". This is done so that the optimized
         ;; serializer can use the has-* function to check if an optional field should be serialized.
-        (defun-inline ,internal-has-function-name (,obj)
+        (defun-inline ,internal-has-function-name (obj_)
           ,(if index
-               `(= (bit (,is-set-accessor ,obj) ,index) 1)
-               `(let ((,cur-value ,(if bool-index
-                                       `(plusp (bit (,bit-field-name ,obj) ,bool-index))
-                                       `(,hidden-accessor-name ,obj))))
+               `(= (bit (,is-set-accessor obj_) ,index) 1)
+               `(let ((val_ ,(if bool-index ; NOLINT
+                                 `(plusp (bit (,bit-field-name obj_) ,bool-index))
+                                 `(,hidden-accessor-name obj_))))
                   ,(case (proto-container field)
-                     (:vector `(not (= (length ,cur-value) 0)))
-                     (:list `(and ,cur-value t))
+                     (:vector `(plusp (length val_)))
+                     (:list `(if val_ t))
                      (t (case (proto-type field)
-                          ((byte-vector cl:string) `(> (length ,cur-value) 0))
-                          ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
-                          (cl:hash-table `(> (hash-table-count ,cur-value) 0))
-                          ;; Otherwise, the type is integral. EQ suffices to check equality.
-                          (t `(not (eq ,cur-value ,default-form)))))))))
+                          ((byte-vector cl:string) `(plusp (length val_)))
+                          ((cl:double-float cl:float) `(/= val_ ,default-form))
+                          (cl:hash-table `(plusp (hash-table-count val_)))
+                          ;; Otherwise, the type is integral
+                          (t `(not (eql val_ ,default-form)))))))))
 
         ;; has-* functions are not exported for proto3-style optional fields. They are only for
         ;; internal usage.
         ,@(when (or (eq (proto-field-presence field) :explicit)
                     (eq (proto-label field) :repeated)
                     (eq (proto-kind field) :map))
-            `((defun-inline ,external-has-function-name (,obj)
-                (,internal-has-function-name ,obj))
+            `((defun-inline ,external-has-function-name (obj_)
+                (,internal-has-function-name obj_))
               (export '(,external-has-function-name))))
 
         ;; Clear function
         ;; Map type clear functions are created in make-map-accessor-forms.
         ;; todo(benkuehnert): rewrite map types/definers so that this isn't necessary
         ,@(unless (eq (proto-kind field) :map)
-            `((defun-inline ,clear-function-name (,obj)
+            `((defun-inline ,clear-function-name (obj_)
                 ,(when index
-                   `(setf (bit (,is-set-accessor ,obj) ,index) 0))
+                   `(setf (bit (,is-set-accessor obj_) ,index) 0))
                 ,(if bool-index
-                     `(setf (bit (,bit-field-name ,obj) ,bool-index)
-                            ,(if default-form 1 0))
-                     `(setf (,hidden-accessor-name ,obj) ,default-form)))))
+                     `(setf (bit (,bit-field-name obj_) ,bool-index) ,(if default-form 1 0))
+                     `(setf (,hidden-accessor-name obj_) ,default-form)))))
 
-        ;; Create defmethods to allow for getting/setting compatibly
-        ;; with the standard-classes.
-        (defmethod ,public-slot-name ((,obj ,proto-type))
-          (,public-accessor-name ,obj))
-
-        (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
-          (setf (,public-accessor-name ,obj) ,new-value))
+        ;; Cause (SLOT-NAME obj) to become (ACCESSOR-NAME obj)
+        ;; and similarly for SETF
+        (define-overloads standard ,proto-type
+          ;; the name on the left becomes the name on the right
+          ,public-slot-name ,public-accessor-name)
 
         (set-field-accessor-functions ',proto-type ',public-slot-name)
 
         ,(unless (eq (proto-kind field) :map)
            `(export '(,clear-function-name)))
 
-        (export '(,public-accessor-name))))))
+        (export '(,public-accessor-name)))))
 
 (defun make-repeated-field-accessors (proto-type field)
   "Make and return forms that define functions that accesses a proto
@@ -683,12 +709,11 @@ Parameters:
                       `(aref (,public-accessor-name ,obj) ,n)
                       `(nth ,n (,public-accessor-name ,obj))))))
 
-        (defmethod ,push-method-name (,element (,obj ,proto-type))
-          (,push-function-name ,element ,obj))
-        (defmethod ,length-method-name ((,obj ,proto-type))
-          (,length-function-name ,obj))
-        (defmethod ,nth-method-name ((,n integer) (,obj ,proto-type))
-          (,nth-function-name ,n ,obj))
+        (define-overloads sequence ,proto-type
+          ;; the name on the left becomes the name on the right
+          (,length-method-name ,length-function-name) ; (<lengthfn> obj)
+          (,nth-method-name ,nth-function-name)       ; (<nthfn> n obj)
+          (,push-method-name ,push-function-name))    ; (<pushfn> elt obj)
 
         (export '(,push-method-name ,push-function-name
                   ,nth-function-name ,nth-method-name
@@ -792,11 +817,9 @@ Paramters:
                       (setf (oneof-value (,hidden-accessor-name ,obj)) nil)
                       (setf (oneof-set-field (,hidden-accessor-name ,obj)) nil)))
 
-                  (defmethod ,public-slot-name ((,obj ,proto-type))
-                    (,public-accessor-name ,obj))
-
-                  (defmethod (setf ,public-slot-name) (,new-value (,obj ,proto-type))
-                    (setf (,public-accessor-name ,obj) ,new-value))
+                  (define-overloads standard ,proto-type
+                    ;; the name on the left becomes the name on the right
+                    ,public-slot-name ,public-accessor-name)
 
                   (set-field-accessor-functions ',proto-type ',public-slot-name)
 
@@ -818,8 +841,8 @@ function) then there is no guarantee on the serialize function working properly.
   (let* ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :map-get))
          (public-remove-name (proto-slot-function-name proto-type public-slot-name :map-rem))
          (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
-         (method-accessor-name (fintern "~A-gethash" public-slot-name))
-         (method-remove-name (fintern "~A-remhash" public-slot-name))
+         (overloaded-accessor-name (fintern "~A-gethash" public-slot-name))
+         (overloaded-remover-name (fintern "~A-remhash" public-slot-name))
          (hidden-accessor-name (fintern "~A-~A"  proto-type slot-name))
          (map-descriptor (find-map-descriptor (proto-class field)))
          (key-type (proto-key-type map-descriptor))
@@ -861,23 +884,15 @@ function) then there is no guarantee on the serialize function working properly.
         (defun-inline ,clear-function-name (,obj)
           (clrhash (,hidden-accessor-name ,obj)))
 
-        ;; These defmethods have the same functionality as the functions defined above
-        ;; but they don't require a refernece to the message type, so using them is more
-        ;; convenient.
-        (defmethod (setf ,method-accessor-name) (,new-val ,new-key (,obj ,proto-type))
-          (setf (,public-accessor-name ,new-key ,obj) ,new-val))
-
-        (defmethod ,method-accessor-name (,new-key (,obj ,proto-type))
-          (,public-accessor-name ,new-key ,obj))
-
-        (defmethod ,method-remove-name (,new-key (,obj ,proto-type))
-          (,public-remove-name ,new-key ,obj))
+        (define-overloads map ,proto-type
+          (,overloaded-accessor-name ,public-accessor-name)
+          (,overloaded-remover-name ,public-remove-name))
 
         (export '(,public-accessor-name
                   ,public-remove-name
                   ,clear-function-name
-                  ,method-accessor-name
-                  ,method-remove-name))))))
+                  ,overloaded-accessor-name
+                  ,overloaded-remover-name))))))
 
 (defun make-structure-class-forms-lazy (proto-type field public-slot-name)
   "Makes forms for the lazy fields of a proto message using STRUCTURE-CLASS.
@@ -951,12 +966,11 @@ function) then there is no guarantee on the serialize function working properly.
                 ((member (proto-kind field) '(:message :group :extends))
                  `(or null ,field-type))
                 (t field-type))))
-    (with-gensyms (obj)
-      `((defun-inline ,public-accessor-name (,obj)
+      `((defun-inline ,public-accessor-name (obj_)
           (the ,accessor-return-type
                ,(if bool-index
-                    `(plusp (bit (,bit-field-name ,obj) ,bool-index))
-                    `(,hidden-accessor-name ,obj))))
+                    `(plusp (bit (,bit-field-name obj_) ,bool-index))
+                    `(,hidden-accessor-name obj_))))
 
         ,@(make-common-forms-for-structure-class
            proto-type public-slot-name slot-name field)
@@ -967,7 +981,7 @@ function) then there is no guarantee on the serialize function working properly.
         ;; Make special map forms.
         ,@(when (typep (find-map-descriptor (proto-class field)) 'map-descriptor)
             (make-map-accessor-forms
-             proto-type public-slot-name slot-name field))))))
+             proto-type public-slot-name slot-name field)))))
 
 
 (let ((defaults (make-hash-table)))
@@ -1326,6 +1340,7 @@ function) then there is no guarantee on the serialize function working properly.
                  (sname  (field-data-internal-slot-name new-slot))
                  ;; The field name
                  (fname (field-data-external-slot-name new-slot))
+                 (accessor-name (fintern "EXT$~A$~A" fname type))
                  (stable (fintern "~A-VALUES" sname))
                  (stype (field-data-type new-slot))
                  (reader (or (field-data-accessor new-slot)
@@ -1339,9 +1354,9 @@ function) then there is no guarantee on the serialize function working properly.
             (collect-form
              `(without-redefinition-warnings ()
                 (let ((,stable (tg:make-weak-hash-table :weakness :key :test #'eq)))
-                  ,@(and reader `((defmethod ,reader ((object ,type))
-                                    (gethash object ,stable ,default))))
-                  (defmethod (setf ,reader) (value (object ,type))
+                  (defun ,accessor-name (object)
+                    (gethash object ,stable ,default))
+                  (defun (setf ,accessor-name) (value object)
                     #-ccl (declare (type ,stype value))
                     (setf (gethash object ,stable) value))
                   (defmethod get-extension ((object ,type) (slot (eql ',fname)))
@@ -1351,7 +1366,10 @@ function) then there is no guarantee on the serialize function working properly.
                   (defmethod has-extension ((object ,type) (slot (eql ',fname)))
                     (nth-value 1 (gethash object ,stable)))
                   (defmethod clear-extension ((object ,type) (slot (eql ',fname)))
-                    (remhash object ,stable)))))))
+                    (remhash object ,stable)))
+                (define-overloads standard ,type
+                  ;; the name on the left becomes the name on the right
+                  ,reader ,accessor-name)))))
         (setf (proto-kind new-field) :extends)
         (appendf (proto-fields extends) (list new-field))
         (appendf (proto-extended-fields extends) (list new-field)))
