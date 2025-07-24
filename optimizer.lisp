@@ -173,7 +173,7 @@
 (defun dispatch-remhash (name key obj) (with-impl (funcall (the symbol impl) key obj)))
 ) ; end MACROLET
 
-(defun compile-mph-based-accessor (choices overloaded-name kind)
+(defun compile-mph-dispatch (choices overloaded-name kind)
   "Compile minimal perfect hash for <CHOICES, OVERLOADED-NAME, KIND>"
   (declare (simple-vector choices))
   (flet ((lhash (layout) (ldb (byte 32 0) (layout-clos-hash layout))))
@@ -229,11 +229,11 @@
           (multiple-value-bind (writer reader) (funcall (compile nil generator))
             (setf (fdefinition `(setf ,sym)) writer
                   (fdefinition sym) reader))
-          (return-from compile-mph-based-accessor)))
+          (return-from compile-mph-dispatch)))
 
       (let ((args (ecase kind
                     ((push nth remhash) '(arg0 obj))
-                    (length '(obj)))))
+                    ((length clear) '(obj)))))
         (compile overloaded-name
          `(sb-int:named-lambda ,overloaded-name ,args
             (declare (instance obj))
@@ -243,11 +243,21 @@
                   (funcall (truly-the function (aref ,funs h)) ,@args)
                   (error "~S can not be applied to ~S" ',overloaded-name obj)))))))))
 
+(declaim (sb-ext:global *clear-impl-funs*))
+
 ;;; For 2- and 3-way branching overloads, we don't compile anything. For 4 and up we do.
 ;;; one-way, two-way, and three-way should cover 95% of all accessors that involve
 ;;; name overloading. At least, it did in my situation and probably will for yours.
 (defun optimize-overloaded-accesssors ()
   "Compile all overloaded functions"
+  ;; optimize dispatch of the CLEAR function
+  (when (> (hash-table-count *clear-impl-funs*) 4)
+    (compile-mph-dispatch
+     (map 'vector
+          (lambda (pair)
+            (cons (sb-kernel:find-layout (car pair)) (cdr pair)))
+          (sb-int:%hash-table-alist *clear-impl-funs*))
+     'clear 'clear))
   (macrolet ((with-two-choices (lexpr)
                `(let ((test (find-layout type-to-test))
                       (f1 (fdefinition if-name))
@@ -326,7 +336,7 @@
                                      ((push nth gethash remhash) #'three-way/2-arg))
                                    t1 t2 f1 f2 f3))))))
             (t
-             (compile-mph-based-accessor
+             (compile-mph-dispatch
               (map 'vector
                    (lambda (choice)
                      (cons (find-layout (car choice))
