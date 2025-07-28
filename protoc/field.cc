@@ -161,22 +161,21 @@ const std::string FieldLispKind(const FieldDescriptor* field) {
 // Return the "arity" of the field, i.e. whether it's required, optional, or
 // repeated, and if repeated the type of repeated.
 const std::string FieldLispLabel(const FieldDescriptor* field) {
-  switch (field->label()) {
-    case FieldDescriptor::Label::LABEL_REQUIRED:
-      return "(:required)";
-    case FieldDescriptor::Label::LABEL_OPTIONAL:
-      return "(:optional)";
-    case FieldDescriptor::Label::LABEL_REPEATED:
-      if (field->options().HasExtension(lisp_container)) {
-        switch (field->options().GetExtension(lisp_container)) {
-          case LIST:
-            return "(:repeated :list)";
-          case VECTOR:
-            return "(:repeated :vector)";
-        }
-      } else {
-        return "(:repeated :list)";
+  if (field->is_repeated()) {
+    if (field->options().HasExtension(lisp_container)) {
+      switch (field->options().GetExtension(lisp_container)) {
+        case LIST:
+          return "(:repeated :list)";
+        case VECTOR:
+          return "(:repeated :vector)";
       }
+    } else {
+      return "(:repeated :list)";
+    }
+  } else if (field->is_required()) {
+    return "(:required)";
+  } else {
+    return "(:optional)";
   }
 
   ABSL_LOG(FATAL) << "Error determining field arity: " << field->DebugString();
