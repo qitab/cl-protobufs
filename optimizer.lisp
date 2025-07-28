@@ -173,7 +173,109 @@
 (defun dispatch-remhash (name key obj) (with-impl (funcall (the symbol impl) key obj)))
 ) ; end MACROLET
 
-(defun compile-mph-dispatch (choices overloaded-name kind)
+(defun simple-pattern-match (input expect)
+  "Return T if INPUT is similar to EXPECT"
+  (sb-int:collect ((parts))
+    (labels ((descend (input expect)
+               (if (atom expect)
+                   (case expect
+                     (? (parts input) t) ; match anything and save the match
+                     (_ t) ; match anything and ignore it
+                     (t (eq input expect))) ; require a match
+                   (and (consp input)
+                        (descend (car input) (car expect))
+                        (descend (cdr input) (cdr expect))))))
+      (when (descend input expect) ; return the variable parts
+        (or (parts) t))))) ; return T if there were no parts to save
+
+(defun compile-equivalence-based-accessor (choices overloaded-name &aux equiv warn)
+  "Compile an efficient accessor given <CHOICES, OVERLOADED-NAME>"
+  (flet ((infer-dsd (fun-name)
+           (let ((parts
+                  (simple-pattern-match
+                   (sb-c::fun-name-inline-expansion fun-name)
+                   '(lambda (obj_) (block _ (the ? (? obj_))))))) ; NOLINT
+             ;; need to handle boolean fields- (THE BOOLEAN (PLUSP (BIT (fun OBJ_) n)))
+             (when (and (not parts) warn)
+               (warn "function ~S lacks expected inline def" fun-name)) ; NOLINT
+             (when parts
+               (let* ((slot-reader (second parts))
+                      (info (sb-int:info :function :source-transform slot-reader)))
+                 (when (and (not (typep info '(cons defstruct-description))) warn)
+                   (warn "function ~S isn't a dsd-reader" slot-reader)) ; NOLINT
+                 (when (typep info '(cons defstruct-description))
+                   (cdr info)))))) ; a defstruct slot description
+         (dsd-equiv (a b) ; Pick a representative dsd per equiv class
+           (and (= (dsd-index a) (dsd-index b))
+                (eq (dsd-raw-type a) (dsd-raw-type b))
+                (type= (specifier-type (dsd-type a))
+                       (specifier-type (dsd-type b))))))
+    ;; Create an alist where the car of each pair is a defstruct description
+    ;; and the cdr is list of types to which this pair pertains.
+    (dolist (choice choices)
+      (let* ((fun-name (cadr (fdefn-name (cdr choice))))
+             (dsd (cond ((infer-dsd fun-name))
+                        (t (return-from compile-equivalence-based-accessor nil)))) ; fail
+             (pair (assoc dsd equiv :test #'dsd-equiv))
+             (msgtype (list (car choice))))
+        (if (not pair)
+            (setq equiv (nconc equiv (list (list* dsd msgtype))))
+            (nconc pair msgtype)))))
+  (flet ((install (name lambda-list body)
+           (let ((expr `(sb-int:named-lambda ,name ,lambda-list
+                          ;; word-sized integers produces efficiency notes
+                          (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+                          ,@body)))
+             (compile name expr)))
+         (type-union-expr (equivalence-class &aux (types (cdr equivalence-class)))
+           (if (cdr types) `(or ,@types) (car types))))
+    (case (length equiv)
+      (1 ; best case
+       (let ((dsd (caar equiv)))
+         (install `(setf ,overloaded-name) '(val obj)
+           `((declare (type (or ,@(mapcar 'car choices)) obj))
+             (setf (,(dsd-reader dsd nil) obj ,(dsd-index dsd)) (the ,(dsd-type dsd) val))))
+         (install overloaded-name '(obj)
+           `((declare (type (or ,@(mapcar 'car choices)) obj))
+             (truly-the ,(dsd-type dsd) (,(dsd-reader dsd nil) obj ,(dsd-index dsd))))))
+       (return-from compile-equivalence-based-accessor t)) ; success
+      (2
+       ;; whichever equivalence class is smaller, test TYPEP on it
+       (let ((cl1 (first equiv)) (cl2 (second equiv)))
+         (when (< (length (cdr cl2)) (length (cdr cl1)))
+           (rotatef cl1 cl2))
+         (let* ((dsd1 (car cl1)) (dsd2 (car cl2))
+                ;; type unions (or singleton) for message types
+                (mt1 (type-union-expr cl1)) (mt2 (type-union-expr cl2))
+                ;; field types
+                (ft1 (dsd-type dsd1)) (ft2 (dsd-type dsd2))
+                ;; if the field types in the two equivalence classes are the same,
+                ;; then a single DECLARE suffices, otherwise we assert that VAL
+                ;; is correct for the taken branch of the IF.
+                (ft= (type= (specifier-type ft1) (specifier-type ft2)))
+                (i1 (dsd-index dsd1)) (i2 (dsd-index dsd2)))
+           (install `(setf ,overloaded-name) '(val obj)
+             `(,@(if ft= `((declare (type ,(dsd-type dsd1) val))))
+               (if (typep obj ',mt1)
+                   (setf (,(dsd-reader dsd1 nil) obj ,i1)
+                         ,(if ft= 'val `(the ,ft1 val)))
+                   (setf (,(dsd-reader dsd2 nil) (the ,mt2 obj) ,i2)
+                         ,(if ft= 'val `(the ,ft2 val))))))
+           (install overloaded-name '(obj)
+             (if (not ft=)
+                 `((if (typep obj ',mt1)
+                       (truly-the ,ft1 (,(dsd-reader dsd1 nil) obj ,i1))
+                       (truly-the ,ft2 (,(dsd-reader dsd2 nil) (the ,mt2 obj) ,i2))))
+                 `((truly-the ,ft1
+                    (if (typep obj ',mt1)
+                        (,(dsd-reader dsd1 nil) obj ,i1)
+                        (,(dsd-reader dsd2 nil) (the ,mt2 obj) ,i2))))))))
+       (return-from compile-equivalence-based-accessor t)) ; success
+      (t
+       (when warn (warn "too many equivalence classes: ~A" equiv))))) ; NOLINT
+  nil) ; fail
+
+(defun compile-mph-based-accessor (choices overloaded-name kind)
   "Compile minimal perfect hash for <CHOICES, OVERLOADED-NAME, KIND>"
   (declare (simple-vector choices))
   (flet ((lhash (layout) (ldb (byte 32 0) (layout-clos-hash layout))))
@@ -229,11 +331,11 @@
           (multiple-value-bind (writer reader) (funcall (compile nil generator))
             (setf (fdefinition `(setf ,sym)) writer
                   (fdefinition sym) reader))
-          (return-from compile-mph-dispatch)))
+          (return-from compile-mph-based-accessor)))
 
       (let ((args (ecase kind
                     ((push nth remhash) '(arg0 obj))
-                    ((length clear) '(obj)))))
+                    (length '(obj)))))
         (compile overloaded-name
          `(sb-int:named-lambda ,overloaded-name ,args
             (declare (instance obj))
@@ -243,21 +345,11 @@
                   (funcall (truly-the function (aref ,funs h)) ,@args)
                   (error "~S can not be applied to ~S" ',overloaded-name obj)))))))))
 
-(declaim (sb-ext:global *clear-impl-funs*))
-
 ;;; For 2- and 3-way branching overloads, we don't compile anything. For 4 and up we do.
 ;;; one-way, two-way, and three-way should cover 95% of all accessors that involve
 ;;; name overloading. At least, it did in my situation and probably will for yours.
 (defun optimize-overloaded-accesssors ()
   "Compile all overloaded functions"
-  ;; optimize dispatch of the CLEAR function
-  (when (> (hash-table-count *clear-impl-funs*) 4)
-    (compile-mph-dispatch
-     (map 'vector
-          (lambda (pair)
-            (cons (sb-kernel:find-layout (car pair)) (cdr pair)))
-          (sb-int:%hash-table-alist *clear-impl-funs*))
-     'clear 'clear))
   (macrolet ((with-two-choices (lexpr)
                `(let ((test (find-layout type-to-test))
                       (f1 (fdefinition if-name))
@@ -336,13 +428,15 @@
                                      ((push nth gethash remhash) #'three-way/2-arg))
                                    t1 t2 f1 f2 f3))))))
             (t
-             (compile-mph-dispatch
-              (map 'vector
-                   (lambda (choice)
-                     (cons (find-layout (car choice))
-                           (type-specific-fun-name choice)))
-                   choices)
-              sym kind)))
+             (or (and (eq kind 'standard) ; would be nice to remove this requirement
+                      (compile-equivalence-based-accessor choices sym))
+                 (compile-mph-based-accessor
+                  (map 'vector
+                       (lambda (choice)
+                         (cons (find-layout (car choice))
+                               (type-specific-fun-name choice)))
+                       choices)
+                  sym kind))))
           ;; I'd like to remove all compile-time data (not just limited to cl-protobufs) which
           ;; empirically gets our application at least a 5% reduction in on-disk executable size.
           ;; But no good deed goes unpunished: removing makes per-file recompilation fail.

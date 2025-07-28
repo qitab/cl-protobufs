@@ -587,56 +587,59 @@ Parameters:
     ;; This means that the field is proto3-style optional, so checking for field presence must
     ;; be done by checking if the bound value is default.
 
-    (with-gensyms (obj new-value cur-value)
-      `(
-        (defun-inline (setf ,public-accessor-name) (,new-value ,obj)
-          (declare (type ,field-type ,new-value))
+    ;; By using interned symbols, we can examine the source code of different accessors
+    ;; of same-named slots to decide if they are doing an identical access, thereby reducing
+    ;; inefficiency caused by name overloading. i.e. if one overloaded name delegates
+    ;; to 10 different things, but those 10 are all the same, then the implementation
+    ;; can be buried into the overloaded function, and nobody can tell that it's not
+    ;; invoking 1 of 10 other functions, other than consuming fewer CPU cycles.
+    ;; If users mess with symbols in this package, that's their problem, not ours.
+      `((defun-inline (setf ,public-accessor-name) (val_ obj_)
+          (declare (type ,field-type val_))
           ,(when index
-             `(setf (bit (,is-set-accessor ,obj) ,index) 1))
+             `(setf (bit (,is-set-accessor obj_) ,index) 1))
           ,(if bool-index
-               `(setf (bit (,bit-field-name ,obj) ,bool-index)
-                      (if ,new-value 1 0))
-               `(setf (,hidden-accessor-name ,obj) ,new-value)))
+               `(setf (bit (,bit-field-name obj_) ,bool-index) (if val_ 1 0))
+               `(setf (,hidden-accessor-name obj_) val_)))
 
         ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
         ;; question: "Is this field set to the default value?". This is done so that the optimized
         ;; serializer can use the has-* function to check if an optional field should be serialized.
-        (defun-inline ,internal-has-function-name (,obj)
+        (defun-inline ,internal-has-function-name (obj_)
           ,(if index
-               `(= (bit (,is-set-accessor ,obj) ,index) 1)
-               `(let ((,cur-value ,(if bool-index
-                                       `(plusp (bit (,bit-field-name ,obj) ,bool-index))
-                                       `(,hidden-accessor-name ,obj))))
+               `(= (bit (,is-set-accessor obj_) ,index) 1)
+               `(let ((val_ ,(if bool-index ; NOLINT
+                                 `(plusp (bit (,bit-field-name obj_) ,bool-index))
+                                 `(,hidden-accessor-name obj_))))
                   ,(case (proto-container field)
-                     (:vector `(not (= (length ,cur-value) 0)))
-                     (:list `(and ,cur-value t))
+                     (:vector `(plusp (length val_)))
+                     (:list `(if val_ t))
                      (t (case (proto-type field)
-                          ((byte-vector cl:string) `(> (length ,cur-value) 0))
-                          ((cl:double-float cl:float) `(not (= ,cur-value ,default-form)))
-                          (cl:hash-table `(> (hash-table-count ,cur-value) 0))
-                          ;; Otherwise, the type is integral. EQ suffices to check equality.
-                          (t `(not (eq ,cur-value ,default-form)))))))))
+                          ((byte-vector cl:string) `(plusp (length val_)))
+                          ((cl:double-float cl:float) `(/= val_ ,default-form))
+                          (cl:hash-table `(plusp (hash-table-count val_)))
+                          ;; Otherwise, the type is integral
+                          (t `(not (eql val_ ,default-form)))))))))
 
         ;; has-* functions are not exported for proto3-style optional fields. They are only for
         ;; internal usage.
         ,@(when (or (eq (proto-field-presence field) :explicit)
                     (eq (proto-label field) :repeated)
                     (eq (proto-kind field) :map))
-            `((defun-inline ,external-has-function-name (,obj)
-                (,internal-has-function-name ,obj))
+            `((defun-inline ,external-has-function-name (obj_)
+                (,internal-has-function-name obj_))
               (export '(,external-has-function-name))))
 
         ;; Clear function
         ;; Map type clear functions are created in make-map-accessor-forms.
         ;; todo(benkuehnert): rewrite map types/definers so that this isn't necessary
         ,@(unless (eq (proto-kind field) :map)
-            `((defun-inline ,clear-function-name (,obj)
+            `((defun-inline ,clear-function-name (obj_)
                 ,(when index
-                   `(setf (bit (,is-set-accessor ,obj) ,index) 0))
+                   `(setf (bit (,is-set-accessor obj_) ,index) 0))
                 ,(if bool-index
-                     `(setf (bit (,bit-field-name ,obj) ,bool-index)
-                            ,(if default-form 1 0))
-                     `(setf (,hidden-accessor-name ,obj) ,default-form)))))
+                     `(setf (bit (,bit-field-name obj_) ,bool-index) ,(if default-form 1 0))
+                     `(setf (,hidden-accessor-name obj_) ,default-form)))))
 
         ;; Cause (SLOT-NAME obj) to become (ACCESSOR-NAME obj)
         ;; and similarly for SETF
@@ -649,7 +652,7 @@ Parameters:
         ,(unless (eq (proto-kind field) :map)
            `(export '(,clear-function-name)))
 
-        (export '(,public-accessor-name))))))
+        (export '(,public-accessor-name)))))
 
 (defun make-repeated-field-accessors (proto-type field)
   "Make and return forms that define functions that accesses a proto
@@ -963,12 +966,11 @@ function) then there is no guarantee on the serialize function working properly.
                 ((member (proto-kind field) '(:message :group :extends))
                  `(or null ,field-type))
                 (t field-type))))
-    (with-gensyms (obj)
-      `((defun-inline ,public-accessor-name (,obj)
+      `((defun-inline ,public-accessor-name (obj_)
           (the ,accessor-return-type
                ,(if bool-index
-                    `(plusp (bit (,bit-field-name ,obj) ,bool-index))
-                    `(,hidden-accessor-name ,obj))))
+                    `(plusp (bit (,bit-field-name obj_) ,bool-index))
+                    `(,hidden-accessor-name obj_))))
 
         ,@(make-common-forms-for-structure-class
            proto-type public-slot-name slot-name field)
@@ -979,7 +981,7 @@ function) then there is no guarantee on the serialize function working properly.
         ;; Make special map forms.
         ,@(when (typep (find-map-descriptor (proto-class field)) 'map-descriptor)
             (make-map-accessor-forms
-             proto-type public-slot-name slot-name field))))))
+             proto-type public-slot-name slot-name field)))))
 
 
 (#+sbcl sb-ext:define-load-time-global #-sbcl defvar *g-d-f-default-forms*
