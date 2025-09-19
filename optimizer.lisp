@@ -73,7 +73,10 @@
           (gethash  `(lambda (val key obj) (funcall #',delegate val key obj)))))))
 
 (define-load-time-global *general-overloaded-fun-info*
-    (let ((info (sb-c::make-fun-info :attributes (sb-c::ir1-attributes)))
+    (let ((info
+           (let ((random-sym (gensym)))
+             (sb-c::%defknown (list random-sym) 'function (sb-c::ir1-attributes) nil)
+             (sb-int:info :function :info random-sym)))
           (make-transform
            ;; Compiler removes global definition of sb-c::make-transform
            ;; but it's still callable from compiled code - Don't ask - which means
