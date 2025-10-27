@@ -9,6 +9,7 @@
         #:clunit
         #:cl-protobufs
         #:alexandria)
+  (:import-from #+sbcl #:sb-ext #-sbcl #:babel #:string-to-octets)
   (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
@@ -90,10 +91,9 @@ Parameters
     (repeated-float 211s0 311s0 511s0) (repeated-double 212d0 312d0 512d0)
     (repeated-bool t nil t)
     (repeated-string "215" "315" "515")
-    (repeated-bytes
-     #.(babel:string-to-octets "216")
-     #.(babel:string-to-octets "316")
-     #.(babel:string-to-octets "516"))
+    (repeated-bytes #.(string-to-octets "216")
+                    #.(string-to-octets "316")
+                    #.(string-to-octets "516"))
     (repeated-nested-enum :bar :baz :foo)
     (repeated-foreign-enum :foreign-bar :foreign-baz :foreign-foo)
     (repeated-import-enum :import-bar :import-baz :import-foo)
