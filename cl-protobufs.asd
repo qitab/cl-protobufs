@@ -54,8 +54,12 @@ and functionality for working with them."
     :pathname ""
     :depends-on ("models")
     :components
-    (#+sbcl (:file "optimizer")
-     (:file "define-proto")))
+   (;; Default ubuntu-latest too old
+    ;; to work with
+    ;; #+sbcl (:file "optimizer")
+    ;; If using a non-ancient version of
+    ;; sbcl it should work.
+    (:file "define-proto")))
    (:module "serialization"
     :serial t
     :pathname ""
