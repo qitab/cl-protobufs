@@ -16,6 +16,18 @@
                        find-layout layout-clos-hash
                        defstruct-description dsd-index dsd-reader dsd-raw-type dsd-type)))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (cond ((sb-c::version>= (sb-c::split-version-string (lisp-implementation-version))
+                          '(2 5 1))
+         (import (find-symbol "MAKE-PERFECT-HASH-LAMBDA" "SB-C"))
+         (pushnew :cl-protobufs-efficient-function-overloading *features*)
+         (pushnew 'optimize-overloaded-accesssors *save-hooks*))
+        (t
+         ;; proclaim just to avoid a stye-warning. We'll not call the function.
+         ;; Must not READ this symbol literally as a symbol, else it causes a conflict on the
+         ;; preceding import (since READing occurs first)
+         (proclaim `(ftype function ,(intern "MAKE-PERFECT-HASH-LAMBDA"))))))
+
 ;;; Users working with protobuf messages seem to want to access slots of a message
 ;;; without regard for the message type name.  This would be akin to making all
 ;;; DEFSTRUCT forms specify (:CONC-NAME ""). But obviously that won't work if different
@@ -72,6 +84,7 @@
           (standard `(lambda (val obj) (funcall #',delegate val obj)))
           (gethash  `(lambda (val key obj) (funcall #',delegate val key obj)))))))
 
+#+cl-protobufs-efficient-function-overloading
 (define-load-time-global *general-overloaded-fun-info*
     (let ((info
            (let ((random-sym (gensym)))
@@ -91,6 +104,8 @@
 
 (defun ensure-transformed (name kind)
   "Ensure that NAME + KIND is compile-time transformed"
+  #-cl-protobufs-efficient-function-overloading (declare (ignorable name kind))
+  #+cl-protobufs-efficient-function-overloading
   (let ((info (sb-int:info :function :info name)))
     (cond (info
            (assert (eq info *general-overloaded-fun-info*)))
@@ -288,7 +303,7 @@
                         choices))
            ;; The MPH generator has a cache in front of it, so we needn't worry too much
            ;; about calling it on the same set of layouts more than once.
-           (mphlambda (or (sb-c:make-perfect-hash-lambda hashes)
+           (mphlambda (or (make-perfect-hash-lambda hashes)
                           (error "cl-protobufs can't optimize ~D-way overload"
                                  n-choices)))
            (compiled-mph (compile nil mphlambda))
@@ -446,6 +461,3 @@
           ;; Perhaps we can confine removal to an optimized build only? Someone will claim to
           ;; need optimized builds and recompilation support though. Just #+nil it out for now.
           #+nil (remprop sym 'overloads))))))
-
-(pushnew 'optimize-overloaded-accesssors *save-hooks*)
-(pushnew :cl-protobufs-efficient-function-overloading *features*)
