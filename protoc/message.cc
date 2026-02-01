@@ -13,14 +13,14 @@
 #include <set>
 #include <unordered_set>
 
-#include "absl/strings/str_cat.h"
-#include "absl/strings/ascii.h"
 #include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/extension_set.h>
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"
 #include "names.h"
+#include "third_party/protobuf/extension_set.h"
 #include <google/protobuf/io/printer.h>
 
 namespace google {
