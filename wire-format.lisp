@@ -807,7 +807,7 @@
   (dotimes (i count count)
     (fast-octet-out buffer (aref scratchpad i))))
 
-#+(and sbcl x86-64)
+#+(and sbcl (or arm64 x86-64))
 (macrolet ((define-fixed-width-encoder (n-bytes name lisp-type accessor)
              `(progn
                 (declaim (ftype (function (,lisp-type buffer)
@@ -838,7 +838,7 @@
 ;;; boggles my mind. This should be reduced...
 ;;; At least macroize writing 4-byte integer so that you can use
 ;;; it for fixed32, single float, and (twice) for double-float
-#-(and sbcl 64-bit)
+#-(and sbcl (or arm64 x86-64))
 (progn
   (defmacro generate-integer-encoders (bits)
     "Generate 32- or 64-bit versions of integer encoders given BITS."
