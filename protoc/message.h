@@ -13,8 +13,8 @@
 #include <vector>
 
 #include <cstdint>
-#include <google/protobuf/descriptor.h>
 #include "enum.h"
+#include "third_party/protobuf/descriptor.h"
 #include <google/protobuf/io/printer.h>
 
 namespace google {

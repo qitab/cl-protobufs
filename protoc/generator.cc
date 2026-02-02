@@ -10,8 +10,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include <google/protobuf/descriptor.h>
 #include "file.h"
+#include "third_party/protobuf/descriptor.h"
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/io/zero_copy_stream.h>
 #include "absl/log/absl_check.h"
