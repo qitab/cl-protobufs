@@ -1274,7 +1274,7 @@ function) then there is no guarantee on the serialize function working properly.
          (make-field-data
           :internal-slot-name '%%bool-values
           :external-slot-name '%%bool-values
-          :type `(bit-vector ,bool-count)
+          :type `(simple-bit-vector ,bool-count)
           :initarg :%%bool-values
           :container :vector
           :initform `(make-array ,bool-count :element-type 'bit
@@ -1287,7 +1287,7 @@ function) then there is no guarantee on the serialize function working properly.
        (make-field-data
         :internal-slot-name '%%is-set
         :external-slot-name '%%is-set
-        :type `(bit-vector ,field-offset)
+        :type `(simple-bit-vector ,field-offset)
         :initarg :%%is-set
         :container :vector
         :initform `(make-array ,field-offset
