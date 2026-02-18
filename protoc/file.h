@@ -12,10 +12,10 @@
 #include <vector>
 
 #include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/descriptor.h>
 #include "enum.h"
 #include "message.h"
 #include "service.h"
+#include "third_party/protobuf/descriptor.h"
 #include <google/protobuf/io/printer.h>
 
 namespace google {

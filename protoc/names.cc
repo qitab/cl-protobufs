@@ -9,16 +9,17 @@
 #include "names.h"
 
 #include <ctype.h>
+
 #include <string>
 #include <string_view>
 
 #include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/extension_set.h>
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "proto2-descriptor-extensions.pb.h"
+#include "third_party/protobuf/extension_set.h"
 
 // Copied from ABSL.
 #if defined(__clang__) && defined(__has_warning)

@@ -13,7 +13,7 @@
 #include <string_view>
 
 #include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/descriptor.h>
+#include "third_party/protobuf/descriptor.h"
 
 namespace google {
 namespace protobuf {
