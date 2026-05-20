@@ -6,6 +6,30 @@
 
 (in-package #:cl-protobufs.implementation)
 
+(defun escape-string (string)
+  "Escape non-ASCII characters to ASCII octal sequences in STRING, while keeping
+printable ASCII characters as-is."
+  (with-output-to-string (s)
+    (loop for ch across string
+          do (cond ((char= ch #\\) (write-string "\\\\" s))
+                   ((char= ch #\") (write-string "\\\"" s))
+                   ((char= ch #\tab) (write-string "\\t" s))
+                   ((char= ch #\newline) (write-string "\\n" s))
+                   ((char= ch #\return) (write-string "\\r" s))
+                   ((char= ch #\page) (write-string "\\f" s))
+                   ((char= ch #\backspace) (write-string "\\b" s))
+                   ((char= ch #\bell) (write-string "\\a" s))
+                   ((char= ch #\esc) (write-string "\\e" s))
+                   ((char= ch #\null) (write-string "\\0" s))
+                   ((and *escape-non-ascii* (> (char-code ch) 127))
+                    (let ((octets (string-to-utf8-octets (string ch))))
+                      (loop for octet across octets
+                            do (format s "\\~3,'0o" octet))))
+                   ((or (< (char-code ch) 32) (= (char-code ch) 127))
+                    ;; Escape ASCII control/non-printable characters using octal
+                    (format s "\\~3,'0o" (char-code ch)))
+                   (t (write-char ch s))))))
+
 ;;; This file implements the protobuf Text Format parser and printer.
 ;;; The exported symbols are parse-text-format and print-text-format.
 
@@ -172,8 +196,7 @@ Parameters:
       ((int32 uint32 int64 uint64 sint32 sint64 fixed32 sfixed32 fixed64 sfixed64)
        (format stream "~D" val))
       ((string)
-       ;; TODO(cgay): This should be the inverse of parse-string.
-       (format stream "\"~A\"" val))
+       (format stream "\"~A\"" (escape-string val)))
       ((byte-vector)
        (format stream "~S" val))
       ((boolean)

@@ -437,7 +437,7 @@ repeated_message {
   message_2: {...}
 }
 " out)
-))
+    ))
 
 (deftest print-text-format-test-nil (text-format-suite)
   (let* ((msg (proto:parse-text-format
@@ -481,7 +481,7 @@ repeated_message {
   }
 }
 " out)
-))
+    ))
 
 (deftest print-text-format-test-minusp (text-format-suite)
   (let* ((msg (proto:parse-text-format
@@ -514,7 +514,7 @@ int_vals: 3
 repeated_message: {...}
 repeated_message: {...}
 " out)
-))
+    ))
 
 (deftest test-nested-repeated-message (text-format-suite)
   (let* ((msg (proto:parse-text-format
@@ -557,7 +557,7 @@ repeated_message {
   }
 }
 " out)
-))
+    ))
 
 (deftest count-lines-test (text-format-suite)
   (handler-case
@@ -623,3 +623,44 @@ Line 2:    int_field: 11,
                         ^"
                          'test-pb:text-format-test.nested-message1)
                  error-string))))))
+
+(deftest test-escape-non-ascii (text-format-suite)
+  (let* ((msg (test-pb:make-text-format-test :string-field "ä中"))
+         ;; 1. Print with *escape-non-ascii* = NIL (Default / raw)
+         (print-nil-text (let ((proto:*escape-non-ascii* nil))
+                           (with-output-to-string (s)
+                             (proto:print-text-format msg :stream s))))
+         ;; 2. Print with *escape-non-ascii* = T (ASCII escaped)
+         (print-t-text (let ((proto:*escape-non-ascii* t))
+                         (with-output-to-string (s)
+                           (proto:print-text-format msg :stream s)))))
+
+    ;; Verify printed outputs
+    (assert-true (search "\"ä中\"" print-nil-text))
+    (assert-true (search "\\303\\244\\344\\270\\255" print-t-text))
+
+    ;; Test all 4 iteration combinations of print (encode) and parse (decode)
+    (flet ((parse-msg (text decode-flag)
+             (let ((proto:*escape-non-ascii* decode-flag))
+               (test-pb:string-field
+                (proto:parse-text-format 'test-pb:text-format-test
+                                         :stream (make-string-input-stream text))))))
+
+      ;; Combination 1: Print = NIL, Parse = NIL
+      ;; Raw characters are printed as-is and parsed back as-is.
+      (assert-equality #'string= "ä中" (parse-msg print-nil-text nil))
+
+      ;; Combination 2: Print = NIL, Parse = T
+      ;; Raw characters are printed as-is; when parsed, they are collected as UTF-8
+      ;; and properly decoded back to "ä中".
+      (assert-equality #'string= "ä中" (parse-msg print-nil-text t))
+
+      ;; Combination 3: Print = T, Parse = NIL
+      ;; Escaped ASCII sequences are parsed literally into raw characters (no UTF-8 decoding).
+      ;; ä (\303\244) -> U+00C3 U+00A4 ("Ã¤")
+      ;; 中 (\344\270\255) -> U+00E4 U+00B8 U+00AD ("ä¸­")
+      (assert-equality #'string= "Ã¤ä¸­" (parse-msg print-t-text nil))
+
+      ;; Combination 4: Print = T, Parse = T
+      ;; Escaped ASCII sequences are parsed and properly UTF-8 decoded back to "ä中".
+      (assert-equality #'string= "ä中" (parse-msg print-t-text t)))))

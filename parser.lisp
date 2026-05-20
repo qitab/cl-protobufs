@@ -6,6 +6,10 @@
 
 (in-package #:cl-protobufs.implementation)
 
+(defvar *escape-non-ascii* nil
+  "If true, escape non-ASCII characters to ASCII octal sequences when outputting text format,
+   and decode escaped ASCII/octal sequences back to UTF-8 string characters when parsing.")
+
 ;;; Text parsing utilities
 
 (defun-inline proto-whitespace-char-p (ch)
@@ -204,24 +208,56 @@ caret string that visually marks the error position in the line."
     (values (parse-string stream) 'string)
     (values (parse-token stream) 'symbol)))
 
+(defun string-to-utf8-octets (string)
+  "Convert a STRING to a UTF-8 encoded octet array."
+  #+sbcl (sb-ext:string-to-octets string :external-format :utf-8)
+  #-sbcl (babel:string-to-octets string))
+
+(defun utf8-octets-to-string (octets)
+  "Convert a UTF-8 encoded OCTETS array to a Lisp string."
+  #+sbcl (sb-ext:octets-to-string octets :external-format :utf-8)
+  #-sbcl (babel:octets-to-string octets :encoding :utf-8))
+
 (defun parse-string (stream)
   "Parse the next quoted string in the stream, then skip the following whitespace.
    The returned value is the string, without the quotation marks."
   (let ((ch0 (read-char stream nil)))
     (unless (member ch0 '(#\' #\"))
       (protobuf-error "Starting string character ~c should be \' or \"." ch0))
-    (loop for ch = (read-char stream nil)
-          until (or (null ch) (char= ch ch0))
-          when (eql ch #\\)
-            do (setq ch (unescape-char stream))
-          collect ch into string
-          finally (progn
-                    (skip-whitespace-comments-and-chars stream)
-                    (if (eql (peek-char nil stream nil) ch0)
-                        ;; If the next character is a quote character, that means
-                        ;; we should go parse another string and concatenate it
-                        (return (strcat (coerce string 'string) (parse-string stream)))
-                        (return (coerce string 'string)))))))
+    (let ((result-string
+           (if *escape-non-ascii*
+               (let ((octets (make-array 32 :element-type '(unsigned-byte 8)
+                                            :adjustable t :fill-pointer 0)))
+                 (loop for ch = (read-char stream nil)
+                       until (or (null ch) (char= ch ch0))
+                       do (if (eql ch #\\)
+                              (let ((escaped-ch (unescape-char stream)))
+                                (let ((code (char-code escaped-ch)))
+                                  (if (<= code 255)
+                                      (vector-push-extend code octets)
+                                      (let ((bytes (string-to-utf8-octets (string escaped-ch))))
+                                        (loop for b across bytes
+                                              do (vector-push-extend b octets))))))
+                              (let ((code (char-code ch)))
+                                (if (<= code 127)
+                                    (vector-push-extend code octets)
+                                    (let ((bytes (string-to-utf8-octets (string ch))))
+                                      (loop for b across bytes
+                                            do (vector-push-extend b octets)))))))
+                 (utf8-octets-to-string octets))
+               ;; Fast path when *escape-non-ascii* is NIL (identical to the original loop)
+               (loop for ch = (read-char stream nil)
+                     until (or (null ch) (char= ch ch0))
+                     when (eql ch #\\)
+                       do (setq ch (unescape-char stream))
+                     collect ch into string-chars
+                     finally (return (coerce string-chars 'string))))))
+      (skip-whitespace-comments-and-chars stream)
+      (if (eql (peek-char nil stream nil) ch0)
+          ;; If the next character is a quote character, that means
+          ;; we should go parse another string and concatenate it
+          (strcat result-string (parse-string stream))
+          result-string))))
 
 (defun unescape-char (stream)
   "Parse the next \"escaped\" character from the stream."

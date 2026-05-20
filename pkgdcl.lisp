@@ -51,6 +51,7 @@
    #:parse-text-format
    #:print-text-format
    #:fmt
+   #:*escape-non-ascii*
 
    ;; Descriptors -- descriptors contain all the information parsed from .proto
    ;; files and may be looked up by the symbol naming a protobuf message, enum,
