@@ -1605,6 +1605,7 @@ function) then there is no guarantee on the serialize function working properly.
                    (vresponse (intern "RESPONSE" package))
                    (vchannel  (intern "CHANNEL" package))
                    (vcallback (intern "CALLBACK" package))
+                   (vtimeout  (intern "TIMEOUT" package))
                    (vrpc      (intern "RPC" package))
                    (call  (gensym "CALL")))
               ;; The client side stub, e.g., 'read-air-reservation'.
@@ -1621,16 +1622,16 @@ function) then there is no guarantee on the serialize function working properly.
               ;; It will also deserialize the response so that the client code sees the
               ;; response as an application object.
               (collect-form
-               `(defgeneric ,client-fn (,vchannel ,vrequest &key ,vcallback ,vresponse)
+               `(defgeneric ,client-fn (,vchannel ,vrequest &key ,vcallback ,vresponse ,vtimeout)
                   #+(or ccl)
                   (declare (values ,output-type))
-                  (:method (,vchannel ,vrequest &key ,vcallback ,vresponse)
-                    (declare (ignorable ,vchannel ,vcallback))
+                  (:method (,vchannel ,vrequest &key ,vcallback ,vresponse ,vtimeout)
+                    (declare (ignorable ,vchannel ,vcallback ,vtimeout))
                     (assert-rpc-function-defined *rpc-call-function*)
                     (funcall *rpc-call-function* ,vchannel ',method ,vrequest ,vresponse
                              :callback ,vcallback
                                         ; :type ',input-type
-                             ))))
+                     ))))
               (when (or input-streaming output-streaming)
                 (let ((start-call
                        (intern (string-upcase (format nil "~A/START" function))
@@ -1648,7 +1649,8 @@ function) then there is no guarantee on the serialize function working properly.
                        (intern (nstring-upcase (format nil "~A/CLEANUP" function))
                                package)))
                   (collect-form
-                   `(defun ,start-call (,vchannel)
+                   `(defun ,start-call (,vchannel &key ,vtimeout)
+                      (declare (ignorable ,vtimeout))
                       (assert-rpc-function-defined *rpc-streaming-client-function*)
                       (funcall *rpc-streaming-client-function*
                                :start :channel ,vchannel :method ',method)))
