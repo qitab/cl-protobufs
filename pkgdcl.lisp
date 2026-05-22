@@ -155,7 +155,8 @@
    ;; An RPC library supporting the client functions defined in
    ;; `define-service` should bind these.
    #:*rpc-call-function*
-   #:*rpc-streaming-client-function*))
+   #:*rpc-streaming-client-function*
+   #:*rpc-streaming-server-function*))
 
 (defpackage #:cl-protobufs.implementation
   (:use :common-lisp :cl-protobufs)

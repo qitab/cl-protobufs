@@ -1512,6 +1512,12 @@ function) then there is no guarantee on the serialize function working properly.
    in :start :send :receive :close :cleanup. Set this when an RPC package that uses cl-protobufs is
    loaded.")
 
+(defparameter *rpc-streaming-server-function* nil
+  "This function should implement the dispatch calls for server side streaming calls. This function
+   must have a signature matching (type &key channel method request call) and have methods for types
+   in :send :receive :receive-close :send-status. Set this when an RPC package that uses
+   cl-protobufs is loaded.")
+
 (defmacro assert-rpc-function-defined (symbol)
   "Assert that SYMBOL is not NIL, otherwise signal an error."
   `(assert ,symbol () (format nil "~a is not bound to an RPC function." ',symbol)))
@@ -1647,6 +1653,18 @@ function) then there is no guarantee on the serialize function working properly.
                                package))
                       (cleanup-call
                        (intern (nstring-upcase (format nil "~A/CLEANUP" function))
+                               package))
+                      (server-send-call
+                       (intern (nstring-upcase (format nil "~A/SERVER-SEND" function))
+                               package))
+                      (server-receive-call
+                       (intern (nstring-upcase (format nil "~A/SERVER-RECEIVE" function))
+                               package))
+                      (server-receive-close-call
+                       (intern (nstring-upcase (format nil "~A/SERVER-RECEIVE-CLOSE" function))
+                               package))
+                      (server-send-status-call
+                       (intern (nstring-upcase (format nil "~A/SERVER-SEND-STATUS" function))
                                package)))
                   (collect-form
                    `(defun ,start-call (,vchannel &key ,vtimeout)
@@ -1672,11 +1690,32 @@ function) then there is no guarantee on the serialize function working properly.
                       (assert-rpc-function-defined *rpc-streaming-client-function*)
                       (funcall *rpc-streaming-client-function* :cleanup :call ,call)))
                   (collect-form
+                   `(defun ,server-send-call (,call ,vresponse)
+                      (assert-rpc-function-defined *rpc-streaming-server-function*)
+                      (funcall *rpc-streaming-server-function*
+                               :send :call ,call :request ,vresponse)))
+                  (collect-form
+                   `(defun ,server-receive-call (,call)
+                      (assert-rpc-function-defined *rpc-streaming-server-function*)
+                      (funcall *rpc-streaming-server-function* :receive :call ,call)))
+                  (collect-form
+                   `(defun ,server-receive-close-call (,call)
+                      (assert-rpc-function-defined *rpc-streaming-server-function*)
+                      (funcall *rpc-streaming-server-function* :receive-close :call ,call)))
+                  (collect-form
+                   `(defun ,server-send-status-call (,call)
+                      (assert-rpc-function-defined *rpc-streaming-server-function*)
+                      (funcall *rpc-streaming-server-function* :send-status :call ,call)))
+                  (collect-form
                    `(export '(,start-call
                               ,send-call
                               ,receive-call
                               ,close-call
-                              ,cleanup-call)
+                              ,cleanup-call
+                              ,server-send-call
+                              ,server-receive-call
+                              ,server-receive-close-call
+                              ,server-send-status-call)
                             ,package))))
 
               ;; The server side stub, e.g., 'do-read-air-reservation'.
@@ -1694,7 +1733,8 @@ function) then there is no guarantee on the serialize function working properly.
               (collect-form `(defgeneric ,old-server-fn (,vchannel ,vrequest ,vrpc)
                                #+(or ccl)
                                (declare (values ,output-type))))
-              (collect-form `(defgeneric ,server-fn (,vrequest ,call)
+              (collect-form `(defgeneric ,server-fn
+              ,(if input-streaming `(,call) `(,vrequest ,call))
                                #+(or ccl)
                                (declare (values ,output-type))))))))
       (collect-form `(record-protobuf-object ',type ,service :service))
