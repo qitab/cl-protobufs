@@ -8,15 +8,14 @@
 
 #include <cstdint>
 
+#include "absl/log/absl_check.h"
 #include "absl/log/absl_log.h"
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/message.h>
 #include "absl/strings/str_cat.h"
 #include "literals.h"
 #include "names.h"
+#include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/io/printer.h>
-#include "absl/log/absl_check.h"
-#include "absl/base/log_severity.h"
+#include <google/protobuf/message.h>
 
 namespace google {
 namespace protobuf {
