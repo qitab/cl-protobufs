@@ -9,14 +9,13 @@
 #include <map>
 
 #include "absl/log/absl_log.h"
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/extension_set.h>
 #include "absl/strings/str_cat.h"
 #include "proto2-descriptor-extensions.pb.h"
 #include "literals.h"
 #include "names.h"
-#include "absl/base/log_severity.h"
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/extension_set.h>
 
 namespace google {
 namespace protobuf {
@@ -83,7 +82,7 @@ const std::string FieldLispType(const FieldDescriptor* field) {
         break;
       default:
         ABSL_LOG(FATAL) << "Unsupported FileDescriptorType: "
-                   << field->DebugString();
+                        << field->DebugString();
         break;
     }
   }
@@ -150,7 +149,7 @@ const std::string FieldLispKind(const FieldDescriptor* field) {
       break;
     default:
       ABSL_LOG(FATAL) << "Unsupported FileDescriptorType: "
-                 << field->DebugString();
+                      << field->DebugString();
       break;
   }
   return proto_kind;

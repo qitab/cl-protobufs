@@ -13,7 +13,6 @@
 #include <vector>
 
 #include <google/protobuf/compiler/code_generator.h>
-#include <google/protobuf/descriptor.pb.h>
 
 namespace google {
 class FileDescriptor;
