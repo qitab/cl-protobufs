@@ -8,7 +8,7 @@
 #include <string>
 #include <string_view>
 
-#include "absl/strings/str_cat.h"
+#include <absl/strings/str_cat.h>
 
 namespace google {
 namespace protobuf {

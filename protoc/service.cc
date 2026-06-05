@@ -8,9 +8,9 @@
 
 #include <cstdint>
 
-#include "absl/log/absl_check.h"
-#include "absl/log/absl_log.h"
-#include "absl/strings/str_cat.h"
+#include <absl/log/absl_check.h>
+#include <absl/log/absl_log.h>
+#include <absl/strings/str_cat.h>
 #include "literals.h"
 #include "names.h"
 #include <google/protobuf/descriptor.pb.h>

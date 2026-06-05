@@ -8,8 +8,8 @@
 
 #include <map>
 
-#include "absl/log/absl_log.h"
-#include "absl/strings/str_cat.h"
+#include <absl/log/absl_log.h>
+#include <absl/strings/str_cat.h>
 #include "proto2-descriptor-extensions.pb.h"
 #include "literals.h"
 #include "names.h"

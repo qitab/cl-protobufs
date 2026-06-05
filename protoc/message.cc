@@ -13,8 +13,8 @@
 #include <set>
 #include <unordered_set>
 
-#include "absl/strings/ascii.h"
-#include "absl/strings/str_cat.h"
+#include <absl/strings/ascii.h>
+#include <absl/strings/str_cat.h>
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"

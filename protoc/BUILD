@@ -3,7 +3,7 @@
 load("//security/hardening/blaze:cc_binary.bzl", "HARDENING_ENABLE_SCUDO_ALLOC", "HARDENING_ENABLE_STACK_AUTO_INIT", "HARDENING_ENABLE_WX", "cc_binary")
 load("//third_party/bazel_rules/rules_cc/cc:cc_library.bzl", "cc_library")
 
-
+package(default_applicable_licenses = ["//:license"])
 
 licenses(["notice"])
 
@@ -47,7 +47,6 @@ cc_library(
         "service.h",
     ],
     deps = [
-        "@com_google_absl//absl/base",
         "@com_google_absl//absl/log:absl_check",
         "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/strings",
