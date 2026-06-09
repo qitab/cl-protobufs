@@ -1612,6 +1612,7 @@ function) then there is no guarantee on the serialize function working properly.
                    (vchannel  (intern "CHANNEL" package))
                    (vcallback (intern "CALLBACK" package))
                    (vtimeout  (intern "TIMEOUT" package))
+                   (vmetadata (intern "METADATA" package))
                    (vrpc      (intern "RPC" package))
                    (call  (gensym "CALL")))
               ;; The client side stub, e.g., 'read-air-reservation'.
@@ -1628,16 +1629,19 @@ function) then there is no guarantee on the serialize function working properly.
               ;; It will also deserialize the response so that the client code sees the
               ;; response as an application object.
               (collect-form
-               `(defgeneric ,client-fn (,vchannel ,vrequest &key ,vcallback ,vresponse ,vtimeout)
+               `(defgeneric ,client-fn (,vchannel ,vrequest
+                                        &key ,vcallback ,vresponse ,vtimeout ,vmetadata)
                   #+(or ccl)
                   (declare (values ,output-type))
-                  (:method (,vchannel ,vrequest &key ,vcallback ,vresponse ,vtimeout)
-                    (declare (ignorable ,vchannel ,vcallback ,vtimeout))
+                  (:method (,vchannel ,vrequest
+                            &key ,vcallback ,vresponse ,vtimeout ,vmetadata)
+                    (declare (ignorable ,vchannel ,vcallback ,vresponse
+                                        ,vtimeout ,vmetadata))
                     (assert-rpc-function-defined *rpc-call-function*)
                     (funcall *rpc-call-function* ,vchannel ',method ,vrequest ,vresponse
                              :callback ,vcallback
-                                        ; :type ',input-type
-                     ))))
+                             :timeout ,vtimeout
+                             :metadata ,vmetadata))))
               (when (or input-streaming output-streaming)
                 (let ((start-call
                        (intern (string-upcase (format nil "~A/START" function))
