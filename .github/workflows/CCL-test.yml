@@ -46,7 +46,7 @@ jobs:
 
       - name: Download and install protobuf
         run: |
-          git clone --recursive -b 28.x https://github.com/protocolbuffers/protobuf
+          git clone --recursive -b 32.x https://github.com/protocolbuffers/protobuf
           cd protobuf/cmake
           mkdir build
           cd build

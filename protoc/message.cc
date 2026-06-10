@@ -50,15 +50,12 @@ MessageGenerator::~MessageGenerator() {}
 
 // Generate code for a normal message.
 void MessageGenerator::Generate(io::Printer* printer) {
-  GenerateSource(printer, lisp_name_, -1, FieldDescriptor::MAX_LABEL);
+  GenerateSource(printer, lisp_name_);
 }
 
-// Generate code for a message or group. If it's a group, tag is a field number
-// > 0 and label is a valid label: optional, required, or repeated.
+// Generate code for a message or group.
 void MessageGenerator::GenerateSource(io::Printer* printer,
-                                      const std::string& lisp_name,
-                                      const int tag,
-                                      const FieldDescriptor::Label label) {
+                                      const std::string& lisp_name) {
   // If descriptor_ describes a map entry message, ignore it. We do not use
   // this generated message for map types.
   if (descriptor_->options().map_entry())
@@ -125,9 +122,7 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
             // TODO(cgay): This is untested and doesn't work.
             MessageGenerator group(field->message_type());
             group.GenerateSource(printer,
-                                 ToLispName(field->message_type()->name()),
-                                 field->number(),
-                                 field->label());
+                                 ToLispName(field->message_type()->name()));
           } else {
             GenerateField(printer, field);
           }
