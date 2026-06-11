@@ -236,6 +236,22 @@ enum-type name."
 (defconstant +threshold-enum-mapping+ 10
   "Threshold for using optimized enum mapping.")
 
+(defun make-enum-associations-table
+    (associations &key (inverse nil) (test #'eql) (keep-first-only nil))
+  "Constructs a hash table from the association list ASSOCIATIONS of (name . value).
+   TEST is the hash table test function.
+   If INVERSE is true, maps value to name.
+   If KEEP-FIRST-ONLY is true, only the first association for a given key is kept."
+  (let ((table (make-hash-table :test test)))
+    (dolist (assoc associations)
+      (let ((key (if inverse (cdr assoc) (car assoc)))
+            (val (if inverse (car assoc) (cdr assoc))))
+        (if keep-first-only
+            (unless (gethash key table)
+              (setf (gethash key table) val))
+            (setf (gethash key table) val))))
+    table))
+
 (defun make-enum-conversion-forms (type open-type value-descriptors)
   "Generates forms for enum <-> integer conversion functions. TYPE is the enum
 type name. OPEN-TYPE is a type including the possibility of unknown enum keywords
@@ -250,72 +266,79 @@ as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
          (sequence-length (length values)))
     `(progn
        ,(cond
-          ;; Use array for dense sequences
-          ((<= range (* sequence-length 2))
-           (let ((array (make-array (+ 1 range)))
-                 (enum-to-int (make-hash-table)))
-             (loop for desc in values do
-                   (let ((enum (enum-value-descriptor-name desc))
-                         (value (enum-value-descriptor-value desc)))
-                     (setf (aref array (- value min-value)) enum)
-                     (setf (gethash enum enum-to-int) value)))
-             `(progn
-                (defun ,key2int (enum)
-                  (declare (type ,open-type enum))
-                  (or (gethash enum ,enum-to-int)
-                      (parse-integer (subseq (symbol-name enum) +%undefined--length+)
-                                     :junk-allowed t)))
-                (defun ,int2key (numeral)
-                  (declare (type int32 numeral))
-                  (when (<= ,min-value numeral ,max-value)
-                  (values (aref ,array (- numeral ,min-value))))))))
-          ;; Use case for small but sparse sequences
-          ((< sequence-length +threshold-enum-mapping+)
-           `(progn
-              (defun ,key2int (enum)
-                (declare (type ,open-type enum))
-                (let ((int (case enum
-                             ,@(loop for desc in values
-                                     collect `(,(enum-value-descriptor-name desc)
-                                               ,(enum-value-descriptor-value desc)))
-                             (t (parse-integer (subseq (symbol-name enum)
-                                                       +%undefined--length+)
-                                               :junk-allowed t)))))
-                  int))
-              (defun ,int2key (numeral)
-                (declare (type int32 numeral))
-                (the (or null ,type)
-                     (let ((key (case numeral
-                                  ,@(loop with mapped = (make-hash-table)
-                                          for desc in values
-                                          for int = (enum-value-descriptor-value desc)
-                                          for already-set-p = (gethash int mapped)
-                                          do (setf (gethash int mapped) t)
-                                          unless already-set-p
-                                            collect
-                                            `(,int ,(enum-value-descriptor-name desc))))))
-                       key)))))
-          ;; Use hash table as fallback
-          (t
-           (let ((enum-to-int (make-hash-table))
-                 (int-to-enum (make-hash-table)))
-             (loop for desc in values do
-                   (let ((enum (enum-value-descriptor-name desc))
-                         (value (enum-value-descriptor-value desc)))
-                     (unless (gethash enum enum-to-int)
-                       (setf (gethash enum enum-to-int) value))
-                     (unless (gethash value int-to-enum)
-                       (setf (gethash value int-to-enum) enum))))
-             `(progn
-                (defun ,key2int (enum)
-                  (declare (type ,open-type enum))
-                  (or (gethash enum ,enum-to-int)
-                      (parse-integer (subseq (symbol-name enum) +%undefined--length+)
-                                     :junk-allowed t)))
-                (defun ,int2key (numeral)
-                  (declare (type int32 numeral))
-                  (the (or null ,type)
-                       (values (gethash numeral ,int-to-enum))))))))
+           ;; Use array for dense sequences
+           ((<= range (* sequence-length 2))
+            (let ((array (make-array (+ 1 range)))
+                  (associations (loop for desc in values
+                                      collect (cons (enum-value-descriptor-name desc)
+                                                    (enum-value-descriptor-value desc)))))
+              (loop for desc in values do
+                    (let ((enum (enum-value-descriptor-name desc))
+                          (value (enum-value-descriptor-value desc)))
+                      (setf (aref array (- value min-value)) enum)))
+              `(progn
+                 (defun ,key2int (enum)
+                   (declare (type ,open-type enum))
+                   (or (gethash enum (load-time-value
+                                       (make-enum-associations-table ',associations)))
+                       (parse-integer
+                        (subseq (symbol-name enum) +%undefined--length+)
+                        :junk-allowed t)))
+                 (defun ,int2key (numeral)
+                   (declare (type int32 numeral))
+                   (when (<= ,min-value numeral ,max-value)
+                   (values (aref ,array (- numeral ,min-value))))))))
+           ;; Use case for small but sparse sequences
+           ((< sequence-length +threshold-enum-mapping+)
+            `(progn
+               (defun ,key2int (enum)
+                 (declare (type ,open-type enum))
+                 (let ((int (case enum
+                              ,@(loop for desc in values
+                                      collect `(,(enum-value-descriptor-name desc)
+                                                ,(enum-value-descriptor-value desc)))
+                              (t (parse-integer (subseq (symbol-name enum)
+                                                        +%undefined--length+)
+                                                :junk-allowed t)))))
+                   int))
+               (defun ,int2key (numeral)
+                 (declare (type int32 numeral))
+                 (the (or null ,type)
+                      (let ((key (case numeral
+                                   ,@(loop with mapped = (make-hash-table)
+                                           for desc in values
+                                           for int = (enum-value-descriptor-value desc)
+                                           for already-set-p = (gethash int mapped)
+                                           do (setf (gethash int mapped) t)
+                                           unless already-set-p
+                                             collect
+                                             `(,int ,(enum-value-descriptor-name desc))))))
+                        key)))))
+           ;; Use hash table as fallback
+           (t
+            (let ((associations (loop for desc in values
+                                      collect (cons (enum-value-descriptor-name desc)
+                                                    (enum-value-descriptor-value desc)))))
+              `(progn
+                 (defun ,key2int (enum)
+                   (declare (type ,open-type enum))
+                   (or (gethash enum
+                                (load-time-value
+                                  (make-enum-associations-table
+                                    ',associations
+                                    :keep-first-only t)))
+                       (parse-integer
+                        (subseq (symbol-name enum) +%undefined--length+)
+                        :junk-allowed t)))
+                 (defun ,int2key (numeral)
+                   (declare (type int32 numeral))
+                   (the (or null ,type)
+                        (values (gethash numeral
+                                         (load-time-value
+                                           (make-enum-associations-table
+                                             ',associations
+                                             :inverse t
+                                             :keep-first-only t))))))))))
        (setf (get ',type 'enum-int-to-keyword) ',int2key)
        (setf (get ',type 'enum-keyword-to-int) ',key2int))))
 
