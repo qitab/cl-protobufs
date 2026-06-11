@@ -1,0 +1,137 @@
+# @file ci.yml
+---
+name: CI
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        lisp: [ sbcl, ccl, abcl ]
+
+    steps:
+      - name: Update apt package list
+        run: sudo apt-get update
+
+      - name: Download ccl
+        if: matrix.lisp == 'ccl'
+        run: |
+          curl -o ccl.tar.gz --location 'https://github.com/Clozure/ccl/releases/download/v1.12/ccl-1.12-linuxx86.tar.gz'
+          tar -xzf ccl.tar.gz
+
+      - name: Download sbcl
+        if: matrix.lisp == 'sbcl'
+        run: sudo apt-get install -y sbcl
+
+      - name: Download ABCL
+        if: matrix.lisp == 'abcl'
+        run: |
+          sudo apt-get install -y ant
+          git clone https://github.com/armedbear/abcl.git
+          cd abcl
+          ant
+
+      - name: Cache Quicklisp
+        id: cache-quicklisp
+        uses: actions/cache@v4
+        with:
+          path: quicklisp
+          key: ${{ runner.os }}-quicklisp-${{ matrix.lisp }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-quicklisp-${{ matrix.lisp }}-
+
+      - name: Download quicklisp
+        if: steps.cache-quicklisp.outputs.cache-hit != 'true'
+        run: curl -o quicklisp.lisp 'https://beta.quicklisp.org/quicklisp.lisp'
+
+      - name: Install quicklisp
+        if: steps.cache-quicklisp.outputs.cache-hit != 'true'
+        run: |
+          if [ "${{ matrix.lisp }}" = "ccl" ]; then
+            ./ccl/lx86cl64 --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
+            ./ccl/lx86cl64 --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
+          elif [ "${{ matrix.lisp }}" = "sbcl" ]; then
+            sbcl --noinform --non-interactive --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\")"
+            sbcl --noinform --non-interactive --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file))'
+          else
+            ./abcl/abcl --batch --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
+            ./abcl/abcl --batch --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
+          fi
+
+      - name: Download repo
+        uses: actions/checkout@v4
+        with:
+          path: quicklisp/local-projects/cl-protobufs
+
+      - name: Add cl-protobufs/protoc to path
+        run: echo "$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc" >> $GITHUB_PATH
+
+      - name: Cache C++ dependencies
+        id: cache-cpp
+        uses: actions/cache@v4
+        with:
+          path: |
+            abseil-cpp
+            protobuf
+          key: ${{ runner.os }}-cpp-deps-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-cpp-deps-
+
+      - name: Download and install Abseil
+        run: |
+          set -ex
+          if [ ! -d "$GITHUB_WORKSPACE/abseil-cpp" ]; then
+            git clone --recursive -b lts_2024_07_22 https://github.com/abseil/abseil-cpp $GITHUB_WORKSPACE/abseil-cpp
+          fi
+          cd $GITHUB_WORKSPACE/abseil-cpp
+          sudo cmake . -DCMAKE_CXX_STANDARD=17 -DABSL_ENABLE_INSTALL=ON
+          sudo make -j$(nproc)
+          sudo make install -j$(nproc)
+          sudo ldconfig
+
+      - name: Download and install protobuf
+        run: |
+          set -ex
+          if [ ! -d "protobuf" ]; then
+            git clone --recursive -b 32.x https://github.com/protocolbuffers/protobuf
+          fi
+          cd protobuf/cmake
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_CXX_STANDARD=17 -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_ABSL_PROVIDER=package -DCMAKE_INSTALL_PREFIX=/usr/local/ ../..
+          sudo make install -j$(nproc)
+          sudo ldconfig
+
+      - name: Cache protoc plugin
+        id: cache-protoc-plugin
+        uses: actions/cache@v4
+        with:
+          path: quicklisp/local-projects/cl-protobufs/protoc
+          key: ${{ runner.os }}-protoc-plugin-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-protoc-plugin-
+
+      - name: Install protoc plug-in
+        run: |
+          cd $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc
+          cmake . -DCMAKE_CXX_STANDARD=17
+          cmake --build . --target install --parallel $(nproc)
+
+      - name: Load and run tests
+        run: |
+          export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
+          if [ "${{ matrix.lisp }}" = "ccl" ]; then
+            ./ccl/lx86cl64 --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
+          elif [ "${{ matrix.lisp }}" = "sbcl" ]; then
+            sbcl --noinform --non-interactive --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
+          else
+            ./abcl/abcl --batch --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
+          fi
+          test -f report
+          cat report
+          ! grep -q "not ok" report
+          grep -q "ok" report
