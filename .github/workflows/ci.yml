@@ -45,21 +45,26 @@ jobs:
             ${{ runner.os }}-quicklisp-${{ matrix.lisp }}-
 
       - name: Download quicklisp
-        if: steps.cache-quicklisp.outputs.cache-hit != 'true'
-        run: curl -o quicklisp.lisp 'https://beta.quicklisp.org/quicklisp.lisp'
+        run: |
+          if [ ! -f "$GITHUB_WORKSPACE/quicklisp/setup.lisp" ]; then
+            curl -o quicklisp.lisp 'https://beta.quicklisp.org/quicklisp.lisp'
+          fi
 
       - name: Install quicklisp
-        if: steps.cache-quicklisp.outputs.cache-hit != 'true'
         run: |
-          if [ "${{ matrix.lisp }}" = "ccl" ]; then
-            ./ccl/lx86cl64 --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
-            ./ccl/lx86cl64 --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
-          elif [ "${{ matrix.lisp }}" = "sbcl" ]; then
-            sbcl --noinform --non-interactive --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\")"
-            sbcl --noinform --non-interactive --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file))'
+          if [ -f "$GITHUB_WORKSPACE/quicklisp/setup.lisp" ]; then
+            echo "Quicklisp already installed."
           else
-            ./abcl/abcl --batch --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
-            ./abcl/abcl --batch --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
+            if [ "${{ matrix.lisp }}" = "ccl" ]; then
+              ./ccl/lx86cl64 --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
+              ./ccl/lx86cl64 --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
+            elif [ "${{ matrix.lisp }}" = "sbcl" ]; then
+              sbcl --noinform --non-interactive --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\")"
+              sbcl --noinform --non-interactive --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file))'
+            else
+              ./abcl/abcl --batch --load quicklisp.lisp --eval "(quicklisp-quickstart:install :path \"$GITHUB_WORKSPACE/quicklisp/\") (quit)"
+              ./abcl/abcl --batch --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql-util:without-prompting (ql:add-to-init-file)) (quit)'
+            fi
           fi
 
       - name: Download repo
@@ -125,11 +130,11 @@ jobs:
         run: |
           export PATH="$PATH:$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc/"
           if [ "${{ matrix.lisp }}" = "ccl" ]; then
-            ./ccl/lx86cl64 --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
+            ./ccl/lx86cl64 --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
           elif [ "${{ matrix.lisp }}" = "sbcl" ]; then
-            sbcl --noinform --non-interactive --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
+            sbcl --noinform --non-interactive --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
           else
-            ./abcl/abcl --batch --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
+            ./abcl/abcl --batch --load "$GITHUB_WORKSPACE/quicklisp/setup.lisp" --eval '(ql:quickload :clunit2)' --eval '(ql:quickload :trivial-benchmark)' --eval '(ql:quickload :cl-base64)' --eval '(ql:quickload :local-time)' --eval '(ql:quickload :babel)' --eval '(setf clunit:*clunit-report-format* :tap)' --eval '(ql:quickload :cl-protobufs)' --eval '(asdf:test-system :cl-protobufs)' >> report
           fi
           test -f report
           cat report
