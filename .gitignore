@@ -1,5 +1,8 @@
 protoc/*.o
 protoc/*.cc
 protoc/*.h
-protoc/protoc-gen-lisp
+protoc/CMake*
+protoc/Makefile
+protoc/cmake_install.cmake
+protoc/protoc-gen-cl-pb
 protoc/protoc_middleman
