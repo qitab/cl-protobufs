@@ -257,7 +257,7 @@ caret string that visually marks the error position in the line."
           ;; If the next character is a quote character, that means
           ;; we should go parse another string and concatenate it
           (strcat result-string (parse-string stream))
-          result-string))))
+          (#+sbcl sb-int:possibly-base-stringize #-sbcl progn result-string)))))
 
 (defun unescape-char (stream)
   "Parse the next \"escaped\" character from the stream."
