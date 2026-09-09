@@ -1,10 +1,11 @@
 // Edition version of proto2 file
-edition = "2023";
+edition = "2026";
 
 package com.example;
 
 option features.field_presence = EXPLICIT;
 option features.repeated_field_encoding = PACKED;
+option features.default_symbol_visibility = EXPORT_ALL;
 
 message Food {
   string name = 1;
@@ -13,7 +14,6 @@ message Food {
 message Drink {
   string name = 1;
 }
-
 
 message Player {
   // fields have explicit presence, so no explicit setting needed
