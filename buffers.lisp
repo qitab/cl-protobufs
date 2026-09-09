@@ -85,7 +85,8 @@
   (backpatches (make-word-buffer 10))
   ;; When copying a fixed-size wire-level primitive that crosses a block boundary,
   ;; use the scratchpad first, then copy two subsequences of octets.
-  (scratchpad (make-array 8 :element-type '(unsigned-byte 8)))
+  (scratchpad (make-array 8 :element-type '(unsigned-byte 8)
+                            #+ubsan :initial-element #+ubsan 0))
   (n-gap-bytes 0 :type fixnum)
   (target nil) ; the destination of these octets, a STREAM typically
   ;; The BUFFER can also pretend to be stream by implementing CHAR-OUT
