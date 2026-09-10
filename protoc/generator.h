@@ -48,7 +48,7 @@ class LispGenerator : public compiler::CodeGenerator {
     return Edition::EDITION_PROTO2;
   }
 
-  Edition GetMaximumEdition() const override { return Edition::EDITION_2026; }
+  Edition GetMaximumEdition() const override { return Edition::EDITION_2024; }
 
  private:
   LispGenerator(const LispGenerator&) = delete;
