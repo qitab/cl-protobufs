@@ -6,6 +6,7 @@
 
 #include "enum.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 

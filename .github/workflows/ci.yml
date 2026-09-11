@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        lisp: [ sbcl, ccl, abcl ]
+        lisp: [ sbcl, ccl ]
 
     steps:
       - name: Update apt package list
@@ -82,15 +82,15 @@ jobs:
           path: |
             abseil-cpp
             protobuf
-          key: ${{ runner.os }}-cpp-deps-${{ github.sha }}
+          key: ${{ runner.os }}-cpp-deps-v36-absl20250512-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-cpp-deps-
+            ${{ runner.os }}-cpp-deps-v36-absl20250512-
 
       - name: Download and install Abseil
         run: |
           set -ex
           if [ ! -d "$GITHUB_WORKSPACE/abseil-cpp" ]; then
-            git clone --recursive -b lts_2024_07_22 https://github.com/abseil/abseil-cpp $GITHUB_WORKSPACE/abseil-cpp
+            git clone --recursive -b 20250512.1 https://github.com/abseil/abseil-cpp $GITHUB_WORKSPACE/abseil-cpp
           fi
           cd $GITHUB_WORKSPACE/abseil-cpp
           sudo cmake . -DCMAKE_CXX_STANDARD=17 -DABSL_ENABLE_INSTALL=ON
@@ -102,23 +102,24 @@ jobs:
         run: |
           set -ex
           if [ ! -d "protobuf" ]; then
-            git clone --recursive -b 32.x https://github.com/protocolbuffers/protobuf
+            git clone --recursive -b 36.x https://github.com/protocolbuffers/protobuf
           fi
-          cd protobuf/cmake
-          mkdir -p build
-          cd build
-          cmake -DCMAKE_CXX_STANDARD=17 -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_ABSL_PROVIDER=package -DCMAKE_INSTALL_PREFIX=/usr/local/ ../..
+          cd protobuf
+          mkdir -p build && cd build
+          cmake -DCMAKE_CXX_STANDARD=17 -Dprotobuf_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=/usr/local/ ..
           sudo make install -j$(nproc)
           sudo ldconfig
+          mkdir -p $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/google/protobuf
+          cp /usr/local/include/google/protobuf/*.proto $GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/google/protobuf/
 
       - name: Cache protoc plugin
         id: cache-protoc-plugin
         uses: actions/cache@v4
         with:
           path: quicklisp/local-projects/cl-protobufs/protoc
-          key: ${{ runner.os }}-protoc-plugin-${{ github.sha }}
+          key: ${{ runner.os }}-protoc-plugin-v36-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-protoc-plugin-
+            ${{ runner.os }}-protoc-plugin-v36-
 
       - name: Install protoc plug-in
         run: |
