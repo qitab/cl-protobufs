@@ -299,7 +299,9 @@ and functionality for working with them."
     :serial t
     :pathname ""
     :depends-on ("text-format-test")
-    :components ((:file "json-test")))
+    :components ((:protobuf-source-file "json-custom-enum"
+                  :proto-search-path ("../" "../google/protobuf/" "/usr/local/include/" "/usr/include/"))
+                 (:file "json-test")))
 
    (:module "zigzag-test"
     :serial t

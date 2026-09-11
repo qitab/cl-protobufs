@@ -32,6 +32,8 @@
    #:enum-keywords
    #:enum-int-to-keyword
    #:enum-keyword-to-int
+   #:enum-keyword-to-json
+   #:enum-json-to-keyword
 
    ;; Serialization to/from various formats
 
@@ -87,6 +89,9 @@
    #:enum-descriptor-class
    #:enum-descriptor-name
    #:enum-descriptor-values
+   #:enum-value-descriptor-name
+   #:enum-value-descriptor-value
+   #:enum-value-descriptor-json-name
 
    ;; The map-* versions are deprecated, to be removed in release 4.0.
    #:proto-key-type    #:map-key-type

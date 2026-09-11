@@ -6,14 +6,32 @@
 
 #include "enum.h"
 
+#include <optional>
+#include <string>
+
 #include <absl/strings/str_cat.h>
 #include "proto2-descriptor-extensions.pb.h"
+#include "literals.h"
 #include "names.h"
 #include <google/protobuf/io/printer.h>
+#include <google/protobuf/json_enumvalue_options.pb.h>
 
 namespace google {
 namespace protobuf {
 namespace cl_protobufs {
+
+namespace {
+
+std::optional<std::string> GetCustomJsonName(const EnumValueDescriptor* value) {
+  const auto& extension = value->options().GetExtension(pb::enumvalue::json);
+  if (!extension.has_string())
+    return std::nullopt;
+
+  std::string json_name(extension.string());
+  return json_name;
+}
+
+}  // namespace
 
 EnumGenerator::EnumGenerator(const EnumDescriptor* descriptor) :
     descriptor_(descriptor),
@@ -41,9 +59,17 @@ void EnumGenerator::Generate(io::Printer* printer) {
   printer->Outdent();
 
   for (int i = 0; i < descriptor_->value_count(); i++) {
-    printer->Print("\n(:$name$ :index $number$)", "name",
-                   ToLispEnumValue(descriptor_->value(i)->name()), "number",
-                   absl::StrCat(descriptor_->value(i)->number()));
+    const EnumValueDescriptor* val = descriptor_->value(i);
+    std::string json_name_str;
+    std::optional<std::string> custom_json = GetCustomJsonName(val);
+    if (custom_json.has_value()) {
+      json_name_str =
+          absl::StrCat(" :json-name ", LispEscapeString(*custom_json));
+    }
+    printer->Print("\n(:$name$ :index $number$$json-name$)", "name",
+                   ToLispEnumValue(val->name()), "number",
+                   absl::StrCat(val->number()), "json-name",
+                   json_name_str);
     printer->Annotate("name", descriptor_);
   }
   printer->Print(")");
@@ -52,9 +78,11 @@ void EnumGenerator::Generate(io::Printer* printer) {
 
 void EnumGenerator::AddExports(std::vector<std::string>* exports) {
   exports->push_back(lisp_name_);
-  // enum keyword to integer conversion functions.
+  // enum keyword to integer and JSON conversion functions.
   exports->push_back(lisp_name_ + "-keyword-to-int");
   exports->push_back(lisp_name_ + "-int-to-keyword");
+  exports->push_back(lisp_name_ + "-keyword-to-json");
+  exports->push_back(lisp_name_ + "-json-to-keyword");
 }
 
 }  // namespace cl_protobufs

@@ -1,0 +1,25 @@
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+edition = "2026";
+
+package test_custom_enum_proto;
+
+import "google/protobuf/json_options.proto";
+
+enum CustomJsonEnum {
+  CUSTOM_JSON_ENUM_UNSPECIFIED = 0;
+  CUSTOM_JSON_ENUM_ONE = 1 [(.pb.enumvalue.json).string = "custom_one"];
+  CUSTOM_JSON_ENUM_TWO = 2 [(.pb.enumvalue.json).string = "custom-two-name"];
+  CUSTOM_JSON_ENUM_ORIGINAL = 3;
+  CUSTOM_JSON_ENUM_EMPTY = 4 [(.pb.enumvalue.json).string = ""];
+  CUSTOM_JSON_ENUM_NUM = 5 [(.pb.enumvalue.json).string = "5"];
+}
+
+message CustomJsonMessage {
+  CustomJsonEnum enum_field = 1;
+  repeated CustomJsonEnum repeated_enum_field = 2;
+}

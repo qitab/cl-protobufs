@@ -233,8 +233,31 @@ enum-type name."
   (let ((conversion (get enum-type 'enum-int-to-keyword)))
     (funcall conversion keyword)))
 
-(defconstant +threshold-enum-mapping+ 10
-  "Threshold for using optimized enum mapping.")
+(defun enum-keyword-to-json (enum-type keyword)
+  "Converts an enum KEYWORD to its corresponding JSON string value (including quotes).
+ENUM-TYPE is the enum-type name."
+  (let ((conversion (get enum-type 'enum-keyword-to-json)))
+    (and conversion (values (funcall conversion keyword)))))
+
+(defun enum-json-to-keyword (enum-type name)
+  "Converts a JSON string NAME to its corresponding enum KEYWORD value.
+ENUM-TYPE is the enum-type name."
+  (let ((conversion (get enum-type 'enum-json-to-keyword)))
+    (if conversion
+        (values (funcall conversion name))
+        (let ((desc (find-enum-descriptor enum-type)))
+          (and desc
+               (let ((enum (or (find name (enum-descriptor-values desc)
+                                     :key #'enum-value-descriptor-json-name
+                                     :test #'(lambda (a b) (and (stringp b) (string= a b))))
+                               (find (keywordify name) (enum-descriptor-values desc)
+                                     :key #'enum-value-descriptor-name)
+                               (let ((val (parse-integer name :junk-allowed t)))
+                                 (and val
+                                      (= (length (format nil "~D" val)) (length name))
+                                      (find val (enum-descriptor-values desc)
+                                            :key #'enum-value-descriptor-value))))))
+                 (and enum (enum-value-descriptor-name enum))))))))
 
 (defun make-enum-conversion-forms (type open-type value-descriptors)
   "Generates forms for enum <-> integer conversion functions. TYPE is the enum
@@ -242,82 +265,74 @@ type name. OPEN-TYPE is a type including the possibility of unknown enum keyword
 as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
   (let* ((key2int (fintern "~A-KEYWORD-TO-INT" type))
          (int2key (fintern "~A-INT-TO-KEYWORD" type))
-         (values (sort (copy-seq value-descriptors) #'<
-                        :key #'enum-value-descriptor-value))
+         (key2json (fintern "~A-KEYWORD-TO-JSON" type))
+         (json2key (fintern "~A-JSON-TO-KEYWORD" type))
+         (json-to-enum (make-hash-table :test #'equal))
+         (values (stable-sort (copy-seq value-descriptors) #'<
+                              :key #'enum-value-descriptor-value))
          (min-value (enum-value-descriptor-value (first values)))
          (max-value (enum-value-descriptor-value (car (last values))))
          (range (- max-value min-value))
          (sequence-length (length values)))
+    (loop for desc in values do
+          (let* ((enum (enum-value-descriptor-name desc))
+                 (value (enum-value-descriptor-value desc))
+                 (proto-name (enum-name->proto enum))
+                 (custom-json (enum-value-descriptor-json-name desc)))
+            (setf (gethash proto-name json-to-enum) enum)
+            (when custom-json
+              (setf (gethash custom-json json-to-enum) enum))
+            (unless (gethash (format nil "~D" value) json-to-enum)
+              (setf (gethash (format nil "~D" value) json-to-enum) enum))))
     `(progn
-       ,(cond
-          ;; Use array for dense sequences
-          ((<= range (* sequence-length 2))
-           (let ((array (make-array (+ 1 range)))
-                 (enum-to-int (make-hash-table)))
-             (loop for desc in values do
-                   (let ((enum (enum-value-descriptor-name desc))
-                         (value (enum-value-descriptor-value desc)))
-                     (setf (aref array (- value min-value)) enum)
-                     (setf (gethash enum enum-to-int) value)))
-             `(progn
-                (defun ,key2int (enum)
-                  (declare (type ,open-type enum))
-                  (or (gethash enum ,enum-to-int)
-                      (parse-integer (subseq (symbol-name enum) +%undefined--length+)
-                                     :junk-allowed t)))
-                (defun ,int2key (numeral)
-                  (declare (type int32 numeral))
-                  (when (<= ,min-value numeral ,max-value)
-                  (values (aref ,array (- numeral ,min-value))))))))
-          ;; Use case for small but sparse sequences
-          ((< sequence-length +threshold-enum-mapping+)
-           `(progn
-              (defun ,key2int (enum)
-                (declare (type ,open-type enum))
-                (let ((int (case enum
-                             ,@(loop for desc in values
-                                     collect `(,(enum-value-descriptor-name desc)
-                                               ,(enum-value-descriptor-value desc)))
-                             (t (parse-integer (subseq (symbol-name enum)
-                                                       +%undefined--length+)
-                                               :junk-allowed t)))))
-                  int))
-              (defun ,int2key (numeral)
-                (declare (type int32 numeral))
-                (the (or null ,type)
-                     (let ((key (case numeral
-                                  ,@(loop with mapped = (make-hash-table)
-                                          for desc in values
-                                          for int = (enum-value-descriptor-value desc)
-                                          for already-set-p = (gethash int mapped)
-                                          do (setf (gethash int mapped) t)
-                                          unless already-set-p
-                                            collect
-                                            `(,int ,(enum-value-descriptor-name desc))))))
-                       key)))))
-          ;; Use hash table as fallback
-          (t
-           (let ((enum-to-int (make-hash-table))
-                 (int-to-enum (make-hash-table)))
-             (loop for desc in values do
-                   (let ((enum (enum-value-descriptor-name desc))
-                         (value (enum-value-descriptor-value desc)))
-                     (unless (gethash enum enum-to-int)
-                       (setf (gethash enum enum-to-int) value))
-                     (unless (gethash value int-to-enum)
-                       (setf (gethash value int-to-enum) enum))))
-             `(progn
-                (defun ,key2int (enum)
-                  (declare (type ,open-type enum))
-                  (or (gethash enum ,enum-to-int)
-                      (parse-integer (subseq (symbol-name enum) +%undefined--length+)
-                                     :junk-allowed t)))
-                (defun ,int2key (numeral)
-                  (declare (type int32 numeral))
-                  (the (or null ,type)
-                       (values (gethash numeral ,int-to-enum))))))))
+       (defun ,key2int (enum)
+         (declare (type ,open-type enum))
+         (case enum
+           ,@(loop for desc in values
+                   collect `(,(enum-value-descriptor-name desc)
+                             ,(enum-value-descriptor-value desc)))
+           (t (parse-integer (subseq (symbol-name enum)
+                                     +%undefined--length+)
+                             :junk-allowed t))))
+       ,(if (<= range (* sequence-length 2))
+            (let ((array (make-array (1+ range) :initial-element nil)))
+              (loop for desc in values
+                    for enum = (enum-value-descriptor-name desc)
+                    for value = (enum-value-descriptor-value desc)
+                    unless (aref array (- value min-value))
+                      do (setf (aref array (- value min-value)) enum))
+              `(defun ,int2key (numeral)
+                 (declare (type int32 numeral))
+                 (the (or null ,type)
+                      (when (<= ,min-value numeral ,max-value)
+                        (values (aref ,array (- numeral ,min-value)))))))
+            `(defun ,int2key (numeral)
+               (declare (type int32 numeral))
+               (the (or null ,type)
+                    (case numeral
+                      ,@(loop with mapped = (make-hash-table)
+                              for desc in values
+                              for int = (enum-value-descriptor-value desc)
+                              for already-set-p = (gethash int mapped)
+                              do (setf (gethash int mapped) t)
+                              unless already-set-p
+                                collect
+                                `(,int ,(enum-value-descriptor-name desc)))))))
+       (defun ,key2json (enum)
+         (declare (type ,open-type enum))
+         (case enum
+           ,@(loop for desc in values
+                   for enum = (enum-value-descriptor-name desc)
+                   for json-name = (or (enum-value-descriptor-json-name desc)
+                                       (enum-name->proto enum))
+                   collect `(,enum ,(format nil "\"~A\"" json-name)))))
+       (defun ,json2key (name)
+         (declare (type string name))
+         (values (gethash name ,json-to-enum)))
        (setf (get ',type 'enum-int-to-keyword) ',int2key)
-       (setf (get ',type 'enum-keyword-to-int) ',key2int))))
+       (setf (get ',type 'enum-keyword-to-int) ',key2int)
+       (setf (get ',type 'enum-keyword-to-json) ',key2json)
+       (setf (get ',type 'enum-json-to-keyword) ',json2key))))
 
 (defun enum-default-value (enum-type)
   "Get the default enum value for ENUM-TYPE, nil if none is found."
@@ -381,10 +396,13 @@ but we want an internal version for the case where we deserialized an unknown
                       (value-descriptors collect-value-descriptor))
       ;; The middle value is :index, useful for readability of generated code...
       ;; (Except that the value is not actually an index, nor is the slot called index anymore.)
-      (loop for (name nil value) in values do
-        (let* ((val-desc (make-enum-value-descriptor :value value :name name)))
-          (collect-name name)
-          (collect-value-descriptor val-desc)))
+      (loop for val in values do
+        (destructuring-bind (name index-kw value &key json-name) val
+          (declare (ignore index-kw))
+          (let* ((val-desc (make-enum-value-descriptor
+                            :value value :name name :json-name json-name)))
+            (collect-name name)
+            (collect-value-descriptor val-desc))))
       (let ((enum (make-enum-descriptor :class type
                                         :name name
                                         :values value-descriptors)))

@@ -263,7 +263,8 @@ message-descriptor.")
   ;; Note that the API uses "keyword-to-int" and "int-to-keyword".
   ;; Let's make this match that at some point.
   (name nil :type keyword)
-  (value nil :type sfixed32))
+  (value nil :type sfixed32)
+  (json-name nil :type (or null string)))
 
 (defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
   (make-load-form-saving-slots desc :environment environment))

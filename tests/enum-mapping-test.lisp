@@ -39,10 +39,24 @@ Parameters
   (assert-eql 3 (pb:my-message.my-enum-keyword-to-int :foo-bar))
   (assert-eql 42 (pb:my-message.my-enum-keyword-to-int :zaphod))
 
+  (assert-equal "\"FOO\"" (pb:my-message.my-enum-keyword-to-json :foo))
+  (assert-equal "\"BAR\"" (pb:my-message.my-enum-keyword-to-json :bar))
+  (assert-equal "\"BAZ\"" (pb:my-message.my-enum-keyword-to-json :baz))
+  (assert-equal "\"FOO_BAR\"" (pb:my-message.my-enum-keyword-to-json :foo-bar))
+  (assert-equal "\"ZAPHOD\"" (pb:my-message.my-enum-keyword-to-json :zaphod))
+
   (assert-true (eq :foo (pb:my-message.my-enum-int-to-keyword 1)))
   ;; There are two enum values with the value 2; BAR and BAZ.  The first value is returned.
   (assert-true (eq :bar (pb:my-message.my-enum-int-to-keyword 2)))
   (assert-true (eq :zaphod (pb:my-message.my-enum-int-to-keyword 42)))
+
+  (assert-equal :foo (pb:my-message.my-enum-json-to-keyword "FOO"))
+  (assert-equal :bar (pb:my-message.my-enum-json-to-keyword "BAR"))
+  (assert-equal :baz (pb:my-message.my-enum-json-to-keyword "BAZ"))
+  (assert-equal :foo-bar (pb:my-message.my-enum-json-to-keyword "FOO_BAR"))
+  (assert-equal :zaphod (pb:my-message.my-enum-json-to-keyword "ZAPHOD"))
+  (assert-equal :foo (pb:my-message.my-enum-json-to-keyword "1"))
+  (assert-equal :zaphod (pb:my-message.my-enum-json-to-keyword "42"))
 
   ;; constants
   (assert-eql 1 pb:+my-message.foo+)
@@ -62,10 +76,22 @@ Parameters
   (assert-eql 12 (pb:outer-enum-keyword-to-int :baz))
   (assert-eql 142 (pb:outer-enum-keyword-to-int :zaphod))
 
+  (assert-equal "\"FOO\"" (pb:outer-enum-keyword-to-json :foo))
+  (assert-equal "\"BAR\"" (pb:outer-enum-keyword-to-json :bar))
+  (assert-equal "\"BAZ\"" (pb:outer-enum-keyword-to-json :baz))
+  (assert-equal "\"ZAPHOD\"" (pb:outer-enum-keyword-to-json :zaphod))
+
   (assert-eq :foo (pb:outer-enum-int-to-keyword 11))
   ;; There are two enum values with the value 2; BAR and BAZ.  The first value is returned.
   (assert-eq :bar (pb:outer-enum-int-to-keyword 12))
   (assert-eq :zaphod (pb:outer-enum-int-to-keyword 142))
+
+  (assert-equal :foo (pb:outer-enum-json-to-keyword "FOO"))
+  (assert-equal :bar (pb:outer-enum-json-to-keyword "BAR"))
+  (assert-equal :baz (pb:outer-enum-json-to-keyword "BAZ"))
+  (assert-equal :zaphod (pb:outer-enum-json-to-keyword "ZAPHOD"))
+  (assert-equal :foo (pb:outer-enum-json-to-keyword "11"))
+  (assert-equal :zaphod (pb:outer-enum-json-to-keyword "142"))
 
   ;; constants
   (assert-eql 11 pb:+foo+)
@@ -98,6 +124,18 @@ Parameters
   (assert-eql 2 (proto:enum-keyword-to-int 'pb:my-message.my-enum :bar))
   (assert-eql 2 (proto:enum-keyword-to-int 'pb:my-message.my-enum :baz))
   (assert-eql 42 (proto:enum-keyword-to-int 'pb:my-message.my-enum :zaphod))
+
+  (assert-equal "\"FOO\"" (proto:enum-keyword-to-json 'pb:my-message.my-enum :foo))
+  (assert-equal "\"BAR\"" (proto:enum-keyword-to-json 'pb:my-message.my-enum :bar))
+  (assert-equal "\"BAZ\"" (proto:enum-keyword-to-json 'pb:my-message.my-enum :baz))
+  (assert-equal "\"ZAPHOD\"" (proto:enum-keyword-to-json 'pb:my-message.my-enum :zaphod))
+
+  (assert-equal :foo (proto:enum-json-to-keyword 'pb:my-message.my-enum "FOO"))
+  (assert-equal :bar (proto:enum-json-to-keyword 'pb:my-message.my-enum "BAR"))
+  (assert-equal :baz (proto:enum-json-to-keyword 'pb:my-message.my-enum "BAZ"))
+  (assert-equal :zaphod (proto:enum-json-to-keyword 'pb:my-message.my-enum "ZAPHOD"))
+  (assert-equal :foo (proto:enum-json-to-keyword 'pb:my-message.my-enum "1"))
+  (assert-equal :zaphod (proto:enum-json-to-keyword 'pb:my-message.my-enum "42"))
 
   (assert-eql 1 (proto:enum-keyword-to-int 'pb:my-message.my-enum :foo))
   (assert-eql 2 (proto:enum-keyword-to-int 'pb:my-message.my-enum :bar))
@@ -165,15 +203,47 @@ Parameters
   (assert-equal 13 (pb:large-dense-enum-keyword-to-int :n14))
   (assert-equal 14 (pb:large-dense-enum-keyword-to-int :o15))
 
+  (assert-eq :b2 (pb:large-dense-enum-int-to-keyword 1))
+  (assert-eq :n14 (pb:large-dense-enum-int-to-keyword 13))
+  (assert-eq :o15 (pb:large-dense-enum-int-to-keyword 14))
+
+  (assert-equal "\"B2\"" (pb:large-dense-enum-keyword-to-json :b2))
+  (assert-equal "\"N14\"" (pb:large-dense-enum-keyword-to-json :n14))
+  (assert-equal "\"O15\"" (pb:large-dense-enum-keyword-to-json :o15))
+
   (assert-equal 20000 (pb:large-sparse-enum-keyword-to-int :p16))
   (assert-equal 250000 (pb:large-sparse-enum-keyword-to-int :v22))
-  (assert-equal 1280000 (pb:large-sparse-enum-keyword-to-int :y25)))
+  (assert-equal 1280000 (pb:large-sparse-enum-keyword-to-int :y25))
+
+  (assert-eq :p16 (pb:large-sparse-enum-int-to-keyword 20000))
+  (assert-eq :v22 (pb:large-sparse-enum-int-to-keyword 250000))
+  (assert-eq :y25 (pb:large-sparse-enum-int-to-keyword 1280000))
+
+  (assert-equal "\"P16\"" (pb:large-sparse-enum-keyword-to-json :p16))
+  (assert-equal "\"V22\"" (pb:large-sparse-enum-keyword-to-json :v22))
+  (assert-equal "\"Y25\"" (pb:large-sparse-enum-keyword-to-json :y25)))
 
 (deftest small-enum-mapping-test-2 (enum-mapping-suite)
   (assert-equal 1 (pb:small-dense-enum-keyword-to-int :bb2))
   (assert-equal 7 (pb:small-dense-enum-keyword-to-int :hh8))
   (assert-equal 8 (pb:small-dense-enum-keyword-to-int :ii9))
 
+  (assert-eq :bb2 (pb:small-dense-enum-int-to-keyword 1))
+  (assert-eq :hh8 (pb:small-dense-enum-int-to-keyword 7))
+  (assert-eq :ii9 (pb:small-dense-enum-int-to-keyword 8))
+
+  (assert-equal "\"BB2\"" (pb:small-dense-enum-keyword-to-json :bb2))
+  (assert-equal "\"HH8\"" (pb:small-dense-enum-keyword-to-json :hh8))
+  (assert-equal "\"II9\"" (pb:small-dense-enum-keyword-to-json :ii9))
+
   (assert-equal 200000 (pb:small-sparse-enum-keyword-to-int :pp16))
   (assert-equal 2500000 (pb:small-sparse-enum-keyword-to-int :vv22))
-  (assert-equal 12800000 (pb:small-sparse-enum-keyword-to-int :yy25)))
+  (assert-equal 12800000 (pb:small-sparse-enum-keyword-to-int :yy25))
+
+  (assert-eq :pp16 (pb:small-sparse-enum-int-to-keyword 200000))
+  (assert-eq :vv22 (pb:small-sparse-enum-int-to-keyword 2500000))
+  (assert-eq :yy25 (pb:small-sparse-enum-int-to-keyword 12800000))
+
+  (assert-equal "\"PP16\"" (pb:small-sparse-enum-keyword-to-json :pp16))
+  (assert-equal "\"VV22\"" (pb:small-sparse-enum-keyword-to-json :vv22))
+  (assert-equal "\"YY25\"" (pb:small-sparse-enum-keyword-to-json :yy25)))

@@ -175,11 +175,23 @@ Parameters:
   "Print an enum VALUE of type TYPE to STREAM. If NUMERIC-ENUMS-P, then print the enums value
 rather than its name."
   (when (eql type 'google:null-value)
-    (format stream "null")
+    (write-string "null" stream)
     (return-from print-enum-to-json))
   (if numeric-enums-p
       (format stream "~D" (enum-keyword-to-int type value))
-      (format stream "\"~A\"" (pi::enum-name->proto value))))
+      (let ((json-str (enum-keyword-to-json type value)))
+        (if json-str
+            (write-string json-str stream)
+            (let ((int-val (or (and (integerp value) value)
+                               (enum-keyword-to-int type value)
+                               (and (symbolp value)
+                                    (let* ((name (symbol-name value))
+                                           (dash (position #\- name :from-end t)))
+                                      (and dash (parse-integer (subseq name (1+ dash))
+                                                               :junk-allowed t)))))))
+              (if int-val
+                  (format stream "~D" int-val)
+                  (format stream "\"~A\"" (pi::enum-name->proto value))))))))
 
 (defun print-map-to-json (value map-descriptor indent stream camel-case-p numeric-enums-p)
   "Print a map type to JSON.
@@ -340,17 +352,13 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
                (if (string= name "null")
                    (return-from parse-value-from-json :null-value)
                    (protobuf-error
-                    "~S is not a valid keyword for well-known enum NullValue" name)))
-             (let ((enum (if (eql type-parsed 'symbol)
-                             ;; If the parsed type is a symbol, then the enum was printed
-                             ;; as an integer. Otherwise, it is a string which names a
-                             ;; keyword.
-                             (find (parse-integer name) (pi::enum-descriptor-values desc)
-                                   :key #'pi::enum-value-descriptor-value)
-                             (find (pi::keywordify name)
-                                   (pi::enum-descriptor-values desc)
-                                   :key #'pi::enum-value-descriptor-name))))
-               (and enum (pi::enum-value-descriptor-name enum)))))
+                     "~S is not a valid keyword for well-known enum NullValue" name)))
+             (if (eql type-parsed 'symbol)
+                 ;; If the parsed type is a symbol, then the enum was printed as an integer.
+                 (let ((val (parse-integer name :junk-allowed t)))
+                   (and val (enum-int-to-keyword type val)))
+                 ;; Otherwise, it is a string which names a keyword, custom json-name, or integer.
+                 (enum-json-to-keyword type name))))
           ;; In the case of maps, return a list of key-value pairs.
           ((typep desc 'pi::map-descriptor)
            (pi::expect-char stream #\{)

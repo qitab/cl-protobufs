@@ -7,7 +7,8 @@
 (defpackage #:cl-protobufs.test.json
   (:use #:cl
         #:clunit)
-  (:local-nicknames (#:google #:cl-protobufs.google.protobuf)
+  (:local-nicknames (#:custom-pb #:cl-protobufs.test-custom-enum-proto)
+                    (#:google #:cl-protobufs.google.protobuf)
                     (#:pb #:cl-protobufs.test-proto)
                     (#:wkt #:cl-protobufs.well-known-types)
                     (#:proto #:cl-protobufs))
@@ -306,3 +307,163 @@ the result is PROTO-EQUAL with MSG."
                      text-msg-pretty (format nil "~@/cl-protobufs.json:fmt/" msg))
     (assert-equality #'string=
                      text-msg-not (format nil "~/cl-protobufs.json:fmt/" msg))))
+
+(deftest test-custom-enum-json-descriptors (json-suite)
+  (let* ((desc (proto:find-enum-descriptor 'custom-pb:custom-json-enum))
+         (vals (proto:enum-descriptor-values desc))
+         (val-unspecified (find :custom-json-enum-unspecified vals
+                                :key #'proto:enum-value-descriptor-name))
+         (val-one (find :custom-json-enum-one vals
+                        :key #'proto:enum-value-descriptor-name))
+         (val-two (find :custom-json-enum-two vals
+                        :key #'proto:enum-value-descriptor-name))
+         (val-original (find :custom-json-enum-original vals
+                             :key #'proto:enum-value-descriptor-name))
+         (val-empty (find :custom-json-enum-empty vals
+                          :key #'proto:enum-value-descriptor-name))
+         (val-num (find :custom-json-enum-num vals
+                        :key #'proto:enum-value-descriptor-name)))
+    (assert-true desc)
+    (assert-equal nil (proto:enum-value-descriptor-json-name val-unspecified))
+    (assert-equal "custom_one" (proto:enum-value-descriptor-json-name val-one))
+    (assert-equal "custom-two-name" (proto:enum-value-descriptor-json-name val-two))
+    (assert-equal nil (proto:enum-value-descriptor-json-name val-original))
+    (assert-equal "" (proto:enum-value-descriptor-json-name val-empty))
+    (assert-equal "5" (proto:enum-value-descriptor-json-name val-num))
+    ;; Test enum-keyword-to-json
+    (assert-equal "\"custom_one\""
+                  (proto:enum-keyword-to-json 'custom-pb:custom-json-enum :custom-json-enum-one))
+    (assert-equal "\"custom-two-name\""
+                  (proto:enum-keyword-to-json 'custom-pb:custom-json-enum :custom-json-enum-two))
+    (assert-equal "\"CUSTOM_JSON_ENUM_ORIGINAL\""
+                  (proto:enum-keyword-to-json 'custom-pb:custom-json-enum :custom-json-enum-original))
+    (assert-equal "\"\""
+                  (proto:enum-keyword-to-json 'custom-pb:custom-json-enum :custom-json-enum-empty))
+    (assert-equal "\"5\""
+                  (proto:enum-keyword-to-json 'custom-pb:custom-json-enum :custom-json-enum-num))
+    (assert-equal "\"custom_one\""
+                  (custom-pb:custom-json-enum-keyword-to-json :custom-json-enum-one))
+    ;; Test enum-json-to-keyword
+    (assert-equal :custom-json-enum-one
+                  (proto:enum-json-to-keyword 'custom-pb:custom-json-enum "custom_one"))
+    (assert-equal :custom-json-enum-two
+                  (proto:enum-json-to-keyword 'custom-pb:custom-json-enum "custom-two-name"))
+    (assert-equal :custom-json-enum-original
+                  (proto:enum-json-to-keyword 'custom-pb:custom-json-enum "CUSTOM_JSON_ENUM_ORIGINAL"))
+    (assert-equal :custom-json-enum-one
+                  (proto:enum-json-to-keyword 'custom-pb:custom-json-enum "CUSTOM_JSON_ENUM_ONE"))
+    (assert-equal :custom-json-enum-one
+                  (proto:enum-json-to-keyword 'custom-pb:custom-json-enum "1"))
+    (assert-equal :custom-json-enum-empty
+                  (proto:enum-json-to-keyword 'custom-pb:custom-json-enum ""))
+    (assert-equal :custom-json-enum-num
+                  (proto:enum-json-to-keyword 'custom-pb:custom-json-enum "5"))
+    (assert-equal :custom-json-enum-one
+                  (custom-pb:custom-json-enum-json-to-keyword "custom_one"))
+    (assert-equal :custom-json-enum-two
+                  (custom-pb:custom-json-enum-json-to-keyword "custom-two-name"))
+    (assert-equal :custom-json-enum-one
+                  (custom-pb:custom-json-enum-json-to-keyword "1"))))
+
+(deftest test-custom-enum-json-serialization (json-suite)
+  (flet ((to-json (msg &key numeric-enums-p)
+           (with-output-to-string (s)
+             (proto:print-json msg :stream s :pretty-print-p nil
+                                   :numeric-enums-p numeric-enums-p))))
+    ;; Custom json name is serialized
+    (let ((msg (custom-pb:make-custom-json-message :enum-field :custom-json-enum-one)))
+      (assert-equality #'string=
+                       "{\"enumField\":\"custom_one\"}"
+                       (to-json msg)))
+    ;; Another custom json name
+    (let ((msg (custom-pb:make-custom-json-message :enum-field :custom-json-enum-two)))
+      (assert-equality #'string=
+                       "{\"enumField\":\"custom-two-name\"}"
+                       (to-json msg)))
+    ;; Fall back to proto enum name when no custom json name
+    (let ((msg (custom-pb:make-custom-json-message :enum-field :custom-json-enum-original)))
+      (assert-equality #'string=
+                       "{\"enumField\":\"CUSTOM_JSON_ENUM_ORIGINAL\"}"
+                       (to-json msg)))
+    ;; Empty string custom json name
+    (let ((msg (custom-pb:make-custom-json-message :enum-field :custom-json-enum-empty)))
+      (assert-equality #'string=
+                       "{\"enumField\":\"\"}"
+                       (to-json msg)))
+    ;; Numeric string custom json name
+    (let ((msg (custom-pb:make-custom-json-message :enum-field :custom-json-enum-num)))
+      (assert-equality #'string=
+                       "{\"enumField\":\"5\"}"
+                       (to-json msg)))
+    ;; numeric-enums-p should emit the integer number
+    (let ((msg (custom-pb:make-custom-json-message :enum-field :custom-json-enum-one)))
+      (assert-equality #'string=
+                       "{\"enumField\":1}"
+                       (to-json msg :numeric-enums-p t)))
+    ;; Unrecognized enum values should serialize to an unquoted integer literal
+    (let ((msg (custom-pb:make-custom-json-message :enum-field :%undefined-42)))
+      (assert-equality #'string=
+                       "{\"enumField\":42}"
+                       (to-json msg)))
+    (let ((msg (custom-pb:make-custom-json-message :enum-field :%undefined-42)))
+      (assert-equality #'string=
+                       "{\"enumField\":42}"
+                       (to-json msg :numeric-enums-p t)))))
+
+(deftest test-custom-enum-json-deserialization (json-suite)
+  (flet ((from-json (str)
+           (with-input-from-string (s str)
+             (proto:parse-json 'custom-pb:custom-json-message :stream s))))
+    ;; Parsing by custom JSON name
+    (let ((msg (from-json "{\"enumField\": \"custom_one\"}")))
+      (assert-equal :custom-json-enum-one (custom-pb:enum-field msg)))
+    (let ((msg (from-json "{\"enumField\": \"custom-two-name\"}")))
+      (assert-equal :custom-json-enum-two (custom-pb:enum-field msg)))
+    ;; Parsing by original proto enum name (even when custom name is specified)
+    (let ((msg (from-json "{\"enumField\": \"CUSTOM_JSON_ENUM_ONE\"}")))
+      (assert-equal :custom-json-enum-one (custom-pb:enum-field msg)))
+    (let ((msg (from-json "{\"enumField\": \"CUSTOM_JSON_ENUM_TWO\"}")))
+      (assert-equal :custom-json-enum-two (custom-pb:enum-field msg)))
+    (let ((msg (from-json "{\"enumField\": \"CUSTOM_JSON_ENUM_ORIGINAL\"}")))
+      (assert-equal :custom-json-enum-original (custom-pb:enum-field msg)))
+    ;; Parsing by numeric integer (unquoted)
+    (let ((msg (from-json "{\"enumField\": 1}")))
+      (assert-equal :custom-json-enum-one (custom-pb:enum-field msg)))
+    (let ((msg (from-json "{\"enumField\": 2}")))
+      (assert-equal :custom-json-enum-two (custom-pb:enum-field msg)))
+    (let ((msg (from-json "{\"enumField\": 3}")))
+      (assert-equal :custom-json-enum-original (custom-pb:enum-field msg)))
+    ;; Parsing by numeric string
+    (let ((msg (from-json "{\"enumField\": \"1\"}")))
+      (assert-equal :custom-json-enum-one (custom-pb:enum-field msg)))
+    ;; Empty string custom JSON name
+    (let ((msg (from-json "{\"enumField\": \"\"}")))
+      (assert-equal :custom-json-enum-empty (custom-pb:enum-field msg)))
+    (let ((msg (from-json "{\"enumField\": \"CUSTOM_JSON_ENUM_EMPTY\"}")))
+      (assert-equal :custom-json-enum-empty (custom-pb:enum-field msg)))
+    ;; Numeric custom JSON name
+    (let ((msg (from-json "{\"enumField\": \"5\"}")))
+      (assert-equal :custom-json-enum-num (custom-pb:enum-field msg)))
+    (let ((msg (from-json "{\"enumField\": 5}")))
+      (assert-equal :custom-json-enum-num (custom-pb:enum-field msg)))
+    ;; Repeated field with mix of representations
+    (let ((msg (from-json "{\"repeatedEnumField\": [\"custom_one\", \"CUSTOM_JSON_ENUM_ONE\", 1, \"1\"]}")))
+      (assert-equal (list :custom-json-enum-one :custom-json-enum-one
+                          :custom-json-enum-one :custom-json-enum-one)
+                    (custom-pb:repeated-enum-field msg)))))
+
+(deftest test-custom-enum-json-roundtrip (json-suite)
+  (let* ((orig (custom-pb:make-custom-json-message
+                :enum-field :custom-json-enum-two
+                :repeated-enum-field (list :custom-json-enum-unspecified
+                                           :custom-json-enum-one
+                                           :custom-json-enum-two
+                                           :custom-json-enum-original
+                                           :custom-json-enum-empty
+                                           :custom-json-enum-num)))
+         (json-str (with-output-to-string (s)
+                     (proto:print-json orig :stream s :pretty-print-p nil)))
+         (parsed (with-input-from-string (s json-str)
+                   (proto:parse-json 'custom-pb:custom-json-message :stream s))))
+    (assert-equal (custom-pb:enum-field orig) (custom-pb:enum-field parsed))
+    (assert-equal (custom-pb:repeated-enum-field orig) (custom-pb:repeated-enum-field parsed))))

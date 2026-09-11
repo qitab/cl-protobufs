@@ -104,9 +104,10 @@ to PARENT-PATH."
   "Resolves the search path of PROTOBUF-SOURCE-FILE."
   (let ((search-path (search-path protobuf-source-file)))
     (let ((parent-path (component-pathname (component-parent protobuf-source-file))))
-      (mapcar (lambda (path)
-                (resolve-relative-pathname path parent-path))
-              search-path))))
+      (remove-if-not #'uiop:directory-exists-p
+                     (mapcar (lambda (path)
+                               (resolve-relative-pathname path parent-path))
+                             search-path)))))
 
 (defun get-search-paths (protobuf-source-file)
   "For a given PROTOBUF-SOURCE-FILE, generate the search paths that should be used.

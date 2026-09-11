@@ -55,7 +55,7 @@ const std::string LispEscapeString(std::string_view str) {
   std::string lisp;
   lisp.append(1, '"');
   for (char c : str) {
-    if (c == '"') lisp.append(1, '\\');
+    if (c == '"' || c == '\\') lisp.append(1, '\\');
     lisp.append(1, c);
   }
   lisp.append(1, '"');

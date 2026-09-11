@@ -53,6 +53,7 @@ cc_library(
         "//:proto2_descriptor_extensions_cc_proto",
         "@com_google_protobuf//:protobuf",
         "@com_google_protobuf//:protobuf",
+        "//third_party/protobuf:json_enumvalue_options_cc_proto",
         "@com_google_protobuf//:protobuf_lite",
         "@com_google_protobuf//:protoc_lib",
         "@com_google_protobuf//:protobuf",
