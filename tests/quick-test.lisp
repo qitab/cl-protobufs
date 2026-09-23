@@ -151,8 +151,7 @@ Parameters
                    (incf n)
                    (when (= n howmany)
                      (return (mapcar (lambda (x)
-                                       (make-instance
-                                        'pi::field-descriptor
+                                       (pi:make-field-descriptor
                                         :index x
                                         :class 'int32
                                         :internal-field-name 'foo
@@ -187,7 +186,7 @@ Parameters
 (defun mapify (list)
   (pi::make-field-map
    (mapcar (lambda (x)
-             (make-instance 'pi::field-descriptor
+             (pi:make-field-descriptor
                             :index (first x)
                             :class 'boolean
                             :internal-field-name (second x)

@@ -51,35 +51,70 @@ Parameters:
 
 ;;; Descriptor classes -- These classes taken together represent the contents of a .proto file.
 
-(defclass abstract-descriptor () ()
-  (:documentation
-   "Base class of all protobuf descriptor classes, which describe the contents of .proto files."))
+(defstruct (abstract-descriptor (:constructor nil))
+  "Base struct of all protobuf descriptor structs, which describe the contents of .proto files.")
+
+(defstruct enum-value-descriptor
+  "The model class that represents a protobuf enum key/value pair."
+  ;; The keyword symbol corresponding to the enum value key.
+  ;; Note that the API uses "keyword-to-int" and "int-to-keyword".
+  ;; Let's make this match that at some point.
+  (name nil :type keyword)
+  (value nil :type sfixed32)
+  (json-name nil :type (or null string)))
+
+(defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
+  (make-load-form-saving-slots desc :environment environment))
+
+(declaim (inline proto-type proto-index))
 
 
 ;; It would be nice if most of the slots had only reader functions, but
 ;; that makes writing the protobuf parser a good deal more complicated.
-(defclass descriptor (abstract-descriptor)
+(defstruct (descriptor
+             (:include abstract-descriptor)
+             (:constructor nil)
+             (:conc-name proto-))
+  "Shared attributes for protobuf descriptors."
   ;; The Lisp name for the type of this object.
-  ((class :type symbol
-          :accessor proto-class
-          :initarg :class
-          :initform nil)
-   ;; The (unqualified) protobuf name for this enum, message, etc
-   (name :type (or null string)
-         :reader proto-name
-         :initarg :name
-         :initform nil)
-   ;; The fully qualified name, e.g., "proto2.MessageSet"
-   (qual-name :type string
-              :accessor proto-qualified-name
-              :initarg :qualified-name
-              :initform "")
-   (options :type (list-of option-descriptor)
-            :accessor proto-options
-            :initarg :options
-            :initform ()))
-  (:documentation
-   "Shared attributes for protobuf message descriptors."))
+  (class nil :type symbol)
+  ;; The (unqualified) protobuf name for this enum, message, etc
+  (name nil :type (or null string))
+  ;; The fully qualified name, e.g., "proto2.MessageSet"
+  (qualified-name "" :type string)
+  (options () :type list))
+
+(defun-inline proto-qual-name (desc)
+  "Return the qualified name for DESC."
+  (proto-qualified-name desc))
+
+(defsetf proto-qual-name (desc) (val)
+  `(setf (proto-qualified-name ,desc) ,val))
+
+(defstruct (enum-descriptor
+             (:include descriptor)
+             (:constructor make-enum-descriptor)
+             (:conc-name enum-descriptor-))
+  "Describes a protobuf enum."
+  ;; The name and integer value of each enum element.
+  (values nil :type (list-of enum-value-descriptor)))
+
+
+(defmethod make-load-form ((e enum-descriptor) &optional environment)
+  (make-load-form-saving-slots e :environment environment))
+
+(defvar *enum-descriptors* (make-hash-table :test 'eq)
+  "Maps enum names (symbols) to enum-descriptor instances.")
+
+(defun-inline find-enum-descriptor (type)
+  "Return a enum-descriptor instance named by TYPE (a symbol)."
+  (gethash type *enum-descriptors*))
+
+(defun enum-keywords (enum-type)
+  "Returns all keywords that belong to the given ENUM-TYPE."
+  (let ((expansion (type-expand enum-type)))
+    (check-type expansion (cons (eql member) list))
+    (rest expansion)))
 
 (defun find-qualified-name (name protos
                             &key (proto-key #'proto-name) (full-key #'proto-qualified-name)
@@ -92,26 +127,50 @@ Parameters:
       (find name protos :key full-key  :test #'string=)))
 
 
-(defclass file-descriptor (descriptor)
-  ((syntax :type (member :proto2 :proto3 :editions)
-           :accessor proto-syntax
-           :initarg :syntax)
-   (edition :type (or null string)
-            :accessor proto-edition
-            :initarg :edition)
-   (package :type (or null string)
-            :accessor proto-package-name
-            :initarg :package
-            :initform nil)
-   (imports :type (list-of string)      ; the names of schemas to be imported
-            :accessor proto-imports
-            :initarg :imports
-            :initform ()))
-  (:documentation
-   "Model class to describe a protobuf file, sometimes referred to as a schema."))
+(defstruct (file-descriptor
+             (:include descriptor)
+             (:constructor %make-file-descriptor)
+             (:conc-name proto-))
+  "Model struct to describe a protobuf file, sometimes referred to as a schema."
+  (syntax :proto2 :type (member :proto2 :proto3 :editions))
+  (edition nil :type (or null string))
+  (package-name nil :type (or null string))
+  (imports () :type (list-of string)))
+
+(defun-inline proto-package (desc)
+  (proto-package-name desc))
+
+(defsetf proto-package (desc) (val)
+  `(setf (proto-package-name ,desc) ,val))
+
+(defun make-file-descriptor (&key class name qualified-name options
+                                  (syntax :proto2) edition
+                                  (package nil package-p) package-name
+                                  imports
+                                  &allow-other-keys)
+  "Create a new file-descriptor.
+Parameters:
+  CLASS: The symbol class.
+  NAME: File name.
+  QUALIFIED-NAME: Qualified name.
+  OPTIONS: File options.
+  SYNTAX: Syntax version (:proto2 or :proto3).
+  EDITION: Protobuf edition.
+  PACKAGE: Package symbol/name.
+  PACKAGE-NAME: Package name string.
+  IMPORTS: Imported files."
+  (%make-file-descriptor
+   :class class
+   :name name
+   :qualified-name (or qualified-name "")
+   :options (or options ())
+   :syntax (or syntax :proto2)
+   :edition edition
+   :package-name (if package-p package package-name)
+   :imports (or imports ())))
 
 (defmethod make-load-form ((file-desc file-descriptor) &optional environment)
-  (with-slots (class) file-desc
+  (let ((class (proto-class file-desc)))
     (multiple-value-bind (constructor initializer)
         (make-load-form-saving-slots file-desc :environment environment)
       (values `(or (gethash ',class *file-descriptors*) ,constructor)
@@ -183,32 +242,27 @@ message-descriptor.")
   "Return a map-descriptor instance named by TYPE (a symbol)."
   (gethash type *map-descriptors*))
 
-(defvar *enum-descriptors* (make-hash-table :test 'eq)
-  "Maps enum names (symbols) to enum-descriptor instances.")
-
-(defun-inline find-enum-descriptor (type)
-  "Return a enum-descriptor instance named by TYPE (a symbol)."
-  (gethash type *enum-descriptors*))
 
 
 ;; We accept and store any option, but only act on a few: default, packed,
 ;; optimize_for, lisp_name, lisp_alias
-(defclass option-descriptor (abstract-descriptor)
-  ;; The name of the option, for example "lisp_name".
-  ((name :type string
-         :reader proto-name
-         :initarg :name)
-   ;; The (untyped) value
-   (value :accessor proto-value
-          :initarg :value
-          :initform nil)
-   ;; Optional Lisp type, one of string, integer, float, symbol (for now).
-   (type :type (or null symbol)
-         :reader proto-type
-         :initarg :type
-         :initform 'string))
-  (:documentation
-   "Model class to describe a protobuf option, i.e., a key/value pair."))
+(defstruct (option-descriptor
+             (:include descriptor)
+             (:constructor %make-option-descriptor)
+             (:conc-name proto-))
+  "Model struct to describe a protobuf option, i.e., a key/value pair."
+  ;; The (untyped) value
+  (value nil)
+  ;; Optional Lisp type, one of string, integer, float, symbol (for now).
+  (option-type 'string :type (or null symbol)))
+
+(defun make-option-descriptor (&key (name "") value (type 'string) &allow-other-keys)
+  "Create a new option-descriptor.
+Parameters:
+  NAME: Option name.
+  VALUE: Option value.
+  TYPE: Option type."
+  (%make-option-descriptor :name name :value value :option-type type))
 
 (defmethod make-load-form ((o option-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
@@ -221,8 +275,8 @@ message-descriptor.")
 
 (defun make-option (name value &optional (type 'string))
   (check-type name string)
-  (make-instance 'option-descriptor
-                 :name name :value value :type type))
+  (%make-option-descriptor
+   :name name :value value :option-type type))
 
 (defun find-option (desc name)
   "Given a protobuf descriptor DESC and the NAME of an option, returns the
@@ -230,7 +284,7 @@ message-descriptor.")
   (declare (type descriptor desc) (type string name))
   (let ((option (find name (proto-options desc) :key #'proto-name :test #'option-name=)))
     (when option
-      (values (proto-value option) (proto-type option)))))
+      (values (proto-value option) (proto-option-type option)))))
 
 (defgeneric remove-options (descriptor &rest names)
   (:documentation
@@ -259,104 +313,86 @@ message-descriptor.")
          (end2   (if (eql (char name2 0) #\() (- (length name2) 1) (length name2))))
     (string= name1 name2 :start1 start1 :end1 end1 :start2 start2 :end2 end2)))
 
-(defstruct enum-descriptor
-  "Describes a protobuf enum."
-  ;; The symbol naming the Lisp type for this enum.
-  (class nil :type symbol)
-  ;; The string naming the protobuf type for this enum.
-  (name nil :type string)
-  ;; The name and integer value of each enum element.
-  (values nil :type (list-of enum-value-descriptor)))
-
-(defmethod make-load-form ((e enum-descriptor) &optional environment)
-  (make-load-form-saving-slots e :environment environment))
-
-(defstruct enum-value-descriptor
-  "The model class that represents a protobuf enum key/value pair."
-  ;; The keyword symbol corresponding to the enum value key.
-  ;; Note that the API uses "keyword-to-int" and "int-to-keyword".
-  ;; Let's make this match that at some point.
-  (name nil :type keyword)
-  (value nil :type sfixed32)
-  (json-name nil :type (or null string)))
-
-(defmethod make-load-form ((desc enum-value-descriptor) &optional environment)
-  (make-load-form-saving-slots desc :environment environment))
-
-(defun enum-keywords (enum-type)
-  "Returns all keywords that belong to the given ENUM-TYPE."
-  (let ((expansion (type-expand enum-type)))
-    (check-type expansion (cons (eql member) list))
-    (rest expansion)))
 
 ;; An object describing a Protobufs message. Confusingly most local variables that hold
 ;; instances of this struct are named MESSAGE, but the C API makes it clear that
 ;; a Message is not its descriptor.
 ;; This would have been far less confusing if it sounded more obviously like a 'descriptor'
 ;; and not the contents of the message per se.
-(defclass message-descriptor (descriptor)
-  (
-   ;; Use this if you want to make this message descriptor an alias for an existing Lisp type.
-   (alias :type (or null symbol)
-          :accessor proto-alias-for
-          :initarg :alias-for
-          :initform nil)
-   ;; All fields for this message, including local ones and extended ones.
-   ;; This does NOT include fields that are inside of a oneof. These field descriptors can
-   ;; be accessed via the FIELDS slot in each oneof-descriptor stored in the ONEOFS slot.
-   (fields :type (list-of field-descriptor)
-           :accessor proto-fields
-           :initarg :fields
-           :initform ())
-   ;; A list of all oneof descriptors defined in this message.
-   (oneofs :type (list-of oneof-descriptor)
-           :accessor proto-oneofs
-           :initarg :oneofs
-           :initform ())
-   ;; The FIELDS slot (more or less) as a vector. If the index space is dense,
-   ;; the vector is accessed by field index, otherwise it requires linear scan.
-   ;; TODO(dougk): sparse indices can do better than linear scan.
-   (field-vect :type vector
-               :accessor proto-field-vect)
-   ;; The extended fields defined in this message.
-   (extended-fields :type (list-of field-descriptor)
-                    :accessor proto-extended-fields
-                    :initform ())
-   (extensions :type (list-of extension-descriptor)
-               :accessor proto-extensions
-               :initarg :extensions
-               :initform ())
-   ;; :message is an ordinary message
-   ;; :extends is an 'extends' to an existing message
-   (message-type :type (member :message :extends)
-                 :accessor proto-message-type
-                 :initarg :message-type
-                 :initform :message))
-  (:documentation
-   "Describes a protobuf message."))
+(defstruct (message-descriptor
+             (:include descriptor)
+             (:constructor %make-message-descriptor)
+             (:conc-name proto-))
+  "Describes a protobuf message."
+  ;; Use this if you want to make this message descriptor an alias for an existing Lisp type.
+  (alias-for nil :type (or null symbol))
+  ;; All fields for this message, including local ones and extended ones.
+  ;; This does NOT include fields that are inside of a oneof. These field descriptors can
+  ;; be accessed via the FIELDS slot in each oneof-descriptor stored in the ONEOFS slot.
+  (fields () :type list)
+  ;; A list of all oneof descriptors defined in this message.
+  (oneofs () :type list)
+  ;; The FIELDS slot (more or less) as a vector. If the index space is dense,
+  ;; the vector is accessed by field index, otherwise it requires linear scan.
+  ;; TODO(dougk): sparse indices can do better than linear scan.
+  (field-vect nil :type (or null vector))
+  ;; The extended fields defined in this message.
+  (extended-fields () :type list)
+  (extensions () :type list)
+  ;; :message is an ordinary message
+  ;; :extends is an 'extends' to an existing message
+  (message-type :message :type (member :message :extends)))
+
+(defun-inline proto-alias (desc)
+  (proto-alias-for desc))
+
+(defsetf proto-alias (desc) (val)
+  `(setf (proto-alias-for ,desc) ,val))
+
+(defun make-message-descriptor (&key class name qualified-name options
+                                     alias (alias-for alias)
+                                     fields oneofs field-vect
+                                     extended-fields extensions
+                                     (message-type :message)
+                                     &allow-other-keys)
+  "Create a new message-descriptor.
+Parameters:
+  CLASS: The symbol class.
+  NAME: Message name.
+  QUALIFIED-NAME: Qualified name.
+  OPTIONS: Message options.
+  ALIAS: Message alias.
+  ALIAS-FOR: Message alias target.
+  FIELDS: Message fields.
+  ONEOFS: Oneof definitions.
+  FIELD-VECT: Vector of fields.
+  EXTENDED-FIELDS: Extended fields list.
+  EXTENSIONS: Extensions list.
+  MESSAGE-TYPE: Type of message (:message, :group, etc.)."
+  (%make-message-descriptor
+   :class class
+   :name name
+   :qualified-name (or qualified-name "")
+   :options (or options ())
+   :alias-for alias-for
+   :fields (or fields ())
+   :oneofs (or oneofs ())
+   :field-vect field-vect
+   :extended-fields (or extended-fields ())
+   :extensions (or extensions ())
+   :message-type message-type))
 
 (defmethod make-load-form ((msg-desc message-descriptor) &optional environment)
-  (with-slots (class message-type alias) msg-desc
-    (multiple-value-bind (constructor initializer)
-        (make-load-form-saving-slots msg-desc :environment environment)
-      (values (if (eq message-type :extends)
-                constructor
-                `(let ((msg-desc ,constructor))
-                   (record-protobuf-object ',message-type msg-desc :message)
-                   msg-desc))
-              initializer))))
+  (make-load-form-saving-slots msg-desc :environment environment))
 
 (defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*
     (print-unreadable-object (msg-desc stream :type t :identity t)
       (format stream "~S~@[ (alias for ~S)~]~@[ (group~*)~]~@[ (extended~*)~]"
               (proto-class msg-desc)
-              (and (slot-boundp msg-desc 'alias)
-                   (proto-alias-for msg-desc))
-              (and (slot-boundp msg-desc 'message-type)
-                   (eq (proto-message-type msg-desc) :group))
-              (and (slot-boundp msg-desc 'message-type)
-                   (eq (proto-message-type msg-desc) :extends))))
+              (proto-alias-for msg-desc)
+              (eq (proto-message-type msg-desc) :group)
+              (eq (proto-message-type msg-desc) :extends)))
     (format stream "~S" (proto-class msg-desc))))
 
 ;; Extensions protocol
@@ -385,80 +421,122 @@ message-descriptor.")
 
 ;; Describes a field within a message.
 ;;--- Support the 'deprecated' option (have serialization ignore such fields?)
-(defclass field-descriptor (descriptor)
+(defstruct (field-descriptor
+             (:include descriptor)
+             (:constructor %make-field-descriptor)
+             (:conc-name proto-))
+  "The model struct that represents one field within a Protobufs message."
   ;; :group means this is a message-typed field but it should be serialized as
   ;; a group. What does nil mean here? Needs a comment.
-  ((kind :type (member :message :group :extends :enum :map :scalar nil)
-         :accessor proto-kind
-         :initarg :kind)
-   (type :type (or null symbol)
-         :accessor proto-type
-         :initarg :type)
-   (label :type (member :required :optional :repeated)
-          :accessor proto-label
-          :initarg :label)
-   ;; TODO(cgay): rename to field-number and proto-field-number. Why be coy?
-   (index :type field-number
-          :accessor proto-index
-          :initarg :index)
-   ;; Offset into the is-set bit vector. nil for members of a oneof.
-   (field-offset :type (or null field-number)
-                 :accessor proto-field-offset
-                 :initarg :field-offset)
-   ;; If this field is contained in a oneof, this holds the order of this field
-   ;; as it was defined in the oneof. This slot is nil if and only if the field
-   ;; is not part of a oneof.
-   (oneof-offset :type (or null field-number)
-                 :accessor proto-oneof-offset
-                 :initarg :oneof-offset
-                 :initform nil)
-   ;; The name of the slot holding the field value.
-   ;; TODO(cgay): there's no deep reason we must have internal and external field names. It's a
-   ;; historical artifact that can probably be removed once the QPX protobuf code has been updated.
-   (internal-field-name :type (or null symbol)
-                        :accessor proto-internal-field-name
-                        :initarg :internal-field-name
-                        :initform nil)
-   (external-field-name
-    :type (or null symbol)                ; The Lisp slot holding the value within an object
-    :accessor proto-external-field-name   ; this also serves as the Lisp field name
-    :initarg :external-field-name
-    :initform nil)
-   (json-name                                   ; The key to use when printing this field to JSON.
-    :type string                                ; This is pulled directly from protoc output.
-    :accessor proto-json-name
-    :initarg :json-name)
-   (default :accessor proto-default             ; Default value (untyped), pulled out of the options
-            :initarg :default
-            :initform $empty-default)
-   (packed :type boolean                        ; Packed, pulled out of the options
-           :accessor proto-packed
-           :initarg :packed
-           :initform nil)
-   (container :accessor proto-container         ; If the field is repeated, this specifies the
-              :type (member nil :vector :list)  ; container type. If not, this field is nil.
-              :initarg :container
-              :initform nil)
-   (lazy :type boolean                          ; Lazy, pulled out of the options
-         :accessor proto-lazy-p
-         :initarg :lazy
-         :initform nil)
-   (bool-index :type (or null integer)      ; For non-repeated boolean fields only, the
-               :accessor proto-bool-index   ; index into the bit-vector of boolean field values.
-               :initarg :bool-index
-               :initform nil)
-   (field-presence :type (member :implicit :explicit)
-                   :accessor proto-field-presence
-                   :initarg :field-presence))
-  (:documentation
-   "The model class that represents one field within a Protobufs message."))
+  (kind nil :type (member :message :group :extends :enum :map :scalar nil))
+  (field-type nil :type (or null symbol))
+  (label :optional :type (member :required :optional :repeated))
+  ;; TODO(cgay): rename to field-number and proto-field-number. Why be coy?
+  (field-index 0 :type field-number)
+  ;; Offset into the is-set bit vector. nil for members of a oneof.
+  (field-offset nil :type (or null field-number))
+  ;; If this field is contained in a oneof, this holds the order of this field
+  ;; as it was defined in the oneof. This slot is nil if and only if the field
+  ;; is not part of a oneof.
+  (oneof-offset nil :type (or null field-number))
+  ;; The name of the slot holding the field value.
+  ;; TODO(cgay): there's no deep reason we must have internal and external field names. It's a
+  ;; historical artifact that can probably be removed once the QPX protobuf code has been updated.
+  (internal-field-name nil :type (or null symbol))
+  ;; The Lisp slot holding the value within an object
+  (external-field-name nil :type (or null symbol))
+  ;; The key to use when printing this field to JSON.
+  (json-name "" :type string)
+  ;; Default value (untyped), pulled out of the options
+  (default $empty-default)
+  (packed nil :type boolean)                       ; Packed, pulled out of the options
+  (container nil :type (member nil :vector :list)) ; If the field is repeated, this specifies the
+                                                   ; container type. If not, this field is nil.
+  (lazy-p nil :type boolean)                       ; Lazy, pulled out of the options
+  ;; For non-repeated boolean fields only, the index into the bit-vector of boolean field values.
+  (bool-index nil :type (or null integer))
+  (field-presence :explicit :type (member :implicit :explicit)))
 
-(defmethod initialize-instance :after ((field field-descriptor) &rest initargs)
-  (declare (ignore initargs))
-  (unless (and (plusp (proto-index field))
-               (not (<= 19000 (proto-index field) 19999)))
+(defun-inline proto-lazy (desc)
+  (proto-lazy-p desc))
+
+(defsetf proto-lazy (desc) (val)
+  `(setf (proto-lazy-p ,desc) ,val))
+
+(defun proto-type (desc)
+  "Return the type of field-descriptor or option-descriptor DESC."
+  (etypecase desc
+    (field-descriptor (proto-field-type desc))
+    (option-descriptor (proto-option-type desc))))
+
+(defsetf proto-type (desc) (val)
+  (let ((gdesc (gensym "DESC"))
+        (gval (gensym "VAL")))
+    `(let ((,gdesc ,desc)
+           (,gval ,val))
+       (etypecase ,gdesc
+         (field-descriptor (setf (proto-field-type ,gdesc) ,gval))
+         (option-descriptor (setf (proto-option-type ,gdesc) ,gval))))))
+
+(defun check-field-index (index)
+  "Validate that field INDEX is positive and not within the reserved range [19000, 19999]."
+  (unless (and (plusp index)
+               (not (<= 19000 index 19999)))
     (protobuf-error
      "Protobuf field indexes must be positive and not between 19000 and 19999 (inclusive)")))
+
+(defun make-field-descriptor (&key class name qualified-name options
+                                   kind type (label :optional) (index 0)
+                                   field-offset oneof-offset
+                                   internal-field-name external-field-name
+                                   (json-name "") (default $empty-default)
+                                   packed container
+                                   lazy (lazy-p lazy)
+                                   bool-index (field-presence :explicit)
+                                   &allow-other-keys)
+  "Create a new field-descriptor.
+Parameters:
+  CLASS: The symbol class.
+  NAME: Field name.
+  QUALIFIED-NAME: Qualified name.
+  OPTIONS: Field options.
+  KIND: Kind of field (:scalar, :message, etc.).
+  TYPE: Type of field.
+  LABEL: Field label (:optional, :required, :repeated).
+  INDEX: Field index number.
+  FIELD-OFFSET: Field offset.
+  ONEOF-OFFSET: Oneof offset.
+  INTERNAL-FIELD-NAME: Internal slot name.
+  EXTERNAL-FIELD-NAME: External field name.
+  JSON-NAME: JSON field name.
+  DEFAULT: Default value.
+  PACKED: Whether field is packed.
+  CONTAINER: Container type (:vector, :list, nil).
+  LAZY: Whether field is lazy.
+  LAZY-P: Lazy predicate boolean.
+  BOOL-INDEX: Bit vector index for boolean fields.
+  FIELD-PRESENCE: Presence tracking (:explicit, :implicit)."
+  (check-field-index index)
+  (%make-field-descriptor
+   :class class
+   :name name
+   :qualified-name (or qualified-name "")
+   :options (or options ())
+   :kind kind
+   :field-type type
+   :label label
+   :field-index index
+   :field-offset field-offset
+   :oneof-offset oneof-offset
+   :internal-field-name internal-field-name
+   :external-field-name external-field-name
+   :json-name (or json-name "")
+   :default default
+   :packed (and packed t)
+   :container container
+   :lazy-p (and lazy-p t)
+   :bool-index bool-index
+   :field-presence field-presence))
 
 (defmethod make-load-form ((f field-descriptor) &optional environment)
   (make-load-form-saving-slots f :environment environment))
@@ -469,7 +547,7 @@ message-descriptor.")
         (format stream "~S :: ~S = ~D~@[ (group~*)~]~@[ (extended~*)~]"
                 (proto-internal-field-name f)
                 (proto-class f)
-                (proto-index f)
+                (proto-field-index f)
                 (eq (proto-kind f) :group)
                 (eq (proto-kind f) :extends)))
       (format stream "~S" (proto-internal-field-name f))))
@@ -478,31 +556,36 @@ message-descriptor.")
   (proto-internal-field-name field))
 
 (defmethod (setf proto-slot) (slot (field field-descriptor))
-  (setf (proto-value field) slot))
+  (setf (proto-internal-field-name field) slot))
 
-(defclass extension-descriptor (abstract-descriptor)
+(defstruct (extension-descriptor
+             (:include abstract-descriptor)
+             (:constructor %make-extension-descriptor)
+             (:conc-name proto-extension-))
+  "The model struct that represents an extension range within a protobuf message."
   ;; The start of the extension range.
-  ((from :type field-number
-         :accessor proto-extension-from
-         :initarg :from)
-   ;; The end of the extension range, inclusive.
-   (to :type field-number
-       :accessor proto-extension-to
-       :initarg :to))
-  (:documentation
-   "The model class that represents an extension range within a protobuf message."))
+  (from 0 :type field-number)
+  ;; The end of the extension range, inclusive.
+  (to 0 :type field-number))
+
+(defun make-extension-descriptor (&key (from 0) (to 0) &allow-other-keys)
+  "Create a new extension-descriptor.
+Parameters:
+  FROM: Start of the extension range.
+  TO: End of the extension range."
+  (%make-extension-descriptor :from from :to to))
 
 ;;; TODO(cgay): this is unused. Were there plans for it?
 (defvar *extension-descriptors* nil "Extension descriptors.")
 
 (defmethod make-load-form ((e extension-descriptor) &optional environment)
   (declare (ignore environment))
-  (let ((from (and (slot-boundp e 'from) (proto-extension-from e)))
-        (to (and (slot-boundp e 'to) (proto-extension-to e))))
+  (let ((from (proto-extension-from e))
+        (to (proto-extension-to e)))
     `(or (cdr (assoc '(,from . ,to) *extension-descriptors* :test #'equal))
-         (let ((obj (make-instance 'extension-descriptor
-                                   ,@(and from `(:from ,from))
-                                   ,@(and to `(:to ,to)))))
+         (let ((obj (make-extension-descriptor
+                     ,@(and from `(:from ,from))
+                     ,@(and to `(:to ,to)))))
            (push (cons '(,from . ,to) obj) *extension-descriptors*)
            obj))))
 
@@ -518,17 +601,40 @@ message-descriptor.")
   "Return a service-descriptor instance named by NAME (a symbol)."
   (gethash name *service-descriptors*))
 
-(defclass service-descriptor (descriptor)
-  ((methods :type (list-of method-descriptor)
-            :accessor proto-methods
-            :initarg :methods
-            :initform ())
-   ;; The pathname of the protobuf the service is defined in.
-   (location :type (or null pathname)
-             :accessor proto-source-location
-             :initarg :source-location
-             :initform nil))
-  (:documentation "Model class to describe a protobuf service."))
+(defstruct (service-descriptor
+             (:include descriptor)
+             (:constructor %make-service-descriptor)
+             (:conc-name proto-))
+  "Model struct to describe a protobuf service."
+  (methods () :type list)
+  ;; The pathname of the protobuf the service is defined in.
+  (source-location nil :type (or null pathname)))
+
+(defun-inline proto-location (desc)
+  (proto-source-location desc))
+
+(defsetf proto-location (desc) (val)
+  `(setf (proto-source-location ,desc) ,val))
+
+(defun make-service-descriptor (&key class name qualified-name options
+                                     methods location (source-location location)
+                                     &allow-other-keys)
+  "Create a new service-descriptor.
+Parameters:
+  CLASS: The symbol class.
+  NAME: Service name.
+  QUALIFIED-NAME: Qualified name.
+  OPTIONS: Service options.
+  METHODS: Service methods.
+  LOCATION: Source location.
+  SOURCE-LOCATION: Pathname of protobuf definition."
+  (%make-service-descriptor
+   :class class
+   :name name
+   :qualified-name (or qualified-name "")
+   :options (or options ())
+   :methods (or methods ())
+   :source-location source-location))
 
 (defmethod make-load-form ((s service-descriptor) &optional environment)
   (make-load-form-saving-slots s :environment environment))
@@ -557,76 +663,141 @@ if we are not in SBCL."
      (setf (get symbol :default-constructor)
            (intern (nstring-upcase (format nil "%MAKE-~A" symbol))
                    (symbol-package symbol)))
-     (when (and (slot-boundp descriptor 'qual-name) (proto-qualified-name descriptor))
+     (when (and (proto-qualified-name descriptor)
+                (string/= (proto-qualified-name descriptor) ""))
        (setf (gethash (proto-qualified-name descriptor) *qualified-messages*)
              (proto-class descriptor))))
     (:map (setf (gethash symbol *map-descriptors*) descriptor))
     (:service (setf (gethash symbol *service-descriptors*) descriptor))))
 
-(defmethod find-method-descriptor ((service service-descriptor) (name symbol))
-  (find name (proto-methods service) :key #'proto-class))
-
-(defmethod find-method-descriptor ((service service-descriptor) (name string))
-  (find-qualified-name name (proto-methods service)))
-
-(defmethod find-method-descriptor ((service service-descriptor) (index integer))
-  (find index (proto-methods service) :key #'proto-index))
-
-
-(defclass method-descriptor (descriptor)
+(defstruct (method-descriptor
+             (:include descriptor)
+             (:constructor %make-method-descriptor)
+             (:conc-name proto-))
+  "Model struct to describe one method in a protobuf service."
   ;; Name of the Stubby service for which this is a method.
-  ((service-name :type string
-                 :accessor proto-service-name
-                 :initarg :service-name)
-   (client-fn :type symbol
-              :accessor proto-client-stub
-              :initarg :client-stub)
-   (server-fn :type symbol
-              :accessor proto-server-stub
-              :initarg :server-stub)
-   ;; TODO(jgodbout): Fix internally and delete.
-   (old-server-fn :type symbol
-                  :accessor proto-old-server-stub
-                  :initarg :old-server-stub)
-   ;; Lisp name of the input parameter, which must be a message or extension.
-   (itype :type symbol
-          :accessor proto-input-type
-          :initarg :input-type)
-   ;; Protobuf name of the input parameter. (Fully qualified?)
-   (iname :type (or null string)
-          :accessor proto-input-name
-          :initarg :input-name
-          :initform nil)
-   (istreaming :type boolean                    ; For stubby4-style streaming.
-               :accessor proto-input-streaming-p
-               :initarg :input-streaming
-               :initform nil)
-   ;; Lisp name of the output parameter, which must be a message or extension.
-   (otype :type symbol
-          :accessor proto-output-type
-          :initarg :output-type)
-   ;; Protobuf name of the output parameter. (Fully qualified?)
-   (oname :type (or null string)
-          :accessor proto-output-name
-          :initarg :output-name
-          :initform nil)
-   (ostreaming :type boolean                    ; For stubby4-style streaming.
-               :accessor proto-output-streaming-p
-               :initarg :output-streaming
-               :initform nil)
-   (stype :type (or symbol null)                ; The Lisp type name of
-          :accessor proto-streams-type          ; the "streams" type.
-          :initarg :streams-type
-          :initform nil)
-   (sname :type (or null string)                ; The Protobufs name of the
-          :accessor proto-streams-name          ; "streams" type.
-          :initarg :streams-name
-          :initform nil)
-   (index :type (unsigned-byte 32)              ; An identifying index for this method.
-          :accessor proto-index                 ; (used by the RPC implementation)
-          :initarg :index))
-  (:documentation
-   "Model class to describe one method in a protobuf service."))
+  (service-name "" :type string)
+  (client-stub nil :type symbol)
+  (server-stub nil :type symbol)
+  ;; TODO(jgodbout): Fix internally and delete.
+  (old-server-stub nil :type symbol)
+  ;; Lisp name of the input parameter, which must be a message or extension.
+  (input-type nil :type (or symbol null))
+  ;; Protobuf name of the input parameter. (Fully qualified?)
+  (input-name nil :type (or null string))
+  (input-streaming-p nil :type boolean) ; For stubby4-style streaming.
+  ;; Lisp name of the output parameter, which must be a message or extension.
+  (output-type nil :type (or symbol null))
+  ;; Protobuf name of the output parameter. (Fully qualified?)
+  (output-name nil :type (or null string))
+  (output-streaming-p nil :type boolean) ; For stubby4-style streaming.
+  (streams-type nil :type (or symbol null)) ; The Lisp type name of the "streams" type.
+  (streams-name nil :type (or null string)) ; The Protobufs name of the "streams" type.
+  (method-index 0 :type (unsigned-byte 32)))       ; An identifying index for this method.
+
+(defun-inline proto-client-fn (desc) (proto-client-stub desc))
+(defsetf proto-client-fn (desc) (val) `(setf (proto-client-stub ,desc) ,val))
+(defun-inline proto-server-fn (desc) (proto-server-stub desc))
+(defsetf proto-server-fn (desc) (val) `(setf (proto-server-stub ,desc) ,val))
+(defun-inline proto-old-server-fn (desc) (proto-old-server-stub desc))
+(defsetf proto-old-server-fn (desc) (val) `(setf (proto-old-server-stub ,desc) ,val))
+(defun-inline proto-itype (desc) (proto-input-type desc))
+(defsetf proto-itype (desc) (val) `(setf (proto-input-type ,desc) ,val))
+(defun-inline proto-iname (desc) (proto-input-name desc))
+(defsetf proto-iname (desc) (val) `(setf (proto-input-name ,desc) ,val))
+(defun-inline proto-istreaming (desc) (proto-input-streaming-p desc))
+(defsetf proto-istreaming (desc) (val) `(setf (proto-input-streaming-p ,desc) ,val))
+(defun-inline proto-otype (desc) (proto-output-type desc))
+(defsetf proto-otype (desc) (val) `(setf (proto-output-type ,desc) ,val))
+(defun-inline proto-oname (desc) (proto-output-name desc))
+(defsetf proto-oname (desc) (val) `(setf (proto-output-name ,desc) ,val))
+(defun-inline proto-ostreaming (desc) (proto-output-streaming-p desc))
+(defsetf proto-ostreaming (desc) (val) `(setf (proto-output-streaming-p ,desc) ,val))
+(defun-inline proto-stype (desc) (proto-streams-type desc))
+(defsetf proto-stype (desc) (val) `(setf (proto-streams-type ,desc) ,val))
+(defun-inline proto-sname (desc) (proto-streams-name desc))
+(defsetf proto-sname (desc) (val) `(setf (proto-streams-name ,desc) ,val))
+
+(defun make-method-descriptor (&key class name qualified-name options
+                                    (service-name "")
+                                    client-stub (client-fn client-stub)
+                                    server-stub (server-fn server-stub)
+                                    old-server-stub (old-server-fn old-server-stub)
+                                    input-type (itype input-type)
+                                    input-name (iname input-name)
+                                    input-streaming (input-streaming-p input-streaming)
+                                    output-type (otype output-type)
+                                    output-name (oname output-name)
+                                    output-streaming (output-streaming-p output-streaming)
+                                    streams-type (stype streams-type)
+                                    streams-name (sname streams-name)
+                                    (index 0)
+                                    &allow-other-keys)
+  "Create a new method-descriptor.
+Parameters:
+  CLASS: The symbol class.
+  NAME: Method name.
+  QUALIFIED-NAME: Qualified name.
+  OPTIONS: Method options.
+  SERVICE-NAME: Name of the containing service.
+  CLIENT-STUB: Client stub function.
+  CLIENT-FN: Client function symbol.
+  SERVER-STUB: Server stub function.
+  SERVER-FN: Server function symbol.
+  OLD-SERVER-STUB: Deprecated server stub function.
+  OLD-SERVER-FN: Deprecated server function.
+  INPUT-TYPE: Input message type.
+  ITYPE: Input type alias.
+  INPUT-NAME: Input parameter name.
+  INAME: Input name alias.
+  INPUT-STREAMING: Input streaming boolean.
+  INPUT-STREAMING-P: Input streaming predicate.
+  OUTPUT-TYPE: Output message type.
+  OTYPE: Output type alias.
+  OUTPUT-NAME: Output parameter name.
+  ONAME: Output name alias.
+  OUTPUT-STREAMING: Output streaming boolean.
+  OUTPUT-STREAMING-P: Output streaming predicate.
+  STREAMS-TYPE: Streams message type.
+  STYPE: Streams type alias.
+  STREAMS-NAME: Streams parameter name.
+  SNAME: Streams name alias.
+  INDEX: Method index number."
+  (%make-method-descriptor
+   :class class
+   :name name
+   :qualified-name (or qualified-name "")
+   :options (or options ())
+   :service-name service-name
+   :client-stub client-fn
+   :server-stub server-fn
+   :old-server-stub old-server-fn
+   :input-type itype
+   :input-name iname
+   :input-streaming-p (and input-streaming-p t)
+   :output-type otype
+   :output-name oname
+   :output-streaming-p (and output-streaming-p t)
+   :streams-type stype
+   :streams-name sname
+   :method-index index))
+
+(defun proto-index (desc)
+  "Return the index of field-descriptor, method-descriptor, or enum-value-descriptor DESC."
+  (etypecase desc
+    (field-descriptor (proto-field-index desc))
+    (method-descriptor (proto-method-index desc))
+    (enum-value-descriptor (enum-value-descriptor-value desc))))
+
+(defsetf proto-index (desc) (val)
+  (let ((gdesc (gensym "DESC"))
+        (gval (gensym "VAL")))
+    `(let ((,gdesc ,desc)
+           (,gval ,val))
+       (etypecase ,gdesc
+         (field-descriptor (setf (proto-field-index ,gdesc) ,gval))
+         (method-descriptor (setf (proto-method-index ,gdesc) ,gval))
+         (enum-value-descriptor (setf (enum-value-descriptor-value ,gdesc) ,gval))))))
 
 (defmethod make-load-form ((m method-descriptor) &optional environment)
   (make-load-form-saving-slots m :environment environment))
@@ -636,9 +807,18 @@ if we are not in SBCL."
     (print-unreadable-object (m stream :type t :identity t)
       (format stream "~S (~S) => (~S)"
               (proto-class m)
-              (and (slot-boundp m 'itype) (proto-input-type m))
-              (and (slot-boundp m 'otype) (proto-output-type m))))
+              (proto-input-type m)
+              (proto-output-type m)))
     (format stream "~S" (proto-class m))))
+
+(defmethod find-method-descriptor ((service service-descriptor) (name symbol))
+  (find name (proto-methods service) :key #'proto-class))
+
+(defmethod find-method-descriptor ((service service-descriptor) (name string))
+  (find-qualified-name name (proto-methods service)))
+
+(defmethod find-method-descriptor ((service service-descriptor) (index integer))
+  (find index (proto-methods service) :key #'proto-index))
 
 (defstruct oneof
   "Stores data for a oneof slot."
@@ -730,3 +910,4 @@ if we are not in SBCL."
   "Make a qualified name for NAME by prepending the message name from PARENT-DESC and a '.'."
   (let* ((parent-qual-name (proto-qualified-name parent-desc)))
     (strcat parent-qual-name "." name)))
+

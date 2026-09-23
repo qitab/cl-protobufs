@@ -178,6 +178,15 @@
 
    #:add-file-descriptor
 
+   #:make-file-descriptor
+   #:make-message-descriptor
+   #:make-field-descriptor
+   #:make-extension-descriptor
+   #:make-service-descriptor
+   #:make-method-descriptor
+   #:make-option-descriptor
+   #:make-option
+
    ;; TODO(cgay): These should be removed or moved to the interface package, as
    ;; appropriate.
    #:encode-double

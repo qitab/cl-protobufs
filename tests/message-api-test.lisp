@@ -228,7 +228,7 @@ Parameters
     (assert-false (pi::oneof-field-equal oneof-1 oneof-2 oneof-descriptor t))))
 
 (deftest test-non-bool-field-equal.with-vector (message-api-suite)
-  (let ((fd (make-instance 'pi::field-descriptor
+  (let ((fd (pi:make-field-descriptor
                            :label :repeated
                            :kind :scalar
                            :container :vector
@@ -239,7 +239,7 @@ Parameters
     (assert-false (pi::non-bool-field-equal #("A") #("a") fd t))
     (assert-true (pi::non-bool-field-equal #("a") #("a") fd t)))
 
-  (let ((fd (make-instance 'pi::field-descriptor
+  (let ((fd (pi:make-field-descriptor
                            :label :repeated
                            :kind :message
                            :container :vector
@@ -253,7 +253,7 @@ Parameters
                   (vector test-message-1) (vector test-message-2) fd nil))))
 
 (deftest test-non-bool-field-equal.with-list (message-api-suite)
-  (let ((fd (make-instance 'pi::field-descriptor
+  (let ((fd (pi:make-field-descriptor
                            :label :repeated
                            :kind :scalar
                            :container :list
@@ -264,7 +264,7 @@ Parameters
     (assert-false (pi::non-bool-field-equal (list "A") (list "a") fd t))
     (assert-true (pi::non-bool-field-equal (list "a") (list "a") fd t)))
 
-  (let ((fd (make-instance 'pi::field-descriptor
+  (let ((fd (pi:make-field-descriptor
                            :label :repeated
                            :kind :message
                            :container :list
@@ -278,7 +278,7 @@ Parameters
                   (list test-message-1) (list test-message-2) fd nil))))
 
 (deftest test-non-bool-field-equal.with-message (message-api-suite)
-  (let ((fd (make-instance 'pi::field-descriptor
+  (let ((fd (pi:make-field-descriptor
                            :label :optional
                            :kind :message
                            :container nil

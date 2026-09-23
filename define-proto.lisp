@@ -198,8 +198,7 @@ the oneof and its nested fields.
                                    val))
                     "optimize_for"))
          (imports  (if (listp import) import (list import)))
-         (descriptor (make-instance
-                      'file-descriptor
+         (descriptor (make-file-descriptor
                       :class    type
                       :name     name
                       ;; CCL requires syntax to be OR'd  with :proto2, :proto3, or :editions
@@ -449,7 +448,7 @@ but we want an internal version for the case where we deserialized an unknown
                                '(make-hash-table :test #'equal)
                                '(make-hash-table :test #'eq))
                  :accessor field-name))
-         (mfield (make-instance 'field-descriptor
+         (mfield (make-field-descriptor
                                 :name (slot-name->proto field-name)
                                 :class class
                                 :qualified-name qual-name
@@ -495,7 +494,7 @@ Parameters:
          (assert index)
          (let ((default (if default-p default $empty-default)))
            (setf (aref field-descriptors oneof-offset)
-                 (make-instance 'field-descriptor
+                 (make-field-descriptor
                                 :name (or name (slot-name->proto slot))
                                 :type type
                                 :kind kind
@@ -1201,7 +1200,7 @@ function) then there is no guarantee on the serialize function working properly.
   (let* ((name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
-         (msg-desc (make-instance 'message-descriptor
+         (msg-desc (make-message-descriptor
                                   :class type
                                   :name  name
                                   :qualified-name (make-qualified-name
@@ -1242,7 +1241,7 @@ function) then there is no guarantee on the serialize function working properly.
              (let* ((to (etypecase to
                           (integer to)
                           (symbol (if (string-equal to "MAX") +max-field-number+ to))))
-                    (ext-desc (make-instance 'extension-descriptor
+                    (ext-desc (make-extension-descriptor
                                              :from from
                                              :to (if (eq to 'max) +max-field-number+ to))))
                (push ext-desc (proto-extensions msg-desc)))))
@@ -1338,8 +1337,7 @@ function) then there is no guarantee on the serialize function working properly.
          (message (find-message-descriptor type)) ; should pass :error-p t here instead
          (alias-for (and message (proto-alias-for message)))
          (extends (and message
-                       (make-instance
-                        'message-descriptor
+                       (make-message-descriptor
                         :class  (proto-class message)
                         :name   (proto-name message)
                         :qualified-name (proto-qualified-name message)
@@ -1494,8 +1492,7 @@ function) then there is no guarantee on the serialize function working properly.
                                        (not (eq type 'boolean)))
                                   nil)
                                  (default-p `,default))))))
-               (field (make-instance
-                       'field-descriptor
+               (field (make-field-descriptor
                        :name (or name (slot-name->proto slot))
                        :type (if (eq kind :enum) (enum-open-type type) type)
                        :kind kind
@@ -1552,13 +1549,13 @@ function) then there is no guarantee on the serialize function working properly.
          (options (loop for (key val) on options by #'cddr
                         collect
                         (make-option (if (symbolp key) (slot-name->proto key) key) val)))
-         (service (make-instance 'service-descriptor
-                                 :class type
-                                 :name  name
-                                 :qualified-name (make-qualified-name *current-file-descriptor*
-                                                                      name)
-                                 :options options
-                                 :source-location source-location))
+         (service (make-service-descriptor
+                   :class type
+                   :name  name
+                   :qualified-name (make-qualified-name *current-file-descriptor*
+                                                        name)
+                   :options options
+                   :source-location source-location))
          (index 0))
     (with-collectors ((forms collect-form))
       (dolist (method method-specs)
@@ -1600,8 +1597,7 @@ function) then there is no guarantee on the serialize function working properly.
                  (client-fn (intern (nstring-upcase (format nil "CALL-~A" function)) package))
                  (old-server-fn (intern (nstring-upcase (format nil "~A-IMPL" function)) package))
                  (server-fn (intern (nstring-upcase (format nil "~A" function)) package))
-                 (method  (make-instance
-                           'method-descriptor
+                 (method  (make-method-descriptor
                            :class function
                            :name  (or name (class-name->proto function))
                            :qualified-name (make-qualified-name *current-file-descriptor*

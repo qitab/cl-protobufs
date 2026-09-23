@@ -437,8 +437,7 @@ See field-descriptor for the distinction between index, offset, and bool-number.
   "Lazily compute and memoize a field map for message-descriptor
    MESSAGE. This is not needed unless the generic deserializer is
    executed."
-  (if (slot-boundp message 'field-vect)
-      (proto-field-vect message)
+  (or (proto-field-vect message)
       (setf (proto-field-vect message)
             (make-field-map (append
                              (proto-fields message)
