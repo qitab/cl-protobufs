@@ -5,10 +5,14 @@ on:
   push:
     branches: [ master ]
   pull_request:
-    branches: [ master ]
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         lisp: [ sbcl, ccl ]
@@ -37,7 +41,7 @@ jobs:
 
       - name: Cache Quicklisp
         id: cache-quicklisp
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: quicklisp
           key: ${{ runner.os }}-quicklisp-${{ matrix.lisp }}-${{ github.sha }}
@@ -68,16 +72,17 @@ jobs:
           fi
 
       - name: Download repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           path: quicklisp/local-projects/cl-protobufs
+          persist-credentials: false
 
       - name: Add cl-protobufs/protoc to path
         run: echo "$GITHUB_WORKSPACE/quicklisp/local-projects/cl-protobufs/protoc" >> $GITHUB_PATH
 
       - name: Cache C++ dependencies
         id: cache-cpp
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: |
             abseil-cpp
@@ -114,7 +119,7 @@ jobs:
 
       - name: Cache protoc plugin
         id: cache-protoc-plugin
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: quicklisp/local-projects/cl-protobufs/protoc
           key: ${{ runner.os }}-protoc-plugin-v36-${{ github.sha }}
