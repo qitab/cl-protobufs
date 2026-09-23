@@ -205,7 +205,7 @@ the oneof and its nested fields.
                       ;; in case syntax is NIL.
                       :syntax   (or syntax :proto2 :proto3 :editions)
                       :edition  edition
-                      :package  package
+                      :package-name package
                       :imports  imports
                       :options  (if optimize
                                     (append options

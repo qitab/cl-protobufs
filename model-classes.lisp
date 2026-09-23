@@ -84,12 +84,6 @@ Parameters:
   (qualified-name "" :type string)
   (options () :type list))
 
-(defun-inline proto-qual-name (desc)
-  "Return the qualified name for DESC."
-  (proto-qualified-name desc))
-
-(defsetf proto-qual-name (desc) (val)
-  `(setf (proto-qualified-name ,desc) ,val))
 
 (defstruct (enum-descriptor
              (:include descriptor)
@@ -137,17 +131,11 @@ Parameters:
   (package-name nil :type (or null string))
   (imports () :type (list-of string)))
 
-(defun-inline proto-package (desc)
-  (proto-package-name desc))
-
-(defsetf proto-package (desc) (val)
-  `(setf (proto-package-name ,desc) ,val))
-
 (defun make-file-descriptor (&key class name qualified-name options
                                   (syntax :proto2) edition
-                                  (package nil package-p) package-name
-                                  imports
-                                  &allow-other-keys)
+                                  (package-name nil package-name-p)
+                                  (package nil)
+                                  imports)
   "Create a new file-descriptor.
 Parameters:
   CLASS: The symbol class.
@@ -156,8 +144,8 @@ Parameters:
   OPTIONS: File options.
   SYNTAX: Syntax version (:proto2 or :proto3).
   EDITION: Protobuf edition.
-  PACKAGE: Package symbol/name.
   PACKAGE-NAME: Package name string.
+  PACKAGE: Package symbol/name (deprecated alias for PACKAGE-NAME).
   IMPORTS: Imported files."
   (%make-file-descriptor
    :class class
@@ -166,7 +154,7 @@ Parameters:
    :options (or options ())
    :syntax (or syntax :proto2)
    :edition edition
-   :package-name (if package-p package package-name)
+   :package-name (if package-name-p package-name package)
    :imports (or imports ())))
 
 (defmethod make-load-form ((file-desc file-descriptor) &optional environment)
@@ -256,13 +244,14 @@ message-descriptor.")
   ;; Optional Lisp type, one of string, integer, float, symbol (for now).
   (option-type 'string :type (or null symbol)))
 
-(defun make-option-descriptor (&key (name "") value (type 'string) &allow-other-keys)
+(defun make-option-descriptor (&key (name "") value (type 'string) (option-type type))
   "Create a new option-descriptor.
 Parameters:
   NAME: Option name.
   VALUE: Option value.
-  TYPE: Option type."
-  (%make-option-descriptor :name name :value value :option-type type))
+  TYPE: Option type.
+  OPTION-TYPE: Option type alias."
+  (%make-option-descriptor :name name :value value :option-type option-type))
 
 (defmethod make-load-form ((o option-descriptor) &optional environment)
   (make-load-form-saving-slots o :environment environment))
@@ -343,25 +332,19 @@ Parameters:
   ;; :extends is an 'extends' to an existing message
   (message-type :message :type (member :message :extends)))
 
-(defun-inline proto-alias (desc)
-  (proto-alias-for desc))
-
-(defsetf proto-alias (desc) (val)
-  `(setf (proto-alias-for ,desc) ,val))
-
 (defun make-message-descriptor (&key class name qualified-name options
-                                     alias (alias-for alias)
+                                     (alias-for nil alias-for-p)
+                                     (alias nil)
                                      fields oneofs field-vect
                                      extended-fields extensions
-                                     (message-type :message)
-                                     &allow-other-keys)
+                                     (message-type :message))
   "Create a new message-descriptor.
 Parameters:
   CLASS: The symbol class.
   NAME: Message name.
   QUALIFIED-NAME: Qualified name.
   OPTIONS: Message options.
-  ALIAS: Message alias.
+  ALIAS: Message alias (deprecated alias for ALIAS-FOR).
   ALIAS-FOR: Message alias target.
   FIELDS: Message fields.
   ONEOFS: Oneof definitions.
@@ -374,7 +357,7 @@ Parameters:
    :name name
    :qualified-name (or qualified-name "")
    :options (or options ())
-   :alias-for alias-for
+   :alias-for (if alias-for-p alias-for alias)
    :fields (or fields ())
    :oneofs (or oneofs ())
    :field-vect field-vect
@@ -457,11 +440,6 @@ Parameters:
   (bool-index nil :type (or null integer))
   (field-presence :explicit :type (member :implicit :explicit)))
 
-(defun-inline proto-lazy (desc)
-  (proto-lazy-p desc))
-
-(defsetf proto-lazy (desc) (val)
-  `(setf (proto-lazy-p ,desc) ,val))
 
 (defun proto-type (desc)
   "Return the type of field-descriptor or option-descriptor DESC."
@@ -486,14 +464,15 @@ Parameters:
      "Protobuf field indexes must be positive and not between 19000 and 19999 (inclusive)")))
 
 (defun make-field-descriptor (&key class name qualified-name options
-                                   kind type (label :optional) (index 0)
+                                   kind type (label :optional)
+                                   (index 0 index-p)
+                                   (field-index index)
                                    field-offset oneof-offset
                                    internal-field-name external-field-name
                                    (json-name "") (default $empty-default)
                                    packed container
                                    lazy (lazy-p lazy)
-                                   bool-index (field-presence :explicit)
-                                   &allow-other-keys)
+                                   bool-index (field-presence :explicit))
   "Create a new field-descriptor.
 Parameters:
   CLASS: The symbol class.
@@ -504,6 +483,7 @@ Parameters:
   TYPE: Type of field.
   LABEL: Field label (:optional, :required, :repeated).
   INDEX: Field index number.
+  FIELD-INDEX: Field index alias.
   FIELD-OFFSET: Field offset.
   ONEOF-OFFSET: Oneof offset.
   INTERNAL-FIELD-NAME: Internal slot name.
@@ -516,27 +496,28 @@ Parameters:
   LAZY-P: Lazy predicate boolean.
   BOOL-INDEX: Bit vector index for boolean fields.
   FIELD-PRESENCE: Presence tracking (:explicit, :implicit)."
-  (check-field-index index)
-  (%make-field-descriptor
-   :class class
-   :name name
-   :qualified-name (or qualified-name "")
-   :options (or options ())
-   :kind kind
-   :field-type type
-   :label label
-   :field-index index
-   :field-offset field-offset
-   :oneof-offset oneof-offset
-   :internal-field-name internal-field-name
-   :external-field-name external-field-name
-   :json-name (or json-name "")
-   :default default
-   :packed (and packed t)
-   :container container
-   :lazy-p (and lazy-p t)
-   :bool-index bool-index
-   :field-presence field-presence))
+  (let ((idx (if index-p index field-index)))
+    (check-field-index idx)
+    (%make-field-descriptor
+     :class class
+     :name name
+     :qualified-name (or qualified-name "")
+     :options (or options ())
+     :kind kind
+     :field-type type
+     :label label
+     :field-index idx
+     :field-offset field-offset
+     :oneof-offset oneof-offset
+     :internal-field-name internal-field-name
+     :external-field-name external-field-name
+     :json-name (or json-name "")
+     :default default
+     :packed (and packed t)
+     :container container
+     :lazy-p (and lazy-p t)
+     :bool-index bool-index
+     :field-presence field-presence)))
 
 (defmethod make-load-form ((f field-descriptor) &optional environment)
   (make-load-form-saving-slots f :environment environment))
@@ -568,7 +549,7 @@ Parameters:
   ;; The end of the extension range, inclusive.
   (to 0 :type field-number))
 
-(defun make-extension-descriptor (&key (from 0) (to 0) &allow-other-keys)
+(defun make-extension-descriptor (&key (from 0) (to 0))
   "Create a new extension-descriptor.
 Parameters:
   FROM: Start of the extension range.
@@ -610,15 +591,10 @@ Parameters:
   ;; The pathname of the protobuf the service is defined in.
   (source-location nil :type (or null pathname)))
 
-(defun-inline proto-location (desc)
-  (proto-source-location desc))
-
-(defsetf proto-location (desc) (val)
-  `(setf (proto-source-location ,desc) ,val))
-
 (defun make-service-descriptor (&key class name qualified-name options
-                                     methods location (source-location location)
-                                     &allow-other-keys)
+                                     methods
+                                     (source-location nil source-location-p)
+                                     (location nil))
   "Create a new service-descriptor.
 Parameters:
   CLASS: The symbol class.
@@ -626,15 +602,15 @@ Parameters:
   QUALIFIED-NAME: Qualified name.
   OPTIONS: Service options.
   METHODS: Service methods.
-  LOCATION: Source location.
-  SOURCE-LOCATION: Pathname of protobuf definition."
+  SOURCE-LOCATION: Pathname of protobuf definition.
+  LOCATION: Source location (deprecated alias for SOURCE-LOCATION)."
   (%make-service-descriptor
    :class class
    :name name
    :qualified-name (or qualified-name "")
    :options (or options ())
    :methods (or methods ())
-   :source-location source-location))
+   :source-location (if source-location-p source-location location)))
 
 (defmethod make-load-form ((s service-descriptor) &optional environment)
   (make-load-form-saving-slots s :environment environment))
@@ -695,44 +671,23 @@ if we are not in SBCL."
   (streams-name nil :type (or null string)) ; The Protobufs name of the "streams" type.
   (method-index 0 :type (unsigned-byte 32)))       ; An identifying index for this method.
 
-(defun-inline proto-client-fn (desc) (proto-client-stub desc))
-(defsetf proto-client-fn (desc) (val) `(setf (proto-client-stub ,desc) ,val))
-(defun-inline proto-server-fn (desc) (proto-server-stub desc))
-(defsetf proto-server-fn (desc) (val) `(setf (proto-server-stub ,desc) ,val))
-(defun-inline proto-old-server-fn (desc) (proto-old-server-stub desc))
-(defsetf proto-old-server-fn (desc) (val) `(setf (proto-old-server-stub ,desc) ,val))
-(defun-inline proto-itype (desc) (proto-input-type desc))
-(defsetf proto-itype (desc) (val) `(setf (proto-input-type ,desc) ,val))
-(defun-inline proto-iname (desc) (proto-input-name desc))
-(defsetf proto-iname (desc) (val) `(setf (proto-input-name ,desc) ,val))
-(defun-inline proto-istreaming (desc) (proto-input-streaming-p desc))
-(defsetf proto-istreaming (desc) (val) `(setf (proto-input-streaming-p ,desc) ,val))
-(defun-inline proto-otype (desc) (proto-output-type desc))
-(defsetf proto-otype (desc) (val) `(setf (proto-output-type ,desc) ,val))
-(defun-inline proto-oname (desc) (proto-output-name desc))
-(defsetf proto-oname (desc) (val) `(setf (proto-output-name ,desc) ,val))
-(defun-inline proto-ostreaming (desc) (proto-output-streaming-p desc))
-(defsetf proto-ostreaming (desc) (val) `(setf (proto-output-streaming-p ,desc) ,val))
-(defun-inline proto-stype (desc) (proto-streams-type desc))
-(defsetf proto-stype (desc) (val) `(setf (proto-streams-type ,desc) ,val))
-(defun-inline proto-sname (desc) (proto-streams-name desc))
-(defsetf proto-sname (desc) (val) `(setf (proto-streams-name ,desc) ,val))
-
 (defun make-method-descriptor (&key class name qualified-name options
                                     (service-name "")
-                                    client-stub (client-fn client-stub)
-                                    server-stub (server-fn server-stub)
-                                    old-server-stub (old-server-fn old-server-stub)
-                                    input-type (itype input-type)
-                                    input-name (iname input-name)
-                                    input-streaming (input-streaming-p input-streaming)
-                                    output-type (otype output-type)
-                                    output-name (oname output-name)
-                                    output-streaming (output-streaming-p output-streaming)
-                                    streams-type (stype streams-type)
-                                    streams-name (sname streams-name)
-                                    (index 0)
-                                    &allow-other-keys)
+                                    client-stub
+                                    server-stub
+                                    old-server-stub
+                                    input-type
+                                    input-name
+                                    (input-streaming nil)
+                                    (input-streaming-p input-streaming)
+                                    output-type
+                                    output-name
+                                    (output-streaming nil)
+                                    (output-streaming-p output-streaming)
+                                    streams-type
+                                    streams-name
+                                    (index 0 index-p)
+                                    (method-index index))
   "Create a new method-descriptor.
 Parameters:
   CLASS: The symbol class.
@@ -741,46 +696,38 @@ Parameters:
   OPTIONS: Method options.
   SERVICE-NAME: Name of the containing service.
   CLIENT-STUB: Client stub function.
-  CLIENT-FN: Client function symbol.
   SERVER-STUB: Server stub function.
-  SERVER-FN: Server function symbol.
   OLD-SERVER-STUB: Deprecated server stub function.
-  OLD-SERVER-FN: Deprecated server function.
   INPUT-TYPE: Input message type.
-  ITYPE: Input type alias.
   INPUT-NAME: Input parameter name.
-  INAME: Input name alias.
   INPUT-STREAMING: Input streaming boolean.
   INPUT-STREAMING-P: Input streaming predicate.
   OUTPUT-TYPE: Output message type.
-  OTYPE: Output type alias.
   OUTPUT-NAME: Output parameter name.
-  ONAME: Output name alias.
   OUTPUT-STREAMING: Output streaming boolean.
   OUTPUT-STREAMING-P: Output streaming predicate.
   STREAMS-TYPE: Streams message type.
-  STYPE: Streams type alias.
   STREAMS-NAME: Streams parameter name.
-  SNAME: Streams name alias.
-  INDEX: Method index number."
+  INDEX: Method index number.
+  METHOD-INDEX: Method index number alias."
   (%make-method-descriptor
    :class class
    :name name
    :qualified-name (or qualified-name "")
    :options (or options ())
    :service-name service-name
-   :client-stub client-fn
-   :server-stub server-fn
-   :old-server-stub old-server-fn
-   :input-type itype
-   :input-name iname
-   :input-streaming-p (and input-streaming-p t)
-   :output-type otype
-   :output-name oname
-   :output-streaming-p (and output-streaming-p t)
-   :streams-type stype
-   :streams-name sname
-   :method-index index))
+   :client-stub client-stub
+   :server-stub server-stub
+   :old-server-stub old-server-stub
+   :input-type input-type
+   :input-name input-name
+   :input-streaming-p (and (or input-streaming-p input-streaming) t)
+   :output-type output-type
+   :output-name output-name
+   :output-streaming-p (and (or output-streaming-p output-streaming) t)
+   :streams-type streams-type
+   :streams-name streams-name
+   :method-index (if index-p index method-index)))
 
 (defun proto-index (desc)
   "Return the index of field-descriptor, method-descriptor, or enum-value-descriptor DESC."
