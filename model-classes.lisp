@@ -16,12 +16,26 @@
   "Find a file-descriptor for the given name. Returns nil if not found.
 Parameters:
   NAME: A string, symbol, or pathname."
-  (values (gethash name *file-descriptors*)))
+  (or (values (gethash name *file-descriptors*))
+      (let ((pathname (if (stringp name)
+                          (pathname name)
+                          (and (pathnamep name) name))))
+        (and pathname
+             (pathname-directory pathname)
+             (values (gethash (make-pathname :name (pathname-name pathname)
+                                             :type (pathname-type pathname))
+                              *file-descriptors*))))))
 
 (defun add-file-descriptor (pathname symbol)
   "Register the file-descriptor named by SYMBOL under the key PATHNAME.
    Intended for use by protoc-gen-cl-pb."
-  (setf (gethash pathname *file-descriptors*) (find-file-descriptor symbol)))
+  (let ((desc (find-file-descriptor symbol)))
+    (setf (gethash pathname *file-descriptors*) desc)
+    (when (and (pathnamep pathname) (pathname-directory pathname))
+      (setf (gethash (make-pathname :name (pathname-name pathname)
+                                    :type (pathname-type pathname))
+                     *file-descriptors*)
+            desc))))
 
 (defstruct message
   "All protobuf message objects extend this type. Note that some fields that

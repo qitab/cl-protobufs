@@ -43,6 +43,12 @@ Parameters
   (assert-true 
    (cl-protobufs:find-file-descriptor #P"deep-import/deep-import-test-2.proto"))
   (assert-true
+   (cl-protobufs:find-file-descriptor #P"deep-import-test-2.proto"))
+  (assert-true
+   (cl-protobufs:find-file-descriptor #P"google/protobuf/deep-import-test-2.proto"))
+  (assert-true
+   (cl-protobufs:find-file-descriptor "google/protobuf/deep-import-test-2.proto"))
+  (assert-true
    (cl-protobufs:find-file-descriptor #P"deep-import-test-3.proto")))
 
 (deftest test-make-sub-structures (deep-import-suite)

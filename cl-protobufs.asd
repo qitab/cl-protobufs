@@ -299,8 +299,14 @@ and functionality for working with them."
     :serial t
     :pathname ""
     :depends-on ("text-format-test")
-    :components ((:protobuf-source-file "json-custom-enum"
-                  :proto-search-path ("../" "../google/protobuf/" "/usr/local/include/" "/usr/include/"))
+    :components ((:protobuf-source-file "json_enumvalue_options"
+                  :proto-pathname "../google/protobuf/json_enumvalue_options.proto"
+                  :proto-search-path ("../" "../google/protobuf/"))
+                 (:protobuf-source-file "json_options"
+                  :proto-pathname "../google/protobuf/json_options.proto"
+                  :proto-search-path ("../" "../google/protobuf/"))
+                 (:protobuf-source-file "json-custom-enum"
+                  :proto-search-path ("../" "../google/protobuf/"))
                  (:file "json-test")))
 
    (:module "zigzag-test"
