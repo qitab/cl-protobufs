@@ -1416,6 +1416,7 @@ function) then there is no guarantee on the serialize function working properly.
       `(progn ,@forms))))
 
 (defun index-within-extensions-p (index message)
+  "Return true if field INDEX falls within any extension range of MESSAGE."
   (let ((extensions (proto-extensions message)))
     (some #'(lambda (ext)
               (and (i>= index (proto-extension-from ext))
@@ -1522,20 +1523,20 @@ function) then there is no guarantee on the serialize function working properly.
 
 (defparameter *rpc-call-function* nil
   "The function that implements RPC client-side calls. This function must have a signature
-   matching (channel method request response &key callback). Set this when an RPC package that uses
-   cl-protobufs is loaded.")
+   matching (channel method request response &key callback timeout metadata). Set this when an RPC
+   package that uses cl-protobufs is loaded.")
 
 (defparameter *rpc-streaming-client-function* nil
   "This function should implement the dispatch calls for client side streaming calls. This function
-   must have a signature matching (type &key channel method request call) and have methods for types
-   in :start :send :receive :close :cleanup. Set this when an RPC package that uses cl-protobufs is
-   loaded.")
+   must have a signature matching (type &key channel method request call timeout metadata) and have
+   methods for types in :start :send :receive :close :cleanup. Set this when an RPC package that
+   uses cl-protobufs is loaded.")
 
 (defparameter *rpc-streaming-server-function* nil
   "This function should implement the dispatch calls for server side streaming calls. This function
-   must have a signature matching (type &key channel method request call) and have methods for types
-   in :send :receive :receive-close :send-status. Set this when an RPC package that uses
-   cl-protobufs is loaded.")
+   must have a signature matching (type &key channel method request call timeout metadata) and have
+   methods for types in :send :receive :receive-close :send-status. Set this when an RPC package
+   that uses cl-protobufs is loaded.")
 
 (defmacro assert-rpc-function-defined (symbol)
   "Assert that SYMBOL is not NIL, otherwise signal an error."
@@ -1548,7 +1549,7 @@ function) then there is no guarantee on the serialize function working properly.
    SOURCE-LOCATION is an optional source location.
 
    The body is a set of METHOD-SPECS of the form (name (input-type [=>] output-type) &key options).
-   INPUT-TYPE and OUTPUT-TYPE may also be of the form (type &key name)."
+   INPUT-TYPE and OUTPUT-TYPE may also be of the form (type &key name stream)."
   (let* ((name    (or name (class-name->proto type)))
          (options (loop for (key val) on options by #'cddr
                         collect
@@ -1566,10 +1567,12 @@ function) then there is no guarantee on the serialize function working properly.
         (destructuring-bind (function (&rest types) &key name options)
             method
           (let* ((input-type   (first types))
-                 (output-type  (if (string= (string (second types)) "=>")
+                 (has-arrow-p  (and (symbolp (second types))
+                                    (string= (symbol-name (second types)) "=>")))
+                 (output-type  (if has-arrow-p
                                    (third types)
                                    (second types)))
-                 (streams-type (if (string= (string (second types)) "=>")
+                 (streams-type (if has-arrow-p
                                    (getf (cdddr types) :streams)
                                    (getf (cddr  types) :streams)))
                  (input-name (and (listp input-type)
@@ -1662,7 +1665,7 @@ function) then there is no guarantee on the serialize function working properly.
                              :metadata ,vmetadata))))
               (when (or input-streaming output-streaming)
                 (let ((start-call
-                       (intern (string-upcase (format nil "~A/START" function))
+                       (intern (nstring-upcase (format nil "~A/START" function))
                                package))
                       (send-call
                        (intern (nstring-upcase (format nil "~A/SEND" function))
@@ -1689,11 +1692,12 @@ function) then there is no guarantee on the serialize function working properly.
                        (intern (nstring-upcase (format nil "~A/SERVER-SEND-STATUS" function))
                                package)))
                   (collect-form
-                   `(defun ,start-call (,vchannel &key ,vtimeout)
-                      (declare (ignorable ,vtimeout))
+                   `(defun ,start-call (,vchannel &key ,vtimeout ,vmetadata)
                       (assert-rpc-function-defined *rpc-streaming-client-function*)
-                      (funcall *rpc-streaming-client-function*
-                               :start :channel ,vchannel :method ',method)))
+                      (apply *rpc-streaming-client-function*
+                             :start :channel ,vchannel :method ',method
+                             (nconc (when ,vtimeout (list :timeout ,vtimeout))
+                                    (when ,vmetadata (list :metadata ,vmetadata))))))
                   (collect-form
                    `(defun ,send-call (,call ,vrequest)
                       (assert-rpc-function-defined *rpc-streaming-client-function*)
@@ -1756,8 +1760,9 @@ function) then there is no guarantee on the serialize function working properly.
                                #+(or ccl)
                                (declare (values ,output-type))))
               (collect-form `(defgeneric ,server-fn
-              ,(if input-streaming `(,call) `(,vrequest ,call))
+                                 ,(if input-streaming `(,call) `(,vrequest ,call))
                                #+(or ccl)
-                               (declare (values ,output-type))))))))
+                               (declare (values ,output-type))))
+              (collect-form `(export '(,client-fn ,server-fn) ,package))))))
       (collect-form `(record-protobuf-object ',type ,service :service))
       `(progn ,@forms))))

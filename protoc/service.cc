@@ -168,9 +168,21 @@ void ServiceGenerator::AddExports(std::vector<std::string>* exports) {
 
 void ServiceGenerator::AddRpcExports(std::vector<std::string>* exports) {
   for (int i = 0; i < descriptor_->method_count(); ++i) {
-    const std::string name = ToLispName(descriptor_->method(i)->name());
+    const MethodDescriptor* method = descriptor_->method(i);
+    const std::string name = ToLispName(method->name());
     exports->push_back("call-" + name);
     exports->push_back(name);
+    if (method->client_streaming() || method->server_streaming()) {
+      exports->push_back(name + "/start");
+      exports->push_back(name + "/send");
+      exports->push_back(name + "/receive");
+      exports->push_back(name + "/close");
+      exports->push_back(name + "/cleanup");
+      exports->push_back(name + "/server-send");
+      exports->push_back(name + "/server-receive");
+      exports->push_back(name + "/server-receive-close");
+      exports->push_back(name + "/server-send-status");
+    }
   }
 }
 

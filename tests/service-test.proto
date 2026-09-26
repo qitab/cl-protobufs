@@ -8,13 +8,12 @@ syntax = "proto2";
 
 package service_test_pb;
 
-message BarRequest {
-}
+message BarRequest {}
 
-message BarResponse {
-}
+message BarResponse {}
 
 service FooService {
+  // Tests unary RPC codegen and method options.
   rpc BarMethod(BarRequest) returns (BarResponse) {
     option deadline = 30.0;
     option duplicate_suppression = true;
@@ -24,4 +23,10 @@ service FooService {
     option legacy_client_initial_tokens = 42;
     option legacy_token_unit = BYTE;
   }
+  // Tests client-streaming RPC codegen.
+  rpc ClientStreamMethod(stream BarRequest) returns (BarResponse);
+  // Tests server-streaming RPC codegen.
+  rpc ServerStreamMethod(BarRequest) returns (stream BarResponse);
+  // Tests bidirectional-streaming RPC codegen.
+  rpc BidiStreamMethod(stream BarRequest) returns (stream BarResponse);
 }
