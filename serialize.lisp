@@ -1033,7 +1033,9 @@ Parameters:
          (kind (proto-kind field))
          (index (proto-index field))
          (lazy-p (proto-lazy-p field))
-         (temp (fintern (string (proto-internal-field-name field))))
+         (temp (if (eq kind :extends)
+                   (gensym (string (proto-internal-field-name field)))
+                   (fintern (string (proto-internal-field-name field)))))
          (oneof-offset (proto-oneof-offset field)))
     (cond ((eq (proto-label field) :repeated)
            (setf repeated-slot (list field temp))
@@ -1302,11 +1304,11 @@ Parameters:
         (def-pseudo-method :deserialize name
           `(,vbuf ,vidx ,vlim &optional (,vendtag 0))
           `((declare #.$optimize-serialization)
-            (declare (ignore ,vbuf ,vlim ,vendtag ,old-index))
+            (declare (ignore ,vbuf ,vlim ,vendtag))
             (values (funcall (get-constructor-name
                               ',(or (proto-alias-for message)
-                                    (proto-class message)))))
-            ,vidx))))
+                                    (proto-class message))))
+                    ,vidx)))))
     (with-collectors ((deserializers collect-deserializer)
                       ;; Nonrepeating slots
                       (nslots collect-nslot)
@@ -1336,18 +1338,21 @@ Parameters:
                        (assert deserializer)
                        (collect-deserializer `((,tag) ,deserializer))
                        (cond ((and nslot (eq (proto-kind field) :extends))
-                              (collect-extended-nslot nslot))
+                              (collect-extended-nslot (list field nslot)))
                              (nslot (collect-nslot nslot))
                              ((and rslot (eq (proto-kind field) :extends))
-                              (collect-extended-rslot nslot))
+                              (collect-extended-rslot rslot))
                              (rslot (collect-rslot rslot))
                              (oneof-slot (collect-oneof-slot oneof-slot))))))))
-      (let* ((rslots  (delete-duplicates rslots :key #'first))
+      (let* ((rslots           (delete-duplicates rslots :key #'first))
+             (extended-rslots  (delete-duplicates extended-rslots :key #'first))
              (extended-rfields (mapcar #'first  extended-rslots))
              (extended-rtemps  (mapcar #'second extended-rslots))
              (extended-nslots  (delete-duplicates extended-nslots :key #'first))
-             (rfields (mapcar #'first  rslots))
-             (rtemps  (mapcar #'second rslots))
+             (extended-nfields (mapcar #'first  extended-nslots))
+             (extended-ntemps  (mapcar #'second extended-nslots))
+             (rfields          (mapcar #'first  rslots))
+             (rtemps           (mapcar #'second rslots))
              (oneof-slots (delete-duplicates oneof-slots :test #'string= :key #'symbol-name))
              (lisp-type (or (proto-alias-for message) (proto-class message)))
              (lisp-class (find-class lisp-type nil))
@@ -1371,10 +1376,11 @@ Parameters:
             (block :deserialize-function
               (let (,@(loop for slot in nslots
                             collect `(,slot ,missing-value))
+                    ,@(loop for slot in extended-ntemps
+                            collect `(,slot ,missing-value))
                     ,@(loop for oneof-slot in oneof-slots
                             collect `(,oneof-slot (make-oneof)))
                     (,old-index ,vidx)
-                    ,@extended-nslots
                     ,@extended-rtemps
                     ,@rtemps
                     ,skipped-bytes-tuple)
@@ -1412,18 +1418,19 @@ Parameters:
                                                          ,missing-value)
                                                     conversion))))))
                          (when (message-p struct)
-                           ,(when extended-rfields
-                              `(,@(loop for field in extended-rfields
-                                        for temp in extended-rtemps
-                                        for mtemp = (slot-value-to-slot-name-symbol temp)
-                                        for conversion = (if (eq :vector (proto-container field))
-                                                             `(coerce (nreverse ,temp) 'vector)
-                                                             `(nreverse ,temp))
-                                        nconc `(when ,temp (setf (,mtemp struct) ,conversion)))))
-                           ,(when extended-nslots
-                              `(,@(loop for temp in extended-nslots
-                                        for mtemp = (slot-value-to-slot-name-symbol temp)
-                                        nconc `(when ,temp (setf (,mtemp struct) ,temp)))))
+                           ,@(loop for field in extended-rfields
+                                   for temp in extended-rtemps
+                                   for field-name = (proto-external-field-name field)
+                                   for conversion = (if (eq :vector (proto-container field))
+                                                        `(coerce (nreverse ,temp) 'vector)
+                                                        `(nreverse ,temp))
+                                   collect `(when ,temp
+                                              (setf (,field-name struct) ,conversion)))
+                           ,@(loop for field in extended-nfields
+                                   for temp in extended-ntemps
+                                   for field-name = (proto-external-field-name field)
+                                   collect `(unless (eq ,temp ,missing-value)
+                                              (setf (,field-name struct) ,temp)))
                            (when ,skipped-bytes-tuple
                              (setf (message-%%skipped-bytes struct)
                                    (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf))))

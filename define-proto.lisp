@@ -1343,7 +1343,9 @@ function) then there is no guarantee on the serialize function working properly.
                         :qualified-name (proto-qualified-name message)
                         :alias-for alias-for
                         :fields   (copy-list (proto-fields message))
+                        :oneofs   (copy-list (proto-oneofs message))
                         :extensions (copy-list (proto-extensions message))
+                        :extended-fields (copy-list (proto-extended-fields message))
                         :options  (remove-options
                                    (or options (copy-list (proto-options message)))
                                    "default" "packed")
@@ -1404,10 +1406,12 @@ function) then there is no guarantee on the serialize function working properly.
                     (remhash object ,stable)))
                 (define-overloads standard ,type
                   ;; the name on the left becomes the name on the right
-                  ,reader ,accessor-name)))))
+                  ,reader ,accessor-name)
+                (export '(,fname ,accessor-name))))))
         (setf (proto-kind new-field) :extends)
         (appendf (proto-fields extends) (list new-field))
         (appendf (proto-extended-fields extends) (list new-field)))
+      (record-protobuf-object type extends :message)
       (collect-form `(record-protobuf-object ',type ,extends :message))
       `(progn ,@forms))))
 

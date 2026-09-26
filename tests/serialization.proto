@@ -241,6 +241,9 @@ message AutoColor {
 
 extend AutoColor {
   optional PaintType paint_type = 1000;
+  optional bool is_matte = 1001 [default = true];
+  repeated string finish_tags = 1002;
+  repeated int32 shade_codes = 1003 [packed = true];
 }
 
 message Automobile {

@@ -11,6 +11,7 @@
         #:clunit
         #:cl-protobufs
         #:cl-protobufs.extend-test)
+  (:local-nicknames (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.extend)
@@ -98,3 +99,68 @@ Parameters
     (set-extension foo 'zoo (make-bar.zoo))
     (assert-true (get-extension foo 'zoo))
     (assert-true (has-extension foo 'zoo))))
+
+(deftest test-fast-deserializer-extensions (extend-suite)
+  (pi:make-serializer bar)
+  (pi:make-serializer bar.zoo)
+  (pi:make-serializer quux)
+  (pi:make-serializer foo)
+  (pi:make-serializer cl-protobufs.extend-base:bar)
+  (pi:make-serializer cl-protobufs.extend-base:foo)
+  (pi:make-serializer cl-protobufs.extend-base:baz)
+  (pi:make-deserializer bar)
+  (pi:make-deserializer bar.zoo)
+  (pi:make-deserializer quux)
+  (pi:make-deserializer foo)
+  (pi:make-deserializer cl-protobufs.extend-base:bar)
+  (pi:make-deserializer cl-protobufs.extend-base:foo)
+  (pi:make-deserializer cl-protobufs.extend-base:baz)
+  ;; Local Foo with multiple extensions (first only, second only, both)
+  (let ((f1 (make-foo))
+        (f2 (make-foo))
+        (f3 (make-foo)))
+    (setf (foo-227 f1) (make-bar))
+    (setf (foo-228 f2) (cl-protobufs.extend-base:make-bar))
+    (setf (foo-227 f3) (make-bar)
+          (foo-228 f3) (cl-protobufs.extend-base:make-bar))
+    (let ((d1 (deserialize-from-bytes 'foo (serialize-to-bytes f1 'foo)))
+          (d2 (deserialize-from-bytes 'foo (serialize-to-bytes f2 'foo)))
+          (d3 (deserialize-from-bytes 'foo (serialize-to-bytes f3 'foo))))
+      (assert-true (has-extension d1 'foo-227))
+      (assert-false (has-extension d1 'foo-228))
+      (assert-false (has-extension d2 'foo-227))
+      (assert-true (has-extension d2 'foo-228))
+      (assert-true (has-extension d3 'foo-227))
+      (assert-true (has-extension d3 'foo-228))))
+  ;; Cross-package extend_base.Foo with extensions defined in extend_test
+  (let ((bf1 (cl-protobufs.extend-base:make-foo))
+        (bf2 (cl-protobufs.extend-base:make-foo))
+        (bf3 (cl-protobufs.extend-base:make-foo)))
+    (setf (foo-127 bf1) (make-bar))
+    (setf (foo-128 bf2) (cl-protobufs.extend-base:make-bar))
+    (setf (foo-127 bf3) (make-bar)
+          (foo-128 bf3) (cl-protobufs.extend-base:make-bar))
+    (let ((d1 (deserialize-from-bytes
+               'cl-protobufs.extend-base:foo
+               (serialize-to-bytes bf1 'cl-protobufs.extend-base:foo)))
+          (d2 (deserialize-from-bytes
+               'cl-protobufs.extend-base:foo
+               (serialize-to-bytes bf2 'cl-protobufs.extend-base:foo)))
+          (d3 (deserialize-from-bytes
+               'cl-protobufs.extend-base:foo
+               (serialize-to-bytes bf3 'cl-protobufs.extend-base:foo))))
+      (assert-true (has-extension d1 'foo-127))
+      (assert-false (has-extension d1 'foo-128))
+      (assert-false (has-extension d2 'foo-127))
+      (assert-true (has-extension d2 'foo-128))
+      (assert-true (has-extension d3 'foo-127))
+      (assert-true (has-extension d3 'foo-128))))
+  ;; Cross-package extend_base.Baz with ext
+  (let ((baz (cl-protobufs.extend-base:make-baz)))
+    (setf (ext baz) (make-quux))
+    (let ((dbaz (deserialize-from-bytes
+                 'cl-protobufs.extend-base:baz
+                 (serialize-to-bytes baz 'cl-protobufs.extend-base:baz))))
+      (assert-true (has-extension dbaz 'ext))
+      (assert-true (typep (get-extension dbaz 'ext) 'quux)))))
+
