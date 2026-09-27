@@ -18,7 +18,7 @@ add_library(proto-objects OBJECT "${CMAKE_CURRENT_LIST_DIR}/../google/protobuf/p
 
 target_link_libraries(proto-objects PUBLIC protobuf::libprotobuf protobuf::libprotoc)
 
-set(PROTO_BINARY_DIR ${CMAKE_CURRENT_LIST_DIR})
+set(PROTO_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 target_include_directories(proto-objects PUBLIC "$<BUILD_INTERFACE:${PROTO_BINARY_DIR}>")
 
