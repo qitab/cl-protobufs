@@ -177,6 +177,8 @@
    #:define-service
 
    #:add-file-descriptor
+   #:export-file-symbols
+   #:reexport-file-symbols
 
    #:make-file-descriptor
    #:make-message-descriptor

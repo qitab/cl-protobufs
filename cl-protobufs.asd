@@ -256,6 +256,16 @@ and functionality for working with them."
                  (:protobuf-source-file "import-proto")
                  (:file "import-test")))
 
+   (:module "import-public-test"
+    :serial t
+    :pathname ""
+    :components ((:protobuf-source-file "import-public-sibling")
+                 (:protobuf-source-file "import-public-target")
+                 (:protobuf-source-file "import-public-middle")
+                 (:protobuf-source-file "import-public-shim")
+                 (:protobuf-source-file "import-public-consumer")
+                 (:file "import-public-test")))
+
    (:module "lazy-test"
     :serial t
     :pathname ""

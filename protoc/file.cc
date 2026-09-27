@@ -8,20 +8,44 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <memory>
 #include <set>
+#include <string>
+#include <vector>
 
+#include <absl/container/flat_hash_set.h>
 #include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"
 #include "message.h"
 #include "names.h"
 #include "service.h"
+#include <google/protobuf/descriptor.h>
 #include <google/protobuf/io/printer.h>
 
 namespace google {
 namespace protobuf {
 namespace cl_protobufs {
+
+namespace {
+
+// Collects the transitive `import public` dependencies of `file` in post-order
+// (leaves first).
+void CollectPublicDependencies(
+    const FileDescriptor* file,
+    absl::flat_hash_set<const FileDescriptor*>* visited,
+    std::vector<const FileDescriptor*>* result) {
+  for (int i = 0; i < file->public_dependency_count(); ++i) {
+    const FileDescriptor* dep = file->public_dependency(i);
+    if (visited->insert(dep).second) {
+      CollectPublicDependencies(dep, visited, result);
+      result->push_back(dep);
+    }
+  }
+}
+
+}  // namespace
 
 // ===================================================================
 
@@ -91,6 +115,28 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   if (!lisp_package_name_.empty()) {
     printer->Print("\n(cl:in-package \"$package_name$\")\n",
                    "package_name", lisp_package_name_);
+    // Re-export symbols from transitive `import public` dependencies before
+    // `define-schema` is read so that any symbol from a public dependency
+    // (including one matching this file's `$schema_name$`) is already present
+    // in this package when reading the rest of the file.
+    absl::flat_hash_set<const FileDescriptor*> visited_public_deps;
+    std::vector<const FileDescriptor*> public_deps;
+    CollectPublicDependencies(file_, &visited_public_deps, &public_deps);
+    bool has_cross_package_public_dep = false;
+    for (const FileDescriptor* dep : public_deps) {
+      if (FileLispPackage(dep) != lisp_package_name_) {
+        if (!has_cross_package_public_dep) {
+          printer->Print(
+              "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n");
+          has_cross_package_public_dep = true;
+        }
+        printer->Print("  (pi:reexport-file-symbols #P\"$file$\" \"$to$\")\n",
+                       "file", dep->name(), "to", lisp_package_name_);
+      }
+    }
+    if (has_cross_package_public_dep) {
+      printer->Print(")\n");
+    }
   }
 
   printer->Print(
@@ -126,7 +172,6 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
   printer->Print(")\n");
 
   std::vector<std::string> exports;
-  exports.push_back(schema_name_);
 
   if (file_->enum_type_count() > 0) {
     printer->Print("\n\n;;; Top-Level enums");
@@ -171,15 +216,22 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
       "file_name", file_proto_.name(), "schema_name", schema_name_);
 
   if (!lisp_package_name_.empty()) {
-    // Export symbols.
+    // Export the file's schema symbol, and export + record the symbols defined
+    // by this file on its file-descriptor so `import public` of this file can
+    // re-export only its symbols rather than everything in its Lisp package.
+    printer->Print(
+        "\n(cl:eval-when (:compile-toplevel :load-toplevel :execute)\n"
+        "  (cl:export '($schema_name$)))\n",
+        "schema_name", schema_name_);
     if (!exports.empty()) {
       std::sort(exports.begin(), exports.end());
       auto last = std::unique(exports.begin(), exports.end());
       exports.erase(last, exports.end());
       sep = "(";
-      printer->Print("\n(cl:export '");
+      printer->Print("\n(pi:export-file-symbols '");
       for (const std::string& e : exports) {
-        printer->Print(sep); sep = "\n             ";
+        printer->Print(sep);
+        sep = "\n                          ";
         printer->PrintRaw(e);
       }
       printer->Print("))\n");

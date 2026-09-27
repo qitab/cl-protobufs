@@ -1,0 +1,15 @@
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+package third_party.lisp.cl_protobufs.tests.import_public_middle;
+
+// Intermediate `import public` shim in its own package, compiled in the same
+// `proto_library` as import-public-target.proto and re-exported again by
+// import-public-shim.proto to exercise both same-target compile-time re-export
+// and multi-hop transitive `import public`.
+import public "import-public-target.proto"; // Test proto

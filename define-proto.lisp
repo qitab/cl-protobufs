@@ -176,6 +176,39 @@ the oneof and its nested fields.
       (unless imported
         (protobuf-error "Could not find file ~S imported by ~S" import file-descriptor)))))
 
+(defun %export-file-symbols (symbols)
+  "Exports SYMBOLS from *PACKAGE* and records them on *CURRENT-FILE-DESCRIPTOR*."
+  (export symbols)
+  (when *current-file-descriptor*
+    (dolist (symbol (if (listp symbols) symbols (list symbols)))
+      (pushnew symbol (proto-exported-symbols *current-file-descriptor*)
+               :test #'eq))))
+
+(defmacro export-file-symbols (symbols)
+  "Exports SYMBOLS from *PACKAGE* and records them on *CURRENT-FILE-DESCRIPTOR*
+   at both compile time and load time. Intended for use by protoc-gen-cl-pb."
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (%export-file-symbols ,symbols)))
+
+(defun reexport-file-symbols (pathname to-package)
+  "Makes the symbols exported by the file-descriptor for PATHNAME external in
+   TO-PACKAGE, so that the definitions of a publicly imported (`import public`)
+   file can be referred to through either package without re-exporting unrelated
+   files that share the same Lisp package. Names that are already taken by a
+   different symbol in TO-PACKAGE are left alone. Intended for use by
+   protoc-gen-cl-pb."
+  (let ((from-desc (find-file-descriptor pathname))
+        (to (find-package to-package)))
+    (when (and from-desc to)
+      (dolist (symbol (reverse (proto-exported-symbols from-desc)))
+        (multiple-value-bind (existing status)
+            (find-symbol (symbol-name symbol) to)
+          (cond ((null status)
+                 (import symbol to)
+                 (export symbol to))
+                ((eq existing symbol)
+                 (export symbol to))))))))
+
 (defun define-schema (type &key name syntax edition package import
                            optimize options)
   "Define a schema named TYPE, corresponding to a .proto file of that name.
@@ -356,7 +389,7 @@ message, and of +<value_name>+ when the enum is defined at top-level."
                 collect `(defconstant ,c ,(enum-value-descriptor-value v)))))
     `(progn
        ,@constants
-       (export ',(mapcar #'second constants)))))
+       (export-file-symbols ',(mapcar #'second constants)))))
 
 (defconstant +%undefined--length+ 11
   "The length of %undefined- which is used frequently below")
@@ -413,7 +446,7 @@ but we want an internal version for the case where we deserialized an unknown
         (collect-form (make-enum-constant-forms type value-descriptors))
         ;; The default value is the keyword associated with the first element.
         (collect-form `(record-protobuf-object ',type ,enum :enum))
-        (collect-form `(export '(,open-type)))
+        (collect-form `(export-file-symbols '(,open-type)))
         ;; Register it by the full symbol name.
         (record-protobuf-object type enum :enum))
       `(progn ,@forms))))
@@ -645,7 +678,7 @@ Parameters:
                     (eq (proto-kind field) :map))
             `((defun-inline ,external-has-function-name (obj_)
                 (,internal-has-function-name obj_))
-              (export '(,external-has-function-name))))
+              (export-file-symbols '(,external-has-function-name))))
 
         ;; Clear function
         ;; Map type clear functions are created in make-map-accessor-forms.
@@ -667,9 +700,9 @@ Parameters:
         (set-field-accessor-functions ',proto-type ',public-slot-name)
 
         ,(unless (eq (proto-kind field) :map)
-           `(export '(,clear-function-name)))
+           `(export-file-symbols '(,clear-function-name)))
 
-        (export '(,public-accessor-name)))))
+        (export-file-symbols '(,public-accessor-name)))))
 
 (defun make-repeated-field-accessors (proto-type field)
   "Make and return forms that define functions that accesses a proto
@@ -732,9 +765,9 @@ Parameters:
           (,nth-method-name ,nth-function-name)       ; (<nthfn> n obj)
           (,push-method-name ,push-function-name))    ; (<pushfn> elt obj)
 
-        (export '(,push-method-name ,push-function-name
-                  ,nth-function-name ,nth-method-name
-                  ,length-function-name ,length-method-name))))))
+        (export-file-symbols '(,push-method-name ,push-function-name
+                               ,nth-function-name ,nth-method-name
+                               ,length-function-name ,length-method-name))))))
 
 (defun make-oneof-accessor-forms (proto-type oneof)
   "Make and return forms that define accessor functions for a oneof and its fields.
@@ -775,7 +808,9 @@ Paramters:
 
         ;; Special oneof forms are only created when ONEOF is not synthetic.
         ,(unless (oneof-descriptor-synthetic-p oneof)
-           `(export '(,case-function-name ,external-has-function-name ,clear-function-name)))
+           `(export-file-symbols '(,case-function-name
+                                   ,external-has-function-name
+                                   ,clear-function-name)))
 
         ;; Fields inside of a oneof need special accessors, since they need to consult
         ;; with the oneof struct. This creates those special accessors for each field.
@@ -840,9 +875,9 @@ Paramters:
 
                   (set-field-accessor-functions ',proto-type ',public-slot-name)
 
-                  (export '(,external-has-function-name
-                            ,clear-function-name
-                            ,public-accessor-name))))))))))
+                  (export-file-symbols '(,external-has-function-name
+                                         ,clear-function-name
+                                         ,public-accessor-name))))))))))
 
 (defun make-map-accessor-forms (proto-type public-slot-name slot-name field)
   "This creates forms that define map accessors which are type safe. Using these will
@@ -905,11 +940,11 @@ function) then there is no guarantee on the serialize function working properly.
           (,overloaded-accessor-name ,public-accessor-name)
           (,overloaded-remover-name ,public-remove-name))
 
-        (export '(,public-accessor-name
-                  ,public-remove-name
-                  ,clear-function-name
-                  ,overloaded-accessor-name
-                  ,overloaded-remover-name))))))
+        (export-file-symbols '(,public-accessor-name
+                               ,public-remove-name
+                               ,clear-function-name
+                               ,overloaded-accessor-name
+                               ,overloaded-remover-name))))))
 
 (defun make-structure-class-forms-lazy (proto-type field public-slot-name)
   "Makes forms for the lazy fields of a proto message using STRUCTURE-CLASS.
@@ -1148,7 +1183,7 @@ function) then there is no guarantee on the serialize function working properly.
          (defun ,clear-is-set-name (,obj)
            (fill (,is-set-name ,obj) 0))
 
-         (export '(,public-constructor-name ,is-set-name))
+         (export-file-symbols '(,public-constructor-name ,is-set-name))
          ,@(let ((impl (fintern "CLEAR<~A>" proto-type)))
              `((defun ,impl (m)
                  (setf (message-%%skipped-bytes m) nil)
@@ -1406,8 +1441,8 @@ function) then there is no guarantee on the serialize function working properly.
                     (remhash object ,stable)))
                 (define-overloads standard ,type
                   ;; the name on the left becomes the name on the right
-                  ,reader ,accessor-name)
-                (export '(,fname ,accessor-name))))))
+                  ,reader ,accessor-name)))
+            (collect-form `(export-file-symbols '(,fname ,accessor-name)))))
         (setf (proto-kind new-field) :extends)
         (appendf (proto-fields extends) (list new-field))
         (appendf (proto-extended-fields extends) (list new-field)))

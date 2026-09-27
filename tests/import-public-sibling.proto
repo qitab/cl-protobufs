@@ -1,0 +1,16 @@
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+// Shares the protobuf (and Lisp) package of import-public-target.proto, but is
+// not publicly imported by import-public-shim.proto, so its symbols must not be
+// re-exported through the shim's package.
+package third_party.lisp.cl_protobufs.tests.import_public_target;
+
+message Sibling {
+  optional string note = 1;
+}

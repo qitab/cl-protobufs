@@ -1,0 +1,32 @@
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
+syntax = "proto2";
+
+// The definitions re-exported by import-public-middle.proto and
+// import-public-shim.proto. They live in a different package than the shims, so
+// a consumer of the shim can only reach them through the shim's package if the
+// shims re-export them.
+package third_party.lisp.cl_protobufs.tests.import_public_target;
+
+import "import-public-sibling.proto"; // Test proto
+
+enum Code {
+  OK = 0;
+  CANCELLED = 1;
+}
+
+message Detail {
+  optional string text = 1;
+  optional Sibling sibling_ref = 2;
+}
+
+// Named to match import-public-middle.proto's file schema symbol
+// (`import-public-middle`) to verify that re-exporting a message whose Lisp
+// name matches the shim's filename stem does not collide with `define-schema`.
+message ImportPublicMiddle {
+  optional string label = 1;
+}

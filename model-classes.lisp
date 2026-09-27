@@ -129,13 +129,15 @@ Parameters:
   (syntax :proto2 :type (member :proto2 :proto3 :editions))
   (edition nil :type (or null string))
   (package-name nil :type (or null string))
-  (imports () :type (list-of string)))
+  (imports () :type (list-of string))
+  (exported-symbols () :type (list-of symbol)))
 
 (defun make-file-descriptor (&key class name qualified-name options
                                   (syntax :proto2) edition
                                   (package-name nil package-name-p)
                                   (package nil)
-                                  imports)
+                                  imports
+                                  exported-symbols)
   "Create a new file-descriptor.
 Parameters:
   CLASS: The symbol class.
@@ -146,7 +148,8 @@ Parameters:
   EDITION: Protobuf edition.
   PACKAGE-NAME: Package name string.
   PACKAGE: Package symbol/name (deprecated alias for PACKAGE-NAME).
-  IMPORTS: Imported files."
+  IMPORTS: Imported files.
+  EXPORTED-SYMBOLS: Symbols exported by this file's definitions."
   (%make-file-descriptor
    :class class
    :name name
@@ -155,7 +158,8 @@ Parameters:
    :syntax (or syntax :proto2)
    :edition edition
    :package-name (if package-name-p package-name package)
-   :imports (or imports ())))
+   :imports (or imports ())
+   :exported-symbols (or exported-symbols ())))
 
 (defmethod make-load-form ((file-desc file-descriptor) &optional environment)
   (let ((class (proto-class file-desc)))
