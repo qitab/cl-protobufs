@@ -63,32 +63,46 @@
 
 ;;; Serialization
 
+(defun %serialize-to-buffer (object type)
+  "Serializes OBJECT of type TYPE into a new OCTET-BUFFER using wire format."
+  (let ((fast-function
+         #-sbcl (get type :serialize)
+         #+sbcl (when (fboundp `(:protobuf :serialize ,type))
+                  (fdefinition `(:protobuf :serialize ,type))))
+        (b (make-octet-buffer 100)))
+    (if fast-function
+        (funcall (the function fast-function) object b)
+        (serialize-message object (find-message-descriptor type) b))
+    b))
+
 (defun serialize-to-stream (object stream &optional (type (type-of object)))
   "Serialize OBJECT of type TYPE onto the STREAM using wire format.
    OBJECT and TYPE are as described in SERIALIZE-TO-BYTES."
-  (let ((buffer (serialize-to-bytes object type)))
-    ;; Todo: serialization to a stream can skip the compactification step.
-    ;; Instead use CALL-WITH-EACH-CHUNK on the uncompactified buffer
-    ;; which will iterate over ranges of octets that contain no intervening
-    ;; deletion markers.
-    (write-sequence buffer stream)
-    buffer))
+  (let ((precomputed-bytes (and (slot-exists-p object '%%bytes)
+                                (proto-%%bytes object))))
+    (if precomputed-bytes
+        (progn
+          (write-sequence precomputed-bytes stream)
+          nil)
+        (let ((b (%serialize-to-buffer object type)))
+          ;; Compactify deletion gaps in-place within the existing OCTET-BUFFER
+          ;; blocks and write each block directly to STREAM. This avoids
+          ;; allocating and copying into a single contiguous array via
+          ;; CONCATENATE-BLOCKS, while also avoiding the per-submessage
+          ;; WRITE-SEQUENCE call overhead that writing uncompacted chunks
+          ;; between backpatch deletion markers would incur.
+          (flet ((out-block (block length)
+                   (write-sequence block stream :start 0 :end length)))
+            (declare (dynamic-extent #'out-block))
+            (call-with-each-block #'out-block (compactify-blocks b)))))))
 
 (defun serialize-to-bytes (object &optional (type (type-of object)))
   "Serializes OBJECT into a new vector of (unsigned-byte 8) using wire format.
    TYPE is a symbol naming a protobuf descriptor class."
   (or (and (slot-exists-p object '%%bytes)
            (proto-%%bytes object))
-      (let ((fast-function
-             #-sbcl (get type :serialize)
-             #+sbcl (when (fboundp `(:protobuf :serialize ,type))
-                      (fdefinition `(:protobuf :serialize ,type))))
-            (b (make-octet-buffer 100)))
-        (if fast-function
-            (funcall (the function fast-function) object b)
-            (serialize-message object (find-message-descriptor type) b))
-        (let ((compact-buf (compactify-blocks b)))
-          (concatenate-blocks compact-buf)))))
+      (let ((compact-buf (compactify-blocks (%serialize-to-buffer object type))))
+        (concatenate-blocks compact-buf))))
 
 ;; Serialize the object using the given protobuf type
 

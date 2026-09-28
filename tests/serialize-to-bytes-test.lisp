@@ -93,3 +93,57 @@ Parameters
       (assert-true (typep (message-with-floats.test-float des-msg) 'float))
       (assert-eql 6.0d0 (message-with-floats.test-double des-msg))
       (assert-true (typep (message-with-floats.test-double des-msg) 'double-float)))))
+
+
+(deftest test-serialize-to-stream (serialize-suite)
+  (let ((path (merge-pathnames "serialize-to-stream-test.bin"
+                               (user-homedir-pathname))))
+    (unwind-protect
+         (flet ((verify-stream-serialization (msg type)
+                  (let ((expected-bytes (serialize-to-bytes msg type)))
+                    (with-open-file (stream path
+                                            :direction :io
+                                            :if-exists :supersede
+                                            :if-does-not-exist :create
+                                            :element-type '(unsigned-byte 8))
+                      (serialize-to-stream msg stream type)
+                      (finish-output stream)
+                      (assert-eql (length expected-bytes) (file-length stream))
+                      (file-position stream 0)
+                      (let ((stream-bytes (make-array (file-length stream)
+                                                      :element-type '(unsigned-byte 8))))
+                        (read-sequence stream-bytes stream)
+                        (assert-equalp expected-bytes stream-bytes))
+                      (file-position stream 0)
+                      (let ((deserialized (deserialize-from-stream type stream)))
+                        (assert-true (proto-equal msg deserialized)))))))
+           ;; Empty message (0 bytes)
+           (verify-stream-serialization (make-optional-message) 'optional-message)
+           ;; Simple scalar message
+           (verify-stream-serialization
+            (make-optional-message :optional-no-default 42 :optional-with-default 7)
+            'optional-message)
+           ;; Nested message with multiple submessages and strings spanning multiple
+           ;; octet-buffer blocks (> 100 bytes) with backpatched length placeholders.
+           (let ((pop (make-population
+                       :people (loop for i from 1 to 10
+                                     collect (make-person
+                                              :id i
+                                              :name (format nil "Person-~D-~A"
+                                                            i (make-string 20 :initial-element #\x))
+                                              :home (make-address
+                                                     :street (format nil "~D Main Street" i)
+                                                     :s-number (* i 100))
+                                              :spouse (make-person
+                                                       :id (+ i 1000)
+                                                       :name (format nil "Spouse-~D" i))
+                                              :odd-p (oddp i))))))
+             (verify-stream-serialization pop 'population)
+             ;; Precomputed %%bytes (lazy field) path
+             (let ((precomputed (make-optional-message :optional-no-default 99)))
+               (setf (slot-value precomputed 'cl-protobufs.implementation::%%bytes)
+                     (serialize-to-bytes precomputed 'optional-message))
+               (verify-stream-serialization precomputed 'optional-message))))
+      (when (probe-file path)
+        (delete-file path)))))
+

@@ -646,6 +646,7 @@ and rewind BUFFER so that it is empty."
 ;; Given a BUFFER or a SERIALIZED-PROTOBUF, call FUNCTION once with each
 ;; block, passing it also the effective length of the block.
 (defun call-with-each-block (function buffer)
+  (declare (function function) #.$optimize-buffering)
   (etypecase buffer
     (serialized-protobuf
      (let ((blocks (serialized-protobuf-blocks buffer)))

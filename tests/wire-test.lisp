@@ -295,3 +295,36 @@ Paramaters:
                         '((0.0d0 #(0 0 0 0 0 0 0 0))
                           (1.0d0 #(0 0 0 0 0 0 240 63))
                           (0.1d0 #(154 153 153 153 153 153 185 63)))))
+
+(deftest test-call-with-each-block (wire-format-suite)
+  (flet ((collect-blocks (compact-buf)
+           (let ((result (make-array 0 :element-type '(unsigned-byte 8)
+                                       :adjustable t :fill-pointer 0)))
+             (pi::call-with-each-block
+              (lambda (block length)
+                (loop for i from 0 below length
+                      do (vector-push-extend (aref block i) result)))
+              compact-buf)
+             (coerce result '(simple-array (unsigned-byte 8) (*))))))
+    ;; Empty buffer
+    (let ((empty-buf (compactify-blocks (make-octet-buffer 16))))
+      (assert-equalp #() (collect-blocks empty-buf)))
+    ;; Buffer with placeholders and deletions spanning block boundaries
+    (let ((buf (make-octet-buffer 8)))
+      (dotimes (i 6)
+        (pi::octet-out buf (+ i 1)))
+      ;; At index 6 of an 8-byte block, a 4-byte placeholder spans blocks 1 and 2.
+      (pi::with-placeholder (buf)
+        (dotimes (i 10)
+          (pi::octet-out buf (+ i 10)))
+        (pi::backpatch 10))
+      ;; Another placeholder with a 2-byte varint length (>= 128)
+      (pi::with-placeholder (buf)
+        (dotimes (i 130)
+          (pi::octet-out buf (mod i 256)))
+        (pi::backpatch 130))
+      (let* ((compact-buf (compactify-blocks buf))
+             (from-blocks (collect-blocks compact-buf))
+             (from-concat (concatenate-blocks compact-buf)))
+        (assert-equalp from-concat from-blocks)))))
+
