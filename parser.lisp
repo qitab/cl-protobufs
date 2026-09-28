@@ -30,18 +30,21 @@
               (digit-char-p ch)
               (member ch '(#\_ #\.)))))
 
+(defvar *parse-comments* t
+  "If true, skip # comments when parsing.")
+
 (defun skip-whitespace-comments-and-chars (stream &key chars)
   "Skip all whitespace characters, text-format comments and elements of CHARS
 are coming up in the STREAM."
   (loop for ch = (peek-char nil stream nil)
         until (or (null ch)
                   (and (not (proto-whitespace-char-p ch))
-                       (not (proto-hash-char-p ch))
+                       (not (and *parse-comments* (proto-hash-char-p ch)))
                        (not (if (listp chars)
                                 (member ch chars)
                                 (eql ch chars)))))
         do
-     (if (proto-hash-char-p ch)
+     (if (and *parse-comments* (proto-hash-char-p ch))
          (read-line stream nil)
          (read-char stream nil))))
 
@@ -112,7 +115,7 @@ caret string that visually marks the error position in the line."
     (skip-whitespace stream)
     (if (string= str string)
         str
-        (error "No ~S found at position ~D" string (file-position stream)))))
+        (protobuf-error "No ~S found at position ~D" string (file-position stream)))))
 
 (defun maybe-skip-chars (stream chars)
   "Skip some optional characters in the stream,
@@ -126,52 +129,9 @@ caret string that visually marks the error position in the line."
           (return-from maybe-skip-chars)))
       (read-char stream))))
 
-
-;;--- Collect the comment so we can attach it to its associated object
-(defun maybe-skip-comments (stream)
-  "If what appears next in the stream is a comment, skip it and any following comments,
-   then skip any following whitespace."
-  (loop
-    (let ((ch (peek-char nil stream nil)))
-      (unless (eql ch #\/)
-        (return-from maybe-skip-comments))
-      (read-char stream)
-      (case (peek-char nil stream nil)
-        ((#\/)
-         (skip-line-comment stream))
-        ((#\*)
-         (skip-block-comment stream))
-        ((nil)
-         (skip-whitespace stream)
-         (return-from maybe-skip-comments))
-        (otherwise
-         (protobuf-error "Found '/' at position ~D to start a comment, but no following '/' or '*'"
-                         (file-position stream)))))))
-
-(defun skip-line-comment (stream)
-  "Skip to the end of a line comment, that is, to the end of the line.
-   Then skip any following whitespace."
-  (loop for ch = (read-char stream nil)
-        until (or (null ch) (proto-eol-char-p ch)))
-  (skip-whitespace stream))
-
-(defun skip-block-comment (stream)
-  "Skip to the end of a block comment, that is, until a '*/' is seen.
-   Then skip any following whitespace."
-  (loop for ch = (read-char stream nil)
-        do (cond ((null ch)
-                  (protobuf-error "Premature end of file while skipping block comment"))
-                 ((and (eql ch #\*)
-                       (eql (peek-char nil stream nil) #\/))
-                  (read-char stream nil)
-                  (return))))
-  (skip-whitespace stream))
-
-
 (defun parse-token (stream &optional additional-chars)
-  "Parse the next token in the stream, then skip following whitespace/comments.
+  "Parse the next token in the stream, then skip following whitespace.
    The returned value is the token."
-  (maybe-skip-comments stream)
   (when (let ((ch (peek-char nil stream nil)))
           (or (proto-token-char-p ch) (member ch additional-chars)))
     (loop for ch = (read-char stream nil)
@@ -182,7 +142,6 @@ caret string that visually marks the error position in the line."
                          (not (member ch1 additional-chars))))
           finally (progn
                     (skip-whitespace stream)
-                    (maybe-skip-comments stream)
                     (return (coerce token 'string))))))
 
 (defun parse-parenthesized-token (stream)
@@ -262,8 +221,9 @@ caret string that visually marks the error position in the line."
 (defun unescape-char (stream)
   "Parse the next \"escaped\" character from the stream."
   (let ((ch (read-char stream nil)))
-    (assert (not (null ch)) ()
-            "End of stream reached while reading escaped character")
+    (unless ch
+      (protobuf-error "End of stream reached while reading escaped character at position ~D"
+                      (file-position stream)))
     (case ch
       ((#\x)
        ;; Two hex digits
@@ -315,29 +275,31 @@ caret string that visually marks the error position in the line."
 (defun parse-unsigned-int (stream)
   "Parse the next token in the stream as an integer, then skip the following whitespace.
    The returned value is the integer."
-  (when (digit-char-p (peek-char nil stream nil))
-    (loop for ch = (read-char stream nil)
-          for ch1 = (peek-char nil stream nil)
-          collect ch into token
-          until (or (null ch1) (and (not (digit-char-p ch1)) (not (eql ch #\x))))
-          finally (progn
-                    (skip-whitespace stream)
-                    (let ((token (coerce token 'string)))
-                      (if (starts-with token "0x")
-                        (let ((*read-base* 16))
-                          (return (parse-integer (subseq token 2))))
-                        (return (parse-integer token))))))))
+  (if (digit-char-p (peek-char nil stream nil))
+      (loop for ch = (read-char stream nil)
+            for ch1 = (peek-char nil stream nil)
+            collect ch into token
+            until (or (null ch1) (and (not (digit-char-p ch1)) (not (eql ch #\x))))
+            finally (progn
+                      (skip-whitespace stream)
+                      (let ((token (coerce token 'string)))
+                        (if (starts-with token "0x")
+                            (let ((*read-base* 16))
+                              (return (parse-integer (subseq token 2))))
+                            (return (parse-integer token))))))
+      (protobuf-error "Expecting an integer at position ~D" (file-position stream))))
 
 (defun parse-float (stream)
   "Parse the next token in the STREAM as a float, then skip the following whitespace.
    The returned value is the float."
   (let ((number (parse-number stream :allow-inf-nan t)))
-    (when number
-      (case number
-        (:infinity float-features:single-float-positive-infinity)
-        (:-infinity float-features:single-float-negative-infinity)
-        (:nan float-features:single-float-nan)
-        (t (coerce number 'float))))))
+    (if (realp number)
+        (coerce number 'float)
+        (case number
+          (:infinity float-features:single-float-positive-infinity)
+          (:-infinity float-features:single-float-negative-infinity)
+          (:nan float-features:single-float-nan)
+          (t (protobuf-error "Expecting a float at position ~D" (file-position stream)))))))
 
 (defun parse-double (stream &key append-d0)
   "Parse the next token in the STREAM as a double, then skip the following whitespace.
@@ -345,12 +307,13 @@ If APPEND-D0 is true, then append 'd0' to the parsed number before attempting to
 to a double. This is necessary in order to parse doubles from the stream which do not
 already have the 'd0' suffix. The returned value is the double-float."
   (let ((number (parse-number stream :append-d0 append-d0 :allow-inf-nan t)))
-    (when number
-      (case number
-        (:infinity float-features:double-float-positive-infinity)
-        (:-infinity float-features:double-float-negative-infinity)
-        (:nan float-features:DOUBLE-FLOAT-NAN )
-        (t (coerce number 'double-float))))))
+    (if (realp number)
+        (coerce number 'double-float)
+        (case number
+          (:infinity float-features:double-float-positive-infinity)
+          (:-infinity float-features:double-float-negative-infinity)
+          (:nan float-features:double-float-nan)
+          (t (protobuf-error "Expecting a double-float at position ~D" (file-position stream)))))))
 
 (defun parse-number (stream &key append-d0 allow-inf-nan)
   "Parse a number from STREAM. If APPEND-D0 is true, append \"d0\"
@@ -380,4 +343,5 @@ true, allow inifinty or nan values."
         ((member string '("-inf" "-infinity") :test #'string-equal)
          :-infinity)
         (t
-         (read-from-string string))))
+         (ignore-errors (read-from-string string)))))
+

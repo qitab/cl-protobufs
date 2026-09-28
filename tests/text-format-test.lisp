@@ -664,3 +664,53 @@ Line 2:    int_field: 11,
       ;; Combination 4: Print = T, Parse = T
       ;; Escaped ASCII sequences are parsed and properly UTF-8 decoded back to "ä中".
       (assert-equality #'string= "ä中" (parse-msg print-t-text t)))))
+
+(deftest test-parse-malformed-map-entry (text-format-suite)
+  (assert-condition proto:protobuf-error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "map_field { not_key: 1 value: 'one' }")))
+  (assert-condition proto:protobuf-error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "map_field { key: 1 not_value: 'one' }"))))
+
+(deftest test-parse-text-format-rejects-c-comments (text-format-suite)
+  (assert-condition proto:protobuf-error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "// comment
+int_field: 1")))
+  (assert-condition proto:protobuf-error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "/* comment */ int_field: 1")))
+  (assert-condition proto:protobuf-error
+      (proto:parse-text-format
+       'test-pb:text-format-test
+       :stream (make-string-input-stream "int_field/* comment */: 1"))))
+
+(deftest test-format-pretty-stream-and-print-circle (text-format-suite)
+  (let* ((shared-bytes (make-array 4 :element-type '(unsigned-byte 8)
+                                     :initial-contents '(0 1 2 3)))
+         (shared-str (copy-seq "shared"))
+         (msg (test-pb:make-text-format-test
+               :int-field 100
+               :string-field shared-str
+               :string-fields (list shared-str shared-str)
+               :bytes-field shared-bytes
+               :enum-vals (list :none :twenty-one)
+               :one-level-nesting (test-pb:make-text-format-test.nested-message1
+                                   :int-field 2))))
+    (setf (test-pb:text-format-test.map-field-gethash 1 msg) shared-str)
+    (let ((expected (with-output-to-string (s)
+                      (proto:print-text-format msg :stream s :pretty-print-p t)))
+          (actual (let ((*print-circle* t)
+                        (*print-pretty* t))
+                    (with-output-to-string (s)
+                      (pprint-logical-block (s nil)
+                        (format s "~@/cl-protobufs:fmt/" msg))))))
+      (assert-equality #'string= expected actual)
+      (assert-false (search "#1=" actual))
+      (assert-false (search (format nil "~%~%") actual)))))
+

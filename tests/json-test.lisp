@@ -467,3 +467,66 @@ the result is PROTO-EQUAL with MSG."
                    (proto:parse-json 'custom-pb:custom-json-message :stream s))))
     (assert-equal (custom-pb:enum-field orig) (custom-pb:enum-field parsed))
     (assert-equal (custom-pb:repeated-enum-field orig) (custom-pb:repeated-enum-field parsed))))
+
+(deftest test-print-json-extension (json-suite)
+  (let ((msg (pb:make-extend-test :int-field 7)))
+    (assert-equality #'string=
+                     "{\"intField\":7}"
+                     (with-output-to-string (s)
+                       (proto:print-json msg :stream s :pretty-print-p nil)))
+    (proto:set-extension msg 'pb:ext-field "ext-val")
+    (assert-equality #'string=
+                     "{\"intField\":7,\"extField\":\"ext-val\"}"
+                     (with-output-to-string (s)
+                       (proto:print-json msg :stream s :pretty-print-p nil)))))
+
+(deftest test-parse-json-malformed-errors (json-suite)
+  ;; Duration missing trailing 's' (b/191373293).
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "\"100\"")
+        (proto:parse-json 'google:duration :stream s)))
+  ;; Unrecognized token instead of "null" (b/191373293).
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "{\"intField\": nul}")
+        (proto:parse-json 'pb:text-format-test :stream s)))
+  ;; Unrecognized token in google.protobuf.Value.
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "@invalid")
+        (proto:parse-json 'google:value :stream s)))
+  ;; EOF while reading escaped character in string.
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "{\"stringField\": \"\\")
+        (proto:parse-json 'pb:text-format-test :stream s))))
+
+(deftest test-parse-json-rejects-comments (json-suite)
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "{ # comment
+\"intField\": 1 }")
+        (proto:parse-json 'pb:text-format-test :stream s)))
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "{ // comment
+\"intField\": 1 }")
+        (proto:parse-json 'pb:text-format-test :stream s)))
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "{ /* comment */ \"intField\": 1 }")
+        (proto:parse-json 'pb:text-format-test :stream s))))
+
+(deftest test-format-json-pretty-stream-and-print-circle (json-suite)
+  (let* ((shared-bytes (make-array 3 :element-type '(unsigned-byte 8)
+                                     :initial-contents '(1 2 3)))
+         (shared-str (copy-seq "shared"))
+         (msg (pb:make-text-format-test
+               :string-field shared-str
+               :string-fields (list shared-str shared-str)
+               :bytes-field shared-bytes
+               :one-level-nesting (pb:make-text-format-test.nested-message1
+                                   :int-field 2)))
+         (expected (with-output-to-string (s)
+                     (proto:print-json msg :stream s :pretty-print-p t)))
+         (actual (let ((*print-circle* t)
+                       (*print-pretty* t))
+                   (with-output-to-string (s)
+                     (pprint-logical-block (s nil)
+                       (format s "~@/cl-protobufs.json:fmt/" msg))))))
+    (assert-equality #'string= expected actual)))
+

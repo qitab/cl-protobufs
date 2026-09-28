@@ -50,18 +50,19 @@ Parameters:
     Default is nil (print all).
   PRINT-LEVEL: Limit the recursion depth in nested messages.
     Default is nil (unlimited)."
-  (let* ((type (type-of object))
+  (let* ((*print-circle* nil)
+         (type (type-of object))
          (message (find-message-descriptor type :error-p t))
          (print-level (1- (or print-level most-positive-fixnum)))
          (print-length (or print-length most-positive-fixnum)))
     (dolist (field (proto-fields message))
-      (when (if (eq (slot-value field 'kind) :extends)
-                (has-extension object (slot-value field 'external-field-name))
-                (has-field object (slot-value field 'external-field-name)))
+      (when (if (eq (proto-kind field) :extends)
+                (has-extension object (proto-external-field-name field))
+                (has-field object (proto-external-field-name field)))
         (let* ((value
-                (if (eq (slot-value field 'kind) :extends)
-                    (get-extension object (slot-value field 'external-field-name))
-                    (proto-slot-value object (slot-value field 'external-field-name)))))
+                (if (eq (proto-kind field) :extends)
+                    (get-extension object (proto-external-field-name field))
+                    (proto-slot-value object (proto-external-field-name field)))))
           (flet ((print-value (v)
                    (%print-field v
                                 (proto-class field)
@@ -81,7 +82,9 @@ Parameters:
                :do (print-value element)
                :finally
                (when (>= i print-length)
-                 (princ "..." stream))))
+                 (if pretty-print-p
+                     (format stream "~V,0T...~%" indent)
+                     (princ "..." stream)))))
              ((arrayp value)
               (loop
                :for element :across value
@@ -89,7 +92,9 @@ Parameters:
                :do (print-value element)
                :finally
                (when (>= i print-length)
-                 (princ "..." stream))))
+                 (if pretty-print-p
+                     (format stream "~V,0T...~%" indent)
+                     (princ "..." stream)))))
              (t
               (error 'unknown-repeated
                      :format-control
@@ -144,7 +149,7 @@ Parameters:
                                       :print-level print-level)
              (print-message-brace nil name pretty-print-p indent stream))
        (pretty-print-p
-          (format stream "~&~V,0T~A: {...}~%" indent name))
+          (format stream "~V,0T~A: {...}~%" indent name))
        (t
           (format stream "~A: {...} " name))))
       ((typep desc 'enum-descriptor)
@@ -153,9 +158,11 @@ Parameters:
        (loop for k being the hash-keys of value using (hash-value v)
              for i from 0 below print-length
              do (if pretty-print-p
-                    (format stream "~&~V,0T~A { " indent name)
+                    (format stream "~V,0T~A { " indent name)
                     (format stream "~A { " name))
                 (print-scalar k (proto-key-type desc) "key" stream nil)
+                (when pretty-print-p
+                  (format stream "~%"))
                 (%print-field v (proto-value-type desc) "value"
                               (+ indent 2)
                               stream
@@ -189,7 +196,7 @@ Parameters:
             do not write a newline."
   (when (or val (eq type 'boolean) (eq type 'symbol))
     (when indent
-      (format stream "~&~V,0T" indent))
+      (format stream "~V,0T" indent))
     (when name
       (format stream "~A: " name))
     (ecase type
@@ -245,7 +252,7 @@ Parameters:
             do not write a newline."
   (when val
     (when indent
-      (format stream "~&~V,0T" indent))
+      (format stream "~V,0T" indent))
     (when name
       (format stream "~A: " name))
     (let* ((e (find (keywordify val)
@@ -269,10 +276,10 @@ Parameters:
   STREAM: The stream to print to."
   (if opening-p
       (if pretty-print-p
-          (format stream "~&~V,0T~A {~%" indent name)
+          (format stream "~V,0T~A {~%" indent name)
           (format stream "~A { " name))
       (if pretty-print-p
-          (format stream "~&~V,0T}~%" indent)
+          (format stream "~V,0T}~%" indent)
           (format stream "} "))))
 
 ;;; Parse objects that were serialized using the text format
@@ -283,9 +290,6 @@ Parameters:
            (type stream stream))
   (let ((message (find-message-descriptor type :error-p t)))
     (parse-text-format-impl message :stream stream)))
-
-;;; TODO(cgay): replace all assertions here with something that signals a
-;;; subtype of protobuf-error and shows current stream position.
 
 (defun parse-text-format-impl
     (msg-desc &key (stream *standard-input*))
@@ -411,10 +415,14 @@ return T as a second value."
                (flet ((parse-map-entry (key-type val-type stream)
                         (let (key val)
                           (expect-char stream #\{)
-                          (assert (string= "key" (parse-token stream)))
+                          (unless (string= "key" (parse-token stream))
+                            (report-error-with-line
+                             stream "Map entry must start with 'key'"))
                           (setf key (parse-field key-type :stream stream))
                           (skip-whitespace-comments-and-chars stream)
-                          (assert (string= "value" (parse-token stream)))
+                          (unless (string= "value" (parse-token stream))
+                            (report-error-with-line
+                             stream "Map entry must have 'value' field"))
                           (setf val (parse-field val-type :stream stream))
                           (skip-whitespace-comments-and-chars stream)
                           (expect-char stream #\})
@@ -447,8 +455,10 @@ return T as a second value."
    COLON-P and AT-SIGN-P are the usual for format directives.
    WIDTH and OTHER-ARGS  is ignored."
   (declare (ignore width))
-  (cond (other-args (error "FORMAT directive ~~/cl-protobufs:fmt/ takes only one argument."))
-        (colon-p (error "FORMAT directive ~~/cl-protobufs:fmt/ does not take colons."))
+  (cond (other-args (protobuf-error
+                     "FORMAT directive ~~/cl-protobufs:fmt/ takes only one argument."))
+        (colon-p (protobuf-error
+                  "FORMAT directive ~~/cl-protobufs:fmt/ does not take colons."))
         (t (print-text-format proto
                               :stream stream
                               :pretty-print-p at-sign-p

@@ -36,8 +36,9 @@ Parameters:
   STREAM: The stream to print to.
   CAMEL-CASE-P: If true print proto field names in camelCase.
   NUMERIC-ENUMS-P: If true, use enum numeric values rather than names."
-  (print-json-impl object (when pretty-print-p 0) stream camel-case-p numeric-enums-p
-                   nil))
+  (let ((*print-circle* nil))
+    (print-json-impl object (when pretty-print-p 0) stream camel-case-p numeric-enums-p
+                     nil)))
 
 (defun print-json-impl (object indent stream camel-case-p numeric-enums-p
                         spliced-p)
@@ -65,29 +66,28 @@ Parameters:
       (print-special-json object type stream indent camel-case-p numeric-enums-p)
       (return-from print-json-impl))
     (unless spliced-p
-      (format stream "{")
-      (when indent (format stream "~%")))
+      (format stream "{"))
     ;; Boolean that tracks if a field is printed. Used for printing commas
     ;; correctly. If this object is spliced into an existing JSON object, then
     ;; a field has been already printed, so always print a comma.
     (let ((field-printed spliced-p))
       (dolist (field (proto-fields message))
-        (when (if (eq (slot-value field 'pi::kind) :extends)
-                  (has-extension object (slot-value field 'external-field-name))
-                  (has-field object (slot-value field 'pi::external-field-name)))
+        (when (if (eq (proto-kind field) :extends)
+                  (has-extension object (proto-external-field-name field))
+                  (has-field object (proto-external-field-name field)))
           (let* ((name (if camel-case-p
                            (pi::proto-json-name field)
                            (proto-name field)))
                  (type (proto-class field))
                  (value
-                   (if (eq (slot-value field 'pi::kind) :extends)
-                       (get-extension object (slot-value field 'pi::external-field-name))
-                       (proto-slot-value object (slot-value field 'pi::external-field-name)))))
+                   (if (eq (proto-kind field) :extends)
+                       (get-extension object (proto-external-field-name field))
+                       (proto-slot-value object (proto-external-field-name field)))))
             (if field-printed
                 (format stream ",")
                 (setf field-printed t))
             (if indent
-                (format stream "~&~V,0T\"~A\": " (+ indent 2) name)
+                (format stream "~%~V,0T\"~A\": " (+ indent 2) name)
                 (format stream "\"~A\":" name))
             (if (not (eq (proto-label field) :repeated))
                 (print-field-to-json value type (and indent (+ indent 2))
@@ -98,11 +98,11 @@ Parameters:
                     (if repeated-printed
                         (format stream ",")
                         (setf repeated-printed t))
-                    (when indent (format stream "~&~V,0T" (+ indent 4)))
+                    (when indent (format stream "~%~V,0T" (+ indent 4)))
                     (print-field-to-json v type (and indent (+ indent 4))
                                          stream camel-case-p numeric-enums-p))
                   (if indent
-                      (format stream "~&~V,0T]" (+ indent 2))
+                      (format stream "~%~V,0T]" (+ indent 2))
                       (format stream "]")))))))
       (dolist (oneof (pi::proto-oneofs message))
         (let* ((oneof-data (slot-value object (pi::oneof-descriptor-internal-name oneof)))
@@ -118,12 +118,12 @@ Parameters:
                   (format stream ",")
                   (setf field-printed t))
               (if indent
-                  (format stream "~&~V,0T\"~A\": " (+ indent 2) name)
+                  (format stream "~%~V,0T\"~A\": " (+ indent 2) name)
                   (format stream "\"~A\":" name))
               (print-field-to-json value type (and indent (+ indent 2))
                                    stream camel-case-p numeric-enums-p))))))
     (if indent
-        (format stream "~&~V,0T}" indent)
+        (format stream "~%~V,0T}" indent)
         (format stream "}"))))
 
 (defun print-field-to-json (value type indent stream camel-case-p numeric-enums-p)
@@ -203,25 +203,21 @@ Parameters:
   STREAM: The stream to print to.
   CAMEL-CASE-P, NUMERIC-ENUMS-P: passed recursively to PRINT-FIELD-TO-JSON."
   (format stream "{")
-  (when indent (format stream "~%"))
   (let ((pair-printed nil))
     (loop for k being the hash-key of value using (hash-value v)
           do (if pair-printed
                  (format stream ",")
                  (setf pair-printed t))
              (if indent
-                 (format stream "~&~V,0T\"~A\": " (+ indent 2) k)
+                 (format stream "~%~V,0T\"~A\": " (+ indent 2) k)
                  (format stream "\"~A\":"  (write-to-string k)))
              (print-field-to-json v (pi::proto-value-type map-descriptor)
                                   (and indent (+ indent 2)) stream camel-case-p numeric-enums-p)))
     (if indent
-        (format stream "~&~V,0T}" indent)
+        (format stream "~%~V,0T}" indent)
         (format stream "}")))
 
 ;;; Parse objects that were serialized using JSON format.
-
-;;; TODO(cgay): replace all assertions here with something that signals a
-;;; subtype of protobuf-error and shows current stream position.
 
 (defun parse-json (type
                    &key (stream *standard-input*) ignore-unknown-fields-p)
@@ -233,7 +229,8 @@ Parameters:
   IGNORE-UNKNOWN-FIELDS-P: If true, then skip fields which are not defined in the
     message TYPE descriptor. Otherwise, throw an error."
   (declare (type symbol type))
-  (let ((message (find-message-descriptor type :error-p t)))
+  (let ((message (find-message-descriptor type :error-p t))
+        (pi::*parse-comments* nil))
     (parse-json-impl message stream ignore-unknown-fields-p nil)))
 
 (defun parse-json-impl (msg-desc stream ignore-unknown-fields-p spliced-p)
@@ -355,7 +352,7 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
                      "~S is not a valid keyword for well-known enum NullValue" name)))
              (if (eql type-parsed 'symbol)
                  ;; If the parsed type is a symbol, then the enum was printed as an integer.
-                 (let ((val (parse-integer name :junk-allowed t)))
+                 (let ((val (and name (parse-integer name :junk-allowed t))))
                    (and val (enum-int-to-keyword type val)))
                  ;; Otherwise, it is a string which names a keyword, custom json-name, or integer.
                  (enum-json-to-keyword type name))))
@@ -465,18 +462,18 @@ PRINT-JSON-IMPL for any types."
            (packed-message (wkt:unpack-any object)))
        (format stream "{")
        (if indent
-           (format stream "~&~V,0T\"url\": \"~A\"" (+ indent 2) url)
+           (format stream "~%~V,0T\"url\": \"~A\"" (+ indent 2) url)
            (format stream "\"url\": \"~A\"" url))
        (if (special-json-p (type-of packed-message))
            ;; special handling for nested special json mapping within an ANY.
            (progn
              (if indent
-                 (format stream ",~&~V,0T\"value\": " (+ indent 2))
+                 (format stream ",~%~V,0T\"value\": " (+ indent 2))
                  (format stream ",\"value\":"))
              (print-special-json packed-message (type-of packed-message) stream
                                  (and indent (+ indent 2)) camel-case-p numeric-enums-p)
              (if indent
-                 (format stream "~&~V,0T}" indent)
+                 (format stream "~%~V,0T}" indent)
                  (format stream "}")))
            (print-json-impl packed-message indent stream camel-case-p
                             numeric-enums-p t))))
@@ -499,7 +496,9 @@ PRINT-JSON-IMPL for any types."
     ((google:duration)
      (let ((seconds (google:duration.seconds object))
            (nanos (google:duration.nanos object)))
-       (assert (eql (signum seconds) (signum nanos)))
+       (unless (eql (signum seconds) (signum nanos))
+         (protobuf-error "Duration seconds ~D and nanos ~D must have the same sign."
+                         seconds nanos))
        (format stream "\"~D.~V,VDs\"" seconds 9 #\0 (abs nanos))))
     ((google:field-mask)
      (let ((paths (google:field-mask.paths object)))
@@ -515,11 +514,11 @@ PRINT-JSON-IMPL for any types."
      (loop for print-comma-p = nil then t
            for value in (google:values object)
            do (when print-comma-p (format stream ","))
-              (when indent (format stream "~&~V,0T" (+ 2 indent)))
+              (when indent (format stream "~%~V,0T" (+ 2 indent)))
               (print-field-to-json value 'google:value (and indent (+ indent 2))
                                    stream camel-case-p numeric-enums-p))
      (if indent
-         (format stream "~&~V,0T]" indent)
+         (format stream "~%~V,0T]" indent)
          (format stream "]")))
     ((google:value)
      (let* ((oneof-data (slot-value object 'google::%kind))
@@ -527,8 +526,9 @@ PRINT-JSON-IMPL for any types."
             ;; descriptor's list is the one we are looking for.
             (oneof-desc (first (pi::proto-oneofs (find-message-descriptor type))))
             (set-field (pi::oneof-set-field oneof-data)))
-       (assert set-field ()
-               "Message ~S must have a set 'kind' oneof as it has well-known-type 'Value'." object)
+       (unless set-field
+         (protobuf-error
+          "Message ~S must have a set 'kind' oneof as it has well-known-type 'Value'." object))
        (let* ((field (aref (pi::oneof-descriptor-fields oneof-desc)
                            (pi::oneof-set-field oneof-data)))
               (value (pi::oneof-value oneof-data)))
@@ -585,7 +585,7 @@ calls to PARSE-JSON-IMPL."
     ((google:duration)
      (pi::expect-char stream #\")
      (let ((seconds (pi::parse-signed-int stream)))
-       (ecase (peek-char nil stream nil)
+       (case (peek-char nil stream nil)
          ;; Duration has no decimal component.
          ((#\s)
           (pi::expect-char stream #\s)
@@ -595,8 +595,12 @@ calls to PARSE-JSON-IMPL."
           (pi::expect-char stream #\.)
           ;; Parse the decimal part of the string, and convert to nanoseconds.
           (let ((remainder (pi::parse-token stream)))
-            (assert (eql (char remainder (1- (length remainder))) #\s)
-                    nil "Duration string ~S.~A does end with \"s\"" seconds remainder)
+            (unless (and remainder
+                         (plusp (length remainder))
+                         (eql (char remainder (1- (length remainder))) #\s))
+              (protobuf-error
+               "Duration string ~S.~A does not end with \"s\" at position ~D"
+               seconds remainder (file-position stream)))
             (pi::expect-char stream #\")
             (let* ((decimals (subseq remainder 0 (1- (length remainder))))
                    ;; If there are more than 9 decimal points, trim to length 9.
@@ -614,7 +618,10 @@ calls to PARSE-JSON-IMPL."
                          (parse-integer (concatenate 'string
                                                      decimals
                                                      (make-string (- 9 dec-length)
-                                                                  :initial-element #\0)))))))))))
+                                                                  :initial-element #\0))))))))
+         (otherwise
+          (protobuf-error "Invalid duration character ~S at position ~D"
+                          (peek-char nil stream nil) (file-position stream))))))
 
     ;; Field masks are in the form \"camelCasePath1,path2,path3\". We need to first split,
     ;; then convert to proto field name format (lowercase, separated by underscore).
@@ -646,7 +653,9 @@ calls to PARSE-JSON-IMPL."
                                          :stream stream
                                          :ignore-unknown-fields-p ignore-unknown-fields-p)
                 (if err
-                    (error "Error while parsing well known type VALUE from JSON format.")
+                    (protobuf-error
+                     "Error while parsing well known type VALUE from JSON format at position ~D."
+                     (file-position stream))
                     (push data (google:list-value.values ret))))
               (if (eql (peek-char nil stream nil) #\,)
                   (pi::expect-char stream #\,)
@@ -683,6 +692,8 @@ calls to PARSE-JSON-IMPL."
    COLON-P and AT-SIGN-P are the usual for format directives.
    WIDTH and OTHER-ARGS are ignored."
   (declare (ignore width))
-  (cond (other-args (error "FORMAT directive ~~/cl-protobufs.json:fmt/ takes only one argument."))
-        (colon-p (error "FORMAT directive ~~/cl-protobufs.json:fmt/ does not take colons."))
+  (cond (other-args (protobuf-error
+                     "FORMAT directive ~~/cl-protobufs.json:fmt/ takes only one argument."))
+        (colon-p (protobuf-error
+                  "FORMAT directive ~~/cl-protobufs.json:fmt/ does not take colons."))
         (t (print-json proto :stream stream :pretty-print-p at-sign-p))))
