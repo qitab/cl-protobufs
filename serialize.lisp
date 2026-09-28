@@ -646,12 +646,15 @@ Parameters:
           (loop for extension in extension-list do
             (set-extension new-struct (first extension) (second extension)))
           (when bool-map
-            (loop with bool-vec = (slot-value new-struct '%%bool-values)
-                  for (bool-index . value) in bool-map do
-                    (setf (bit bool-vec bool-index) (if value 1 0))))
-          (loop with is-set = (slot-value new-struct '%%is-set)
-                for offset in offset-list do
-                  (setf (bit is-set offset) 1))
+            (let ((bool-vals (slot-value new-struct '%%bool-values)))
+              (loop for (bool-index . value) in bool-map do
+                (setf (ldb (byte 1 bool-index) bool-vals) (if value 1 0)))
+              (setf (slot-value new-struct '%%bool-values) bool-vals)))
+          (when offset-list
+            (let ((is-set (slot-value new-struct '%%is-set)))
+              (loop for offset in offset-list do
+                (setf (ldb (byte 1 offset) is-set) 1))
+              (setf (slot-value new-struct '%%is-set) is-set)))
           (when skipped-bytes-tuple
             (setf (message-%%skipped-bytes new-struct)
                   (make-skipped-byte-vector skipped-bytes-tuple buffer)))
