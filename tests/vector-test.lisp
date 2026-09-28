@@ -189,6 +189,14 @@ Parameters
     ;;  REPEATED-LIST-PROTO.LENGTH-OF-REPEATED-INT32
     (assert-eq (length-of-repeated-int32 vector-proto) 0)
     (assert-eq (length-of-repeated-int32 list-proto) 0)
+    (assert-condition protobuf-error
+      (repeated-proto.nth-repeated-int32 0 vector-proto))
+    (assert-condition protobuf-error
+      (repeated-list-proto.nth-repeated-int32 0 list-proto))
+    (assert-condition protobuf-error
+      (repeated-proto.nth-repeated-int32 -1 vector-proto))
+    (assert-condition protobuf-error
+      (repeated-list-proto.nth-repeated-int32 -1 list-proto))
     (loop for i from 0 to 9
           do
        (repeated-proto.push-repeated-int32 i vector-proto)
@@ -198,7 +206,15 @@ Parameters
     (loop for i from 0 to 9
           do
        (assert-eq (repeated-proto.nth-repeated-int32 i vector-proto) i)
-       (assert-eq (repeated-list-proto.nth-repeated-int32 (- 9 i) list-proto) i))))
+       (assert-eq (repeated-list-proto.nth-repeated-int32 (- 9 i) list-proto) i))
+    (assert-condition protobuf-error
+      (repeated-proto.nth-repeated-int32 10 vector-proto))
+    (assert-condition protobuf-error
+      (repeated-list-proto.nth-repeated-int32 10 list-proto))
+    (assert-condition protobuf-error
+      (repeated-proto.nth-repeated-int32 -1 vector-proto))
+    (assert-condition protobuf-error
+      (repeated-list-proto.nth-repeated-int32 -1 list-proto))))
 
 (deftest test-vector-merge-from (vector-suite)
   (let ((to-vector-proto (make-repeated-proto))

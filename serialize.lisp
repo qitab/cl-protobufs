@@ -1237,9 +1237,10 @@ Parameters:
                          (make-hash-table :test #',(if (eql (proto-key-type msg) 'string)
                                                        'equal
                                                        'eq))))
-                 ;; TODO(benkuehnert): val-data should be the default value
-                 ;; of ,key-type instead of nil.
-                 (let (val-data map-tag map-len key-data start)
+                 (let ((val-data ,(get-default-form (proto-value-type msg)
+                                                    nil nil
+                                                    (proto-value-kind msg)))
+                       map-tag map-len key-data start)
                    (multiple-value-setq (map-len ,vidx)
                      (decode-uint32 ,vbuf ,vidx))
                    (setq start ,vidx)

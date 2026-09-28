@@ -752,7 +752,7 @@ Parameters:
                    (type fixnum ,n))
           (the ,field-type
                (let ((length (length (,public-accessor-name ,obj))))
-                 (when (i< length ,n)
+                 (when (or (i< ,n 0) (i<= length ,n))
                    (protobuf-error "Repeated field ~S is length ~D but element ~D was requested."
                                    ',public-slot-name length ,n))
                  ,(if (eq (proto-container field) :vector)
@@ -1078,7 +1078,9 @@ function) then there is no guarantee on the serialize function working properly.
          '(make-hash-table))
         ((or possible-default
              (eq type 'cl:boolean))
-         possible-default))))
+         possible-default)
+        ((eq kind :enum)
+         (enum-default-value type)))))
 
 (defun make-structure-class-forms (proto-type slots non-lazy-fields lazy-fields oneofs)
   "Makes the definition forms for the define-message macro.

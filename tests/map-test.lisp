@@ -27,7 +27,7 @@
 (defun clear-serialization-functions ()
   "Clear the optimized serialization functions."
   (dolist (msg '(map-proto val-message map-message
-                 map-enum nested-map))
+                 map-enum nested-map map-all map-all.inner-msg))
     #-sbcl
     (setf (get `,msg :serialize) nil
           (get `,msg :deserialize) nil)
@@ -37,7 +37,7 @@
 (defun create-serialization-functions ()
   "Create the optimized serialization functions."
   (dolist (msg '(map-proto val-message map-message
-                 map-enum nested-map))
+                 map-enum nested-map map-all map-all.inner-msg))
     (let ((message (find-message-descriptor msg :error-p t)))
       (eval (pi::generate-deserializer message))
       (eval (pi::generate-serializer message)))))
@@ -203,6 +203,21 @@
       (assert-true (proto-equal test2 t2res))
       (assert-true (proto-equal test3 t3res))
       (assert-true (proto-equal test4 t4res)))
+    (clear-serialization-functions)))
+
+(deftest optimized-deserialization-missing-value-test (map-suite)
+  (create-serialization-functions)
+  (unwind-protect
+       (let* ((bytes (make-array 16 :element-type '(unsigned-byte 8)
+                                    :initial-contents '(#x0a #x02 #x08 #x07
+                                                        #x12 #x02 #x08 #x08
+                                                        #x1a #x02 #x08 #x09
+                                                        #x22 #x02 #x08 #x0a)))
+              (res (deserialize-from-bytes 'map-all bytes)))
+         (assert-eq (values 0 t) (map-all.intmap-gethash 7 res))
+         (assert-equal (values "" t) (map-all.stringmap-gethash 8 res))
+         (assert-eq (values nil t) (map-all.msgmap-gethash 9 res))
+         (assert-eql (values :one t) (map-all.enummap-gethash 10 res)))
     (clear-serialization-functions)))
 
 (deftest text-format-test (map-suite)
