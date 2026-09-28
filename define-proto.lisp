@@ -647,9 +647,9 @@ Parameters:
       `((defun-inline (setf ,public-accessor-name) (val_ obj_)
           (declare (type ,field-type val_))
           ,(when index
-             `(setf (bit (,is-set-accessor obj_) ,index) 1))
+             `(setf (ldb (byte 1 ,index) (,is-set-accessor obj_)) 1))
           ,(if bool-index
-               `(setf (bit (,bit-field-name obj_) ,bool-index) (if val_ 1 0))
+               `(setf (ldb (byte 1 ,bool-index) (,bit-field-name obj_)) (if val_ 1 0))
                `(setf (,hidden-accessor-name obj_) val_)))
 
         ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
@@ -657,9 +657,9 @@ Parameters:
         ;; serializer can use the has-* function to check if an optional field should be serialized.
         (defun-inline ,internal-has-function-name (obj_)
           ,(if index
-               `(= (bit (,is-set-accessor obj_) ,index) 1)
+               `(logbitp ,index (,is-set-accessor obj_))
                `(let ((val_ ,(if bool-index ; NOLINT
-                                 `(plusp (bit (,bit-field-name obj_) ,bool-index))
+                                 `(logbitp ,bool-index (,bit-field-name obj_))
                                  `(,hidden-accessor-name obj_))))
                   ,(case (proto-container field)
                      (:vector `(plusp (length val_)))
@@ -686,9 +686,10 @@ Parameters:
         ,@(unless (eq (proto-kind field) :map)
             `((defun-inline ,clear-function-name (obj_)
                 ,(when index
-                   `(setf (bit (,is-set-accessor obj_) ,index) 0))
+                   `(setf (ldb (byte 1 ,index) (,is-set-accessor obj_)) 0))
                 ,(if bool-index
-                     `(setf (bit (,bit-field-name obj_) ,bool-index) ,(if default-form 1 0))
+                     `(setf (ldb (byte 1 ,bool-index) (,bit-field-name obj_))
+                            ,(if default-form 1 0))
                      `(setf (,hidden-accessor-name obj_) ,default-form)))))
 
         ;; Cause (SLOT-NAME obj) to become (ACCESSOR-NAME obj)
@@ -1021,7 +1022,7 @@ function) then there is no guarantee on the serialize function working properly.
       `((defun-inline ,public-accessor-name (obj_)
           (the ,accessor-return-type
                ,(if bool-index
-                    `(plusp (bit (,bit-field-name obj_) ,bool-index))
+                    `(logbitp ,bool-index (,bit-field-name obj_))
                     `(,hidden-accessor-name obj_))))
 
         ,@(make-common-forms-for-structure-class
@@ -1095,9 +1096,10 @@ function) then there is no guarantee on the serialize function working properly.
          (hidden-constructor-name (fintern "%MAKE-~A" proto-type))
          (public-lazy-slot-names (mapcar #'proto-external-field-name lazy-fields))
          (public-non-lazy-slot-names (mapcar #'proto-external-field-name non-lazy-fields))
+         (has-is-set-p (find '%%is-set slots :key #'field-data-internal-slot-name))
          (is-set-name (fintern "~A-%%IS-SET" proto-type))
          (clear-is-set-name (fintern "~A.CLEAR-%%IS-SET" proto-type))
-         (additional-slots '(%%is-set))
+         (additional-slots (when has-is-set-p '(%%is-set)))
          (oneof-fields (loop for oneof in oneofs
                              append (coerce (oneof-descriptor-fields oneof) 'list))))
     (with-gensyms (obj)
@@ -1182,10 +1184,12 @@ function) then there is no guarantee on the serialize function working properly.
              ,obj))
 
          ;; Define clear functions.
-         (defun ,clear-is-set-name (,obj)
-           (fill (,is-set-name ,obj) 0))
+         ,@(when has-is-set-p
+             `((defun ,clear-is-set-name (,obj)
+                 (setf (,is-set-name ,obj) 0))))
 
-         (export-file-symbols '(,public-constructor-name ,is-set-name))
+         (export-file-symbols '(,public-constructor-name
+                                ,@(when has-is-set-p (list is-set-name))))
          ,@(let ((impl (fintern "CLEAR<~A>" proto-type)))
              `((defun ,impl (m)
                  (setf (message-%%skipped-bytes m) nil)
@@ -1328,25 +1332,21 @@ function) then there is no guarantee on the serialize function working properly.
          (make-field-data
           :internal-slot-name '%%bool-values
           :external-slot-name '%%bool-values
-          :type `(simple-bit-vector ,bool-count)
+          :type `(unsigned-byte ,bool-count)
           :initarg :%%bool-values
-          :container :vector
-          :initform `(make-array ,bool-count :element-type 'bit
-                                             :initial-contents ,bool-values))))
+          :initform (loop for bit across bool-values
+                          for i from 0
+                          when (= bit 1)
+                            sum (ash 1 i)))))
 
-      ;; todo(jgodbout): Storing the is-set vector as N >= 1 slots of
-      ;; type sb-ext:word rather than 1 slot as a bit-vector would reduce
-      ;; the memory reads by 1 per slot access.
-      (collect-slot
-       (make-field-data
-        :internal-slot-name '%%is-set
-        :external-slot-name '%%is-set
-        :type `(simple-bit-vector ,field-offset)
-        :initarg :%%is-set
-        :container :vector
-        :initform `(make-array ,field-offset
-                               :element-type 'bit
-                               :initial-element 0)))
+      (when (plusp field-offset)
+        (collect-slot
+         (make-field-data
+          :internal-slot-name '%%is-set
+          :external-slot-name '%%is-set
+          :type `(unsigned-byte ,field-offset)
+          :initarg :%%is-set
+          :initform 0)))
       (if alias-for
           ;; If we've got an alias, define a type that is the subtype of the Lisp class so that
           ;; typep and subtypep work.  Unless alias-for is a type which is not yet defined (as is

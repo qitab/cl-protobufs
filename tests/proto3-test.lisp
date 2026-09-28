@@ -115,3 +115,36 @@ Parameters
     (clear msg)
     (assert-false (mixed-test.has-first-opt msg))
     (assert-false (mixed-test.has-second-opt msg))))
+
+(deftest test-unboxed-bitfield-slots (proto3-suite)
+  ;; TestMessage has no explicit-presence fields (field-offset == 0), so %%is-set is omitted,
+  ;; while %%bool-values is stored as an integer.
+  (let ((msg1 (make-test-message))
+        (msg2 (make-test-message)))
+    (assert-false (slot-exists-p msg1 'pi::%%is-set))
+    (assert-true (slot-exists-p msg1 'pi::%%bool-values))
+    (assert-true (integerp (slot-value msg1 'pi::%%bool-values)))
+    (assert-eql 0 (slot-value msg1 'pi::%%bool-values))
+    (setf (test-message.has-value msg1) t)
+    (assert-eql 1 (slot-value msg1 'pi::%%bool-values))
+    (assert-false (proto-equal msg1 msg2 :exact t))
+    (clear msg1)
+    (assert-eql 0 (slot-value msg1 'pi::%%bool-values))
+    (assert-true (proto-equal msg1 msg2 :exact t)))
+  ;; AllSingular has an explicit-presence message field (field-offset == 1) and a bool field,
+  ;; so both %%is-set and %%bool-values exist and are stored as integers.
+  (let ((msg (make-all-singular)))
+    (assert-true (slot-exists-p msg 'pi::%%is-set))
+    (assert-true (integerp (slot-value msg 'pi::%%is-set)))
+    (assert-eql 0 (slot-value msg 'pi::%%is-set))
+    (assert-true (slot-exists-p msg 'pi::%%bool-values))
+    (assert-true (integerp (slot-value msg 'pi::%%bool-values)))
+    (assert-eql 0 (slot-value msg 'pi::%%bool-values))
+    (setf (all-singular.msg-value msg) (make-test-message :value 1)
+          (all-singular.bool-value msg) t)
+    (assert-eql 1 (slot-value msg 'pi::%%is-set))
+    (assert-eql 1 (slot-value msg 'pi::%%bool-values))
+    (clear msg)
+    (assert-eql 0 (slot-value msg 'pi::%%is-set))
+    (assert-eql 0 (slot-value msg 'pi::%%bool-values))))
+
