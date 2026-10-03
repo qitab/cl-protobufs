@@ -81,22 +81,22 @@ Parameters
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.intmap test-1)
                    (map-test-pb:map-all.intmap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.intmap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.intmap)
                    nil))
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.stringmap test-1)
                    (map-test-pb:map-all.stringmap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.stringmap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.stringmap)
                    nil))
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.msgmap test-1)
                    (map-test-pb:map-all.msgmap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.msgmap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.msgmap)
                    nil))
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.enummap test-1)
                    (map-test-pb:map-all.enummap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.enummap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.enummap)
                    nil))))
 
 (deftest test-map-field-equal.both-have-values (message-api-suite)
@@ -115,22 +115,22 @@ Parameters
     (assert-true (pi::map-field-equal
                    (map-test-pb:map-all.intmap test-1)
                    (map-test-pb:map-all.intmap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.intmap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.intmap)
                    nil))
     (assert-true (pi::map-field-equal
                    (map-test-pb:map-all.stringmap test-1)
                    (map-test-pb:map-all.stringmap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.stringmap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.stringmap)
                    nil))
     (assert-true (pi::map-field-equal
                    (map-test-pb:map-all.msgmap test-1)
                    (map-test-pb:map-all.msgmap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.msgmap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.msgmap)
                    nil))
     (assert-true (pi::map-field-equal
                    (map-test-pb:map-all.enummap test-1)
                    (map-test-pb:map-all.enummap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.enummap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.enummap)
                    nil))))
 
 (deftest test-map-field-equal.both-have-values-but-different (message-api-suite)
@@ -150,22 +150,22 @@ Parameters
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.intmap test-1)
                    (map-test-pb:map-all.intmap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.intmap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.intmap)
                    nil))
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.stringmap test-1)
                    (map-test-pb:map-all.stringmap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.stringmap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.stringmap)
                    nil))
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.msgmap test-1)
                    (map-test-pb:map-all.msgmap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.msgmap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.msgmap)
                    nil))
     (assert-false (pi::map-field-equal
                    (map-test-pb:map-all.enummap test-1)
                    (map-test-pb:map-all.enummap test-2)
-                   (proto:find-map-descriptor 'map-test-pb::map-test.map-all.enummap)
+                   (proto:find-map-descriptor 'map-test-pb:map-test.map-all.enummap)
                    nil))))
 
 (deftest test-oneof-field-equal.with-same-submessage (message-api-suite)
@@ -176,7 +176,7 @@ Parameters
          (oneof-2 (oneof-pb::oneof-test-%my-oneof oneof-test-2))
          (desc (proto:find-message-descriptor 'oneof-pb:oneof-test))
          (oneof-descriptor
-          (find 'oneof-pb::my-oneof (proto:proto-oneofs desc)
+          (find 'oneof-pb:my-oneof (proto:proto-oneofs desc)
                 :key #'pi::oneof-descriptor-external-name)))
     (assert-true (pi::oneof-field-equal oneof-1 oneof-2 oneof-descriptor t))))
 
@@ -189,7 +189,7 @@ Parameters
          (oneof-2 (oneof-pb::oneof-test-%my-oneof oneof-test-2))
          (desc (proto:find-message-descriptor 'oneof-pb:oneof-test))
          (oneof-descriptor
-          (find 'oneof-pb::my-oneof (proto:proto-oneofs desc)
+          (find 'oneof-pb:my-oneof (proto:proto-oneofs desc)
                 :key #'pi::oneof-descriptor-external-name)))
     (assert-false (pi::oneof-field-equal oneof-1 oneof-2 oneof-descriptor t))))
 
@@ -201,7 +201,7 @@ Parameters
          (oneof-2 (oneof-pb::oneof-test-%my-oneof oneof-test-2))
          (desc (proto:find-message-descriptor 'oneof-pb:oneof-test))
          (oneof-descriptor
-          (find 'oneof-pb::my-oneof (proto:proto-oneofs desc)
+          (find 'oneof-pb:my-oneof (proto:proto-oneofs desc)
                 :key #'pi::oneof-descriptor-external-name)))
     (assert-false (pi::oneof-field-equal oneof-1 oneof-2 oneof-descriptor t))))
 
@@ -212,7 +212,7 @@ Parameters
          (oneof-2 (oneof-pb::oneof-test-%my-oneof oneof-test-2))
          (desc (proto:find-message-descriptor 'oneof-pb:oneof-test))
          (oneof-descriptor
-          (find 'oneof-pb::my-oneof (proto:proto-oneofs desc)
+          (find 'oneof-pb:my-oneof (proto:proto-oneofs desc)
                 :key #'pi::oneof-descriptor-external-name)))
     (assert-true (pi::oneof-field-equal oneof-1 oneof-2 oneof-descriptor t))))
 
@@ -223,7 +223,7 @@ Parameters
          (oneof-2 (oneof-pb::oneof-test-%my-oneof oneof-test-2))
          (desc (proto:find-message-descriptor 'oneof-pb:oneof-test))
          (oneof-descriptor
-          (find 'oneof-pb::my-oneof (proto:proto-oneofs desc)
+          (find 'oneof-pb:my-oneof (proto:proto-oneofs desc)
                 :key #'pi::oneof-descriptor-external-name)))
     (assert-false (pi::oneof-field-equal oneof-1 oneof-2 oneof-descriptor t))))
 

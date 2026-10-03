@@ -127,7 +127,40 @@ Parameters
       (string= (pi::make-qualified-name
                 (find-file-descriptor 'cl-protobufs.protobuf-unittest:testproto2)
                 "bbaz")
-               "protobuf_unittest.bbaz")))
+               "protobuf_unittest.bbaz"))
+  (assert-true
+      (string= (pi::make-qualified-name nil "bbaz")
+               "bbaz")))
+
+(deftest test-standalone-define-message-macroexpansion (quick-suite)
+  (let ((pi::*current-file-descriptor* nil))
+    (assert-true
+     (macroexpand-1
+      '(pi:define-message axolotl ()
+        (pi:define-message axolotl.gill ()
+          (frilly-p :index 1 :type cl:boolean :kind :scalar
+                    :label (:optional) :field-presence :explicit
+                    :json-name "frillyP"))
+        (name :index 1 :type cl:string :kind :scalar
+              :label (:optional) :field-presence :explicit
+              :json-name "name")
+        (pi:define-oneof regeneration-state ()
+          (regrowing-limb :index 2 :type cl:string :kind :scalar
+                          :label (:optional) :field-presence :explicit
+                          :json-name "regrowingLimb"))
+        (pi:define-map snacks
+           :key-type cl-protobufs:int32
+           :value-type cl:string
+           :json-name "snacks"
+           :value-kind :scalar
+           :index 3
+           :field-presence :explicit))))
+    (let ((axolotl-desc (find-message-descriptor 'axolotl))
+          (gill-desc (find-message-descriptor 'axolotl.gill)))
+      (assert-true axolotl-desc)
+      (assert-true gill-desc)
+      (assert-equal "Axolotl" (proto-qualified-name axolotl-desc))
+      (assert-equal "Axolotl.Gill" (proto-qualified-name gill-desc)))))
 
 ;;; Some tests for the mechanism that maps a field number to its descriptor.
 ;;; The need for such is that in deserializing a structure using the generic path,
