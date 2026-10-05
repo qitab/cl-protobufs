@@ -11,15 +11,14 @@
 The definition of initialized is that all required fields are set."
   (loop for field in (proto-fields message)
         when (eq (proto-label field) :required)
-          do (when (= (bit (slot-value object '%%is-set)
-                           (proto-field-offset field))
-                      0)
+          do (unless (bit-set-p (slot-value object '%%is-set)
+                                (proto-field-offset field))
                (return-from object-initialized-p nil))
         when (and (member (proto-kind field) '(:message :group :extends))
                   (or (eq (proto-label field) :repeated)
-                      (= (bit (slot-value object '%%is-set)
-                              (proto-field-offset field))
-                         1)))
+                      (and (proto-field-offset field)
+                           (bit-set-p (slot-value object '%%is-set)
+                                      (proto-field-offset field)))))
           do (let ((lisp-type (proto-class field))
                    (field-value (slot-value object (proto-internal-field-name field))))
                (when (and (not (keywordp lisp-type))
@@ -156,10 +155,11 @@ Parameters:
 
      ;; Check same fields are set if exact is specified.
      (or (not exact)
+         (not (slot-exists-p message-1 '%%is-set))
          (equalp (slot-value message-1 '%%is-set)
                  (slot-value message-2 '%%is-set)))
 
-     ;; Bool values are stored in a vector.
+     ;; Bool values are stored in a bit-field.
      (or (not (slot-exists-p message-1 '%%bool-values))
          (equalp (slot-value message-1 '%%bool-values)
                  (slot-value message-2 '%%bool-values)))

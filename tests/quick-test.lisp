@@ -310,3 +310,76 @@ Parameters
   (test-get-field-cell *field-map-1*)
   (test-get-field-cell *field-map-2*)
   (assert t))
+
+(deftest test-bit-field-slots (quick-suite)
+  ;; 1. Small message: %%is-set and %%bool-values fit in a fixnum.
+  (let ((p (cl-protobufs.protobuf-unittest:make-test1-proto)))
+    (assert-true (typep (slot-value p 'pi::%%is-set) 'fixnum))
+    (assert-true (typep (slot-value p 'pi::%%bool-values) 'fixnum)))
+
+  ;; 2. Message with field-offset == 0 omits %%is-set completely.
+  (let* ((pkg (or (find-package "CL-PROTOBUFS.TEST.BIT-FIELD-TEMP")
+                  (make-package "CL-PROTOBUFS.TEST.BIT-FIELD-TEMP" :use '(#:cl))))
+         (*package* pkg))
+    (eval
+     `(pi:define-message ,(intern "NO-EXPLICIT-FIELDS-MSG" pkg) ()
+        (,(intern "ITEMS" pkg) :index 1 :type cl-protobufs:int32 :kind :scalar
+                               :label (:repeated :list) :field-presence :implicit
+                               :json-name "items")))
+    (let* ((make-fn (find-symbol "MAKE-NO-EXPLICIT-FIELDS-MSG" pkg))
+           (msg1 (funcall make-fn))
+           (msg2 (funcall make-fn)))
+      (assert-false (slot-exists-p msg1 'pi::%%is-set))
+      (assert-false (find-symbol "NO-EXPLICIT-FIELDS-MSG-%%IS-SET" pkg))
+      (assert-true (is-initialized msg1))
+      (assert-true (proto-equal msg1 msg2 :exact t))
+      (clear msg1)
+      (let* ((bytes (serialize-to-bytes msg1))
+             (deser (deserialize-from-bytes (intern "NO-EXPLICIT-FIELDS-MSG" pkg) bytes)))
+        (assert-true (proto-equal msg1 deser :exact t))))
+
+    ;; 3. Message with > +max-fixnum-bits+ explicit boolean fields falls back to simple-bit-vector.
+    (let* ((num-fields (+ pi::+max-fixnum-bits+ 3))
+           (msg-sym (intern "LARGE-BOOL-MSG" pkg))
+           (field-specs
+             (loop for i from 1 to num-fields
+                   for sym = (intern (format nil "FLAG-~D" i) pkg)
+                   collect `(,sym :index ,i :type cl:boolean :kind :scalar
+                                  :label (:optional) :field-presence :explicit
+                                  :default ,(evenp i)
+                                  :json-name ,(format nil "flag~D" i)))))
+      (eval `(pi:define-message ,msg-sym () ,@field-specs))
+      (let* ((make-fn (find-symbol "MAKE-LARGE-BOOL-MSG" pkg))
+             (msg (funcall make-fn))
+             (first-flag (intern "FLAG-1" pkg))
+             (second-flag (intern "FLAG-2" pkg))
+             (last-flag (intern (format nil "FLAG-~D" num-fields) pkg)))
+        (assert-true (typep (slot-value msg 'pi::%%is-set)
+                            `(simple-bit-vector ,num-fields)))
+        (assert-true (typep (slot-value msg 'pi::%%bool-values)
+                            `(simple-bit-vector ,num-fields)))
+        ;; Check default values: odd index -> nil, even index -> t.
+        (assert-false (proto-slot-value msg first-flag))
+        (assert-true (proto-slot-value msg second-flag))
+        (assert-false (has-field msg first-flag))
+        (assert-false (has-field msg last-flag))
+        ;; Set and check first and last flags.
+        (setf (proto-slot-value msg first-flag) t)
+        (setf (proto-slot-value msg last-flag) (not (evenp num-fields)))
+        (assert-true (has-field msg first-flag))
+        (assert-true (has-field msg last-flag))
+        (assert-true (proto-slot-value msg first-flag))
+        (assert-eql (not (evenp num-fields)) (proto-slot-value msg last-flag))
+        ;; Round-trip serialize and deserialize.
+        (let* ((bytes (serialize-to-bytes msg))
+               (deser (deserialize-from-bytes msg-sym bytes)))
+          (assert-true (proto-equal msg deser :exact t))
+          (assert-true (has-field deser first-flag))
+          (assert-true (has-field deser last-flag)))
+        ;; Clear single field and clear whole message.
+        (pi::clear-field msg first-flag)
+        (assert-false (has-field msg first-flag))
+        (assert-false (proto-slot-value msg first-flag))
+        (clear msg)
+        (assert-false (has-field msg last-flag))
+        (assert-eql (evenp num-fields) (proto-slot-value msg last-flag))))))

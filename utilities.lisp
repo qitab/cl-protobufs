@@ -195,6 +195,55 @@
           bindings)
      ,@body))
 
+(defconstant +max-fixnum-bits+ (integer-length most-positive-fixnum)
+  "Maximum number of bits that can be stored in an unsigned fixnum.")
+
+(defun make-bit-field (size)
+  "Create a bit-field of SIZE bits initialized to 0.
+Uses a fixnum when SIZE fits in a fixnum, otherwise a simple-bit-vector."
+  (if (<= size +max-fixnum-bits+)
+      0
+      (make-array size :element-type 'bit :initial-element 0)))
+
+(defmacro bit-set-p (place index)
+  "Return true if the bit at INDEX in PLACE (a fixnum or simple-bit-vector) is 1."
+  (with-gensyms (store idx)
+    `(let ((,store ,place)
+           (,idx ,index))
+       (etypecase ,store
+         (fixnum (logbitp ,idx ,store))
+         (simple-bit-vector (= (sbit ,store ,idx) 1))))))
+
+(defmacro set-bit (place index val &environment env)
+  "Set the bit at INDEX in PLACE (a fixnum or simple-bit-vector) to VAL (0 or 1)."
+  (multiple-value-bind (dummies vals newval setter getter)
+      (get-setf-expansion place env)
+    (with-gensyms (idx v store)
+      `(let* (,@(mapcar #'list dummies vals)
+              (,idx ,index)
+              (,v ,val)
+              (,store ,getter))
+         (etypecase ,store
+           (fixnum
+            (let ((,(car newval) (dpb ,v (byte 1 ,idx) ,store)))
+              ,setter))
+           (simple-bit-vector
+            (setf (sbit ,store ,idx) ,v)))))))
+
+(defmacro clear-bits (place &environment env)
+  "Clear all bits in PLACE (a fixnum or simple-bit-vector) to 0."
+  (multiple-value-bind (dummies vals newval setter getter)
+      (get-setf-expansion place env)
+    (with-gensyms (store)
+      `(let* (,@(mapcar #'list dummies vals)
+              (,store ,getter))
+         (etypecase ,store
+           (fixnum
+            (let ((,(car newval) 0))
+              ,setter))
+           (simple-bit-vector
+            (fill ,store 0)))))))
+
 (defun lisp-symbol-string (symbol)
   "Returns the string used as the wire format for SYMBOL."
   (case symbol

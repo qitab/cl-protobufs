@@ -645,13 +645,10 @@ Parameters:
           ;; exist in our version of the message
           (loop for extension in extension-list do
             (set-extension new-struct (first extension) (second extension)))
-          (when bool-map
-            (loop with bool-vec = (slot-value new-struct '%%bool-values)
-                  for (bool-index . value) in bool-map do
-                    (setf (bit bool-vec bool-index) (if value 1 0))))
-          (loop with is-set = (slot-value new-struct '%%is-set)
-                for offset in offset-list do
-                  (setf (bit is-set offset) 1))
+          (loop for (bool-index . value) in bool-map do
+            (set-bit (slot-value new-struct '%%bool-values) bool-index (if value 1 0)))
+          (loop for offset in offset-list do
+            (set-bit (slot-value new-struct '%%is-set) offset 1))
           (when skipped-bytes-tuple
             (setf (message-%%skipped-bytes new-struct)
                   (make-skipped-byte-vector skipped-bytes-tuple buffer)))

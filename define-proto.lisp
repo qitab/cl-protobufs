@@ -164,6 +164,27 @@ the oneof and its nested fields.
   (initarg nil)
   (initform nil))
 
+(defun make-bit-field-slot (name count &optional (initial-contents 0))
+  "Create a field-data slot named NAME for bit storage of size COUNT,
+initialized with INITIAL-CONTENTS."
+  (if (<= count +max-fixnum-bits+)
+      (make-field-data
+       :internal-slot-name name
+       :external-slot-name name
+       :type `(unsigned-byte ,count)
+       :initarg (kintern (symbol-name name))
+       :initform initial-contents)
+      (make-field-data
+       :internal-slot-name name
+       :external-slot-name name
+       :type `(simple-bit-vector ,count)
+       :initarg (kintern (symbol-name name))
+       :container :vector
+       :initform (if (eql initial-contents 0)
+                     `(make-array ,count :element-type 'bit :initial-element 0)
+                     `(make-array ,count :element-type 'bit
+                                         :initial-contents ,initial-contents)))))
+
 (defun validate-imports (file-descriptor imports)
   "Validates that all of the IMPORTS (a list of file names) have
    already been loaded. FILE-DESCRIPTOR is the descriptor of the
@@ -606,9 +627,8 @@ Parameters:
   PUBLIC-SLOT-NAME: Public slot name for the field (without the #\% prefix).
   SLOT-NAME: Slot name for the field (with the #\% prefix).
   FIELD: The class object field definition of the field."
-  (let ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
-        (is-set-accessor (fintern "~A-%%IS-SET" proto-type))
-        (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
+  (let* ((public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
+         (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
         (internal-has-function-name
          (proto-slot-function-name proto-type public-slot-name :internal-has))
         (external-has-function-name
@@ -618,9 +638,10 @@ Parameters:
                                         (proto-container field)
                                         (proto-type field)))
         (index (proto-field-offset field))
+        (is-set-accessor (when index (fintern "~A-%%IS-SET" proto-type)))
         (clear-function-name (proto-slot-function-name proto-type public-slot-name :clear))
         (bool-index (proto-bool-index field))
-        (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
+        (bit-field-name (when bool-index (fintern "~A-%%BOOL-VALUES" proto-type)))
         (field-type (cond ((eq (proto-container field) :vector)
                            `(cl-protobufs:vector-of ,(proto-type field)))
                           ((eq (proto-container field) :list)
@@ -640,9 +661,9 @@ Parameters:
       `((defun-inline (setf ,public-accessor-name) (val_ obj_)
           (declare (type ,field-type val_))
           ,(when index
-             `(setf (bit (,is-set-accessor obj_) ,index) 1))
+             `(set-bit (,is-set-accessor obj_) ,index 1))
           ,(if bool-index
-               `(setf (bit (,bit-field-name obj_) ,bool-index) (if val_ 1 0))
+               `(set-bit (,bit-field-name obj_) ,bool-index (if val_ 1 0))
                `(setf (,hidden-accessor-name obj_) val_)))
 
         ;; For proto3-style optional fields, the has-* function is repurposed. It now answers the
@@ -650,9 +671,9 @@ Parameters:
         ;; serializer can use the has-* function to check if an optional field should be serialized.
         (defun-inline ,internal-has-function-name (obj_)
           ,(if index
-               `(= (bit (,is-set-accessor obj_) ,index) 1)
+               `(bit-set-p (,is-set-accessor obj_) ,index)
                `(let ((val_ ,(if bool-index ; NOLINT
-                                 `(plusp (bit (,bit-field-name obj_) ,bool-index))
+                                 `(bit-set-p (,bit-field-name obj_) ,bool-index)
                                  `(,hidden-accessor-name obj_))))
                   ,(case (proto-container field)
                      (:vector `(plusp (length val_)))
@@ -679,9 +700,9 @@ Parameters:
         ,@(unless (eq (proto-kind field) :map)
             `((defun-inline ,clear-function-name (obj_)
                 ,(when index
-                   `(setf (bit (,is-set-accessor obj_) ,index) 0))
+                   `(set-bit (,is-set-accessor obj_) ,index 0))
                 ,(if bool-index
-                     `(setf (bit (,bit-field-name obj_) ,bool-index) ,(if default-form 1 0))
+                     `(set-bit (,bit-field-name obj_) ,bool-index ,(if default-form 1 0))
                      `(setf (,hidden-accessor-name obj_) ,default-form)))))
 
         ;; Cause (SLOT-NAME obj) to become (ACCESSOR-NAME obj)
@@ -1004,7 +1025,7 @@ function) then there is no guarantee on the serialize function working properly.
          (public-accessor-name (proto-slot-function-name proto-type public-slot-name :get))
          (hidden-accessor-name (fintern "~A-~A" proto-type slot-name))
          (bool-index (proto-bool-index field))
-         (bit-field-name (fintern "~A-%%BOOL-VALUES" proto-type))
+         (bit-field-name (when bool-index (fintern "~A-%%BOOL-VALUES" proto-type)))
          (field-type (proto-type field))
          (accessor-return-type
           (cond ((eq (proto-container field) :vector)
@@ -1017,7 +1038,7 @@ function) then there is no guarantee on the serialize function working properly.
       `((defun-inline ,public-accessor-name (obj_)
           (the ,accessor-return-type
                ,(if bool-index
-                    `(plusp (bit (,bit-field-name obj_) ,bool-index))
+                    `(bit-set-p (,bit-field-name obj_) ,bool-index)
                     `(,hidden-accessor-name obj_))))
 
         ,@(make-common-forms-for-structure-class
@@ -1091,9 +1112,10 @@ function) then there is no guarantee on the serialize function working properly.
          (hidden-constructor-name (fintern "%MAKE-~A" proto-type))
          (public-lazy-slot-names (mapcar #'proto-external-field-name lazy-fields))
          (public-non-lazy-slot-names (mapcar #'proto-external-field-name non-lazy-fields))
-         (is-set-name (fintern "~A-%%IS-SET" proto-type))
-         (clear-is-set-name (fintern "~A.CLEAR-%%IS-SET" proto-type))
-         (additional-slots '(%%is-set))
+         (has-is-set-p (find '%%is-set slots :key #'field-data-internal-slot-name))
+         (is-set-name (when has-is-set-p (fintern "~A-%%IS-SET" proto-type)))
+         (clear-is-set-name (when has-is-set-p (fintern "~A.CLEAR-%%IS-SET" proto-type)))
+         (additional-slots (when has-is-set-p '(%%is-set)))
          (oneof-fields (loop for oneof in oneofs
                              append (coerce (oneof-descriptor-fields oneof) 'list))))
     (with-gensyms (obj)
@@ -1178,10 +1200,11 @@ function) then there is no guarantee on the serialize function working properly.
              ,obj))
 
          ;; Define clear functions.
-         (defun ,clear-is-set-name (,obj)
-           (fill (,is-set-name ,obj) 0))
+         ,@(when has-is-set-p
+             `((defun ,clear-is-set-name (,obj)
+                 (clear-bits (,is-set-name ,obj)))))
 
-         (export-file-symbols '(,public-constructor-name ,is-set-name))
+         (export-file-symbols '(,public-constructor-name ,@(when is-set-name `(,is-set-name))))
          ,@(let ((impl (fintern "CLEAR<~A>" proto-type)))
              `((defun ,impl (m)
                  (setf (message-%%skipped-bytes m) nil)
@@ -1253,7 +1276,7 @@ function) then there is no guarantee on the serialize function working properly.
          (field-offset 0)
          (bool-count (count-if #'non-repeated-bool-field fields))
          (bool-index -1)
-         (bool-values (make-array bool-count :element-type 'bit :initial-element 0)))
+         (bool-values (make-bit-field bool-count)))
     ;; Register the message descriptor early so nested messages can find it.
     (record-protobuf-object type msg-desc :message)
     (with-collectors ((slots collect-slot)
@@ -1300,9 +1323,12 @@ function) then there is no guarantee on the serialize function working properly.
                                     :alias-for alias-for
                                     :field-offset field-offset
                                     :bool-index (when (non-repeated-bool-field field)
-                                                  (incf bool-index))
-                                    :bool-values bool-values)
+                                                  (incf bool-index)))
              (declare (ignore idx))
+             (when (and (proto-bool-index field-desc)
+                        (proto-default field-desc)
+                        (not (eq (proto-default field-desc) $empty-default)))
+               (set-bit bool-values (proto-bool-index field-desc) 1))
              (when offset-p
                (incf field-offset))
              (if (proto-lazy-p field-desc)
@@ -1327,29 +1353,10 @@ function) then there is no guarantee on the serialize function working properly.
         :initform nil))
 
       (unless (= bool-index -1)
-        (collect-slot
-         (make-field-data
-          :internal-slot-name '%%bool-values
-          :external-slot-name '%%bool-values
-          :type `(simple-bit-vector ,bool-count)
-          :initarg :%%bool-values
-          :container :vector
-          :initform `(make-array ,bool-count :element-type 'bit
-                                             :initial-contents ,bool-values))))
+        (collect-slot (make-bit-field-slot '%%bool-values bool-count bool-values)))
 
-      ;; todo(jgodbout): Storing the is-set vector as N >= 1 slots of
-      ;; type sb-ext:word rather than 1 slot as a bit-vector would reduce
-      ;; the memory reads by 1 per slot access.
-      (collect-slot
-       (make-field-data
-        :internal-slot-name '%%is-set
-        :external-slot-name '%%is-set
-        :type `(simple-bit-vector ,field-offset)
-        :initarg :%%is-set
-        :container :vector
-        :initform `(make-array ,field-offset
-                               :element-type 'bit
-                               :initial-element 0)))
+      (when (plusp field-offset)
+        (collect-slot (make-bit-field-slot '%%is-set field-offset)))
       (if alias-for
           ;; If we've got an alias, define a type that is the subtype of the Lisp class so that
           ;; typep and subtypep work.  Unless alias-for is a type which is not yet defined (as is
@@ -1460,7 +1467,7 @@ function) then there is no guarantee on the serialize function working properly.
                    (i<= index (proto-extension-to ext))))
           extensions)))
 
-(defun process-field (field &key parent-desc alias-for field-offset bool-index bool-values)
+(defun process-field (field &key parent-desc alias-for field-offset bool-index)
   "Process one field descriptor within 'define-message' or 'define-extend'.
    Returns a field-descriptor object, a defstruct slot form, the field number,
    and a boolean indicating whether FIELD has an offset.
@@ -1481,11 +1488,8 @@ function) then there is no guarantee on the serialize function working properly.
    FIELD-OFFSET is an internal concept of the index of a field
      in a proto-message.
    BOOL-INDEX: nil if this is not a simple (non-repeated) boolean field.
-     If this is a simple boolean field, this is the index into the bit vector of all
-     simple boolean fields (i.e., the bool-values argument).
-   BOOL-VALUES: A bit-vector holding all boolean values for a message.
-     On exit this vector holds the correct default value for FIELD if it is a
-     simple boolean field."
+     If this is a simple boolean field, this is the index into the bit-field of all
+     simple boolean fields."
   (destructuring-bind (slot &key type name (default nil default-p) packed lazy
                             json-name index label kind field-presence &allow-other-keys)
       field
@@ -1499,10 +1503,6 @@ function) then there is no guarantee on the serialize function working properly.
                (offset (and (eq field-presence :explicit)
                             (not (eq label :repeated))
                             field-offset))
-               (default
-                (if default-p
-                    default
-                    $empty-default))
                (default (if default-p default $empty-default))
                (cslot (unless alias-for
                         ;; Enum type specifiers might not be loaded.
@@ -1555,8 +1555,6 @@ function) then there is no guarantee on the serialize function working properly.
                        :lazy (and lazy t)
                        :bool-index bool-index
                        :field-presence field-presence)))
-          (when (and bool-index default (not (eq default $empty-default)))
-            (setf (bit bool-values bool-index) 1))
           (values field cslot index (and offset t)))))))
 
 (defparameter *rpc-call-function* nil
