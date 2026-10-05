@@ -17,7 +17,8 @@
            #:symbol-importer-message.imported-type-field
            #:make-symbol-importer-message
            #:symbol-imported-message-%%is-set
-           #:symbol-importer-message.has-imported-type-field)
+           #:symbol-importer-message.has-imported-type-field
+           #:imported-type-field)
   (:export :run))
 
 (in-package #:cl-protobufs.test.symbol-import)

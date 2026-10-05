@@ -75,9 +75,7 @@
       (assert-false (has-field m 'map-field)))))
 
 (deftest descriptor-accessor-check (map-suite)
-  ;; TODO(b/186795342): 'cl-protobufs.map-test::map-test.map-proto.map-field
-  ;; should be exported.
-  (let* ((map-desc (find-map-descriptor 'cl-protobufs.map-test::map-test.map-proto.map-field)))
+  (let* ((map-desc (find-map-descriptor 'cl-protobufs.map-test:map-test.map-proto.map-field)))
     (assert-true map-desc)
     (assert-equal 'int32 (proto-key-type map-desc))
     (assert-equal 'string (proto-value-type map-desc))

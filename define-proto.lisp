@@ -100,8 +100,8 @@ declaration of the field object in a proto.
 
 Example:   (author  :index 1  :type cl:string :label (:optional) :typename "string")
 
-First we create the PROTOBUF-MESSAGE meta-object that is defined in the
-define-message lambda list and store it in *current-message-descriptor*.  If we
+First we create the MESSAGE-DESCRIPTOR meta-object that is defined in the
+define-message lambda list and record it via record-protobuf-object.  If we
 see a define-message we recursively call the define macro to create a submessage
 named:
 
@@ -136,7 +136,7 @@ Note: Actually using services require a gRPC plugin.
 
 DEFINE-ONEOF:
 
-The define-oneof macro takes a body of field defintions and creates a ONEOF-DESCRIPTOR
+The define-oneof form takes a body of field definitions and creates a ONEOF-DESCRIPTOR
 meta-object which holds field descriptors for the fields in its body. This
 ONEOF-DESCRIPTOR gets appended to the message's PROTO-ONEOFS slot. Then,
 MAKE-STRUCTURE-CLASS-FORMS will use the PROTO-ONEOFS slot to create forms for accessing
@@ -146,9 +146,6 @@ the oneof and its nested fields.
 
 (defvar *current-file-descriptor* nil
   "The file-descriptor for the file currently being loaded.")
-
-(defvar *current-message-descriptor* nil
-  "The message-descriptor for the message or group currently being loaded.")
 
 
 ;;; TODO(jgodbout): remove this, we already have field-descriptor
@@ -451,106 +448,102 @@ but we want an internal version for the case where we deserialized an unknown
         (record-protobuf-object type enum :enum))
       `(progn ,@forms))))
 
-(defmacro define-map (field-name &key key-type value-type json-name index
-                                 value-kind val-default field-presence)
-  "Define a Lisp type given the data for a protobuf map type.
+(defun process-map (field parent-desc)
+  "Process a define-map form FIELD within PARENT-DESC (a message-descriptor).
+   Returns three values: the form to record the map-descriptor, the
+   field-descriptor, and the field-data struct.
 
  Parameters:
-  FIELD-NAME: Lisp name of the field containing this map.
-  KEY-TYPE: Lisp type of the map's keys.
-  VALUE-TYPE: Lisp type of the map's values.
-  JSON-NAME: String to use for the map field when reading/writing JSON.
-    Either the value of the json_name field option or derived from the
-    field name.
-  VALUE-KIND: Category of the value type: :scalar, :message, :enum, etc.
-  INDEX: Message field number of this map type.
-  VAL-DEFAULT: Default value for the map entries, or nil to use $empty-default.
-  FIELD-PRESENCE: Should the map has a has-function."
-  (assert json-name)
-  (assert value-kind)
-  (check-type index integer)
-  (let* ((internal-slot-name (fintern "%~A" field-name))
-         (qual-name (make-qualified-name *current-message-descriptor*
-                                         (slot-name->proto field-name)))
-         (class (fintern (uncamel-case qual-name)))
-         (mdata (make-field-data
-                 :internal-slot-name internal-slot-name
-                 :external-slot-name field-name
-                 :type 'hash-table
-                 :initform (if (eql key-type 'cl:string)
-                               '(make-hash-table :test #'equal)
-                               '(make-hash-table :test #'eq))
-                 :accessor field-name))
-         (mfield (make-field-descriptor
-                                :name (slot-name->proto field-name)
-                                :class class
-                                :qualified-name qual-name
-                                :label :optional
-                                :index index
-                                :internal-field-name internal-slot-name
-                                :external-field-name field-name
-                                :json-name json-name
-                                :type 'cl:hash-table
-                                :default (or val-default
-                                             $empty-default)
-                                :kind :map
-                                :field-offset nil
-                                :field-presence field-presence))
-         (map-desc (make-map-descriptor :key-type key-type
-                                        :value-type value-type
-                                        :value-kind value-kind)))
-    (record-protobuf-object class map-desc :map)
-    `((record-protobuf-object ',class ,map-desc :map)
-      ,mfield
-      ,mdata)))
+  FIELD: A form of the shape (pi:define-map field-name &key key-type value-type
+    json-name index value-kind val-default field-presence).
+  PARENT-DESC: The containing message-descriptor."
+  (destructuring-bind (field-name &key key-type value-type json-name index
+                                  value-kind val-default field-presence)
+      (cdr field)
+    (assert json-name)
+    (assert value-kind)
+    (check-type index integer)
+    (let* ((internal-slot-name (fintern "%~A" field-name))
+           (qual-name (make-qualified-name parent-desc
+                                           (slot-name->proto field-name)))
+           (class (fintern (uncamel-case qual-name)))
+           (mdata (make-field-data
+                   :internal-slot-name internal-slot-name
+                   :external-slot-name field-name
+                   :type 'hash-table
+                   :initform (if (eql key-type 'cl:string)
+                                 '(make-hash-table :test #'equal)
+                                 '(make-hash-table :test #'eq))
+                   :accessor field-name))
+           (mfield (make-field-descriptor
+                    :name (slot-name->proto field-name)
+                    :class class
+                    :qualified-name qual-name
+                    :label :optional
+                    :index index
+                    :internal-field-name internal-slot-name
+                    :external-field-name field-name
+                    :json-name json-name
+                    :type 'cl:hash-table
+                    :default (or val-default
+                                 $empty-default)
+                    :kind :map
+                    :field-offset nil
+                    :field-presence field-presence))
+           (map-desc (make-map-descriptor :key-type key-type
+                                          :value-type value-type
+                                          :value-kind value-kind)))
+      (record-protobuf-object class map-desc :map)
+      (values `(record-protobuf-object ',class ,map-desc :map)
+              mfield
+              mdata))))
 
-(defmacro define-oneof (name (&key synthetic-p) &body fields)
-  "Creates a oneof descriptor and the defining forms for its fields.
+(defun process-oneof (oneof-form parent-desc)
+  "Creates a oneof descriptor for ONEOF-FORM within PARENT-DESC (a message-descriptor).
 
 Parameters:
-  NAME: The name of the oneof.
-  SYNTHETIC-P: If true, this oneof is automatically generated by protoc, in
-    which case the special oneof accessors should not be created.
-  FIELDS: Field as output by protoc."
-  (let* ((internal-name (fintern "%~A" name))
-         (field-descriptors (make-array (length fields))))
-    (loop for field in fields
-          for oneof-offset from 0
-          do
-       ;; TODO(cgay): this doesn't currently handle groups. If we want to
-       ;; support this we need to handle define-message and fields with :kind
-       ;; :group here.
-       (destructuring-bind (slot &key type name (default nil default-p)
-                                 lazy json-name index kind &allow-other-keys)
-           field
-         (assert json-name)
-         (assert index)
-         (let ((default (if default-p default $empty-default)))
-           (setf (aref field-descriptors oneof-offset)
-                 (make-field-descriptor
-                                :name (or name (slot-name->proto slot))
-                                :type type
-                                :kind kind
-                                :class type
-                                :qualified-name (make-qualified-name
-                                                 *current-message-descriptor*
-                                                 (or name (slot-name->proto slot)))
-                                :label :optional
-                                :index index
-                                ;; Oneof fields don't have a bit in the %%is-set vector, as field
-                                ;; presence is tracked via the SET-FIELD slot of the oneof struct.
-                                :field-offset nil
-                                :internal-field-name internal-name
-                                :external-field-name slot
-                                :json-name json-name
-                                :oneof-offset oneof-offset
-                                :default default
-                                :lazy (and lazy t))))))
-    `(progn
-       ,(make-oneof-descriptor :internal-name internal-name
-                               :external-name name
-                               :synthetic-p (and synthetic-p t)
-                               :fields field-descriptors))))
+  ONEOF-FORM: A form of the shape (pi:define-oneof name (&key synthetic-p) &body fields).
+  PARENT-DESC: The containing message-descriptor."
+  (destructuring-bind (name (&key synthetic-p) &body fields)
+      (cdr oneof-form)
+    (let* ((internal-name (fintern "%~A" name))
+           (field-descriptors (make-array (length fields))))
+      (loop for field in fields
+            for oneof-offset from 0
+            do
+         ;; TODO(cgay): this doesn't currently handle groups. If we want to
+         ;; support this we need to handle define-message and fields with :kind
+         ;; :group here.
+         (destructuring-bind (slot &key type name (default nil default-p)
+                                   lazy json-name index kind &allow-other-keys)
+             field
+           (assert json-name)
+           (assert index)
+           (let ((default (if default-p default $empty-default)))
+             (setf (aref field-descriptors oneof-offset)
+                   (make-field-descriptor
+                    :name (or name (slot-name->proto slot))
+                    :type type
+                    :kind kind
+                    :class type
+                    :qualified-name (make-qualified-name
+                                     parent-desc
+                                     (or name (slot-name->proto slot)))
+                    :label :optional
+                    :index index
+                    ;; Oneof fields don't have a bit in the %%is-set vector, as field
+                    ;; presence is tracked via the SET-FIELD slot of the oneof struct.
+                    :field-offset nil
+                    :internal-field-name internal-name
+                    :external-field-name slot
+                    :json-name json-name
+                    :oneof-offset oneof-offset
+                    :default default
+                    :lazy (and lazy t))))))
+      (make-oneof-descriptor :internal-name internal-name
+                             :external-name name
+                             :synthetic-p (and synthetic-p t)
+                             :fields field-descriptors))))
 
 (defun-inline proto-%%bytes (obj)
   "Returns the %%bytes field of the proto object OBJ."
@@ -702,7 +695,7 @@ Parameters:
         ,(unless (eq (proto-kind field) :map)
            `(export-file-symbols '(,clear-function-name)))
 
-        (export-file-symbols '(,public-accessor-name)))))
+        (export-file-symbols '(,public-slot-name ,public-accessor-name)))))
 
 (defun make-repeated-field-accessors (proto-type field)
   "Make and return forms that define functions that accesses a proto
@@ -808,7 +801,8 @@ Paramters:
 
         ;; Special oneof forms are only created when ONEOF is not synthetic.
         ,(unless (oneof-descriptor-synthetic-p oneof)
-           `(export-file-symbols '(,case-function-name
+           `(export-file-symbols '(,public-slot-name
+                                   ,case-function-name
                                    ,external-has-function-name
                                    ,clear-function-name)))
 
@@ -875,7 +869,8 @@ Paramters:
 
                   (set-field-accessor-functions ',proto-type ',public-slot-name)
 
-                  (export-file-symbols '(,external-has-function-name
+                  (export-file-symbols '(,public-slot-name
+                                         ,external-has-function-name
                                          ,clear-function-name
                                          ,public-accessor-name))))))))))
 
@@ -940,7 +935,8 @@ function) then there is no guarantee on the serialize function working properly.
           (,overloaded-accessor-name ,public-accessor-name)
           (,overloaded-remover-name ,public-remove-name))
 
-        (export-file-symbols '(,public-accessor-name
+        (export-file-symbols '(,(proto-class field)
+                               ,public-accessor-name
                                ,public-remove-name
                                ,clear-function-name
                                ,overloaded-accessor-name
@@ -1217,6 +1213,17 @@ function) then there is no guarantee on the serialize function working properly.
        (not (member '(:repeated :list) field :test #'equal))
        (not (member '(:repeated :vector) field :test #'equal))))
 
+(defun message-qualified-name (type name)
+  "Compute the qualified name for a message descriptor with class symbol TYPE and proto name NAME."
+  (let* ((sym-name (symbol-name type))
+         (dot-pos (position #\. sym-name :from-end t))
+         (parent-desc (or (and dot-pos
+                               (find-message-descriptor
+                                (find-symbol (subseq sym-name 0 dot-pos)
+                                             (symbol-package type))))
+                          *current-file-descriptor*)))
+    (make-qualified-name parent-desc name)))
+
 (defmacro define-message (type (&key name alias-for options)
                           &body fields &environment env)
   "Define a new protobuf message type.
@@ -1240,17 +1247,15 @@ function) then there is no guarantee on the serialize function working properly.
          (msg-desc (make-message-descriptor
                                   :class type
                                   :name  name
-                                  :qualified-name (make-qualified-name
-                                                   (or *current-message-descriptor*
-                                                       *current-file-descriptor*)
-                                                   name)
+                                  :qualified-name (message-qualified-name type name)
                                   :alias-for alias-for
                                   :options (remove-options options "default" "packed")))
          (field-offset 0)
-         (*current-message-descriptor* msg-desc)
          (bool-count (count-if #'non-repeated-bool-field fields))
          (bool-index -1)
          (bool-values (make-array bool-count :element-type 'bit :initial-element 0)))
+    ;; Register the message descriptor early so nested messages can find it.
+    (record-protobuf-object type msg-desc :message)
     (with-collectors ((slots collect-slot)
                       (forms collect-form)
                       ;; The typedef needs to be first in forms otherwise ccl warns.
@@ -1267,8 +1272,8 @@ function) then there is no guarantee on the serialize function working properly.
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-type-form (cdr result))))
           ((define-map)
-           (destructuring-bind (definer extra-field extra-slot)
-               (macroexpand-1 field env)
+           (multiple-value-bind (definer extra-field extra-slot)
+               (process-map field msg-desc)
              (collect-form definer)
              (collect-slot extra-slot)
              (collect-non-lazy-field extra-field)
@@ -1283,10 +1288,7 @@ function) then there is no guarantee on the serialize function working properly.
                                              :to (if (eq to 'max) +max-field-number+ to))))
                (push ext-desc (proto-extensions msg-desc)))))
           ((define-oneof)
-           (destructuring-bind (&optional progn oneof-desc)
-               (macroexpand-1 field env)
-             (assert (eq progn 'progn) ()
-                     "The macroexpansion for ~S failed in DEFINE-MESSAGE" field)
+           (let ((oneof-desc (process-oneof field msg-desc)))
              (when oneof-desc
                (push oneof-desc (proto-oneofs msg-desc))
                (collect-oneof oneof-desc))))
@@ -1294,7 +1296,8 @@ function) then there is no guarantee on the serialize function working properly.
            ;; It's a regular field. Note that groups generate both a nested
            ;; message and a field with :kind :group.
            (multiple-value-bind (field-desc slot idx offset-p)
-               (process-field field :alias-for alias-for
+               (process-field field :parent-desc msg-desc
+                                    :alias-for alias-for
                                     :field-offset field-offset
                                     :bool-index (when (non-repeated-bool-field field)
                                                   (incf bool-index))
@@ -1361,7 +1364,6 @@ function) then there is no guarantee on the serialize function working properly.
           (collect-type-form
            (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs)))
       ;; Register it by the full symbol name.
-      (record-protobuf-object type msg-desc :message)
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
       `(progn ,@type-forms ,@forms))))
 
@@ -1386,9 +1388,7 @@ function) then there is no guarantee on the serialize function working properly.
                         :options  (remove-options
                                    (or options (copy-list (proto-options message)))
                                    "default" "packed")
-                        :message-type :extends))) ; this message is an extension
-         ;; Only now can we bind *current-message-descriptor* to the new extended message
-         (*current-message-descriptor* extends))
+                        :message-type :extends)))) ; this message is an extension
     (assert message ()
             "There is no message named ~A to extend" name)
     (assert (eq type (proto-class message)) ()
@@ -1403,7 +1403,7 @@ function) then there is no guarantee on the serialize function working properly.
                              '(define-enum define-message define-extend define-extension)))
                 () "The body of ~S can only contain field and group definitions" 'define-extend)
         (multiple-value-bind (field-desc slot idx)
-            (process-field field :alias-for alias-for)
+            (process-field field :parent-desc extends :alias-for alias-for)
           (assert (index-within-extensions-p idx message) ()
                   "The index ~D is not in range for extending ~S"
                   idx (proto-class message))
@@ -1460,7 +1460,7 @@ function) then there is no guarantee on the serialize function working properly.
                    (i<= index (proto-extension-to ext))))
           extensions)))
 
-(defun process-field (field &key alias-for field-offset bool-index bool-values)
+(defun process-field (field &key parent-desc alias-for field-offset bool-index bool-values)
   "Process one field descriptor within 'define-message' or 'define-extend'.
    Returns a field-descriptor object, a defstruct slot form, the field number,
    and a boolean indicating whether FIELD has an offset.
@@ -1476,6 +1476,7 @@ function) then there is no guarantee on the serialize function working properly.
      :lazy - Determines whether to lazily deserialize the field with respect to the proto API.
      :label - One of (:repeated :vector), (:repeated :list), (:optional), (:required).
      :kind - One of :enum :map :scalar :group :message :extends
+   PARENT-DESC: The enclosing message-descriptor.
    ALIAS-FOR is to determine if this is an alias for a difference field.
    FIELD-OFFSET is an internal concept of the index of a field
      in a proto-message.
@@ -1539,7 +1540,7 @@ function) then there is no guarantee on the serialize function working properly.
                        :type (if (eq kind :enum) (enum-open-type type) type)
                        :kind kind
                        :class type
-                       :qualified-name (make-qualified-name *current-message-descriptor*
+                       :qualified-name (make-qualified-name parent-desc
                                                             (or name (slot-name->proto slot)))
                        :label label
                        :index index

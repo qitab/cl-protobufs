@@ -845,20 +845,13 @@ Parameters:
   (:method ((method method-descriptor))
     (setf (proto-input-type method) nil)))
 
-(defgeneric make-qualified-name (parent-desc name)
-  (:documentation
-   "Given a parent file-descriptor or message-descriptor and a name,
-    generate a fully qualified name string for the name."))
-
-(defmethod make-qualified-name ((parent-desc file-descriptor) name)
-  "Make a qualified name for NAME by prepending the package name from PARENT-DESC and a '.'."
-  (let* ((parent-name (proto-package-name parent-desc)))
-    (if parent-name
-        (strcat parent-name "." name)
+(defun make-qualified-name (parent-desc name)
+  "Given a PARENT-DESC (file-descriptor, message-descriptor, or nil) and a NAME,
+   generate a fully qualified name string for NAME."
+  (let ((parent-qual-name (etypecase parent-desc
+                            (null nil)
+                            (file-descriptor (proto-package-name parent-desc))
+                            (message-descriptor (proto-qualified-name parent-desc)))))
+    (if (and parent-qual-name (string/= parent-qual-name ""))
+        (strcat parent-qual-name "." name)
         name)))
-
-(defmethod make-qualified-name ((parent-desc message-descriptor) name)
-  "Make a qualified name for NAME by prepending the message name from PARENT-DESC and a '.'."
-  (let* ((parent-qual-name (proto-qualified-name parent-desc)))
-    (strcat parent-qual-name "." name)))
-
