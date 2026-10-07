@@ -945,7 +945,7 @@
       (loop repeat 8 doing
         (let ((byte (ldb (byte 8 0) bits)))
           (declare (type (unsigned-byte 8) byte))
-          (setf byte (ash bits -8))
+          (setf bits (ash bits -8))
           (fast-octet-out buffer byte)))
       8)))
 
