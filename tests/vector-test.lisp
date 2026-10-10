@@ -165,6 +165,13 @@ Parameters
     (pop (repeated-list-proto.repeated-int32 vector-proto))
     (assert-false (repeated-list-proto.has-repeated-int32 vector-proto))))
 
+;;; The next test tries to elicit a run-time type-error. Instead, the test would get
+;;; a compile-time error if *derive-function-types* is T, which would not signal the
+;;; thing in question at correct time for the test, and therefore count as a test failure
+;;; even though the compiler has already said "your code has a type-error". That seems
+;;; like it should count as good, but it doesn't. So set this at its default.
+#+sbcl (eval-when (:compile-toplevel) (setq sb-ext:*derive-function-types* nil))
+
 ;; Test that we properly type check a message when pushing into a repeated
 ;; field.
 (deftest test-message-type-checking (vector-suite)
