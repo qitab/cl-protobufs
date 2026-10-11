@@ -191,9 +191,11 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
 
   if (file_->extension_count() > 0) {
     printer->Print("\n\n;;; Top-Level extensions");
+    std::vector<const FieldDescriptor*> extensions(file_->extension_count());
     for (int i = 0; i < file_->extension_count(); ++i) {
-      GenerateExtension(printer, file_->extension(i), file_);
+      extensions[i] = file_->extension(i);
     }
+    GenerateExtensions(printer, extensions, file_);
   }
 
   std::vector<std::string> rpc_exports;

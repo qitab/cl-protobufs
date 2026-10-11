@@ -143,10 +143,12 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
 
   if (descriptor_->extension_count() > 0) {
     printer->Print("\n;; Extensions");
+    std::vector<const FieldDescriptor*> extensions(
+        descriptor_->extension_count());
     for (int i = 0; i < descriptor_->extension_count(); ++i) {
-      GenerateExtension(
-          printer, descriptor_->extension(i), descriptor_->file());
+      extensions[i] = descriptor_->extension(i);
     }
+    GenerateExtensions(printer, extensions, descriptor_->file());
   }
 
   if (descriptor_->extension_range_count() > 0) {

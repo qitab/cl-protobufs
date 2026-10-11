@@ -1289,11 +1289,16 @@ function) then there is no guarantee on the serialize function working properly.
                       (oneofs collect-oneof))
       (dolist (field fields)
         (case (car field)
-          ((define-message define-extend define-enum)
+          ((define-message define-enum)
            (let ((result (macroexpand-1 field env)))
              (assert (eq (car result) 'progn) ()
                      "The macroexpansion for ~S failed" field)
              (map () #'collect-type-form (cdr result))))
+          ((define-extend)
+           (let ((result (macroexpand-1 field env)))
+             (assert (eq (car result) 'progn) ()
+                     "The macroexpansion for ~S failed" field)
+             (map () #'collect-form (cdr result))))
           ((define-map)
            (multiple-value-bind (definer extra-field extra-slot)
                (process-map field msg-desc)
@@ -1366,12 +1371,15 @@ function) then there is no guarantee on the serialize function working properly.
                    (alias-type (or (and alias-class (class-name alias-class))
                                    t)))
               (collect-type-form `(deftype ,type () ',alias-type))
-              (collect-form `(record-protobuf-object ',alias-for ,msg-desc :message))))
+              (collect-type-form `(record-protobuf-object ',alias-for ,msg-desc :message))))
           ;; If no alias, define the class now
           (collect-type-form
            (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs)))
-      ;; Register it by the full symbol name.
-      (collect-form `(record-protobuf-object ',type ,msg-desc :message))
+      ;; Register it by the full symbol name before any nested define-extend forms.
+      (collect-type-form `(record-protobuf-object ',type ,msg-desc :message))
+      (unless alias-for
+        (collect-form `(make-serializer ,type :default-p t))
+        (collect-form `(make-deserializer ,type :default-p t)))
       `(progn ,@type-forms ,@forms))))
 
 (defmacro define-extend (type (&key name options) &body fields)
@@ -1457,6 +1465,9 @@ function) then there is no guarantee on the serialize function working properly.
         (appendf (proto-extended-fields extends) (list new-field)))
       (record-protobuf-object type extends :message)
       (collect-form `(record-protobuf-object ',type ,extends :message))
+      (unless alias-for
+        (collect-form `(make-serializer ,type :default-p t))
+        (collect-form `(make-deserializer ,type :default-p t)))
       `(progn ,@forms))))
 
 (defun index-within-extensions-p (index message)

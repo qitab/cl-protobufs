@@ -283,13 +283,26 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field) {
 void GenerateExtension(io::Printer* printer,
                        const FieldDescriptor* extension,
                        const FileDescriptor* file) {
-  printer->Print(
-      "\n(pi:define-extend $name$ ()",
-      "name", QualifiedMessageLispName(extension->containing_type(), file));
-  printer->Indent();
-  GenerateField(printer, extension);
-  printer->Print(")");
-  printer->Outdent();
+  GenerateExtensions(printer, {extension}, file);
+}
+
+void GenerateExtensions(io::Printer* printer,
+                        const std::vector<const FieldDescriptor*>& extensions,
+                        const FileDescriptor* file) {
+  for (size_t i = 0; i < extensions.size();) {
+    const Descriptor* containing_type = extensions[i]->containing_type();
+    printer->Print(
+        "\n(pi:define-extend $name$ ()",
+        "name", QualifiedMessageLispName(containing_type, file));
+    printer->Indent();
+    for (; i < extensions.size() &&
+           extensions[i]->containing_type() == containing_type;
+         ++i) {
+      GenerateField(printer, extensions[i]);
+    }
+    printer->Print(")");
+    printer->Outdent();
+  }
 }
 
 }  // namespace cl_protobufs

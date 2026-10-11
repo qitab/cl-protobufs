@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/io/printer.h>
@@ -26,6 +27,10 @@ void GenerateField(io::Printer* printer, const FieldDescriptor* field);
 void GenerateExtension(io::Printer* printer,
                        const FieldDescriptor* extension,
                        const FileDescriptor* file);
+
+void GenerateExtensions(io::Printer* printer,
+                        const std::vector<const FieldDescriptor*>& extensions,
+                        const FileDescriptor* file);
 
 }  // namespace cl_protobufs
 }  // namespace protobuf
