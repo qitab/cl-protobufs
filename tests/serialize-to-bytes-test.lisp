@@ -92,7 +92,17 @@ Parameters
       (assert-eql 5.0 (message-with-floats.test-float des-msg))
       (assert-true (typep (message-with-floats.test-float des-msg) 'float))
       (assert-eql 6.0d0 (message-with-floats.test-double des-msg))
-      (assert-true (typep (message-with-floats.test-double des-msg) 'double-float)))))
+      (assert-true (typep (message-with-floats.test-double des-msg) 'double-float)))
+
+    (setf (message-with-floats.test-float msg) 3.1415927f0
+          (message-with-floats.test-double msg) 3.141592653589793d0)
+    (let* ((msg-bytes (serialize-to-bytes msg 'message-with-floats))
+           (des-msg (deserialize-from-bytes 'message-with-floats msg-bytes)))
+      ;; Tag 1 (float, wire-type 5) = 13, followed by 4 bytes for 3.1415927f0;
+      ;; Tag 2 (double, wire-type 1) = 17, followed by 8 bytes for 3.141592653589793d0.
+      (assert-equalp msg-bytes #(13 219 15 73 64 17 24 45 68 84 251 33 9 64))
+      (assert-eql 3.1415927f0 (message-with-floats.test-float des-msg))
+      (assert-eql 3.141592653589793d0 (message-with-floats.test-double des-msg)))))
 
 
 (deftest test-serialize-to-stream (serialize-suite)

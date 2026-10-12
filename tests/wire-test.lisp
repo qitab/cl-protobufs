@@ -289,12 +289,28 @@ Paramaters:
 ;;---  prim-size, packed-size, enum-size
 ;;---  encode/decode-single/double
 
+(deftest test-encode-single (wire-format-suite)
+  (verify-encode-decode #'pi::encode-single
+                        #'pi::decode-single
+                        '((0.0f0 #(0 0 0 0))
+                          (1.0f0 #(0 0 128 63))
+                          (-1.0f0 #(0 0 128 191))
+                          (0.1f0 #(205 204 204 61))
+                          (3.1415927f0 #(219 15 73 64)))))
+
 (deftest test-encode-double (wire-format-suite)
   (verify-encode-decode #'pi::encode-double
                         #'pi::decode-double
-                        '((0.0d0 #(0 0 0 0 0 0 0 0))
+                        `((0.0d0 #(0 0 0 0 0 0 0 0))
                           (1.0d0 #(0 0 0 0 0 0 240 63))
-                          (0.1d0 #(154 153 153 153 153 153 185 63)))))
+                          (-1.0d0 #(0 0 0 0 0 0 240 191))
+                          (0.1d0 #(154 153 153 153 153 153 185 63))
+                          (-0.1d0 #(154 153 153 153 153 153 185 191))
+                          (3.141592653589793d0 #(24 45 68 84 251 33 9 64))
+                          (-3.141592653589793d0 #(24 45 68 84 251 33 9 192))
+                          (,most-positive-double-float #(255 255 255 255 255 255 239 127))
+                          (,most-negative-double-float #(255 255 255 255 255 255 239 255))
+                          (,least-positive-double-float #(1 0 0 0 0 0 0 0)))))
 
 (deftest test-call-with-each-block (wire-format-suite)
   (flet ((collect-blocks (compact-buf)
