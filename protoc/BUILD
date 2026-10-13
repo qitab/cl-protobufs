@@ -1,6 +1,6 @@
 # Description: protoc plugin for cl-protobufs
 
-load("//security/hardening/blaze:cc_binary.bzl", "HARDENING_ENABLE_SCUDO_ALLOC", "HARDENING_ENABLE_STACK_AUTO_INIT", "HARDENING_ENABLE_WX", "cc_binary")
+load("//security/hardening/blaze:cc_binary.bzl", "HARDENING_ENABLE_SCUDO_ALLOC", "HARDENING_ENABLE_STACK_AUTO_INIT", "cc_binary")
 load("//third_party/bazel_rules/rules_cc/cc:cc_library.bzl", "cc_library")
 
 package(default_applicable_licenses = ["//:license"])
@@ -10,13 +10,10 @@ licenses(["notice"])
 cc_binary(
     name = "protoc-gen-cl-pb",
     srcs = ["main.cc"],
-    calls_initgoogle = True,
     hardening_mode = [
         HARDENING_ENABLE_SCUDO_ALLOC,
-        HARDENING_ENABLE_WX,
         HARDENING_ENABLE_STACK_AUTO_INIT,
     ],
-    third_party = True,
     visibility = ["//visibility:public"],
     deps = [
         ":lib",
