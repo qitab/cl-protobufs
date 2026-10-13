@@ -24,21 +24,51 @@
          (symbolp (third name))
          (values t (second name)))))
 
-(defun def-pseudo-method (method-name meta-message args body)
+(defun def-pseudo-method (method-name meta-message args body &key default-p)
+  "Define a pseudo-method METHOD-NAME for META-MESSAGE with ARGS and BODY.
+If DEFAULT-P is true, store the compiled function on the symbol's plist
+instead of defining a (:PROTOBUF METHOD-NAME NAME) function."
   (let ((name (etypecase meta-message
                 (symbol meta-message)
                 (message-descriptor (proto-class meta-message)))))
-    #+sbcl `(defun (:protobuf ,method-name ,name) ,args ,@body)
-    #-sbcl `(setf (get ',name ',method-name) (lambda ,args ,@body))))
+    (if #+sbcl (not default-p) #-sbcl nil
+        `(defun (:protobuf ,method-name ,name) ,args ,@body)
+        `(setf (get ',name ',method-name) (lambda ,args ,@body)))))
+
+(defun-inline call-custom-serializer (fn obj buf)
+  "Call custom serializer FN on OBJ and BUF, or emit pre-computed lazy %%BYTES if present."
+  (let ((bytes (and (slot-exists-p obj '%%bytes)
+                    (proto-%%bytes obj))))
+    (if bytes
+        (let ((size (length bytes)))
+          (buffer-ensure-space buf size)
+          (fast-octets-out buf bytes)
+          size)
+        (funcall (the function fn) obj buf))))
 
 (defun call-pseudo-method (method-name meta-message &rest args)
-  (let ((class (proto-class meta-message)))
-    #+sbcl
-    `(funcall #'(:protobuf ,method-name ,class) ,@args)
-    #-sbcl
-    `(let ((method (get ',class ',method-name)))
-       (assert method)
-       (funcall (the function method) ,@args))))
+  "Emit a form that invokes METHOD-NAME for META-MESSAGE with ARGS."
+  (let ((class (etypecase meta-message
+                 (symbol meta-message)
+                 (message-descriptor (proto-class meta-message))))
+        (fn (gensym "FN")))
+    `(let ((,fn (or #+sbcl
+                    (sb-kernel:fdefn-fun
+                     (load-time-value
+                      (sb-kernel:find-or-create-fdefn '(:protobuf ,method-name ,class))
+                      t))
+                    (get ',class ',method-name))))
+       (if ,fn
+           ,(ecase method-name
+              (:serialize `(call-custom-serializer ,fn ,@args))
+              (:deserialize `(funcall (the function ,fn) ,@args)))
+           ,(ecase method-name
+              (:serialize
+               `(serialize-message ,(first args)
+                                   (find-message-descriptor ',class :error-p t)
+                                   ,(second args)))
+              (:deserialize
+               `(%deserialize ',class ,@args)))))))
 
 ;; Within a custom serializer/deserializer "method", in SBCL it is faster to call
 ;; another custom "method" via the function name syntax
@@ -51,24 +81,21 @@
 
 (defun-inline custom-serializer (type)
   (the (or null function)
-       #+sbcl (let ((name `(:protobuf :serialize ,type)))
-                (if (fboundp name) (fdefinition name)))
-       #-sbcl (get type :serialize)))
+       (or #+sbcl (let ((name `(:protobuf :serialize ,type)))
+                    (if (fboundp name) (fdefinition name)))
+           (get type :serialize))))
 
 (defun-inline custom-deserializer (type)
   (the (or null function)
-       #+sbcl(let ((name `(:protobuf :deserialize ,type)))
-               (if (fboundp name) (fdefinition name)))
-       #-sbcl(get type :deserialize)))
+       (or #+sbcl (let ((name `(:protobuf :deserialize ,type)))
+                    (if (fboundp name) (fdefinition name)))
+           (get type :deserialize))))
 
 ;;; Serialization
 
 (defun %serialize-to-buffer (object type)
   "Serializes OBJECT of type TYPE into a new OCTET-BUFFER using wire format."
-  (let ((fast-function
-         #-sbcl (get type :serialize)
-         #+sbcl (when (fboundp `(:protobuf :serialize ,type))
-                  (fdefinition `(:protobuf :serialize ,type))))
+  (let ((fast-function (custom-serializer type))
         (b (make-octet-buffer 100)))
     (if fast-function
         (funcall (the function fast-function) object b)
@@ -353,10 +380,7 @@ Parameters:
    END is the last byte plus one.
    Returns two values: the new object and the final index into BUFFER."
   (check-type type symbol)
-  (let ((fast-function
-         #-sbcl (get type :deserialize)
-         #+sbcl (when (fboundp `(:protobuf :deserialize ,type))
-                  (fdefinition `(:protobuf :deserialize ,type)))))
+  (let ((fast-function (custom-deserializer type)))
     (if fast-function
         (funcall (the function fast-function) buffer start end)
         (%deserialize type buffer start end))))
@@ -811,35 +835,41 @@ Parameters:
              `(when ,boundp
                 (,iterator (,vval ,reader)
                            (iincf ,size (serialize-scalar ,vval ',class ,tag ,vbuf))))))
-          ((typep msg 'message-descriptor)
-           (if (eq kind :group)
-               ;; The end tag for a group is the field index shifted and
-               ;; and-ed with a constant.
-               (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                     (tag2 (make-wire-tag $wire-type-end-group   index)))
-                 `(when ,boundp
-                    (,iterator (,vval ,reader)
-                               (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-                               (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
-                               (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
-               (let ((tag (make-wire-tag $wire-type-string index)))
-                 `(when ,boundp
-                    (,iterator (,vval ,reader)
-                               (iincf ,size (encode-uint32 ,tag ,vbuf))
-                               (with-placeholder (,vbuf)
-                                 (let ((len ,(call-pseudo-method
-                                              :serialize msg vval vbuf)))
-                                   (iincf ,size (i+ len (backpatch len))))))))))
-          ((typep msg 'enum-descriptor)
-           (let ((tag (make-wire-tag $wire-type-varint index)))
+          ((or (typep msg 'message-descriptor)
+               (member kind '(:message :group)))
+           (let ((target (or msg class)))
+             (if (eq kind :group)
+                 ;; The end tag for a group is the field index shifted and
+                 ;; and-ed with a constant.
+                 (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                       (tag2 (make-wire-tag $wire-type-end-group   index)))
+                   `(when ,boundp
+                      (,iterator (,vval ,reader)
+                                 (iincf ,size (encode-uint32 ,tag1 ,vbuf))
+                                 (iincf ,size ,(call-pseudo-method :serialize target vval vbuf))
+                                 (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
+                 (let ((tag (make-wire-tag $wire-type-string index)))
+                   `(when ,boundp
+                      (,iterator (,vval ,reader)
+                                 (iincf ,size (encode-uint32 ,tag ,vbuf))
+                                 (with-placeholder (,vbuf)
+                                   (let ((len ,(call-pseudo-method
+                                                :serialize target vval vbuf)))
+                                     (iincf ,size (i+ len (backpatch len)))))))))))
+          ((or (typep msg 'enum-descriptor)
+               (eq kind :enum))
+           (let ((tag (make-wire-tag $wire-type-varint index))
+                 (enum-vals (if (typep msg 'enum-descriptor)
+                                `'(,@(enum-descriptor-values msg))
+                                `(enum-descriptor-values (find-enum-descriptor ',class)))))
              (if packed-p
                  `(iincf ,size
-                         (serialize-packed-enum ,reader '(,@(enum-descriptor-values msg))
+                         (serialize-packed-enum ,reader ,enum-vals
                                                 ,index ,vbuf))
                  `(when ,boundp
                     (,iterator (,vval ,reader)
                                (iincf ,size (serialize-enum
-                                             ,vval '(,@(enum-descriptor-values msg))
+                                             ,vval ,enum-vals
                                              ,tag ,vbuf))))))))))
 
 (defun generate-non-repeated-field-serializer (class kind field-num boundp reader vbuf size)
@@ -865,28 +895,34 @@ Parameters:
              `(when ,boundp
                 (let ((,vval ,reader))
                   (iincf ,size (serialize-scalar ,vval ',class ,tag ,vbuf))))))
-          ((typep msg 'message-descriptor)
-           (if (eq kind :group)
-               (let ((tag1 (make-wire-tag $wire-type-start-group field-num))
-                     (tag2 (make-wire-tag $wire-type-end-group   field-num)))
-                 `(let ((,vval ,reader))
-                    (when ,vval
-                      (iincf ,size (encode-uint32 ,tag1 ,vbuf))
-                      (iincf ,size ,(call-pseudo-method :serialize msg vval vbuf))
-                      (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
-               (let ((tag (make-wire-tag $wire-type-string field-num)))
-                 `(let ((,vval ,reader))
-                    (when ,vval
-                      (iincf ,size (encode-uint32 ,tag ,vbuf))
-                      (with-placeholder (,vbuf)
-                        (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
-                          (iincf ,size (i+ len (backpatch len))))))))))
-          ((typep msg 'enum-descriptor)
-           (let ((tag (make-wire-tag $wire-type-varint field-num)))
+          ((or (typep msg 'message-descriptor)
+               (member kind '(:message :group)))
+           (let ((target (or msg class)))
+             (if (eq kind :group)
+                 (let ((tag1 (make-wire-tag $wire-type-start-group field-num))
+                       (tag2 (make-wire-tag $wire-type-end-group   field-num)))
+                   `(let ((,vval ,reader))
+                      (when ,vval
+                        (iincf ,size (encode-uint32 ,tag1 ,vbuf))
+                        (iincf ,size ,(call-pseudo-method :serialize target vval vbuf))
+                        (iincf ,size (encode-uint32 ,tag2 ,vbuf)))))
+                 (let ((tag (make-wire-tag $wire-type-string field-num)))
+                   `(let ((,vval ,reader))
+                      (when ,vval
+                        (iincf ,size (encode-uint32 ,tag ,vbuf))
+                        (with-placeholder (,vbuf)
+                          (let ((len ,(call-pseudo-method :serialize target vval vbuf)))
+                            (iincf ,size (i+ len (backpatch len)))))))))))
+          ((or (typep msg 'enum-descriptor)
+               (eq kind :enum))
+           (let ((tag (make-wire-tag $wire-type-varint field-num))
+                 (enum-vals (if (typep msg 'enum-descriptor)
+                                `'(,@(enum-descriptor-values msg))
+                                `(enum-descriptor-values (find-enum-descriptor ',class)))))
              `(when ,boundp
                 (let ((,vval ,reader))
                   (iincf ,size (serialize-enum
-                                ,vval '(,@(enum-descriptor-values msg))
+                                ,vval ,enum-vals
                                 ,tag ,vbuf))))))
           ((typep msg 'map-descriptor)
            (let* ((tag      (make-wire-tag $wire-type-string field-num))
@@ -954,11 +990,14 @@ Parameters:
                             (find-enum-descriptor class))))
               (field-name (proto-external-field-name field))
               (extension-p (eq (proto-kind field) :extends))
-              (reader (if extension-p
-                          `(,field-name ,vobj)
-                          `(,(proto-slot-function-name
-                              (proto-class message) field-name :get)
-                            ,vobj)))
+              (reader (cond (extension-p
+                             `(get-extension ,vobj ',field-name))
+                            ((proto-lazy-p field)
+                             `(slot-value ,vobj ',(proto-internal-field-name field)))
+                            (t
+                             `(,(proto-slot-function-name
+                                 (proto-class message) field-name :get)
+                               ,vobj))))
               (boundp (if extension-p
                           `(has-extension ,vobj ',field-name)
                           `(,(proto-slot-function-name
@@ -970,13 +1009,22 @@ Parameters:
        (push (generate-oneof-serializer message oneof vobj vbuf size)
              serializers)))))
 
-(defmacro make-serializer (message-name)
+(defmacro make-serializer (message-name &key default-p)
   "Create the serializer for a message.
 Parameters:
-  MESSAGE-NAME: The symbol name of a message."
-  (generate-serializer (find-message-descriptor message-name)))
+  MESSAGE-NAME: The symbol name of a message.
+  DEFAULT-P: If true, store the serializer on MESSAGE-NAME's plist as a fallback
+    instead of defining (:PROTOBUF :SERIALIZE MESSAGE-NAME)."
+  (let ((message (find-message-descriptor message-name)))
+    (when message
+      `(without-redefinition-warnings ()
+         ,(generate-serializer message :default-p default-p)))))
 
-(defun generate-serializer (message)
+(defun generate-serializer (message &key default-p)
+  "Generate a serializer method for MESSAGE.
+Parameters:
+  MESSAGE: The message-descriptor to make a serializer for.
+  DEFAULT-P: If true, store the serializer on MESSAGE's class plist as a fallback."
   (let ((vobj (make-symbol "OBJ"))
         (vbuf (make-symbol "BUF"))
         (size (make-symbol "SIZE"))
@@ -985,7 +1033,8 @@ Parameters:
         (generate-serializer-body message vobj vbuf size)
       (def-pseudo-method :serialize message `(,vobj ,vbuf &aux (,size 0))
         `((declare ,$optimize-serialization)
-          (declare (ignorable ,vobj ,vbuf))
+          (declare (ignorable ,vobj ,vbuf)
+                   #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
           (declare ; maybe allow specification of the type
            #+ignore(type ,(proto-class message) ,vobj)
            (type fixnum ,size))
@@ -1000,7 +1049,8 @@ Parameters:
                ,size)
               (t
                ,@serializers
-               (incf ,size (emit-skipped-bytes ,vobj ,vbuf))))))))))
+               (incf ,size (emit-skipped-bytes ,vobj ,vbuf))))))
+        :default-p default-p))))
 
 (defun generate-oneof-serializer (message oneof vobj vbuf size)
   "Creates and returns the code that serializes a oneof.
@@ -1087,7 +1137,9 @@ Parameters:
                       class kind index lazy-p vbuf vidx temp
                       :value-consumer
                       (lambda (val)
-                        `((setf (,accessor ,vstruct) ,val))))
+                        (if (eq kind :extends)
+                            `((set-extension ,vstruct ',accessor ,val))
+                            `((setf (,accessor ,vstruct) ,val)))))
                    (unless deserializer
                      (unknown-field-type class field message))
                    (return-from generate-field-deserializer
@@ -1166,44 +1218,50 @@ Parameters:
                     (list tag packed-tag)
                     t)
                    (values non-packed-form tag))))
-            ((typep msg 'message-descriptor)
-             (if (eq kind :group)
-                 (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                       (tag2 (make-wire-tag $wire-type-end-group index)))
-                   (values `(multiple-value-bind (obj end)
-                                ,(call-deserializer
-                                  msg vbuf vidx (- array-dimension-limit 2) tag2)
-                              (setq ,vidx end)
-                              (push obj ,dest))
-                           tag1))
-                 (values `(multiple-value-bind (payload-len payload-start)
-                              (decode-uint32 ,vbuf ,vidx)
-                            ;; This index points *after* the sub-message,
-                            ;; but incrementing it now serves to computes the LIMIT
-                            ;; for the recursive call. And we don't need
-                            ;; the secondary return value for anything.
-                            (setq ,vidx (+ payload-start payload-len))
-                            ,(if lazy-p
-                                 ;; If this field is declared lazy, then don't deserialize.
-                                 ;; Instead, create a new message with %%BYTES field set to
-                                 ;; the bytes on the wire.
-                                 `(push (make-message-with-bytes
-                                         ',class (subseq ,vbuf payload-start ,vidx))
-                                        ,dest)
-                                 `(push ,(call-deserializer msg vbuf 'payload-start vidx)
-                                        ,dest)))
-                         (make-wire-tag $wire-type-string index))))
-            ((typep msg 'enum-descriptor)
+            ((or (typep msg 'message-descriptor)
+                 (member kind '(:message :group)))
+             (let ((target (or msg class)))
+               (if (eq kind :group)
+                   (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                         (tag2 (make-wire-tag $wire-type-end-group index)))
+                     (values `(multiple-value-bind (obj end)
+                                  ,(call-deserializer
+                                    target vbuf vidx (- array-dimension-limit 2) tag2)
+                                (setq ,vidx end)
+                                (push obj ,dest))
+                             tag1))
+                   (values `(multiple-value-bind (payload-len payload-start)
+                                (decode-uint32 ,vbuf ,vidx)
+                              ;; This index points *after* the sub-message,
+                              ;; but incrementing it now serves to computes the LIMIT
+                              ;; for the recursive call. And we don't need
+                              ;; the secondary return value for anything.
+                              (setq ,vidx (+ payload-start payload-len))
+                              ,(if lazy-p
+                                   ;; If this field is declared lazy, then don't deserialize.
+                                   ;; Instead, create a new message with %%BYTES field set to
+                                   ;; the bytes on the wire.
+                                   `(push (make-message-with-bytes
+                                           ',class (subseq ,vbuf payload-start ,vidx))
+                                          ,dest)
+                                   `(push ,(call-deserializer target vbuf 'payload-start vidx)
+                                          ,dest)))
+                           (make-wire-tag $wire-type-string index)))))
+            ((or (typep msg 'enum-descriptor)
+                 (eq kind :enum))
              (let* ((tag (make-wire-tag $wire-type-varint index))
                     (packed-tag (packed-tag index))
+                    (enum-vals (if (typep msg 'enum-descriptor)
+                                   `'(,@(enum-descriptor-values msg))
+                                   `(enum-descriptor-values (find-enum-descriptor ',class))))
                     (non-packed-form `(multiple-value-bind (x idx)
                                           (deserialize-enum
-                                           '(,@(enum-descriptor-values msg)) ,vbuf ,vidx)
+                                           ,enum-vals ,vbuf ,vidx)
                                         (setq ,vidx idx)
                                         (push x ,dest)))
                     (packed-form `(multiple-value-bind (x idx)
                                       (deserialize-packed-enum
-                                       '(,@(enum-descriptor-values msg))
+                                       ,enum-vals
                                        ,vbuf ,vidx)
                                     (setq ,vidx idx)
                                     ;; The reason for nreversing here is that a field that
@@ -1254,37 +1312,43 @@ Parameters:
              (values
               (emit-mv-decode `(deserialize-scalar ',class ,vbuf ,vidx))
               (make-tag class index)))
-            ((typep msg 'message-descriptor)
-             (if (eq kind :group)
-                 (let ((tag1 (make-wire-tag $wire-type-start-group index))
-                       (tag2 (make-wire-tag $wire-type-end-group index)))
-                   (values
-                    (emit-mv-decode
-                     (call-deserializer
-                      msg vbuf vidx (- array-dimension-limit 2) tag2))
-                    tag1))
-                 (let ((decode-expr
-                         (if lazy-p
-                             `(make-message-with-bytes
-                               ',class (subseq ,vbuf payload-start ,vidx))
-                             (call-deserializer msg vbuf 'payload-start vidx))))
-                   (values
-                    `(multiple-value-bind (payload-len payload-start)
-                         (decode-uint32 ,vbuf ,vidx)
-                       (setq ,vidx (+ payload-start payload-len))
-                       ;; If this field is declared lazy, then don't deserialize.
-                       ;; Instead, create a new message with %%BYTES field set to
-                       ;; the bytes on the wire.
-                       ,(if value-consumer
-                            `(let ((,dest ,decode-expr))
-                               ,@(funcall value-consumer dest))
-                            `(setq ,dest ,decode-expr)))
-                    (make-wire-tag $wire-type-string index)))))
-            ((typep msg 'enum-descriptor)
-             (values
-              (emit-mv-decode
-               `(deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
-              (make-wire-tag $wire-type-varint index)))
+            ((or (typep msg 'message-descriptor)
+                 (member kind '(:message :group)))
+             (let ((target (or msg class)))
+               (if (eq kind :group)
+                   (let ((tag1 (make-wire-tag $wire-type-start-group index))
+                         (tag2 (make-wire-tag $wire-type-end-group index)))
+                     (values
+                      (emit-mv-decode
+                       (call-deserializer
+                        target vbuf vidx (- array-dimension-limit 2) tag2))
+                      tag1))
+                   (let ((decode-expr
+                           (if lazy-p
+                               `(make-message-with-bytes
+                                 ',class (subseq ,vbuf payload-start ,vidx))
+                               (call-deserializer target vbuf 'payload-start vidx))))
+                     (values
+                      `(multiple-value-bind (payload-len payload-start)
+                           (decode-uint32 ,vbuf ,vidx)
+                         (setq ,vidx (+ payload-start payload-len))
+                         ;; If this field is declared lazy, then don't deserialize.
+                         ;; Instead, create a new message with %%BYTES field set to
+                         ;; the bytes on the wire.
+                         ,(if value-consumer
+                              `(let ((,dest ,decode-expr))
+                                 ,@(funcall value-consumer dest))
+                              `(setq ,dest ,decode-expr)))
+                      (make-wire-tag $wire-type-string index))))))
+            ((or (typep msg 'enum-descriptor)
+                 (eq kind :enum))
+             (let ((enum-vals (if (typep msg 'enum-descriptor)
+                                  `'(,@(enum-descriptor-values msg))
+                                  `(enum-descriptor-values (find-enum-descriptor ',class)))))
+               (values
+                (emit-mv-decode
+                 `(deserialize-enum ,enum-vals ,vbuf ,vidx))
+                (make-wire-tag $wire-type-varint index))))
             ((typep msg 'map-descriptor)
              (values
               `(progn
@@ -1295,9 +1359,12 @@ Parameters:
                                (make-hash-table :test #',(if (eql (proto-key-type msg) 'string)
                                                              'equal
                                                              'eq))))))
-                 (let ((val-data ,(get-default-form (proto-value-type msg)
-                                                    nil nil
-                                                    (proto-value-kind msg)))
+                 (let ((val-data ,(if (and (eq (proto-value-kind msg) :enum)
+                                           (not (find-enum-descriptor (proto-value-type msg))))
+                                      `(enum-default-value ',(proto-value-type msg))
+                                      (get-default-form (proto-value-type msg)
+                                                        nil nil
+                                                        (proto-value-kind msg))))
                        map-tag map-len key-data start)
                    (multiple-value-setq (map-len ,vidx)
                      (decode-uint32 ,vbuf ,vidx))
@@ -1325,18 +1392,24 @@ Parameters:
         (intern (subseq (symbol-name slot-value) 1)))))
 
 
-(defmacro make-deserializer (message-name)
+(defmacro make-deserializer (message-name &key default-p)
   "Create the deserializer for a message.
 Parameters:
-  MESSAGE-NAME: The symbol-name of a message."
-  (generate-deserializer (find-message-descriptor message-name)))
+  MESSAGE-NAME: The symbol-name of a message.
+  DEFAULT-P: If true, store the deserializer on MESSAGE-NAME's plist as a fallback
+    instead of defining (:PROTOBUF :DESERIALIZE MESSAGE-NAME)."
+  (let ((message (find-message-descriptor message-name)))
+    (when message
+      `(without-redefinition-warnings ()
+         ,(generate-deserializer message :default-p default-p)))))
 
 ;; Note well: keep this in sync with the main 'deserialize' method above
 (defun generate-deserializer (message &key (name message) constructor
                                       (missing-value :%unset)
                                       (skip-fields nil)
                                       (include-fields :all)
-                                      (direct-struct-p nil direct-struct-p-supplied-p))
+                                      (direct-struct-p nil direct-struct-p-supplied-p)
+                                      default-p)
   "Generate a 'deserialize' method for the given message descriptor.
  Parameters:
   MESSAGE: The message-descriptor to make a deserializer for.
@@ -1347,7 +1420,8 @@ Parameters:
   INCLUDE-FIELDS: Fields to include while deserializing.
   DIRECT-STRUCT-P: When true (the default for non-aliased structure-class messages
     without a custom CONSTRUCTOR), allocate the struct at the start of the
-    deserializer and mutate slots directly."
+    deserializer and mutate slots directly.
+  DEFAULT-P: If true, store the deserializer on NAME's plist as a fallback."
   (let* ((vbuf (gensym "BUFFER"))
          (vidx (gensym "INDEX"))
          (vlim (gensym "LIMIT"))
@@ -1379,11 +1453,13 @@ Parameters:
           `((declare #.$optimize-serialization)
             ,@(when hidden-constructor
                 `((declare (inline ,hidden-constructor))))
-            (declare (ignore ,vbuf ,vlim ,vendtag))
+            (declare (ignore ,vbuf ,vlim ,vendtag)
+                     #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
             (values ,(if direct-struct-p
                          `(,hidden-constructor)
                          `(funcall (get-constructor-name ',lisp-type)))
-                    ,vidx)))))
+                    ,vidx))
+          :default-p default-p)))
     (with-collectors ((deserializers collect-deserializer)
                       ;; Nonrepeating slots
                       (nslots collect-nslot)
@@ -1432,7 +1508,8 @@ Parameters:
              (constructor
               (or constructor
                   (when (and (not direct-struct-p)
-                             (typep lisp-class 'structure-class))
+                             (or (null (proto-alias-for message))
+                                 (typep lisp-class 'structure-class)))
                     (let ((*package* (symbol-package lisp-type)))
                       (fintern "MAKE-~A" lisp-type))))))
         (def-pseudo-method :deserialize name
@@ -1440,7 +1517,8 @@ Parameters:
           `((declare ,$optimize-serialization)
             (declare ,@(cond (hidden-constructor `((inline ,hidden-constructor)))
                              (constructor `((inline ,constructor))))
-                     (type array-index ,vidx ,vlim))
+                     (type array-index ,vidx ,vlim)
+                     #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
             (block :deserialize-function
               (let (,@(when direct-struct-p
                         `((,vstruct (,hidden-constructor))))
@@ -1481,7 +1559,7 @@ Parameters:
                                                            `(coerce (nreverse ,temp) 'vector)
                                                            `(nreverse ,temp))
                                       collect `(when ,temp
-                                                 (setf (,field-name ,vstruct) ,conversion)))
+                                                 (set-extension ,vstruct ',field-name ,conversion)))
                               (when ,skipped-bytes-tuple
                                 (setf (message-%%skipped-bytes ,vstruct)
                                       (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf)))
@@ -1522,12 +1600,13 @@ Parameters:
                                                               `(coerce (nreverse ,temp) 'vector)
                                                               `(nreverse ,temp))
                                          collect `(when ,temp
-                                                    (setf (,field-name struct) ,conversion)))
+                                                    (set-extension
+                                                     struct ',field-name ,conversion)))
                                  ,@(loop for field in extended-nfields
                                          for temp in extended-ntemps
                                          for field-name = (proto-external-field-name field)
                                          collect `(unless (eq ,temp ,missing-value)
-                                                    (setf (,field-name struct) ,temp)))
+                                                    (set-extension struct ',field-name ,temp)))
                                  (when ,skipped-bytes-tuple
                                    (setf (message-%%skipped-bytes struct)
                                          (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf))))
@@ -1540,7 +1619,8 @@ Parameters:
                           `(setf ,vidx (skip-element ,vbuf ,vidx tag))
                           `(progn
                              (setf ,vidx (skip-element ,vbuf ,vidx tag))
-                             (push (cons ,old-index ,vidx) ,skipped-bytes-tuple))))))))))))))
+                             (push (cons ,old-index ,vidx) ,skipped-bytes-tuple)))))))))
+          :default-p default-p)))))
 
 
 (defun make-message-with-bytes (type buffer)
