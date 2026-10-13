@@ -1030,21 +1030,24 @@ Parameters:
                           (unknown-field-type class field message)))))
          ((nil) nil)))))
 
-(defun generate-field-deserializer (message field vbuf vidx)
+(defun generate-field-deserializer (message field vbuf vidx &optional vstruct)
   "Generate a deserializer for a single field.
 
 Parameters:
   MESSAGE: The message-descriptor that contains the field.
   FIELD: The field-descriptor of the field to deserialize.
   VBUF: The symbol naming the buffer to deserialize from.
-  VIDX: The symbol naming the index of the buffer to read from."
+  VIDX: The symbol naming the index of the buffer to read from.
+  VSTRUCT: When non-nil, the symbol naming the pre-allocated message struct
+    to mutate directly."
   (let* (non-repeated-slot
          repeated-slot
+         (lisp-type (or (proto-alias-for message) (proto-class message)))
          (class (proto-class field))
          (kind (proto-kind field))
          (index (proto-index field))
          (lazy-p (proto-lazy-p field))
-         (temp (if (eq kind :extends)
+         (temp (if (or vstruct (eq kind :extends))
                    (gensym (string (proto-internal-field-name field)))
                    (fintern (string (proto-internal-field-name field)))))
          (oneof-offset (proto-oneof-offset field)))
@@ -1062,6 +1065,33 @@ Parameters:
                        (values (list tag) (list deserializer)
                                non-repeated-slot repeated-slot)))
                  (unknown-field-type class field message))))
+          ;; Non-repeated (including oneof and map) field with direct struct mutation.
+          (vstruct
+           (let ((accessor (if (eq kind :extends)
+                               (proto-external-field-name field)
+                               (proto-slot-function-name
+                                lisp-type (proto-external-field-name field) :get))))
+             (if (eq kind :map)
+                 (multiple-value-bind (deserializer tag)
+                     (generate-non-repeated-field-deserializer
+                      class kind index lazy-p vbuf vidx temp :direct-map-p t)
+                   (unless deserializer
+                     (unknown-field-type class field message))
+                   (return-from generate-field-deserializer
+                     (values (list tag)
+                             (list `(let ((,temp (,accessor ,vstruct)))
+                                      ,deserializer))
+                             nil nil)))
+                 (multiple-value-bind (deserializer tag)
+                     (generate-non-repeated-field-deserializer
+                      class kind index lazy-p vbuf vidx temp
+                      :value-consumer
+                      (lambda (val)
+                        `((setf (,accessor ,vstruct) ,val))))
+                   (unless deserializer
+                     (unknown-field-type class field message))
+                   (return-from generate-field-deserializer
+                     (values (list tag) (list deserializer) nil nil))))))
           ;; If this field is contained in a oneof, we need to put the value in the
           ;; proper slot in the one-of data struct.
           (oneof-offset
@@ -1078,7 +1108,7 @@ Parameters:
                  (return-from generate-field-deserializer
                    (values (list tag) (list deserializer) nil nil temp)))
                (unknown-field-type class field message))))
-          ;; Non-repeated field.
+          ;; Non-repeated field (constructor keyword argument path).
           (t
            (setf non-repeated-slot temp)
            (multiple-value-bind (deserializer tag)
@@ -1189,7 +1219,7 @@ Parameters:
                        t)))))))
 
 (defun generate-non-repeated-field-deserializer
-    (class kind index lazy-p vbuf vidx dest)
+    (class kind index lazy-p vbuf vidx dest &key direct-map-p value-consumer)
   "Returns two values: The first is lisp code that deserializes the specified object
    to dest and updates vidx to the new index. The second is the tag of this field.
 
@@ -1200,54 +1230,71 @@ Parameters:
   LAZY-P: True if and only if the field is lazy.
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
-  DEST: The symbol name for the destination of deserialized data."
+  DEST: The symbol name for the destination of deserialized data.
+  DIRECT-MAP-P: True when DEST is already bound to the map slot's hash-table.
+  VALUE-CONSUMER: Optional function of one argument (the symbol holding the
+    decoded value) returning a list of forms to consume the decoded value."
   (let ((msg (and class
                   (not (scalarp class))
                   (or (find-message-descriptor class)
                       (find-enum-descriptor class)
                       (find-map-descriptor class)))))
     (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
-             (call-pseudo-method :deserialize msg vbuf start end end-tag)))
+             (call-pseudo-method :deserialize msg vbuf start end end-tag))
+           (emit-mv-decode (decode-form)
+             (if value-consumer
+                 (let ((next-idx (gensym "NEXT-INDEX")))
+                   `(multiple-value-bind (,dest ,next-idx)
+                        ,decode-form
+                      (setq ,vidx ,next-idx)
+                      ,@(funcall value-consumer dest)))
+                 `(multiple-value-setq (,dest ,vidx)
+                    ,decode-form))))
       (cond ((scalarp class)
              (values
-              `(multiple-value-setq (,dest ,vidx)
-                 (deserialize-scalar ',class ,vbuf ,vidx))
+              (emit-mv-decode `(deserialize-scalar ',class ,vbuf ,vidx))
               (make-tag class index)))
             ((typep msg 'message-descriptor)
              (if (eq kind :group)
                  (let ((tag1 (make-wire-tag $wire-type-start-group index))
                        (tag2 (make-wire-tag $wire-type-end-group index)))
                    (values
-                    `(multiple-value-setq (,dest ,vidx)
-                       ,(call-deserializer
-                         msg vbuf vidx (- array-dimension-limit 2) tag2))
+                    (emit-mv-decode
+                     (call-deserializer
+                      msg vbuf vidx (- array-dimension-limit 2) tag2))
                     tag1))
-                 (values
-                  `(multiple-value-bind (payload-len payload-start)
-                       (decode-uint32 ,vbuf ,vidx)
-                     (setq ,vidx (+ payload-start payload-len))
-                     ;; If this field is declared lazy, then don't deserialize.
-                     ;; Instead, create a new message with %%BYTES field set to
-                     ;; the bytes on the wire.
-                     ,(if lazy-p
-                          `(setq ,dest (make-message-with-bytes
-                                        ',class (subseq ,vbuf payload-start ,vidx)))
-                          `(setq ,dest ,(call-deserializer msg vbuf 'payload-start vidx))))
-                  (make-wire-tag $wire-type-string index))))
+                 (let ((decode-expr
+                         (if lazy-p
+                             `(make-message-with-bytes
+                               ',class (subseq ,vbuf payload-start ,vidx))
+                             (call-deserializer msg vbuf 'payload-start vidx))))
+                   (values
+                    `(multiple-value-bind (payload-len payload-start)
+                         (decode-uint32 ,vbuf ,vidx)
+                       (setq ,vidx (+ payload-start payload-len))
+                       ;; If this field is declared lazy, then don't deserialize.
+                       ;; Instead, create a new message with %%BYTES field set to
+                       ;; the bytes on the wire.
+                       ,(if value-consumer
+                            `(let ((,dest ,decode-expr))
+                               ,@(funcall value-consumer dest))
+                            `(setq ,dest ,decode-expr)))
+                    (make-wire-tag $wire-type-string index)))))
             ((typep msg 'enum-descriptor)
              (values
-              `(multiple-value-setq (,dest ,vidx)
-                 (deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
+              (emit-mv-decode
+               `(deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
               (make-wire-tag $wire-type-varint index)))
             ((typep msg 'map-descriptor)
              (values
               `(progn
-                 ;; If ,dest points to the "unset" placeholder, make a new hash-table.
-                 (unless (typep ,dest 'hash-table)
-                   (setq ,dest
-                         (make-hash-table :test #',(if (eql (proto-key-type msg) 'string)
-                                                       'equal
-                                                       'eq))))
+                 ,@(unless direct-map-p
+                     ;; If ,dest points to the "unset" placeholder, make a new hash-table.
+                     `((unless (typep ,dest 'hash-table)
+                         (setq ,dest
+                               (make-hash-table :test #',(if (eql (proto-key-type msg) 'string)
+                                                             'equal
+                                                             'eq))))))
                  (let ((val-data ,(get-default-form (proto-value-type msg)
                                                     nil nil
                                                     (proto-value-kind msg)))
@@ -1288,7 +1335,8 @@ Parameters:
 (defun generate-deserializer (message &key (name message) constructor
                                       (missing-value :%unset)
                                       (skip-fields nil)
-                                      (include-fields :all))
+                                      (include-fields :all)
+                                      (direct-struct-p nil direct-struct-p-supplied-p))
   "Generate a 'deserialize' method for the given message descriptor.
  Parameters:
   MESSAGE: The message-descriptor to make a deserializer for.
@@ -1296,30 +1344,45 @@ Parameters:
   CONSTRUCTOR: The constructor to use when making the object.
   MISSING-VALUE: The value to set a field to if not found while deserializing.
   SKIP-FIELDS: Fields to skip while deserializing.
-  INCLUDE-FIELDS: Fields to include while deserializing."
-  (let ((vbuf (gensym "BUFFER"))
-        (vidx (gensym "INDEX"))
-        (vlim (gensym "LIMIT"))
-        (vendtag (gensym "ENDTAG"))
-        (skipped-bytes-tuple (gensym "SKIPPED-BYTES-TUPLE"))
-        (old-index (gensym "OLD-INDEX"))
-        ;; Add oneof fields to the list of field descriptors, since we need to
-        ;; create a deserializer for each.
-        (fields (append (proto-fields message)
-                        (loop for oneof in (proto-oneofs message)
-                              append (coerce (oneof-descriptor-fields oneof)
-                                             'list))))
-        (save-skipped-bytes-p (or constructor skip-fields
-                                  (not (eq include-fields :all)))))
+  INCLUDE-FIELDS: Fields to include while deserializing.
+  DIRECT-STRUCT-P: When true (the default for non-aliased structure-class messages
+    without a custom CONSTRUCTOR), allocate the struct at the start of the
+    deserializer and mutate slots directly."
+  (let* ((vbuf (gensym "BUFFER"))
+         (vidx (gensym "INDEX"))
+         (vlim (gensym "LIMIT"))
+         (vendtag (gensym "ENDTAG"))
+         (skipped-bytes-tuple (gensym "SKIPPED-BYTES-TUPLE"))
+         (old-index (gensym "OLD-INDEX"))
+         (lisp-type (or (proto-alias-for message) (proto-class message)))
+         (lisp-class (find-class lisp-type nil))
+         (direct-struct-p (if direct-struct-p-supplied-p
+                              direct-struct-p
+                              (and (null constructor)
+                                   (null (proto-alias-for message))
+                                   (typep lisp-class 'structure-class))))
+         (vstruct (when direct-struct-p (gensym "STRUCT")))
+         (hidden-constructor (when direct-struct-p
+                               (get-constructor-name lisp-type)))
+         ;; Add oneof fields to the list of field descriptors, since we need to
+         ;; create a deserializer for each.
+         (fields (append (proto-fields message)
+                         (loop for oneof in (proto-oneofs message)
+                               append (coerce (oneof-descriptor-fields oneof)
+                                              'list))))
+         (save-skipped-bytes-p (or constructor skip-fields
+                                   (not (eq include-fields :all)))))
     (when (null fields)
       (return-from generate-deserializer
         (def-pseudo-method :deserialize name
           `(,vbuf ,vidx ,vlim &optional (,vendtag 0))
           `((declare #.$optimize-serialization)
+            ,@(when hidden-constructor
+                `((declare (inline ,hidden-constructor))))
             (declare (ignore ,vbuf ,vlim ,vendtag))
-            (values (funcall (get-constructor-name
-                              ',(or (proto-alias-for message)
-                                    (proto-class message))))
+            (values ,(if direct-struct-p
+                         `(,hidden-constructor)
+                         `(funcall (get-constructor-name ',lisp-type)))
                     ,vidx)))))
     (with-collectors ((deserializers collect-deserializer)
                       ;; Nonrepeating slots
@@ -1341,7 +1404,7 @@ Parameters:
           (when (and (include-field field)
                      (not (skip-field field)))
             (multiple-value-bind (tags deserializers nslot rslot oneof-slot)
-                (generate-field-deserializer message field vbuf vidx)
+                (generate-field-deserializer message field vbuf vidx vstruct)
               (assert tags)
               (assert deserializers)
               (loop for tag in tags
@@ -1366,27 +1429,22 @@ Parameters:
              (rfields          (mapcar #'first  rslots))
              (rtemps           (mapcar #'second rslots))
              (oneof-slots (delete-duplicates oneof-slots :test #'string= :key #'symbol-name))
-             (lisp-type (or (proto-alias-for message) (proto-class message)))
-             (lisp-class (find-class lisp-type nil))
              (constructor
               (or constructor
-                  (when (typep lisp-class 'structure-class)
+                  (when (and (not direct-struct-p)
+                             (typep lisp-class 'structure-class))
                     (let ((*package* (symbol-package lisp-type)))
                       (fintern "MAKE-~A" lisp-type))))))
-        ;; assume that 'define-proto' named it so
-        ;; Lacking a portable way to construct a structure with explicit disregard for whether
-        ;; any field must be initialized, we defer calling the constructor until all fields have
-        ;; been accumulated. This unfortunately requires a local variable for the tentative value
-        ;; of each field. In SBCL there is a workaround for this that would allow the object
-        ;; to be created in advance of filling in the slots, but it's not clear that it would go
-        ;; any faster. It would, however, need potentially fewer local vars, therefore less stack space.
         (def-pseudo-method :deserialize name
           `(,vbuf ,vidx ,vlim &optional (,vendtag 0) &aux tag)
           `((declare ,$optimize-serialization)
-            (declare ,@(if constructor `((inline ,constructor)))
+            (declare ,@(cond (hidden-constructor `((inline ,hidden-constructor)))
+                             (constructor `((inline ,constructor))))
                      (type array-index ,vidx ,vlim))
             (block :deserialize-function
-              (let (,@(loop for slot in nslots
+              (let (,@(when direct-struct-p
+                        `((,vstruct (,hidden-constructor))))
+                    ,@(loop for slot in nslots
                             collect `(,slot ,missing-value))
                     ,@(loop for slot in extended-ntemps
                             collect `(,slot ,missing-value))
@@ -1396,58 +1454,85 @@ Parameters:
                     ,@extended-rtemps
                     ,@rtemps
                     ,skipped-bytes-tuple)
+                ,@(when direct-struct-p
+                    `((declare (type ,lisp-type ,vstruct))))
                 ,(when save-skipped-bytes-p `(declare (ignore ,old-index)))
                 (loop
                   (multiple-value-setq (tag ,vidx)
                     (if (i< ,vidx ,vlim) (decode-uint32 ,vbuf ,vidx) (values 0 ,vidx)))
                   (when (i= tag ,vendtag)
                     (return-from :deserialize-function
-                      (values
-                       ;; We may have skipped bytes we have to save to the structure
-                       ;; after we cons it.
-                       (let ((struct
-                              (,@(if constructor (list constructor)
-                                     `(funcall (get-constructor-name ',lisp-type)))
-                               ;; oneofs
-                               ,@(loop for temp in oneof-slots
-                                       for mtemp = (slot-value-to-slot-name-symbol temp)
-                                       nconc (list (intern (string mtemp) :keyword) temp))
-                               ;; nonrepeating slots
-                               ,@(loop for temp in nslots
-                                       for mtemp = (slot-value-to-slot-name-symbol temp)
-                                       nconc (list (intern (string mtemp) :keyword) temp))
-                               ;; repeating slots
-                               ,@(loop for field in rfields
-                                       for temp in rtemps
-                                       for mtemp = (slot-value-to-slot-name-symbol temp)
-                                       for conversion = (if (eq :vector (proto-container field))
-                                                            `(coerce (nreverse ,temp) 'vector)
-                                                            `(nreverse ,temp))
-                                       nconc `(,(intern (string mtemp) :keyword)
-                                               ,(if missing-value
-                                                    `(if ,temp
-                                                         ,conversion
-                                                         ,missing-value)
-                                                    conversion))))))
-                         (when (message-p struct)
-                           ,@(loop for field in extended-rfields
-                                   for temp in extended-rtemps
-                                   for field-name = (proto-external-field-name field)
-                                   for conversion = (if (eq :vector (proto-container field))
-                                                        `(coerce (nreverse ,temp) 'vector)
-                                                        `(nreverse ,temp))
-                                   collect `(when ,temp
-                                              (setf (,field-name struct) ,conversion)))
-                           ,@(loop for field in extended-nfields
-                                   for temp in extended-ntemps
-                                   for field-name = (proto-external-field-name field)
-                                   collect `(unless (eq ,temp ,missing-value)
-                                              (setf (,field-name struct) ,temp)))
-                           (when ,skipped-bytes-tuple
-                             (setf (message-%%skipped-bytes struct)
-                                   (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf))))
-                         struct)
-                       ,vidx)))
+                      ,(if direct-struct-p
+                           `(progn
+                              ,@(loop for field in rfields
+                                      for temp in rtemps
+                                      for accessor
+                                        = (proto-slot-function-name
+                                           lisp-type (proto-external-field-name field) :get)
+                                      for conversion = (if (eq :vector (proto-container field))
+                                                           `(coerce (nreverse ,temp) 'vector)
+                                                           `(nreverse ,temp))
+                                      collect `(when ,temp
+                                                 (setf (,accessor ,vstruct) ,conversion)))
+                              ,@(loop for field in extended-rfields
+                                      for temp in extended-rtemps
+                                      for field-name = (proto-external-field-name field)
+                                      for conversion = (if (eq :vector (proto-container field))
+                                                           `(coerce (nreverse ,temp) 'vector)
+                                                           `(nreverse ,temp))
+                                      collect `(when ,temp
+                                                 (setf (,field-name ,vstruct) ,conversion)))
+                              (when ,skipped-bytes-tuple
+                                (setf (message-%%skipped-bytes ,vstruct)
+                                      (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf)))
+                              (values ,vstruct ,vidx))
+                           `(values
+                             ;; We may have skipped bytes we have to save to the structure
+                             ;; after we cons it.
+                             (let ((struct
+                                    (,@(if constructor (list constructor)
+                                           `(funcall (get-constructor-name ',lisp-type)))
+                                     ;; oneofs
+                                     ,@(loop for temp in oneof-slots
+                                             for mtemp = (slot-value-to-slot-name-symbol temp)
+                                             nconc (list (intern (string mtemp) :keyword) temp))
+                                     ;; nonrepeating slots
+                                     ,@(loop for temp in nslots
+                                             for mtemp = (slot-value-to-slot-name-symbol temp)
+                                             nconc (list (intern (string mtemp) :keyword) temp))
+                                     ;; repeating slots
+                                     ,@(loop for field in rfields
+                                             for temp in rtemps
+                                             for mtemp = (slot-value-to-slot-name-symbol temp)
+                                             for conversion
+                                               = (if (eq :vector (proto-container field))
+                                                     `(coerce (nreverse ,temp) 'vector)
+                                                     `(nreverse ,temp))
+                                             nconc `(,(intern (string mtemp) :keyword)
+                                                     ,(if missing-value
+                                                          `(if ,temp
+                                                               ,conversion
+                                                               ,missing-value)
+                                                          conversion))))))
+                               (when (message-p struct)
+                                 ,@(loop for field in extended-rfields
+                                         for temp in extended-rtemps
+                                         for field-name = (proto-external-field-name field)
+                                         for conversion = (if (eq :vector (proto-container field))
+                                                              `(coerce (nreverse ,temp) 'vector)
+                                                              `(nreverse ,temp))
+                                         collect `(when ,temp
+                                                    (setf (,field-name struct) ,conversion)))
+                                 ,@(loop for field in extended-nfields
+                                         for temp in extended-ntemps
+                                         for field-name = (proto-external-field-name field)
+                                         collect `(unless (eq ,temp ,missing-value)
+                                                    (setf (,field-name struct) ,temp)))
+                                 (when ,skipped-bytes-tuple
+                                   (setf (message-%%skipped-bytes struct)
+                                         (make-skipped-byte-vector ,skipped-bytes-tuple ,vbuf))))
+                               struct)
+                             ,vidx))))
                   (case tag
                     ,@deserializers
                     (otherwise

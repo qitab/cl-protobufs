@@ -544,7 +544,7 @@ Parameters:
              (setf (aref field-descriptors oneof-offset)
                    (make-field-descriptor
                     :name (or name (slot-name->proto slot))
-                    :type type
+                    :type (if (eq kind :enum) (enum-open-type type) type)
                     :kind kind
                     :class type
                     :qualified-name (make-qualified-name
