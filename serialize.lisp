@@ -51,24 +51,21 @@
 
 (defun-inline custom-serializer (type)
   (the (or null function)
-       #+sbcl (let ((name `(:protobuf :serialize ,type)))
-                (if (fboundp name) (fdefinition name)))
+       #+sbcl (sb-int:dx-let ((name (list :protobuf :serialize type)))
+                (fboundp name))
        #-sbcl (get type :serialize)))
 
 (defun-inline custom-deserializer (type)
   (the (or null function)
-       #+sbcl(let ((name `(:protobuf :deserialize ,type)))
-               (if (fboundp name) (fdefinition name)))
-       #-sbcl(get type :deserialize)))
+       #+sbcl (sb-int:dx-let ((name (list :protobuf :deserialize type)))
+                (fboundp name))
+       #-sbcl (get type :deserialize)))
 
 ;;; Serialization
 
 (defun %serialize-to-buffer (object type)
   "Serializes OBJECT of type TYPE into a new OCTET-BUFFER using wire format."
-  (let ((fast-function
-         #-sbcl (get type :serialize)
-         #+sbcl (when (fboundp `(:protobuf :serialize ,type))
-                  (fdefinition `(:protobuf :serialize ,type))))
+  (let ((fast-function (custom-serializer type))
         (b (make-octet-buffer 100)))
     (if fast-function
         (funcall (the function fast-function) object b)
@@ -353,10 +350,7 @@ Parameters:
    END is the last byte plus one.
    Returns two values: the new object and the final index into BUFFER."
   (check-type type symbol)
-  (let ((fast-function
-         #-sbcl (get type :deserialize)
-         #+sbcl (when (fboundp `(:protobuf :deserialize ,type))
-                  (fdefinition `(:protobuf :deserialize ,type)))))
+  (let ((fast-function (custom-deserializer type)))
     (if fast-function
         (funcall (the function fast-function) buffer start end)
         (%deserialize type buffer start end))))
@@ -768,7 +762,6 @@ Parameters:
                    (multiple-value-bind (embedded-msg-len start)
                        (decode-uint32 buffer index)
                      (let* ((end (+ start embedded-msg-len))
-                            (deserializer (custom-deserializer type))
                             (obj
                              (cond (lazy-p
                                     ;; For lazy fields, just store bytes in the %%bytes field.

@@ -422,12 +422,23 @@
          (decode-fixed  (fintern "~A~A" 'decode-fixed bits))
          (decode-sfixed (fintern "~A~A" 'decode-sfixed bits))
          (bytes (/ bits 8))
+         ;; Accessors for the native fixed-width decoders.
+         (sap-ref #+sbcl (ecase bits
+                           (32 'sb-sys:sap-ref-32)
+                           (64 'sb-sys:sap-ref-64))
+                  #-sbcl nil)
+         (signed-sap-ref #+sbcl (ecase bits
+                                  (32 'sb-sys:signed-sap-ref-32)
+                                  (64 'sb-sys:signed-sap-ref-64))
+                         #-sbcl nil)
          ;; Given bits, can we use fixnums safely?
          (fixnump (<= bits (integer-length most-negative-fixnum)))
          (ldb (if fixnump 'ildb 'ldb))
          (ash (if fixnump 'iash 'ash))
          (decf (if fixnump 'idecf 'decf))
          (logior (if fixnump 'ilogior 'logior)))
+    ;; Each platform's expansion only uses some of these.
+    (declare (ignorable sap-ref signed-sap-ref ldb ash decf logior))
     `(progn
        (declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
                                  (values (unsigned-byte ,bits) array-index))
@@ -466,6 +477,10 @@
            (if (i= (ldb (byte 1 ,(1- bits)) val) 1)
                (values (the (signed-byte ,bits) (logior val ,(ash -1 bits))) new-index)
                (values val new-index))))
+       (declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
+                                 (values (unsigned-byte ,bits) array-index))
+                       ,decode-fixed)
+                (inline ,decode-fixed))
        (defun ,decode-fixed (buffer index)
          ,(format
            nil
@@ -476,14 +491,22 @@
          (declare #.$optimize-serialization)
          (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
                   (array-index index))
+         #+(and sbcl (or arm64 x86-64))
+         (values (,sap-ref (sb-sys:vector-sap buffer) index)
+                 (i+ index ,bytes))
+         #-(and sbcl (or arm64 x86-64))
          ;; Eight bits at a time, least significant bits first
          (let ((val 0))
-           ,@(when fixnump `((declare (type fixnum val))))
+           (declare (type ,(if fixnump 'fixnum `(unsigned-byte ,bits)) val))
            (loop repeat ,bytes
                  for places fixnum upfrom 0 by 8
                  for byte fixnum = (prog1 (aref buffer index) (iincf index))
                  do (setq val (,logior val (,ash byte places))))
            (values val index)))
+       (declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
+                                 (values (signed-byte ,bits) array-index))
+                       ,decode-sfixed)
+                (inline ,decode-sfixed))
        (defun ,decode-sfixed (buffer index)
          ,(format
            nil
@@ -494,19 +517,72 @@
          (declare #.$optimize-serialization)
          (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
                   (array-index index))
+         #+(and sbcl (or arm64 x86-64))
+         (values (,signed-sap-ref (sb-sys:vector-sap buffer) index)
+                 (i+ index ,bytes))
+         #-(and sbcl (or arm64 x86-64))
          ;; Eight bits at a time, least significant bits first
          (let ((val 0))
-           ,@(when fixnump `((declare (type fixnum val))))
+           (declare (type ,(if fixnump 'fixnum `(unsigned-byte ,bits)) val))
            (loop repeat ,bytes
                  for places fixnum upfrom 0 by 8
                  for byte fixnum = (prog1 (aref buffer index) (iincf index))
                  do (setq val (,logior val (,ash byte places))))
-           (when (i= (,ldb (byte 1 ,(1- bits)) val) 1)  ; sign bit set, so negative value
-             (,decf val ,(ash 1 bits)))
-           (values val index))))))
+           (if (i= (,ldb (byte 1 ,(1- bits)) val) 1)  ; sign bit set, so negative value
+               (values (,decf val ,(ash 1 bits)) index)
+               (values val index)))))))
 
 (generate-integer-decoders 32)
 (generate-integer-decoders 64)
+
+(declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
+                          (values single-float array-index))
+                decode-single)
+         (inline decode-single))
+(defun decode-single (buffer index)
+  "Decodes the next single float in BUFFER at the given INDEX.
+   Returns both the decoded value and the new index into BUFFER.
+   Watch out, this function turns off all type checking and array bounds checking."
+  (declare #.$optimize-serialization)
+  (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
+           (array-index index))
+  #+sbcl
+  (values (sb-sys:sap-ref-single (sb-sys:vector-sap buffer) index)
+          (i+ index 4))
+  ;; Eight bits at a time, least significant bits first
+  #-sbcl
+  (let ((bits 0))
+    (loop repeat 4
+          for places fixnum upfrom 0 by 8
+          for byte fixnum = (prog1 (aref buffer index) (iincf index))
+          do (setq bits (logior bits (ash byte places))))
+    (when (i= (ldb (byte 1 31) bits) 1)             ; sign bit set, so negative value
+      (decf bits #.(ash 1 32)))
+    (values (float-features:bits-single-float bits) index)))
+
+(declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
+                          (values double-float array-index))
+                decode-double)
+         (inline decode-double))
+(defun decode-double (buffer index)
+  "Decodes the next double float in BUFFER at the given INDEX.
+   Returns both the decoded value and the new index into BUFFER.
+   Watch out, this function turns off all type checking and array bounds checking."
+  (declare #.$optimize-serialization)
+  (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
+           (array-index index))
+  #+sbcl
+  (values (sb-sys:sap-ref-double (sb-sys:vector-sap buffer) index)
+          (i+ index 8))
+  #-sbcl
+  ;; Eight bits at a time, least significant bits first
+  (let ((val  0))
+    (declare (type (unsigned-byte 64) val))
+    (loop repeat 8
+          for places fixnum upfrom 0 by 8
+          for byte fixnum = (prog1 (aref buffer index) (iincf index))
+          do (setq val (logior val (ash byte places))))
+    (values (float-features:bits-double-float val) index)))
 
 ;; Deserialize the next object of type 'type'
 ;; FIXME: most of these are bad. QPX does not do much decoding,
@@ -1025,48 +1101,6 @@
     (incf len (encode-uint32 len buffer))
     (fast-octets-out buffer octets)
     len))
-
-
-(defun decode-single (buffer index)
-  "Decodes the next single float in the buffer at the given index.
-   Returns both the decoded value and the new index into the buffer.
-   Watch out, this function turns off all type checking and array bounds checking."
-  (declare #.$optimize-serialization)
-  (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
-           (array-index index))
-  #+sbcl
-  (values (sb-sys:sap-ref-single (sb-sys:vector-sap buffer) index)
-          (i+ index 4))
-  ;; Eight bits at a time, least significant bits first
-  #-sbcl
-  (let ((bits 0))
-    (loop repeat 4
-          for places fixnum upfrom 0 by 8
-          for byte fixnum = (prog1 (aref buffer index) (iincf index))
-          do (setq bits (logior bits (ash byte places))))
-    (when (i= (ldb (byte 1 31) bits) 1)             ;sign bit set, so negative value
-      (decf bits #.(ash 1 32)))
-    (values (float-features:bits-single-float bits) index)))
-
-(defun decode-double (buffer index)
-  "Decodes the next double float in the buffer at the given index.
-   Returns both the decoded value and the new index into the buffer.
-   Watch out, this function turns off all type checking and array bounds checking."
-  (declare #.$optimize-serialization)
-  (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
-           (array-index index))
-  #+sbcl
-  (values (sb-sys:sap-ref-double (sb-sys:vector-sap buffer) index)
-          (i+ index 8))
-  #-sbcl
-  ;; Eight bits at a time, least significant bits first
-  (let ((val  0))
-    (declare (type (unsigned-byte 64) val)
-    (loop repeat 8
-          for places fixnum upfrom 0 by 8
-          for byte fixnum = (prog1 (aref buffer index) (iincf index))
-          do (setq val (logior val (ash byte places))))
-    (values (float-features:bits-double-float val) index))))
 
 (defun decode-string (buffer index)
   "Decodes the next UTF-8 encoded string in the buffer at the given index.
