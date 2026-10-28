@@ -712,8 +712,11 @@ Paramaters:
       (let ((before (sb-ext:get-bytes-consed)))
         (decode-fixed-and-float-loop 1000)
         (assert-eql 0 (- (sb-ext:get-bytes-consed) before)))
-      (let ((before (sb-ext:get-bytes-consed)))
-        (assert-eql 2000 (dispatch-lookup-loop 1000 'wire-format-suite))
-        (assert-eql 0 (- (sb-ext:get-bytes-consed) before))))))
+      ;; Measure before asserting: clunit's assertion bookkeeping conses.
+      (let* ((before (sb-ext:get-bytes-consed))
+             (count (dispatch-lookup-loop 1000 'wire-format-suite))
+             (consed (- (sb-ext:get-bytes-consed) before)))
+        (assert-eql 2000 count)
+        (assert-eql 0 consed)))))
 
 
