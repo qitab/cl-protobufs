@@ -46,7 +46,10 @@ Parameters:
   ;; identify when we tried to deserialize a proto but will
   ;; add to the serialized bytes for the proto if we serialize it.
   ;; See https://developers.google.com/protocol-buffers/docs/overview#updating
-  (%%skipped-bytes nil :type (or null byte-vector)))
+  (%%skipped-bytes nil :type (or null byte-vector))
+  ;; Pre-computed wire serialization bytes for lazy fields and
+  ;; make-message-with-bytes pass-through objects.
+  (%%bytes nil :type (or null (simple-array (unsigned-byte 8) 1))))
 
 
 ;;; Descriptor classes -- These classes taken together represent the contents of a .proto file.
