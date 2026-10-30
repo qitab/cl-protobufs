@@ -168,6 +168,93 @@ Parameters:
           (or (emit-non-repeated-field value type field-num kind buffer)
               (unknown-field-type type field object))))))
 
+(defun-inline enum-keyword-to-int-fn (enum-type)
+  "Return the generated keyword-to-int function for ENUM-TYPE if bound, or NIL."
+  (let ((fn (and enum-type (get enum-type 'enum-keyword-to-int))))
+    (and fn (fboundp fn) (symbol-function fn))))
+
+(defun-inline enum-int-to-keyword-fn (enum-type)
+  "Return the generated int-to-keyword function for ENUM-TYPE if bound, or NIL."
+  (let ((fn (and enum-type (get enum-type 'enum-int-to-keyword))))
+    (and fn (fboundp fn) (symbol-function fn))))
+
+(defun-inline enum-keyword-to-int-sym (enum-type)
+  "Return the generated keyword-to-int function symbol for ENUM-TYPE, or NIL."
+  (and enum-type (get enum-type 'enum-keyword-to-int)))
+
+(defun-inline enum-int-to-keyword-sym (enum-type)
+  "Return the generated int-to-keyword function symbol for ENUM-TYPE, or NIL."
+  (and enum-type (get enum-type 'enum-int-to-keyword)))
+
+(defun %undefined-enum-keyword (val)
+  "Construct an :%UNDEFINED-<val> keyword for an unrecognized wire enum integer VAL."
+  (declare (type int32 val))
+  (kintern "%UNDEFINED-~D" val))
+
+(defun-inline serialize-enum-with-fn (name key2int-fn tag buffer)
+  "Serialize enum keyword NAME into BUFFER with TAG using KEY2INT-FN."
+  (declare (type function key2int-fn)
+           (type (unsigned-byte 32) tag)
+           (type buffer buffer))
+  (locally (declare #.$optimize-serialization)
+    (let ((val (ldb (byte 32 0) (the sfixed32 (funcall key2int-fn name)))))
+      (declare (type (unsigned-byte 32) val))
+      (i+ (encode-uint32 tag buffer) (encode-uint32 val buffer)))))
+
+(defun serialize-packed-enum-with-fn (names key2int-fn index buffer)
+  "Serialize packed enum keywords NAMES into BUFFER at field INDEX using KEY2INT-FN."
+  (declare (type function key2int-fn)
+           (type (unsigned-byte 32) index)
+           (type buffer buffer))
+  (when (if (vectorp names) (zerop (length names)) (null names))
+    (return-from serialize-packed-enum-with-fn 0))
+  (locally (declare #.$optimize-serialization)
+    (let ((payload-len 0))
+      (declare (type fixnum payload-len))
+      (if (vectorp names)
+          (dovector (name names)
+            (let ((val (the sfixed32 (funcall key2int-fn name))))
+              (iincf payload-len (length32 (ldb (byte 32 0) val)))))
+          (dolist (name names)
+            (let ((val (the sfixed32 (funcall key2int-fn name))))
+              (iincf payload-len (length32 (ldb (byte 32 0) val))))))
+      (let* ((tag-len (encode-uint32 (packed-tag index) buffer))
+             (prefix-len (encode-uint32 payload-len buffer))
+             (sum 0))
+        (declare (type fixnum sum))
+        (if (vectorp names)
+            (dovector (name names)
+              (let ((val (the sfixed32 (funcall key2int-fn name))))
+                (iincf sum (encode-uint32 (ldb (byte 32 0) val) buffer))))
+            (dolist (name names)
+              (let ((val (the sfixed32 (funcall key2int-fn name))))
+                (iincf sum (encode-uint32 (ldb (byte 32 0) val) buffer)))))
+        (assert (= sum payload-len))
+        (i+ tag-len prefix-len payload-len)))))
+
+(defun deserialize-packed-enum-into-list (int2key-fn buffer index acc)
+  "Deserialize packed enum values from BUFFER at INDEX using INT2KEY-FN,
+   pushing each decoded keyword onto ACC in reverse order for final NREVERSE."
+  (declare (type function int2key-fn)
+           (type (simple-array (unsigned-byte 8) (*)) buffer)
+           (type array-index index)
+           (type list acc))
+  (locally (declare #.$optimize-serialization)
+    (multiple-value-bind (len idx)
+        (decode-uint32 buffer index)
+      (declare (type (unsigned-byte 32) len)
+               (type array-index idx))
+      (let ((end (i+ idx len)))
+        (declare (type array-index end))
+        (loop while (i< idx end) do
+          (multiple-value-bind (val nidx)
+              (decode-int32 buffer idx)
+            (push (or (funcall int2key-fn val)
+                      (%undefined-enum-keyword val))
+                  acc)
+            (setq idx nidx)))
+        (values acc idx)))))
+
 (defun emit-repeated-field (value type packed-p field-num kind buffer)
   "Serialize a repeated field to buffer. Return nil on failure.
 
@@ -193,13 +280,27 @@ Parameters:
           ((setq desc (find-message-descriptor type))
            (emit-repeated-message-field desc value type field-num kind buffer))
           ((setq desc (find-enum-descriptor type))
-           (if packed-p
-               (serialize-packed-enum value (enum-descriptor-values desc) field-num buffer)
-               (let ((tag (make-wire-tag $wire-type-varint field-num))
-                     (size 0))
-                 (doseq (name value)
-                   (iincf size (serialize-enum name (enum-descriptor-values desc) tag buffer)))
-                 size))))))
+           (let ((key2int-fn (enum-keyword-to-int-fn (proto-class desc))))
+             (cond ((and packed-p key2int-fn)
+                    (serialize-packed-enum-with-fn value key2int-fn field-num buffer))
+                   (packed-p
+                    (serialize-packed-enum value (enum-descriptor-values desc) field-num buffer))
+                   (key2int-fn
+                    (let ((tag (make-wire-tag $wire-type-varint field-num))
+                          (size 0))
+                      (declare (type fixnum size))
+                      (if (vectorp value)
+                          (dovector (name value)
+                            (iincf size (serialize-enum-with-fn name key2int-fn tag buffer)))
+                          (dolist (name value)
+                            (iincf size (serialize-enum-with-fn name key2int-fn tag buffer))))
+                      size))
+                   (t
+                    (let ((tag (make-wire-tag $wire-type-varint field-num))
+                          (size 0))
+                      (doseq (name value)
+                        (iincf size (serialize-enum name (enum-descriptor-values desc) tag buffer)))
+                      size))))))))
 
 (defun emit-repeated-message-field (msg-desc messages type field-num kind buffer)
   "Serialize a repeated message (or group) field.
@@ -235,8 +336,7 @@ Parameters:
             (iincf size (encode-uint32 tag buffer))
             ;; If MSG has %%BYTES bound, then it is a lazy field, and BYTES is
             ;; the pre-computed serialization of MSG, so output that.
-            (let ((precomputed-bytes (and (slot-exists-p msg '%%bytes)
-                                          (proto-%%bytes msg)))
+            (let ((precomputed-bytes (proto-%%bytes msg))
                   (submessage-size 0))
               (with-placeholder (buffer) ; reserve space for submessage-size in buffer
                 (cond (precomputed-bytes
@@ -269,9 +369,11 @@ Parameters:
           ((setq desc (find-message-descriptor type))
            (emit-non-repeated-message-field desc value type field-num kind buffer))
           ((setq desc (find-enum-descriptor type))
-           (serialize-enum value (enum-descriptor-values desc)
-                           (make-wire-tag $wire-type-varint field-num)
-                           buffer))
+           (let ((tag (make-wire-tag $wire-type-varint field-num))
+                 (key2int-fn (enum-keyword-to-int-fn (proto-class desc))))
+             (if key2int-fn
+                 (serialize-enum-with-fn value key2int-fn tag buffer)
+                 (serialize-enum value (enum-descriptor-values desc) tag buffer))))
           ((setq desc (find-map-descriptor type))
            (let* ((tag (make-wire-tag $wire-type-string field-num))
                   (key-type (proto-key-type desc))
@@ -314,8 +416,7 @@ Parameters:
         (t
          ;; If MSG has %%BYTES bound, then it is a lazy field, and %%BYTES is
          ;; the pre-computed serialization of MSG, so output that.
-         (let ((precomputed-bytes (and (slot-exists-p msg '%%bytes)
-                                       (proto-%%bytes msg)))
+         (let ((precomputed-bytes (proto-%%bytes msg))
                (custom-serializer (custom-serializer type))
                (tag-size (encode-uint32 (make-wire-tag $wire-type-string field-num) buffer))
                (submessage-size 0))
@@ -732,17 +833,27 @@ Parameters:
                       new-index)))))
     (t (let ((enum (find-enum-descriptor type)))
          (if enum
-             (cond ((length-encoded-tag-p tag)
-                    (multiple-value-bind (data new-index)
-                      (deserialize-packed-enum (enum-descriptor-values enum)
-                                               buffer index)
-                    (values (nreconc data (car cell)) new-index)))
-                   (t
-                    (multiple-value-bind (data new-index)
-                      (deserialize-enum (enum-descriptor-values enum)
-                                        buffer index)
-                      (values (if repeated-p (cons data (car cell)) data)
-                              new-index))))
+             (let ((int2key-fn (enum-int-to-keyword-fn (proto-class enum))))
+               (cond ((and (length-encoded-tag-p tag) int2key-fn)
+                      (deserialize-packed-enum-into-list int2key-fn buffer index (car cell)))
+                     ((length-encoded-tag-p tag)
+                      (multiple-value-bind (data new-index)
+                          (deserialize-packed-enum (enum-descriptor-values enum)
+                                                   buffer index)
+                        (values (nreconc data (car cell)) new-index)))
+                     (int2key-fn
+                      (multiple-value-bind (val new-index)
+                          (decode-int32 buffer index)
+                        (let ((data (or (funcall int2key-fn val)
+                                        (%undefined-enum-keyword val))))
+                          (values (if repeated-p (cons data (car cell)) data)
+                                  new-index))))
+                     (t
+                      (multiple-value-bind (data new-index)
+                          (deserialize-enum (enum-descriptor-values enum)
+                                            buffer index)
+                        (values (if repeated-p (cons data (car cell)) data)
+                                new-index)))))
              (let* ((submessage (find-message-descriptor type :error-p t))
                     (deserializer (custom-deserializer type))
                     (group-p (i= (logand tag 7) $wire-type-start-group))
@@ -824,16 +935,52 @@ Parameters:
                                               :serialize msg vval vbuf)))
                                    (iincf ,size (i+ len (backpatch len))))))))))
           ((typep msg 'enum-descriptor)
-           (let ((tag (make-wire-tag $wire-type-varint index)))
-             (if packed-p
-                 `(iincf ,size
-                         (serialize-packed-enum ,reader '(,@(enum-descriptor-values msg))
-                                                ,index ,vbuf))
-                 `(when ,boundp
-                    (,iterator (,vval ,reader)
-                               (iincf ,size (serialize-enum
-                                             ,vval '(,@(enum-descriptor-values msg))
-                                             ,tag ,vbuf))))))))))
+           (let ((tag (make-wire-tag $wire-type-varint index))
+                 (key2int (enum-keyword-to-int-sym (proto-class msg))))
+             (cond ((and packed-p key2int)
+                    (let ((vvals (gensym "VALS"))
+                          (vint (gensym "INT"))
+                          (vpayload-len (gensym "PAYLOAD-LEN"))
+                          (vtag-len (gensym "TAG-LEN"))
+                          (vprefix-len (gensym "PREFIX-LEN"))
+                          (p-tag (packed-tag index)))
+                      `(when ,boundp
+                         (let ((,vvals ,reader))
+                           (unless ,(if vector-p `(zerop (length ,vvals)) `(null ,vvals))
+                             (locally (declare #.$optimize-serialization)
+                               (let ((,vpayload-len 0))
+                                 (declare (type fixnum ,vpayload-len))
+                                 (,iterator (,vval ,vvals)
+                                   (iincf ,vpayload-len
+                                          (length32 (ldb (byte 32 0)
+                                                         (the sfixed32 (,key2int ,vval))))))
+                                 (let ((,vtag-len (encode-uint32 ,p-tag ,vbuf))
+                                       (,vprefix-len (encode-uint32 ,vpayload-len ,vbuf)))
+                                   (,iterator (,vval ,vvals)
+                                     (let ((,vint (ldb (byte 32 0)
+                                                       (the sfixed32 (,key2int ,vval)))))
+                                       (declare (type (unsigned-byte 32) ,vint))
+                                       (encode-uint32 ,vint ,vbuf)))
+                                   (iincf ,size
+                                          (i+ ,vtag-len ,vprefix-len ,vpayload-len))))))))))
+                   (packed-p
+                    `(iincf ,size
+                            (serialize-packed-enum ,reader '(,@(enum-descriptor-values msg))
+                                                   ,index ,vbuf)))
+                   (key2int
+                    (let ((vint (gensym "INT")))
+                      `(when ,boundp
+                         (,iterator (,vval ,reader)
+                           (let ((,vint (ldb (byte 32 0) (the sfixed32 (,key2int ,vval)))))
+                             (declare (type (unsigned-byte 32) ,vint))
+                             (iincf ,size (i+ (encode-uint32 ,tag ,vbuf)
+                                              (encode-uint32 ,vint ,vbuf))))))))
+                   (t
+                    `(when ,boundp
+                       (,iterator (,vval ,reader)
+                         (iincf ,size (serialize-enum
+                                       ,vval '(,@(enum-descriptor-values msg))
+                                       ,tag ,vbuf)))))))))))
 
 (defun generate-non-repeated-field-serializer (class kind field-num boundp reader vbuf size)
   "Generate the field serializer for a non-repeated field
@@ -875,12 +1022,19 @@ Parameters:
                         (let ((len ,(call-pseudo-method :serialize msg vval vbuf)))
                           (iincf ,size (i+ len (backpatch len))))))))))
           ((typep msg 'enum-descriptor)
-           (let ((tag (make-wire-tag $wire-type-varint field-num)))
-             `(when ,boundp
-                (let ((,vval ,reader))
-                  (iincf ,size (serialize-enum
-                                ,vval '(,@(enum-descriptor-values msg))
-                                ,tag ,vbuf))))))
+           (let ((tag (make-wire-tag $wire-type-varint field-num))
+                 (key2int (enum-keyword-to-int-sym (proto-class msg))))
+             (if key2int
+                 `(when ,boundp
+                    (let ((,vval (ldb (byte 32 0) (the sfixed32 (,key2int ,reader)))))
+                      (declare (type (unsigned-byte 32) ,vval))
+                      (iincf ,size (i+ (encode-uint32 ,tag ,vbuf)
+                                       (encode-uint32 ,vval ,vbuf)))))
+                 `(when ,boundp
+                    (let ((,vval ,reader))
+                      (iincf ,size (serialize-enum
+                                    ,vval '(,@(enum-descriptor-values msg))
+                                    ,tag ,vbuf)))))))
           ((typep msg 'map-descriptor)
            (let* ((tag      (make-wire-tag $wire-type-string field-num))
                   (key-type (proto-key-type msg)))
@@ -1004,8 +1158,22 @@ Parameters:
   VOBJ: A symbol which will store the protobuf object to serialize.
   VBUF: A symbol which will store the buffer to serialize to.
   SIZE: A symbol which stores the running total of bytes serialized."
-  (let ((fields (oneof-descriptor-fields oneof)))
-    `(let* ((oneof (slot-value ,vobj ',(oneof-descriptor-internal-name oneof)))
+  (let* ((fields (oneof-descriptor-fields oneof))
+         (proto-type (proto-class message))
+         (oneof-slot (oneof-descriptor-internal-name oneof))
+         (proto-class (find-class proto-type nil))
+         (oneof-reader
+          (if (and (null (proto-alias-for message))
+                   (or (null proto-class)
+                       (typep proto-class 'structure-class)))
+              `(,(intern (nstring-upcase
+                          (format nil "~A-~A"
+                                  (symbol-name proto-type)
+                                  (symbol-name oneof-slot)))
+                         (symbol-package proto-type))
+                ,vobj)
+              `(slot-value ,vobj ',oneof-slot))))
+    `(let* ((oneof ,oneof-reader)
             (set-field  (oneof-set-field oneof))
             (value      (oneof-value oneof)))
        (ecase set-field
@@ -1189,24 +1357,56 @@ Parameters:
             ((typep msg 'enum-descriptor)
              (let* ((tag (make-wire-tag $wire-type-varint index))
                     (packed-tag (packed-tag index))
-                    (non-packed-form `(multiple-value-bind (x idx)
-                                          (deserialize-enum
-                                           '(,@(enum-descriptor-values msg)) ,vbuf ,vidx)
-                                        (setq ,vidx idx)
-                                        (push x ,dest)))
-                    (packed-form `(multiple-value-bind (x idx)
-                                      (deserialize-packed-enum
-                                       '(,@(enum-descriptor-values msg))
-                                       ,vbuf ,vidx)
-                                    (setq ,vidx idx)
-                                    ;; The reason for nreversing here is that a field that
-                                    ;; is repeated+packed may be transmitted as several
-                                    ;; runs of packed values interleaved with other fields,
-                                    ;; and it might even be possible to send an occurrence
-                                    ;; of the field as non-packed, but I'm not sure.
-                                    ;; The final NREVERSE is going to put everything right.
-                                    ;; Not efficient, but probably not a huge loss.
-                                    (setq ,dest (nreconc x ,dest)))))
+                    (int2key (enum-int-to-keyword-sym (proto-class msg)))
+                    (non-packed-form
+                     (if int2key
+                         (let ((vraw (gensym "RAW-ENUM"))
+                               (vnext (gensym "NEXT-IDX")))
+                           `(multiple-value-bind (,vraw ,vnext)
+                                (decode-int32 ,vbuf ,vidx)
+                              (setq ,vidx ,vnext)
+                              (push (or (,int2key ,vraw)
+                                        (%undefined-enum-keyword ,vraw))
+                                    ,dest)))
+                         `(multiple-value-bind (x idx)
+                              (deserialize-enum
+                               '(,@(enum-descriptor-values msg)) ,vbuf ,vidx)
+                            (setq ,vidx idx)
+                            (push x ,dest))))
+                    (packed-form
+                     (if int2key
+                         (let ((vlen (gensym "LEN"))
+                               (vpidx (gensym "IDX"))
+                               (vend (gensym "END"))
+                               (vraw (gensym "RAW-ENUM"))
+                               (vnidx (gensym "NIDX")))
+                           `(multiple-value-bind (,vlen ,vpidx)
+                                (decode-uint32 ,vbuf ,vidx)
+                              (declare (type (unsigned-byte 32) ,vlen)
+                                       (type array-index ,vpidx))
+                              (let ((,vend (i+ ,vpidx ,vlen)))
+                                (declare (type array-index ,vend))
+                                (loop while (i< ,vpidx ,vend) do
+                                  (multiple-value-bind (,vraw ,vnidx)
+                                      (decode-int32 ,vbuf ,vpidx)
+                                    (push (or (,int2key ,vraw)
+                                              (%undefined-enum-keyword ,vraw))
+                                          ,dest)
+                                    (setq ,vpidx ,vnidx)))
+                                (setq ,vidx ,vpidx))))
+                         `(multiple-value-bind (x idx)
+                              (deserialize-packed-enum
+                               '(,@(enum-descriptor-values msg))
+                               ,vbuf ,vidx)
+                            (setq ,vidx idx)
+                            ;; The reason for nreversing here is that a field that
+                            ;; is repeated+packed may be transmitted as several
+                            ;; runs of packed values interleaved with other fields,
+                            ;; and it might even be possible to send an occurrence
+                            ;; of the field as non-packed, but I'm not sure.
+                            ;; The final NREVERSE is going to put everything right.
+                            ;; Not efficient, but probably not a huge loss.
+                            (setq ,dest (nreconc x ,dest))))))
                (values (list non-packed-form packed-form)
                        (list tag packed-tag)
                        t)))))))
@@ -1274,10 +1474,19 @@ Parameters:
                             `(setq ,dest ,decode-expr)))
                     (make-wire-tag $wire-type-string index)))))
             ((typep msg 'enum-descriptor)
-             (values
-              (emit-mv-decode
-               `(deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx))
-              (make-wire-tag $wire-type-varint index)))
+             (let ((int2key (enum-int-to-keyword-sym (proto-class msg))))
+               (values
+                (emit-mv-decode
+                 (if int2key
+                     (let ((vraw (gensym "RAW-ENUM"))
+                           (vnext (gensym "NEXT-IDX")))
+                       `(multiple-value-bind (,vraw ,vnext)
+                            (decode-int32 ,vbuf ,vidx)
+                          (values (or (,int2key ,vraw)
+                                      (%undefined-enum-keyword ,vraw))
+                                  ,vnext)))
+                     `(deserialize-enum '(,@(enum-descriptor-values msg)) ,vbuf ,vidx)))
+                (make-wire-tag $wire-type-varint index))))
             ((typep msg 'map-descriptor)
              (values
               `(progn
@@ -1449,8 +1658,12 @@ Parameters:
                     ,skipped-bytes-tuple)
                 ,@(when direct-struct-p
                     `((declare (type ,lisp-type ,vstruct))))
-                ,(when save-skipped-bytes-p `(declare (ignore ,old-index)))
+                ,(if save-skipped-bytes-p
+                     `(declare (ignore ,old-index))
+                     `(declare (type array-index ,old-index)))
                 (loop
+                  ,@(unless save-skipped-bytes-p
+                      `((setf ,old-index ,vidx)))
                   (multiple-value-setq (tag ,vidx)
                     (if (i< ,vidx ,vlim) (decode-uint32 ,vbuf ,vidx) (values 0 ,vidx)))
                   (when (i= tag ,vendtag)

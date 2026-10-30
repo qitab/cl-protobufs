@@ -337,13 +337,14 @@ as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
     `(progn
        (defun ,key2int (enum)
          (declare (type ,open-type enum))
-         (case enum
-           ,@(loop for desc in values
-                   collect `(,(enum-value-descriptor-name desc)
-                             ,(enum-value-descriptor-value desc)))
-           (t (parse-integer (subseq (symbol-name enum)
-                                     +%undefined--length+)
-                             :junk-allowed t))))
+         (the (or null int32)
+              (case enum
+                ,@(loop for desc in values
+                        collect `(,(enum-value-descriptor-name desc)
+                                  ,(enum-value-descriptor-value desc)))
+                (t (values (parse-integer (symbol-name enum)
+                                          :start +%undefined--length+
+                                          :junk-allowed t))))))
        ,(if (<= range (* sequence-length 2))
             (let ((array (make-array (1+ range) :initial-element nil)))
               (loop for desc in values
@@ -379,10 +380,11 @@ as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
        (defun ,json2key (name)
          (declare (type string name))
          (values (gethash name ,json-to-enum)))
-       (setf (get ',type 'enum-int-to-keyword) ',int2key)
-       (setf (get ',type 'enum-keyword-to-int) ',key2int)
-       (setf (get ',type 'enum-keyword-to-json) ',key2json)
-       (setf (get ',type 'enum-json-to-keyword) ',json2key))))
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (setf (get ',type 'enum-int-to-keyword) ',int2key)
+         (setf (get ',type 'enum-keyword-to-int) ',key2int)
+         (setf (get ',type 'enum-keyword-to-json) ',key2json)
+         (setf (get ',type 'enum-json-to-keyword) ',json2key)))))
 
 (defun enum-default-value (enum-type)
   "Get the default enum value for ENUM-TYPE, nil if none is found."
@@ -419,7 +421,7 @@ predicate must check that."
     (let ((keyword-name (symbol-name enum-keyword)))
       (and (> (length keyword-name) +%undefined--length+)
            (starts-with keyword-name "%UNDEFINED-")
-           (parse-integer (subseq keyword-name +%undefined--length+) :junk-allowed t)))))
+           (values (parse-integer keyword-name :start +%undefined--length+ :junk-allowed t))))))
 
 (defun enum-open-type (type)
   "We want the deftype of an enum TYPE to be a strict set of the keywords,
@@ -566,13 +568,24 @@ Parameters:
                              :synthetic-p (and synthetic-p t)
                              :fields field-descriptors))))
 
+(defun %non-message-%%bytes (obj)
+  "Fallback reader for %%bytes on non-MESSAGE object OBJ (e.g. aliased structs)."
+  (the (or (simple-array (unsigned-byte 8) 1) null)
+       (and (slot-exists-p obj '%%bytes)
+            (slot-value obj '%%bytes))))
+
 (defun-inline proto-%%bytes (obj)
   "Returns the %%bytes field of the proto object OBJ."
-  (the (or (simple-array (unsigned-byte 8) 1) null) (slot-value obj '%%bytes)))
+  (the (or (simple-array (unsigned-byte 8) 1) null)
+       (if (message-p obj)
+           (message-%%bytes obj)
+           (%non-message-%%bytes obj))))
 
 (defun-inline (setf proto-%%bytes) (new-value obj)
-  "Sets the %bytes field of the proto object OBJ with NEW-VALUE."
-  (setf (slot-value obj '%%bytes) new-value))
+  "Sets the %%bytes field of the proto object OBJ with NEW-VALUE."
+  (if (message-p obj)
+      (setf (message-%%bytes obj) new-value)
+      (setf (slot-value obj '%%bytes) new-value)))
 
 (defstruct field-accessors
   "Structure containing the get, set, and has functions
@@ -1192,10 +1205,16 @@ function) then there is no guarantee on the serialize function working properly.
                 (lambda (oneof)
                   (let* ((public-slot-name (oneof-descriptor-external-name oneof))
                          (hidden-slot-name (oneof-descriptor-internal-name oneof))
+                         (hidden-accessor-name
+                          (intern (nstring-upcase
+                                   (format nil "~A-~A"
+                                           (symbol-name proto-type)
+                                           (symbol-name hidden-slot-name)))
+                                  (symbol-package proto-type)))
                          (set-check `(or (eq ,public-slot-name :%unset)
                                          (not ,public-slot-name))))
-                         `((unless ,set-check
-                             (setf (slot-value ,obj ',hidden-slot-name) ,public-slot-name)))))
+                    `((unless ,set-check
+                        (setf (,hidden-accessor-name ,obj) ,public-slot-name)))))
                 oneofs)
              ,obj))
 
@@ -1343,14 +1362,6 @@ function) then there is no guarantee on the serialize function working properly.
       ;; Not required, but this will have the proto-fields serialized
       ;; in the order they were defined.
       (setf (proto-fields msg-desc) (nreverse (proto-fields msg-desc)))
-      ;; One extra slot for the make-message-with-bytes feature.
-      (collect-slot
-       (make-field-data
-        :internal-slot-name '%%bytes
-        :external-slot-name '%%bytes
-        :type '(or null (simple-array (unsigned-byte 8)))
-        :initarg :%%bytes
-        :initform nil))
 
       (unless (= bool-index -1)
         (collect-slot (make-bit-field-slot '%%bool-values bool-count bool-values)))
