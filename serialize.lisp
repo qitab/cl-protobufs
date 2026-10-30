@@ -66,7 +66,7 @@
 (defun %serialize-to-buffer (object type)
   "Serializes OBJECT of type TYPE into a new OCTET-BUFFER using wire format."
   (let ((fast-function (custom-serializer type))
-        (b (make-octet-buffer 100)))
+        (b (make-octet-buffer 256)))
     (if fast-function
         (funcall (the function fast-function) object b)
         (serialize-message object (find-message-descriptor type) b))
