@@ -143,7 +143,7 @@
        (sfixed64       (encode-sfixed64 val buffer))
        (string         (encode-string val buffer))
        (byte-vector    (encode-octets val buffer))
-       (boolean        (encode-uint32 (if val 1 0) buffer))
+       (boolean        (progn (octet-out buffer (if val 1 0)) 1))
        (float          (encode-single val buffer))
        (double-float   (encode-double val buffer))
        ;; A few of our homegrown types
@@ -170,7 +170,7 @@
          (fixed64  `(encode-fixed64 ,val ,buffer))
          (sfixed64 `(encode-sfixed64 ,val ,buffer))
          (string   `(encode-string ,val ,buffer))
-         (boolean  `(encode-uint32 (if ,val 1 0) ,buffer))
+         (boolean  `(progn (octet-out ,buffer (if ,val 1 0)) 1))
          (float    `(encode-single ,val ,buffer))
          (byte-vector `(encode-octets ,val ,buffer))
          (double-float `(encode-double ,val ,buffer)))))
@@ -191,7 +191,7 @@
     (sfixed32 #'encode-sfixed32)
     (fixed64  #'encode-fixed64)
     (sfixed64 #'encode-sfixed64)
-    (boolean  (lambda (val b) (encode-uint32 (if val 1 0) b)))
+    (boolean  (lambda (val b) (octet-out b (if val 1 0)) 1))
     (float    #'encode-single)
     (double-float #'encode-double)))
 
@@ -334,86 +334,178 @@
 ;;; Wire-level decoders
 ;;; These are called at the lowest level, so arg types are assumed to be correct
 
-(declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index
-                           (unsigned-byte 14) (member 32 64))
-                          (values integer array-index))
-                %decode-rest-of-uint))
-(defun %decode-rest-of-uint (buffer index start-value max-bits)
-   "Decodes the rest of the 64-bit varint integer in the BUFFER at the given INDEX.
+(declaim (ftype (function ((simple-array (unsigned-byte 8) (*))
+                           array-index
+                           (unsigned-byte 8))
+                          (values (unsigned-byte 32)
+                                  (unsigned-byte 32)
+                                  array-index
+                                  &optional))
+                %decode-varint-slow)
+         (inline %decode-varint-slow))
+(defun %decode-varint-slow (a index low-bits)
+  "Decode bytes 2..10 of a multi-byte varint in buffer A starting at INDEX,
+   given LOW-BITS (the low 7 bits of the first byte).
+   Returns (VALUES LOW-32 HIGH-32 NEW-INDEX) so 64-bit SBCL returns unboxed
+   fixnums in registers without heap-allocating bignums."
+  (declare #.$optimize-serialization
+           (type (simple-array (unsigned-byte 8) (*)) a)
+           (type array-index index)
+           (type (unsigned-byte 8) low-bits))
+  ;; Fast-path 2-byte and 3-byte varints (128 .. 2097151) without looping.
+  (let ((b1 (aref a index))
+        (idx1 (i+ index 1)))
+    (when (< b1 128)
+      (return-from %decode-varint-slow
+        (values (ilogior low-bits (iash b1 7)) 0 idx1)))
+    (let ((word14 (ilogior low-bits (iash (ilogand b1 127) 7)))
+          (b2 (aref a idx1))
+          (idx2 (i+ idx1 1)))
+      (when (< b2 128)
+        (return-from %decode-varint-slow
+          (values (ilogior word14 (iash b2 14)) 0 idx2)))
+      #+(and sbcl 64-bit)
+      (let ((word (ilogior word14 (iash (ilogand b2 127) 14)))
+            (shift 21)
+            (idx idx2))
+        (declare (type sb-ext:word word)
+                 (type (integer 21 63) shift)
+                 (type array-index idx))
+        (loop
+          (let ((byte (aref a idx)))
+            (iincf idx)
+            (setf word
+                  (logior word
+                          (logand (ash (logand byte 127) (the (mod 64) shift))
+                                  sb-ext:most-positive-word)))
+            (when (or (< byte 128) (>= shift 63))
+              (return (values (ldb (byte 32 0) word)
+                              (ash word -32)
+                              idx)))
+            (incf shift 7))))
+      #-(and sbcl 64-bit)
+      (let ((word (ilogior word14 (iash (ilogand b2 127) 14)))
+            (shift 21)
+            (idx idx2))
+        (declare (type (unsigned-byte 64) word)
+                 (type (integer 21 63) shift)
+                 (type array-index idx))
+        (loop
+          (let ((byte (aref a idx)))
+            (iincf idx)
+            (setf word
+                  (ldb (byte 64 0)
+                       (logior word (ash (logand byte 127) shift))))
+            (when (or (< byte 128) (>= shift 63))
+              (return (values (ldb (byte 32 0) word)
+                              (ldb (byte 32 32) word)
+                              idx)))
+            (incf shift 7)))))))
 
-    Assumes that the first two bytes of the integer have already been read from the buffer,
-    resulting in START-VALUE.
+(declaim (ftype (function ((simple-array (unsigned-byte 8) (*))
+                           array-index
+                           (unsigned-byte 8))
+                          (values (unsigned-byte 32) array-index &optional))
+                %decode-uint32-slow)
+         (ftype (function ((simple-array (unsigned-byte 8) (*))
+                           array-index
+                           (unsigned-byte 8))
+                          (values (signed-byte 32) array-index &optional))
+                %decode-int32-slow)
+         (ftype (function ((simple-array (unsigned-byte 8) (*))
+                           array-index
+                           (unsigned-byte 8))
+                          (values (signed-byte 64) array-index &optional))
+                %decode-int64-slow)
+         (ftype (function ((simple-array (unsigned-byte 8) (*))
+                           array-index
+                           (unsigned-byte 8))
+                          (values boolean array-index &optional))
+                %decode-boolean-slow))
 
-    Returns both the decoded value and the new index into the buffer, and checks that the value fits
-    in MAX-BITS.
+(defun %decode-uint32-slow (a index low-bits)
+  (declare #.$optimize-serialization
+           (type (simple-array (unsigned-byte 8) (*)) a)
+           (type array-index index)
+           (type (unsigned-byte 8) low-bits))
+  (multiple-value-bind (lo hi next-index)
+      (%decode-varint-slow a index low-bits)
+    (declare (ignore hi))
+    (values lo next-index)))
 
-    Watch out, this function turns off all type checking and array bounds checking."
-  (declare #.$optimize-serialization)
-  (let ((idx index))
-    (flet ((get-byte ()
-             (prog1 (aref buffer (the array-index idx))
-               (iincf idx)))
-           (return-as-correct-size (value)
-             ;; Negative numbers are always encoded as ten bytes. We need to
-             ;; return just the MAX-BITS low bits.
-             (return-from %decode-rest-of-uint (values (ldb (byte max-bits 0) value) idx))))
-      (let ((fixnum-bits (* (floor (integer-length most-negative-fixnum) 7) 7))
-            (bits-read 14)
-            (low-word start-value))
-        (declare (type fixnum low-word fixnum-bits))
+(defun %decode-int32-slow (a index low-bits)
+  (declare #.$optimize-serialization
+           (type (simple-array (unsigned-byte 8) (*)) a)
+           (type array-index index)
+           (type (unsigned-byte 8) low-bits))
+  (multiple-value-bind (lo hi next-index)
+      (%decode-varint-slow a index low-bits)
+    (declare (ignore hi))
+    (values (if (logbitp 31 lo)
+                (the (signed-byte 32) (logior lo #.(ash -1 32)))
+                lo)
+            next-index)))
 
-        ;; Read as much as we can fit in a fixnum, and return as soon as we're done
-        (loop for place from bits-read by 7 below fixnum-bits
-              for byte fixnum = (get-byte)
-              for bits = (ildb (byte 7 0) byte)
-              do (setq low-word (ilogior (the fixnum low-word) (the fixnum (iash bits place))))
-                 (when (i< byte 128)
-                   (return-as-correct-size low-word)))
+(defun %decode-int64-slow (a index low-bits)
+  (declare #.$optimize-serialization
+           (type (simple-array (unsigned-byte 8) (*)) a)
+           (type array-index index)
+           (type (unsigned-byte 8) low-bits))
+  (multiple-value-bind (lo hi next-index)
+      (%decode-varint-slow a index low-bits)
+    (let ((shi (if (logbitp 31 hi)
+                   (the (signed-byte 32) (logior hi #.(ash -1 32)))
+                   hi)))
+      (values (the (signed-byte 64) (logior lo (ash shi 32)))
+              next-index))))
 
-        ;; Value doesn't fit into a fixnum. Read any additional values into another fixnum, and then
-        ;; shift left and add to the low fixnum.
-        (let ((high-word 0))
-          (declare (type fixnum high-word))
-          (loop for place from 0 by 7 below fixnum-bits
-                for byte fixnum = (get-byte)
-                for bits = (ildb (byte 7 0) byte)
-                do (setq high-word (ilogior (the fixnum high-word) (the fixnum (iash bits place))))
-                   (when (i< byte 128)
-                     (return-as-correct-size (+ (ash high-word fixnum-bits) low-word)))))
+(defun %decode-boolean-slow (a index low-bits)
+  (declare #.$optimize-serialization
+           (type (simple-array (unsigned-byte 8) (*)) a)
+           (type array-index index)
+           (type (unsigned-byte 8) low-bits))
+  (multiple-value-bind (lo hi next-index)
+      (%decode-varint-slow a index low-bits)
+    (values (not (and (i= lo 0) (i= hi 0))) next-index)))
 
-        ;; We shouldn't get here unless we're reading a value that doesn't fit in two fixnums.
-        (assert nil nil "The value doesn't fit into ~A bits" (* 2 fixnum-bits))))))
-
+;; Keep %DECODE-VARINT-SLOW out-of-line in DECODE-VARINT callers now that the
+;; four specialized %DECODE-*-SLOW helpers above have inlined it.
+(declaim (notinline %decode-varint-slow))
 
 ;; TODO(jgodbout): Find all of the different instances of word-size
 ;; for each language, make a defconstant for word-size, then use it.
 (declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
-                          (values (unsigned-byte 64) array-index))
+                          (values (unsigned-byte 64) array-index &optional))
                 decode-varint)
          (inline decode-varint))
 (defun decode-varint (a index)
   "Decode the varint in buffer A at INDEX."
-  (let ((word 0))
-    (declare (type (simple-array (unsigned-byte 8) (*)) a)
-             #+sbcl (type sb-ext:word word)
-             #+sbcl (type sb-int:index index)
-             (optimize (safety 0)))
-    (let ((shift 0)
-          (idx index))
-      (dotimes (i 10)
-        (let ((byte (aref a idx)))
-          (incf idx)
-          (setf word
-                (logior (logand (ash (logand byte 127) (the (mod 64) shift))
-                                #+sbcl sb-ext:most-positive-word)
-                        word))
-          (unless (logbitp 7 byte) (return)))
-        (incf shift 7))
-      (values word idx))))
+  (declare #.$optimize-serialization
+           (type (simple-array (unsigned-byte 8) (*)) a)
+           (type array-index index))
+  (let ((byte (aref a index)))
+    (if (< byte 128)
+        (values byte (i+ index 1))
+        (multiple-value-bind (lo hi next-index)
+            (%decode-varint-slow a (i+ index 1) (logand byte 127))
+          (values (logior lo (ash hi 32)) next-index)))))
+
+(declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
+                          (values boolean array-index &optional))
+                decode-boolean)
+         (inline decode-boolean))
+(defun decode-boolean (buffer index)
+  "Decodes the next boolean varint in BUFFER at the given INDEX."
+  (declare #.$optimize-serialization
+           (type (simple-array (unsigned-byte 8) (*)) buffer)
+           (type array-index index))
+  (let ((byte (aref buffer index)))
+    (if (< byte 128)
+        (values (not (i= byte 0)) (i+ index 1))
+        (%decode-boolean-slow buffer (i+ index 1) (logand byte 127)))))
 
 ;; Decode the value from the buffer at the given index,
 ;; then return the value and new index into the buffer
-;; These produce a storm of efficiency notes in SBCL.
 (defmacro generate-integer-decoders (bits)
   "Generate 32- or 64-bit versions of integer decoders, specified by BITS."
   (assert (and (plusp bits) (zerop (mod bits 8))))
@@ -421,6 +513,7 @@
          (decode-int  (fintern "~A~A" 'decode-int bits))
          (decode-fixed  (fintern "~A~A" 'decode-fixed bits))
          (decode-sfixed (fintern "~A~A" 'decode-sfixed bits))
+         (decode-int-slow (fintern "~A~A~A" '%decode-int bits '-slow))
          (bytes (/ bits 8))
          ;; Accessors for the native fixed-width decoders.
          (sap-ref #+sbcl (ecase bits
@@ -441,7 +534,7 @@
     (declare (ignorable sap-ref signed-sap-ref ldb ash decf logior))
     `(progn
        (declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
-                                 (values (unsigned-byte ,bits) array-index))
+                                 (values (unsigned-byte ,bits) array-index &optional))
                        ,decode-uint)
                 (inline ,decode-uint))
        (defun ,decode-uint (buffer index)
@@ -451,14 +544,17 @@
            ~&    Returns both the decoded value and the new index into the buffer.~
            ~&    Watch out, this function turns off all type checking and array bounds checking."
            bits)
-         (declare #.$optimize-serialization)
-         (multiple-value-bind (val new-index)
-             (decode-varint buffer index)
-           ,(when (= bits 32)
-              `(setf val (ildb (byte ,bits 0) val)))
-           (values val new-index)))
+         (declare #.$optimize-serialization
+                  (type (simple-array (unsigned-byte 8) (*)) buffer)
+                  (array-index index))
+         ,(if (= bits 32)
+              `(let ((byte (aref buffer index)))
+                 (if (< byte 128)
+                     (values byte (i+ index 1))
+                     (%decode-uint32-slow buffer (i+ index 1) (logand byte 127))))
+              `(decode-varint buffer index)))
        (declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
-                                 (values (signed-byte ,bits) array-index))
+                                 (values (signed-byte ,bits) array-index &optional))
                        ,decode-int)
                 (inline ,decode-int))
        (defun ,decode-int (buffer index)
@@ -468,15 +564,13 @@
            ~&    Returns both the decoded value and the new index into the buffer.~
            ~&    Watch out, this function turns off all type checking and array bounds checking."
            bits)
-         (declare #.$optimize-serialization)
-         (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
+         (declare #.$optimize-serialization
+                  (type (simple-array (unsigned-byte 8) (*)) buffer)
                   (array-index index))
-         (multiple-value-bind (val new-index)
-             (decode-varint buffer index)
-           (declare (type array-index new-index))
-           (if (i= (ldb (byte 1 ,(1- bits)) val) 1)
-               (values (the (signed-byte ,bits) (logior val ,(ash -1 bits))) new-index)
-               (values val new-index))))
+         (let ((byte (aref buffer index)))
+           (if (< byte 128)
+               (values byte (i+ index 1))
+               (,decode-int-slow buffer (i+ index 1) (logand byte 127)))))
        (declaim (ftype (function ((simple-array (unsigned-byte 8) (*)) array-index)
                                  (values (unsigned-byte ,bits) array-index))
                        ,decode-fixed)
@@ -612,9 +706,7 @@
       (sfixed64 (decode-sfixed64 buffer index))
       (string   (decode-string buffer index))
       (byte-vector (decode-octets buffer index))
-      (boolean  (multiple-value-bind (val idx)
-                    (decode-uint32 buffer index)
-                  (values (if (i= val 0) nil t) idx)))
+      (boolean  (decode-boolean buffer index))
       (float    (decode-single buffer index))
       (double-float (decode-double buffer index))
       ;; A few of our homegrown types
@@ -629,36 +721,38 @@
        (decode-uint64 buffer index)))))
 
 (define-compiler-macro deserialize-scalar (&whole form type buffer index)
-  (let ((decoder
-         (case type
-           (int32    `(decode-int32 ,buffer ,index))
-           (int64    `(decode-int64 ,buffer ,index))
-           (uint32   `(decode-uint32 ,buffer ,index))
-           (uint64   `(decode-uint64 ,buffer ,index))
-           (sint32   `(multiple-value-bind (val idx)
-                          (decode-uint32 ,buffer ,index)
-                        (values (zig-zag-decode32 val) idx)))
-           (sint64   `(multiple-value-bind (val idx)
-                          (decode-uint64 ,buffer ,index)
-                        (values (zig-zag-decode64 val) idx)))
-           (fixed32  `(decode-fixed32 ,buffer ,index))
-           (sfixed32 `(decode-sfixed32 ,buffer ,index))
-           (fixed64  `(decode-fixed64 ,buffer ,index))
-           (sfixed64 `(decode-sfixed64 ,buffer ,index))
-           (string   `(decode-string ,buffer ,index))
-           (byte-vector `(decode-octets ,buffer ,index))
-           (boolean  `(multiple-value-bind (val idx)
-                          (decode-uint32 ,buffer ,index)
-                        (values (if (i= val 0) nil t) idx)))
-           (float    `(decode-single ,buffer ,index))
-           (double-float `(decode-double ,buffer ,index)))))
+  (let* ((scalar-type (if (and (consp type) (eq (car type) 'quote))
+                          (second type)
+                          type))
+         (buf (gensym "BUFFER"))
+         (idx (gensym "INDEX"))
+         (decoder
+           (case scalar-type
+             (int32    `(decode-int32 ,buf ,idx))
+             (int64    `(decode-int64 ,buf ,idx))
+             (uint32   `(decode-uint32 ,buf ,idx))
+             (uint64   `(decode-uint64 ,buf ,idx))
+             (sint32   `(multiple-value-bind (val next-idx)
+                            (decode-uint32 ,buf ,idx)
+                          (values (zig-zag-decode32 val) next-idx)))
+             (sint64   `(multiple-value-bind (val next-idx)
+                            (decode-uint64 ,buf ,idx)
+                          (values (zig-zag-decode64 val) next-idx)))
+             (fixed32  `(decode-fixed32 ,buf ,idx))
+             (sfixed32 `(decode-sfixed32 ,buf ,idx))
+             (fixed64  `(decode-fixed64 ,buf ,idx))
+             (sfixed64 `(decode-sfixed64 ,buf ,idx))
+             (string   `(decode-string ,buf ,idx))
+             (byte-vector `(decode-octets ,buf ,idx))
+             (boolean  `(decode-boolean ,buf ,idx))
+             (float    `(decode-single ,buf ,idx))
+             (double-float `(decode-double ,buf ,idx)))))
     (if decoder
-        ;; The type declaration of BUFFER is essentially useless since these are
-        ;; all out-of-line calls to unsafe functions, and we're not imparting any
-        ;; more safety because this also elides type-checks.
-        `(locally (declare #.$optimize-serialization
-                           (type (simple-array (unsigned-byte 8) (*)) ,buffer)
-                           (type fixnum ,index))
+        `(let ((,buf ,buffer)
+               (,idx ,index))
+           (declare #.$optimize-serialization
+                    (type (simple-array (unsigned-byte 8) (*)) ,buf)
+                    (type array-index ,idx))
            ,decoder)
         form)))
 
@@ -707,9 +801,7 @@
                   ((sfixed64)
                    (decode-sfixed64 buffer idx))
                   ((boolean)
-                   (multiple-value-bind (val nidx)
-                       (decode-uint32 buffer idx)
-                     (values (if (i= val 0) nil t) nidx)))
+                   (decode-boolean buffer idx))
                   ((float)
                    (decode-single buffer idx))
                   ((double-float)
@@ -762,9 +854,7 @@
                           ((sfixed64)
                            `(decode-sfixed64 ,buffer idx))
                           ((boolean)
-                           `(multiple-value-bind (val nidx)
-                                (decode-uint32 ,buffer idx)
-                              (values (if (i= val 0) nil t) nidx)))
+                           `(decode-boolean ,buffer idx))
                           ((float)
                            `(decode-single ,buffer idx))
                           ((double-float)
@@ -1061,28 +1151,85 @@
   ;; The string doesn't technically have to be SIMPLE to allow the single-pass
   ;; optimization but I didn't feel like adding more hair.
   (when (simple-string-p string)
-    (let ((strlen (length string)))
-      ;; First ensure space, *then* mark where we are.
-      (buffer-ensure-space buffer (+ strlen +SUBMSG-LEN-SPACE-RESERVATION+))
-      (with-bookmark (buffer)
-        ;; FAST-ENCODE merely skips a redundant call to ENSURE-SPACE
-        (let ((prefix-len (fast-encode-uint32 strlen buffer)))
-          (macrolet ((scan ()
-                       `(dotimes (i strlen
-                                  (return-from encode-string
-                                    (+ prefix-len strlen)))
-                         (let ((code (char-code (char string i))))
-                           (if (< code 128)
-                               (fast-octet-out buffer code)
-                               (return))))))
-            ;; "procedure cloning" elides the runtime per-character dispatch
-            ;; based on whether the source string is UCS-4-encoded.
-            ;; (The commonest case is UCS-4 but with no char-code over 127)
-            ;; XXX: is there is a type that expresses UCS-4-encoded?
-            ;; T works ok, since STRING is already known to be STRINGP.
+    (let* ((strlen (length string))
+           (within-block-p
+             (buffer-ensure-space buffer (+ strlen +SUBMSG-LEN-SPACE-RESERVATION+))))
+      (if within-block-p
+          (macrolet ((scan-contiguous (str-type)
+                       `(when (< strlen #.(ash 1 28))
+                          (with-bookmark (buffer)
+                            (block ascii-scan
+                              (let* ((block (buffer-block buffer))
+                                     (prefix-len
+                                       (if (< strlen 128)
+                                           (let ((idx (buffer-index buffer)))
+                                             (setf (aref block idx) strlen
+                                                   (buffer-index buffer) (i+ idx 1))
+                                             1)
+                                           (fast-encode-uint32 strlen buffer)))
+                                     (out-idx (buffer-index buffer)))
+                                (declare (type (simple-array octet-type 1) block)
+                                         (type ,str-type string)
+                                         (type array-index out-idx)
+                                         #+(and sbcl (not dbg))
+                                         (optimize (sb-c::insert-array-bounds-checks 0)))
+                                (dotimes (i strlen)
+                                  (let ((code (char-code (aref string i))))
+                                    (unless (< code 128)
+                                      (return-from ascii-scan))
+                                    (setf (aref block out-idx) code)
+                                    (iincf out-idx)))
+                                (setf (buffer-index buffer) out-idx)
+                                (return-from encode-string
+                                  (i+ prefix-len strlen))))))))
+            ;; On SBCL with sb-unicode, SIMPLE-BASE-STRING elements are strictly
+            ;; 7-bit ASCII (0..127), so all STRLEN bytes can be bulk-copied
+            ;; directly into the current buffer block without per-char checks.
+            #+(and sbcl sb-unicode)
             (typecase string
-              (base-string (scan))
-              (t (scan))))))))
+              (simple-base-string
+               (when (< strlen #.(ash 1 28))
+                 (let ((block (buffer-block buffer)))
+                   (declare (type (simple-array octet-type 1) block)
+                            #+(and sbcl (not dbg))
+                            (optimize (sb-c::insert-array-bounds-checks 0)))
+                   (if (< strlen 128)
+                       (let* ((idx (buffer-index buffer))
+                              (payload-idx (i+ idx 1)))
+                         (setf (aref block idx) strlen)
+                         (sb-kernel:%byte-blt string 0 block payload-idx strlen)
+                         (setf (buffer-index buffer) (i+ payload-idx strlen))
+                         (return-from encode-string (i+ strlen 1)))
+                       (let* ((prefix-len (fast-encode-uint32 strlen buffer))
+                              (payload-idx (buffer-index buffer)))
+                         (sb-kernel:%byte-blt string 0 block payload-idx strlen)
+                         (setf (buffer-index buffer) (i+ payload-idx strlen))
+                         (return-from encode-string (i+ prefix-len strlen)))))))
+              ((simple-array character (*))
+               (scan-contiguous (simple-array character (*)))))
+            #-(and sbcl sb-unicode)
+            (scan-contiguous simple-string))
+          ;; Multi-block simple-string fallback when the string spans a block boundary.
+          (macrolet ((scan-multi-block (str-type)
+                       `(with-bookmark (buffer)
+                          (block ascii-scan
+                            (let ((prefix-len (fast-encode-uint32 strlen buffer)))
+                              (declare (type ,str-type string))
+                              (dotimes (i strlen)
+                                (let ((code (char-code (aref string i))))
+                                  (unless (< code 128)
+                                    (return-from ascii-scan))
+                                  (fast-octet-out buffer code)))
+                              (return-from encode-string
+                                (i+ prefix-len strlen)))))))
+            #+(and sbcl sb-unicode)
+            (typecase string
+              (simple-base-string
+               (scan-multi-block simple-base-string))
+              ((simple-array character (*))
+               (scan-multi-block (simple-array character (*)))))
+            #-(and sbcl sb-unicode)
+            (scan-multi-block simple-string)))))
   ;; Todo: If UTF-8 encoding is needed, it should be doable without an intermediate
   ;; temporary vector of octets, but the SBCL interface doesn't allow a caller-supplied
   ;; buffer, and the performance of Babel is pretty bad relative to native routines.
