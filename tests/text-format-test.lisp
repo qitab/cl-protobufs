@@ -714,3 +714,171 @@ int_field: 1")))
       (assert-false (search "#1=" actual))
       (assert-false (search (format nil "~%~%") actual)))))
 
+(deftest test-parse-integer-boundaries-and-hex (text-format-suite)
+  ;; Zero and negative zero
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream
+                       "int_field: 0 sint_field: -0 uint_field: 0 int64_field: 0 sint64_field: -0"))))
+    (assert-eql 0 (test-pb:int-field msg))
+    (assert-eql 0 (test-pb:sint-field msg))
+    (assert-eql 0 (test-pb:uint-field msg))
+    (assert-eql 0 (test-pb:int64-field msg))
+    (assert-eql 0 (test-pb:sint64-field msg)))
+  ;; Decimal min/max boundaries for 32-bit and 64-bit signed/unsigned integers
+  (let ((min-msg (proto:parse-text-format
+                  'test-pb:text-format-test
+                  :stream (make-string-input-stream
+                           "int_field: -2147483648 sint_field: -2147483648 int64_field: -9223372036854775808 sint64_field: -9223372036854775808")))
+        (max-msg (proto:parse-text-format
+                  'test-pb:text-format-test
+                  :stream (make-string-input-stream
+                           "int_field: 2147483647 sint_field: 2147483647 uint_field: 4294967295 int64_field: 9223372036854775807 sint64_field: 9223372036854775807"))))
+    (assert-eql -2147483648 (test-pb:int-field min-msg))
+    (assert-eql -2147483648 (test-pb:sint-field min-msg))
+    (assert-eql -9223372036854775808 (test-pb:int64-field min-msg))
+    (assert-eql -9223372036854775808 (test-pb:sint64-field min-msg))
+    (assert-eql 2147483647 (test-pb:int-field max-msg))
+    (assert-eql 2147483647 (test-pb:sint-field max-msg))
+    (assert-eql 4294967295 (test-pb:uint-field max-msg))
+    (assert-eql 9223372036854775807 (test-pb:int64-field max-msg))
+    (assert-eql 9223372036854775807 (test-pb:sint64-field max-msg)))
+  ;; Hexadecimal integer literals (0x and 0X, signed and unsigned)
+  (let ((hex-msg (proto:parse-text-format
+                  'test-pb:text-format-test
+                  :stream (make-string-input-stream
+                           "int_field: 0x7FFFFFFF sint_field: -0x80000000 uint_field: 0xFFFFFFFF int64_field: 0x7FFFFFFFFFFFFFFF sint64_field: -0x8000000000000000 int_vals: [0x0, 0xFF, 0X1a2B]"))))
+    (assert-eql #x7FFFFFFF (test-pb:int-field hex-msg))
+    (assert-eql (- #x80000000) (test-pb:sint-field hex-msg))
+    (assert-eql #xFFFFFFFF (test-pb:uint-field hex-msg))
+    (assert-eql #x7FFFFFFFFFFFFFFF (test-pb:int64-field hex-msg))
+    (assert-eql (- #x8000000000000000) (test-pb:sint64-field hex-msg))
+    (assert-equal '(0 #xFF #x1A2B) (test-pb:int-vals hex-msg)))
+  ;; Direct uint64 max and bignum promotion checks on parser primitives
+  (with-input-from-string (s "18446744073709551615 0xFFFFFFFFFFFFFFFF")
+    (assert-eql 18446744073709551615 (cl-protobufs.implementation::parse-unsigned-int s))
+    (assert-eql #xFFFFFFFFFFFFFFFF (cl-protobufs.implementation::parse-unsigned-int s)))
+  (with-input-from-string (s "-18446744073709551615")
+    (assert-eql -18446744073709551615 (cl-protobufs.implementation::parse-signed-int s)))
+  ;; Malformed integer inputs must signal protobuf-error
+  (dolist (bad '("" "-" "0x" "-0x" "abc"))
+    (assert-condition proto:protobuf-error
+        (with-input-from-string (s bad)
+          (cl-protobufs.implementation::parse-signed-int s))))
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "-1")
+        (cl-protobufs.implementation::parse-unsigned-int s))))
+
+#+sbcl
+(deftest test-parse-integer-zero-allocation (text-format-suite)
+  (let ((signed-stream (make-string-input-stream "-123456789 "))
+        (unsigned-stream (make-string-input-stream "4294967295 ")))
+    (dotimes (i 100)
+      (file-position signed-stream 0)
+      (cl-protobufs.implementation::parse-signed-int signed-stream)
+      (file-position unsigned-stream 0)
+      (cl-protobufs.implementation::parse-unsigned-int unsigned-stream))
+    (let* ((signed-sum 0)
+           (unsigned-sum 0)
+           (before-signed (sb-ext:get-bytes-consed))
+           (_s (dotimes (i 1000)
+                 (declare (type fixnum signed-sum))
+                 (file-position signed-stream 0)
+                 (incf signed-sum
+                       (the fixnum (cl-protobufs.implementation::parse-signed-int signed-stream)))))
+           (signed-consed (- (sb-ext:get-bytes-consed) before-signed))
+           (before-unsigned (sb-ext:get-bytes-consed))
+           (_u (dotimes (i 1000)
+                 (declare (type fixnum unsigned-sum))
+                 (file-position unsigned-stream 0)
+                 (incf unsigned-sum
+                       (the fixnum
+                            (cl-protobufs.implementation::parse-unsigned-int unsigned-stream)))))
+           (unsigned-consed (- (sb-ext:get-bytes-consed) before-unsigned)))
+      (declare (ignore _s _u))
+      (assert-eql -123456789000 signed-sum)
+      (assert-eql 0 signed-consed)
+      (assert-eql 4294967295000 unsigned-sum)
+      (assert-eql 0 unsigned-consed))))
+
+(deftest test-parse-string-escapes-and-concatenation (text-format-suite)
+  ;; Empty strings (single- and double-quoted) and adjacent concatenation across comments
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream "
+string_field: \"foo\" # comment between adjacent literals
+  \"bar\" \"\"
+string_fields: ''
+string_fields: \"\"
+string_fields: 'single' 'quoted'"))))
+    (assert-equality #'string= "foobar" (test-pb:string-field msg))
+    (assert-equal '("" "" "singlequoted") (test-pb:string-fields msg)))
+  ;; Standard C/proto escapes, octal (\0, \07, \101), hex (\x41, \X7a, \x7), and Unicode escapes
+  (let* ((grinning (if (< #x1F600 char-code-limit)
+                       (string (code-char #x1F600))
+                       (coerce (list (code-char #xD83D) (code-char #xDE00)) 'string)))
+         (expected (concatenate 'string
+                                "\"'\\"
+                                (string #\Newline)
+                                (string #\Tab)
+                                (string #\Return)
+                                (string (code-char 11))
+                                (string #\Null)
+                                (string (code-char 7))
+                                "AAz"
+                                (string (code-char 7))
+                                "A中"
+                                grinning
+                                grinning)))
+    (dolist (escape-flag '(nil t))
+      (let* ((proto:*escape-non-ascii* escape-flag)
+             (msg (proto:parse-text-format
+                   'test-pb:text-format-test
+                   :stream (make-string-input-stream
+                            "string_field: \"\\\"\\'\\\\\\n\\t\\r\\v\\0\\07\\101\\x41\\X7a\\x7\\u0041\\u4e2d\\U0001F600\\uD83D\\uDE00\""))))
+        (assert-equality #'string= expected (test-pb:string-field msg)))))
+  ;; Malformed / unterminated string and unpaired surrogate errors
+  (dolist (bad '("string_field: \"unterminated"
+                 "string_field: \"\\uD83D\""
+                 "string_field: \"\\uDC00\""
+                 "string_field: \"\\uD83D\\u0041\""
+                 "string_field: \"\\xZZ\""))
+    (assert-condition proto:protobuf-error
+        (proto:parse-text-format
+         'test-pb:text-format-test
+         :stream (make-string-input-stream bad)))))
+
+#+(and sbcl arena-allocator)
+(deftest test-parse-text-format-sbcl-arena-safety (text-format-suite)
+  (cl-protobufs.implementation::reset-scratch-char-pool)
+  (let* ((long-str (make-string 300 :initial-element #\x))
+         (payload (format nil "int_field: 42 string_field: \"~A\" int_vals: [1, 2, 3]"
+                          long-str))
+         (arena (sb-vm:new-arena 1048576)))
+    (unwind-protect
+         (progn
+           (dotimes (pass 3)
+             (sb-vm:with-arena (arena)
+               (let ((msg (proto:parse-text-format
+                           'test-pb:text-format-test
+                           :stream (make-string-input-stream payload))))
+                 (assert-eql 42 (test-pb:int-field msg))
+                 (assert-equality #'string= long-str (test-pb:string-field msg))
+                 (assert-equal '(1 2 3) (test-pb:int-vals msg))))
+             (sb-vm:rewind-arena arena))
+           (loop for buf across cl-protobufs.implementation::*scratch-char-pool*
+                 when buf
+                   do (assert-true (sb-kernel:dynamic-space-obj-p buf)))
+           (let ((heap-msg (proto:parse-text-format
+                            'test-pb:text-format-test
+                            :stream (make-string-input-stream payload))))
+             (assert-eql 42 (test-pb:int-field heap-msg))
+             (assert-equality #'string= long-str (test-pb:string-field heap-msg))
+             (assert-equal '(1 2 3) (test-pb:int-vals heap-msg))))
+      (sb-vm:destroy-arena arena))
+    (let ((post-destroy-msg (proto:parse-text-format
+                             'test-pb:text-format-test
+                             :stream (make-string-input-stream payload))))
+      (assert-eql 42 (test-pb:int-field post-destroy-msg))
+      (assert-equality #'string= long-str (test-pb:string-field post-destroy-msg)))))
+

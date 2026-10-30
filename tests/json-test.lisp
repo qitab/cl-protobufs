@@ -530,3 +530,195 @@ the result is PROTO-EQUAL with MSG."
                        (format s "~@/cl-protobufs.json:fmt/" msg))))))
     (assert-equality #'string= expected actual)))
 
+(deftest test-json-integer-boundaries (json-suite)
+  ;; Zero, negative zero, and 32/64-bit boundaries (both quoted and unquoted)
+  (let ((zero-msg (with-input-from-string
+                      (s "{\"intField\":0,\"sintField\":\"-0\",\"uintField\":\"0\",\"int64Field\":0,\"sint64Field\":\"-0\"}")
+                    (proto:parse-json 'pb:text-format-test :stream s))))
+    (assert-eql 0 (pb:int-field zero-msg))
+    (assert-eql 0 (pb:sint-field zero-msg))
+    (assert-eql 0 (pb:uint-field zero-msg))
+    (assert-eql 0 (pb:int64-field zero-msg))
+    (assert-eql 0 (pb:sint64-field zero-msg)))
+  (let ((min-msg (with-input-from-string
+                     (s "{\"intField\":-2147483648,\"sintField\":\"-2147483648\",\"int64Field\":\"-9223372036854775808\",\"sint64Field\":-9223372036854775808}")
+                   (proto:parse-json 'pb:text-format-test :stream s)))
+        (max-msg (with-input-from-string
+                     (s "{\"intField\":\"2147483647\",\"sintField\":2147483647,\"uintField\":4294967295,\"int64Field\":\"9223372036854775807\",\"sint64Field\":9223372036854775807}")
+                   (proto:parse-json 'pb:text-format-test :stream s))))
+    (assert-eql -2147483648 (pb:int-field min-msg))
+    (assert-eql -2147483648 (pb:sint-field min-msg))
+    (assert-eql -9223372036854775808 (pb:int64-field min-msg))
+    (assert-eql -9223372036854775808 (pb:sint64-field min-msg))
+    (assert-eql 2147483647 (pb:int-field max-msg))
+    (assert-eql 2147483647 (pb:sint-field max-msg))
+    (assert-eql 4294967295 (pb:uint-field max-msg))
+    (assert-eql 9223372036854775807 (pb:int64-field max-msg))
+    (assert-eql 9223372036854775807 (pb:sint64-field max-msg))
+    (json-roundtrip min-msg :pretty-print-p nil)
+    (json-roundtrip max-msg :pretty-print-p nil))
+  ;; 64-bit wrapper boundaries including uint64 max (18446744073709551615)
+  (let ((i64-min (google:make-int64-value :value -9223372036854775808))
+        (i64-max (google:make-int64-value :value 9223372036854775807))
+        (u64-max (google:make-u-int64-value :value 18446744073709551615)))
+    (assert-equality #'string=
+                     "\"-9223372036854775808\""
+                     (with-output-to-string (s)
+                       (proto:print-json i64-min :stream s :pretty-print-p nil)))
+    (assert-equality #'string=
+                     "\"9223372036854775807\""
+                     (with-output-to-string (s)
+                       (proto:print-json i64-max :stream s :pretty-print-p nil)))
+    (assert-equality #'string=
+                     "\"18446744073709551615\""
+                     (with-output-to-string (s)
+                       (proto:print-json u64-max :stream s :pretty-print-p nil)))
+    (let ((parsed-i64-min (with-input-from-string (s "\"-9223372036854775808\"")
+                            (proto:parse-json 'google:int64-value :stream s)))
+          (parsed-i64-max (with-input-from-string (s "\"9223372036854775807\"")
+                            (proto:parse-json 'google:int64-value :stream s)))
+          (parsed-u64-q (with-input-from-string (s "\"18446744073709551615\"")
+                          (proto:parse-json 'google:u-int64-value :stream s)))
+          (parsed-u64-u (with-input-from-string (s "18446744073709551615")
+                          (proto:parse-json 'google:u-int64-value :stream s))))
+      (assert-eql -9223372036854775808 (google:value parsed-i64-min))
+      (assert-eql 9223372036854775807 (google:value parsed-i64-max))
+      (assert-eql 18446744073709551615 (google:value parsed-u64-q))
+      (assert-eql 18446744073709551615 (google:value parsed-u64-u))))
+  ;; Negative value for unsigned field signals protobuf-error
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "{\"uintField\": -1}")
+        (proto:parse-json 'pb:text-format-test :stream s))))
+
+(deftest test-json-string-escapes-and-roundtrip (json-suite)
+  (let* ((grinning (if (< #x1F600 char-code-limit)
+                       (string (code-char #x1F600))
+                       (coerce (list (code-char #xD83D) (code-char #xDE00)) 'string)))
+         (json-input "{\"stringField\":\"\\\"\\\\\\/\\b\\f\\n\\r\\t\\u0001\\u0041\\u4e2d\\uD83D\\uDE00\",\"stringFields\":[\"\",\"plain\"]}")
+         (parsed (with-input-from-string (s json-input)
+                   (proto:parse-json 'pb:text-format-test :stream s)))
+         (expected-str (concatenate 'string
+                                    "\"\\/"
+                                    (string #\Backspace)
+                                    (string #\Page)
+                                    (string #\Newline)
+                                    (string #\Return)
+                                    (string #\Tab)
+                                    (string (code-char 1))
+                                    "A中"
+                                    grinning)))
+    (assert-equality #'string= expected-str (pb:string-field parsed))
+    (assert-equal '("" "plain") (pb:string-fields parsed))
+    ;; Verify RFC 8259 control-char and quote/backslash escaping in print-json + roundtrip
+    (let* ((printed (with-output-to-string (s)
+                      (proto:print-json parsed :stream s :pretty-print-p nil)))
+           (reparsed (with-input-from-string (s printed)
+                       (proto:parse-json 'pb:text-format-test :stream s))))
+      (assert-true (search "\\\"\\\\/" printed))
+      (assert-true (search "\\b\\f\\n\\r\\t\\u0001" printed))
+      (assert-equality #'string= expected-str (pb:string-field reparsed))
+      (assert-equal '("" "plain") (pb:string-fields reparsed))))
+  ;; Invalid Unicode escapes and unterminated JSON strings signal protobuf-error
+  (dolist (bad '("{\"stringField\":\"\\uD83D\"}"
+                 "{\"stringField\":\"\\uDC00\"}"
+                 "{\"stringField\":\"\\uD83D\\u0041\"}"
+                 "{\"stringField\":\"\\u12G4\"}"
+                 "{\"stringField\":\"unterminated"))
+    (assert-condition proto:protobuf-error
+        (with-input-from-string (s bad)
+          (proto:parse-json 'pb:text-format-test :stream s)))))
+
+(deftest test-json-empty-containers-and-unknown-fields (json-suite)
+  ;; Empty message {}, empty repeated array [], and empty map {}
+  (let ((empty-msg (with-input-from-string (s "{}")
+                     (proto:parse-json 'pb:text-format-test :stream s)))
+        (ws-empty-msg (with-input-from-string (s "{   }")
+                        (proto:parse-json 'pb:text-format-test :stream s)))
+        (containers-msg (with-input-from-string
+                            (s "{\"stringFields\":[],\"repeatedMessage\":[],\"mapField\":{},\"oneLevelNesting\":{}}")
+                          (proto:parse-json 'pb:text-format-test :stream s))))
+    (assert-equality #'string=
+                     "{}"
+                     (with-output-to-string (s)
+                       (proto:print-json empty-msg :stream s :pretty-print-p nil)))
+    (assert-false (pb:text-format-test.has-int-field ws-empty-msg))
+    (assert-equal '() (pb:string-fields containers-msg))
+    (assert-equal '() (pb:repeated-message containers-msg))
+    (assert-eql 0 (hash-table-count (pb:map-field containers-msg)))
+    (assert-true (pb:text-format-test.has-one-level-nesting containers-msg)))
+  ;; Empty well-known Struct {} and ListValue []
+  (let ((empty-struct (with-input-from-string (s "{}")
+                        (proto:parse-json 'google:struct :stream s)))
+        (empty-list (with-input-from-string (s "[]")
+                      (proto:parse-json 'google:list-value :stream s))))
+    (assert-eql 0 (hash-table-count (google:fields empty-struct)))
+    (assert-equal '() (google:list-value.values empty-list)))
+  ;; Unknown JSON fields: ignored when :ignore-unknown-fields-p t, error when nil
+  (let* ((json-with-unknowns
+          "{\"unknownEmptyObj\":{},\"unknownEmptyArr\":[],\"unknownNested\":{\"a\":[1,true,null,\"x\\\"y\",{}]},\"intField\":77,\"unknownTrailing\":false}")
+         (msg (with-input-from-string (s json-with-unknowns)
+                (proto:parse-json 'pb:text-format-test :stream s :ignore-unknown-fields-p t))))
+    (assert-eql 77 (pb:int-field msg))
+    (assert-condition proto:unknown-field-type
+        (with-input-from-string (s json-with-unknowns)
+          (proto:parse-json 'pb:text-format-test :stream s :ignore-unknown-fields-p nil)))))
+
+(deftest test-json-field-names-oneofs-and-extensions (json-suite)
+  ;; Both camelCase json_name and snake_case proto name work for regular and oneof fields
+  (let ((camel-oneof-int (with-input-from-string (s "{\"intField\":11,\"oneofIntField\":22}")
+                           (proto:parse-json 'pb:text-format-test :stream s)))
+        (snake-oneof-int (with-input-from-string (s "{\"int_field\":11,\"oneof_int_field\":22}")
+                           (proto:parse-json 'pb:text-format-test :stream s)))
+        (camel-oneof-str (with-input-from-string (s "{\"oneofStringField\":\"hello\"}")
+                           (proto:parse-json 'pb:text-format-test :stream s)))
+        (snake-oneof-str (with-input-from-string (s "{\"oneof_string_field\":\"hello\"}")
+                           (proto:parse-json 'pb:text-format-test :stream s))))
+    (assert-eql 11 (pb:int-field camel-oneof-int))
+    (assert-eql 22 (pb:oneof-int-field camel-oneof-int))
+    (assert-true (proto:proto-equal camel-oneof-int snake-oneof-int))
+    (assert-equality #'string= "hello" (pb:oneof-string-field camel-oneof-str))
+    (assert-true (proto:proto-equal camel-oneof-str snake-oneof-str)))
+  ;; Extension roundtrip (camelCase and snake_case)
+  (let ((ext-camel (with-input-from-string (s "{\"intField\":7,\"extField\":\"ext-val\"}")
+                     (proto:parse-json 'pb:extend-test :stream s)))
+        (ext-snake (with-input-from-string (s "{\"int_field\":7,\"ext_field\":\"ext-val\"}")
+                     (proto:parse-json 'pb:extend-test :stream s))))
+    (assert-eql 7 (pb:int-field ext-camel))
+    (assert-true (proto:has-extension ext-camel 'pb:ext-field))
+    (assert-equality #'string= "ext-val" (proto:get-extension ext-camel 'pb:ext-field))
+    (assert-true (proto:has-extension ext-snake 'pb:ext-field))
+    (assert-equality #'string= "ext-val" (proto:get-extension ext-snake 'pb:ext-field))))
+
+#+(and sbcl arena-allocator)
+(deftest test-json-sbcl-arena-safety (json-suite)
+  (cl-protobufs.json::reset-json-message-metadata)
+  (cl-protobufs.implementation::reset-scratch-char-pool)
+  (let* ((long-str (make-string 300 :initial-element #\y))
+         (json-payload (format nil "{\"intField\":99,\"stringField\":\"~A\",\"intVals\":[4,5]}"
+                               long-str))
+         (arena (sb-vm:new-arena 1048576)))
+    (unwind-protect
+         (progn
+           (dotimes (pass 3)
+             (sb-vm:with-arena (arena)
+               (let* ((parsed (with-input-from-string (s json-payload)
+                                (proto:parse-json 'pb:text-format-test :stream s)))
+                      (printed (with-output-to-string (s)
+                                 (proto:print-json parsed :stream s :pretty-print-p nil))))
+                 (assert-eql 99 (pb:int-field parsed))
+                 (assert-equality #'string= long-str (pb:string-field parsed))
+                 (assert-equal '(4 5) (pb:int-vals parsed))
+                 (assert-true (search "\"intField\":99" printed))))
+             (sb-vm:rewind-arena arena))
+           (let ((desc (proto:find-message-descriptor 'pb:text-format-test :error-p t)))
+             (assert-true (sb-kernel:dynamic-space-obj-p
+                           (gethash desc cl-protobufs.json::*json-message-metadata*)))))
+      (sb-vm:destroy-arena arena))
+    (let* ((parsed (with-input-from-string (s json-payload)
+                     (proto:parse-json 'pb:text-format-test :stream s)))
+           (printed (with-output-to-string (s)
+                      (proto:print-json parsed :stream s :pretty-print-p nil))))
+      (assert-eql 99 (pb:int-field parsed))
+      (assert-equality #'string= long-str (pb:string-field parsed))
+      (assert-true (search "\"intField\":99" printed)))))
+
