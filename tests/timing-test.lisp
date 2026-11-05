@@ -468,3 +468,74 @@ Parameters
                          1000
         (deserialize-from-bytes (type-of population) buffer)))
     (clear-proto2-serialization-functions)))
+
+(pi:define-enum sparse-timing-enum ()
+  (:s0 :index 0)
+  (:s1 :index 7)
+  (:s2 :index 14)
+  (:s3 :index 21)
+  (:s4 :index 28)
+  (:s5 :index 35)
+  (:s6 :index 42)
+  (:s7 :index 49)
+  (:s8 :index 56)
+  (:s9 :index 63)
+  (:s10 :index 70)
+  (:s11 :index 77)
+  (:s12 :index 84)
+  (:s13 :index 91)
+  (:s14 :index 98)
+  (:s15 :index 105)
+  (:s16 :index 112)
+  (:s17 :index 119)
+  (:s18 :index 126)
+  (:s19 :index 133)
+  (:s20 :index 140)
+  (:s21 :index 147)
+  (:s22 :index 154)
+  (:s23 :index 161))
+
+(pi:define-message sparse-enum-holder ()
+  (single :index 1 :type sparse-timing-enum :kind :enum
+          :label (:optional) :field-presence :explicit :default :s0
+          :json-name "single")
+  (unpacked :index 2 :type sparse-timing-enum :kind :enum
+            :label (:repeated :list) :packed nil :field-presence :implicit
+            :json-name "unpacked")
+  (packed :index 3 :type sparse-timing-enum :kind :enum
+          :label (:repeated :list) :packed t :field-presence :implicit
+          :json-name "packed"))
+
+(defun run-enum-benchmarks (size msg make-optimized)
+  "Time reflective, then optimized, serialization of the enum-holding MSG.
+SIZE names the enum in the benchmark name. MAKE-OPTIMIZED is a function that
+generates the optimized (de)serializers for MSG's type."
+  (let ((type (type-of msg)))
+    (flet ((run-pair (mode)
+             (run-timed-section (format nil "BM_Enum_~A_Serialize_~A" size mode)
+                                (format nil "~A Enum Serialization ~A" size mode)
+                                10000
+               (serialize-to-bytes msg type))
+             (let ((buffer (serialize-to-bytes msg type)))
+               (assert-true (proto-equal msg (deserialize-from-bytes type buffer) :exact t))
+               (run-timed-section (format nil "BM_Enum_~A_Deserialize_~A" size mode)
+                                  (format nil "~A Enum Deserialization ~A" size mode)
+                                  10000
+                 (deserialize-from-bytes type buffer)))))
+      (run-pair "Reflective")
+      (funcall make-optimized)
+      (run-pair "Optimized"))))
+
+(deftest enum-serialization-times (timing-suite)
+  (let ((small (loop for i below 64 collect (if (oddp i) :baz :auto)))
+        (large (loop for i below 64 collect (intern (format nil "S~D" (mod i 24)) :keyword))))
+    (run-enum-benchmarks "Small"
+                         (serial-proto:make-message-v2 :e :baz :e3 small :e4 small)
+                         (lambda ()
+                           (pi::make-serializer serial-proto:message-v2)
+                           (pi::make-deserializer serial-proto:message-v2)))
+    (run-enum-benchmarks "Large"
+                         (make-sparse-enum-holder :single :s23 :unpacked large :packed large)
+                         (lambda ()
+                           (pi::make-serializer sparse-enum-holder)
+                           (pi::make-deserializer sparse-enum-holder)))))
