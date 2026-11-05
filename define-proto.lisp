@@ -567,12 +567,12 @@ Parameters:
                              :fields field-descriptors))))
 
 (defun-inline proto-%%bytes (obj)
-  "Returns the %%bytes field of the proto object OBJ."
-  (the (or (simple-array (unsigned-byte 8) 1) null) (slot-value obj '%%bytes)))
+  "Returns the %%bytes field of the proto object OBJ, or NIL if OBJ is not a MESSAGE."
+  (and (message-p obj) (message-%%bytes obj)))
 
 (defun-inline (setf proto-%%bytes) (new-value obj)
-  "Sets the %bytes field of the proto object OBJ with NEW-VALUE."
-  (setf (slot-value obj '%%bytes) new-value))
+  "Sets the %%bytes field of the proto object OBJ with NEW-VALUE."
+  (setf (message-%%bytes obj) new-value))
 
 (defstruct field-accessors
   "Structure containing the get, set, and has functions
@@ -1343,14 +1343,6 @@ function) then there is no guarantee on the serialize function working properly.
       ;; Not required, but this will have the proto-fields serialized
       ;; in the order they were defined.
       (setf (proto-fields msg-desc) (nreverse (proto-fields msg-desc)))
-      ;; One extra slot for the make-message-with-bytes feature.
-      (collect-slot
-       (make-field-data
-        :internal-slot-name '%%bytes
-        :external-slot-name '%%bytes
-        :type '(or null (simple-array (unsigned-byte 8)))
-        :initarg :%%bytes
-        :initform nil))
 
       (unless (= bool-index -1)
         (collect-slot (make-bit-field-slot '%%bool-values bool-count bool-values)))

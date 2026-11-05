@@ -75,8 +75,7 @@
 (defun serialize-to-stream (object stream &optional (type (type-of object)))
   "Serialize OBJECT of type TYPE onto the STREAM using wire format.
    OBJECT and TYPE are as described in SERIALIZE-TO-BYTES."
-  (let ((precomputed-bytes (and (slot-exists-p object '%%bytes)
-                                (proto-%%bytes object))))
+  (let ((precomputed-bytes (proto-%%bytes object)))
     (if precomputed-bytes
         (progn
           (write-sequence precomputed-bytes stream)
@@ -96,8 +95,7 @@
 (defun serialize-to-bytes (object &optional (type (type-of object)))
   "Serializes OBJECT into a new vector of (unsigned-byte 8) using wire format.
    TYPE is a symbol naming a protobuf descriptor class."
-  (or (and (slot-exists-p object '%%bytes)
-           (proto-%%bytes object))
+  (or (proto-%%bytes object)
       (let ((compact-buf (compactify-blocks (%serialize-to-buffer object type))))
         (concatenate-blocks compact-buf))))
 
@@ -235,8 +233,7 @@ Parameters:
             (iincf size (encode-uint32 tag buffer))
             ;; If MSG has %%BYTES bound, then it is a lazy field, and BYTES is
             ;; the pre-computed serialization of MSG, so output that.
-            (let ((precomputed-bytes (and (slot-exists-p msg '%%bytes)
-                                          (proto-%%bytes msg)))
+            (let ((precomputed-bytes (proto-%%bytes msg))
                   (submessage-size 0))
               (with-placeholder (buffer) ; reserve space for submessage-size in buffer
                 (cond (precomputed-bytes
@@ -314,8 +311,7 @@ Parameters:
         (t
          ;; If MSG has %%BYTES bound, then it is a lazy field, and %%BYTES is
          ;; the pre-computed serialization of MSG, so output that.
-         (let ((precomputed-bytes (and (slot-exists-p msg '%%bytes)
-                                       (proto-%%bytes msg)))
+         (let ((precomputed-bytes (proto-%%bytes msg))
                (custom-serializer (custom-serializer type))
                (tag-size (encode-uint32 (make-wire-tag $wire-type-string field-num) buffer))
                (submessage-size 0))
