@@ -12,6 +12,12 @@
 
 ;;; Text parsing utilities
 
+(defconstant +safe-fixnum-mul10-limit+ (truncate (- most-positive-fixnum 9) 10)
+  "Largest fixnum N such that (+ (* N 10) 9) is guaranteed to remain a fixnum.")
+
+(defconstant +safe-fixnum-hex-limit+ (ash most-positive-fixnum -4)
+  "Largest fixnum N such that (+ (ash N 4) 15) is guaranteed to remain a fixnum.")
+
 (defun-inline proto-whitespace-char-p (ch)
   (declare #.*optimize-fast-unsafe*)
   (and ch (member ch '(#\space #\tab #\return #\newline))))
@@ -29,6 +35,28 @@
   (and ch (or (alpha-char-p ch)
               (digit-char-p ch)
               (member ch '(#\_ #\.)))))
+
+(defun-inline ascii-decimal-digit (ch)
+  "If CH is an ASCII decimal digit #\\0..#\\9, return its fixnum value 0..9; else NIL."
+  (declare #.*optimize-fast-unsafe*)
+  (when ch
+    (let ((d (i- (char-code ch) #.(char-code #\0))))
+      (when (and (i<= 0 d) (i<= d 9))
+        d))))
+
+(defun-inline ascii-hex-digit (ch)
+  "If CH is an ASCII hex digit 0-9, a-f, A-F, return its fixnum value 0..15; else NIL."
+  (declare #.*optimize-fast-unsafe*)
+  (when ch
+    (let ((code (char-code ch)))
+      (declare (type fixnum code))
+      (cond ((and (i<= #.(char-code #\0) code) (i<= code #.(char-code #\9)))
+             (i- code #.(char-code #\0)))
+            ((and (i<= #.(char-code #\a) code) (i<= code #.(char-code #\f)))
+             (i+ 10 (i- code #.(char-code #\a))))
+            ((and (i<= #.(char-code #\A) code) (i<= code #.(char-code #\F)))
+             (i+ 10 (i- code #.(char-code #\A))))
+            (t nil)))))
 
 (defvar *parse-comments* t
   "If true, skip # comments when parsing.")
@@ -263,31 +291,91 @@ caret string that visually marks the error position in the line."
       (otherwise
        (format nil "\\x~2,'0X" (char-code ch))))))
 
+(defun finish-int-delimiter (stream ch)
+  "Unread non-whitespace delimiter CH onto STREAM, or skip remaining whitespace."
+  (when ch
+    (if (proto-whitespace-char-p ch)
+        (skip-whitespace stream)
+        (unread-char ch stream)))
+  nil)
+
+(defun parse-hex-unsigned-int (stream)
+  "Parse hexadecimal digits after a '0x' or '0X' prefix from STREAM."
+  (let* ((h0 (read-char stream nil))
+         (hd0 (ascii-hex-digit h0)))
+    (unless hd0
+      (when h0
+        (unread-char h0 stream))
+      (protobuf-error "Expecting an integer at position ~D" (file-position stream)))
+    (let ((acc hd0))
+      (declare (type fixnum acc))
+      (loop
+        (let* ((c (read-char stream nil))
+               (d (ascii-hex-digit c)))
+          (unless d
+            (finish-int-delimiter stream c)
+            (return acc))
+          (if (i<= acc +safe-fixnum-hex-limit+)
+              (setf acc (i+ (iash acc 4) d))
+              (let ((big (+ (ash acc 4) d)))
+                (return
+                  (loop
+                    (let* ((c2 (read-char stream nil))
+                           (d2 (ascii-hex-digit c2)))
+                      (unless d2
+                        (finish-int-delimiter stream c2)
+                        (return big))
+                      (setf big (+ (ash big 4) d2))))))))))))
+
+(defun %parse-unsigned-int-from-char (stream ch0)
+  "Parse an unsigned decimal or 0x-prefixed hex integer from STREAM starting at CH0."
+  (let ((d0 (ascii-decimal-digit ch0)))
+    (unless d0
+      (when ch0
+        (unread-char ch0 stream))
+      (protobuf-error "Expecting an integer at position ~D" (file-position stream)))
+    (let ((ch1 (read-char stream nil)))
+      (when (and (i= d0 0) (or (eql ch1 #\x) (eql ch1 #\X)))
+        (return-from %parse-unsigned-int-from-char (parse-hex-unsigned-int stream)))
+      (let ((d1 (ascii-decimal-digit ch1)))
+        (unless d1
+          (finish-int-delimiter stream ch1)
+          (return-from %parse-unsigned-int-from-char d0))
+        (let ((acc (i+ (i* d0 10) d1)))
+          (declare (type fixnum acc))
+          (loop
+            (let* ((c (read-char stream nil))
+                   (d (ascii-decimal-digit c)))
+              (unless d
+                (finish-int-delimiter stream c)
+                (return acc))
+              (if (i<= acc +safe-fixnum-mul10-limit+)
+                  (setf acc (i+ (i* acc 10) d))
+                  (let ((big (+ (* acc 10) d)))
+                    (return
+                      (loop
+                        (let* ((c2 (read-char stream nil))
+                               (d2 (ascii-decimal-digit c2)))
+                          (unless d2
+                            (finish-int-delimiter stream c2)
+                            (return big))
+                          (setf big (+ (* big 10) d2))))))))))))))
+
 (defun parse-signed-int (stream)
   "Parse the next token in the stream as an integer, then skip the following whitespace.
    The returned value is the integer."
-  (let* ((sign (if (eql (peek-char nil stream nil) #\-)
-                 (progn (read-char stream) -1)
-                 1))
-         (int  (parse-unsigned-int stream)))
-    (* int sign)))
+  (let ((ch (read-char stream nil)))
+    (if (eql ch #\-)
+        (let ((mag (%parse-unsigned-int-from-char stream (read-char stream nil))))
+          (if (typep mag 'fixnum)
+              (i- 0 (the fixnum mag))
+              (- mag)))
+        (%parse-unsigned-int-from-char stream ch))))
 
 (defun parse-unsigned-int (stream)
   "Parse the next token in the stream as an integer, then skip the following whitespace.
    The returned value is the integer."
-  (if (digit-char-p (peek-char nil stream nil))
-      (loop for ch = (read-char stream nil)
-            for ch1 = (peek-char nil stream nil)
-            collect ch into token
-            until (or (null ch1) (and (not (digit-char-p ch1)) (not (eql ch #\x))))
-            finally (progn
-                      (skip-whitespace stream)
-                      (let ((token (coerce token 'string)))
-                        (if (starts-with token "0x")
-                            (let ((*read-base* 16))
-                              (return (parse-integer (subseq token 2))))
-                            (return (parse-integer token))))))
-      (protobuf-error "Expecting an integer at position ~D" (file-position stream))))
+  (%parse-unsigned-int-from-char stream (read-char stream nil)))
 
 (defun parse-float (stream)
   "Parse the next token in the STREAM as a float, then skip the following whitespace.
@@ -316,32 +404,43 @@ already have the 'd0' suffix. The returned value is the double-float."
           (t (protobuf-error "Expecting a double-float at position ~D" (file-position stream)))))))
 
 (defun parse-number (stream &key append-d0 allow-inf-nan)
-  "Parse a number from STREAM. If APPEND-D0 is true, append \"d0\"
-to the end of the parsed numerical string. If ALLOW-INF-NAN is
-true, allow inifinty or nan values."
+  "Parse a number from STREAM. If APPEND-D0 is true, parse float literals with
+DOUBLE-FLOAT precision. If ALLOW-INF-NAN is true, allow infinity or nan values."
   (let ((ch (peek-char nil stream nil)))
-    (when (or (digit-char-p ch)
-              (member ch '(#\- #\+ #\.))
-              (and allow-inf-nan
-                   (member ch '(#\i #\n))))
+    (when (and ch
+               (or (ascii-decimal-digit ch)
+                   (char= ch #\-)
+                   (char= ch #\+)
+                   (char= ch #\.)
+                   (and allow-inf-nan
+                        (or (char-equal ch #\i) (char-equal ch #\n)))))
       (let ((token (parse-token stream '(#\- #\+ #\.))))
         (when token
           (skip-whitespace-comments-and-chars stream)
-
           (if append-d0
-              (parse-numeric-string (concatenate 'string token "d0"))
+              (let* ((*read-default-float-format* 'double-float)
+                     (num (parse-numeric-string token)))
+                (if (integerp num)
+                    (coerce num 'double-float)
+                    num))
               (parse-numeric-string token)))))))
 
 (defun parse-numeric-string (string)
-  (cond ((starts-with string "0x")
-         (parse-integer (subseq string 2) :radix 16))
-        ((starts-with string "-0x")
-         (- (parse-integer (subseq string 3) :radix 16)))
-        ((member string '("nan") :test #'string-equal) :nan)
-        ((member string '("inf" "infinity") :test #'string-equal)
+  (cond ((or (starts-with string "0x") (starts-with string "0X"))
+         (values (parse-integer string :start 2 :radix 16)))
+        ((or (starts-with string "-0x") (starts-with string "-0X"))
+         (- (values (parse-integer string :start 3 :radix 16))))
+        ((string-equal string "nan") :nan)
+        ((or (string-equal string "inf")
+             (string-equal string "infinity")
+             (string-equal string "+inf")
+             (string-equal string "+infinity"))
          :infinity)
-        ((member string '("-inf" "-infinity") :test #'string-equal)
+        ((or (string-equal string "-inf")
+             (string-equal string "-infinity"))
          :-infinity)
         (t
-         (ignore-errors (read-from-string string)))))
+         (let ((*read-eval* nil)
+               (*read-base* 10))
+           (ignore-errors (values (read-from-string string)))))))
 

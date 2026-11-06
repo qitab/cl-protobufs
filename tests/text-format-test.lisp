@@ -714,3 +714,100 @@ int_field: 1")))
       (assert-false (search "#1=" actual))
       (assert-false (search (format nil "~%~%") actual)))))
 
+(deftest test-parse-integer-boundaries-and-hex (text-format-suite)
+  ;; Zero and negative zero
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream
+                       "int_field: 0 sint_field: -0 uint_field: 0 int64_field: 0 sint64_field: -0"))))
+    (assert-eql 0 (test-pb:int-field msg))
+    (assert-eql 0 (test-pb:sint-field msg))
+    (assert-eql 0 (test-pb:uint-field msg))
+    (assert-eql 0 (test-pb:int64-field msg))
+    (assert-eql 0 (test-pb:sint64-field msg)))
+  ;; Decimal min/max boundaries for 32-bit and 64-bit signed/unsigned integers
+  (let ((min-msg (proto:parse-text-format
+                  'test-pb:text-format-test
+                  :stream (make-string-input-stream
+                           "int_field: -2147483648 sint_field: -2147483648 int64_field: -9223372036854775808 sint64_field: -9223372036854775808")))
+        (max-msg (proto:parse-text-format
+                  'test-pb:text-format-test
+                  :stream (make-string-input-stream
+                           "int_field: 2147483647 sint_field: 2147483647 uint_field: 4294967295 int64_field: 9223372036854775807 sint64_field: 9223372036854775807"))))
+    (assert-eql -2147483648 (test-pb:int-field min-msg))
+    (assert-eql -2147483648 (test-pb:sint-field min-msg))
+    (assert-eql -9223372036854775808 (test-pb:int64-field min-msg))
+    (assert-eql -9223372036854775808 (test-pb:sint64-field min-msg))
+    (assert-eql 2147483647 (test-pb:int-field max-msg))
+    (assert-eql 2147483647 (test-pb:sint-field max-msg))
+    (assert-eql 4294967295 (test-pb:uint-field max-msg))
+    (assert-eql 9223372036854775807 (test-pb:int64-field max-msg))
+    (assert-eql 9223372036854775807 (test-pb:sint64-field max-msg)))
+  ;; Hexadecimal integer literals (0x and 0X, signed and unsigned)
+  (let ((hex-msg (proto:parse-text-format
+                  'test-pb:text-format-test
+                  :stream (make-string-input-stream
+                           "int_field: 0x7FFFFFFF sint_field: -0x80000000 uint_field: 0xFFFFFFFF int64_field: 0x7FFFFFFFFFFFFFFF sint64_field: -0X8000000000000000 int_vals: [0x0, 0xFF, 0X1a2B]"))))
+    (assert-eql #x7FFFFFFF (test-pb:int-field hex-msg))
+    (assert-eql (- #x80000000) (test-pb:sint-field hex-msg))
+    (assert-eql #xFFFFFFFF (test-pb:uint-field hex-msg))
+    (assert-eql #x7FFFFFFFFFFFFFFF (test-pb:int64-field hex-msg))
+    (assert-eql (- #x8000000000000000) (test-pb:sint64-field hex-msg))
+    (assert-equal '(0 #xFF #x1A2B) (test-pb:int-vals hex-msg)))
+  ;; Double parsing with :append-d0 t preserves full precision on scientific notation and hex
+  (with-input-from-string (s "1.5e10 2.718281828459045e-3 -0Xff")
+    (assert-eql 1.5d10
+                (cl-protobufs.implementation::parse-double s :append-d0 t))
+    (assert-eql 2.718281828459045d-3
+                (cl-protobufs.implementation::parse-double s :append-d0 t))
+    (assert-eql -255.0d0
+                (cl-protobufs.implementation::parse-double s :append-d0 t)))
+  ;; Direct uint64 max and bignum promotion checks on parser primitives
+  (with-input-from-string (s "18446744073709551615 0xFFFFFFFFFFFFFFFF")
+    (assert-eql 18446744073709551615 (cl-protobufs.implementation::parse-unsigned-int s))
+    (assert-eql #xFFFFFFFFFFFFFFFF (cl-protobufs.implementation::parse-unsigned-int s)))
+  (with-input-from-string (s "-18446744073709551615")
+    (assert-eql -18446744073709551615 (cl-protobufs.implementation::parse-signed-int s)))
+  ;; Malformed integer inputs must signal protobuf-error
+  (dolist (bad '("" "-" "0x" "-0x" "abc"))
+    (assert-condition proto:protobuf-error
+        (with-input-from-string (s bad)
+          (cl-protobufs.implementation::parse-signed-int s))))
+  (assert-condition proto:protobuf-error
+      (with-input-from-string (s "-1")
+        (cl-protobufs.implementation::parse-unsigned-int s))))
+
+#+sbcl
+(deftest test-parse-integer-zero-allocation (text-format-suite)
+  (let ((signed-stream (make-string-input-stream "-123456789 "))
+        (unsigned-stream (make-string-input-stream "4294967295 ")))
+    (loop repeat 100
+          do (file-position signed-stream 0)
+             (cl-protobufs.implementation::parse-signed-int signed-stream)
+             (file-position unsigned-stream 0)
+             (cl-protobufs.implementation::parse-unsigned-int unsigned-stream))
+    (let ((signed-sum 0)
+          (signed-consed 0)
+          (unsigned-sum 0)
+          (unsigned-consed 0))
+      (declare (type fixnum signed-sum unsigned-sum))
+      (let ((before-signed (sb-ext:get-bytes-consed)))
+        (loop repeat 1000
+              do (file-position signed-stream 0)
+                 (incf signed-sum
+                       (the fixnum
+                            (cl-protobufs.implementation::parse-signed-int signed-stream))))
+        (setf signed-consed (- (sb-ext:get-bytes-consed) before-signed)))
+      (let ((before-unsigned (sb-ext:get-bytes-consed)))
+        (loop repeat 1000
+              do (file-position unsigned-stream 0)
+                 (incf unsigned-sum
+                       (the fixnum
+                            (cl-protobufs.implementation::parse-unsigned-int unsigned-stream))))
+        (setf unsigned-consed (- (sb-ext:get-bytes-consed) before-unsigned)))
+      (assert-eql -123456789000 signed-sum)
+      (assert-eql 0 signed-consed)
+      (assert-eql 4294967295000 unsigned-sum)
+      (assert-eql 0 unsigned-consed))))
+
+
