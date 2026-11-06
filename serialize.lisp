@@ -1445,8 +1445,12 @@ Parameters:
                     ,skipped-bytes-tuple)
                 ,@(when direct-struct-p
                     `((declare (type ,lisp-type ,vstruct))))
-                ,(when save-skipped-bytes-p `(declare (ignore ,old-index)))
+                ,(if save-skipped-bytes-p
+                     `(declare (ignore ,old-index))
+                     `(declare (type array-index ,old-index)))
                 (loop
+                  ,@(unless save-skipped-bytes-p
+                      `((setf ,old-index ,vidx)))
                   (multiple-value-setq (tag ,vidx)
                     (if (i< ,vidx ,vlim) (decode-uint32 ,vbuf ,vidx) (values 0 ,vidx)))
                   (when (i= tag ,vendtag)
