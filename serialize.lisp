@@ -673,7 +673,7 @@ Parameters:
                           (decode-uint32 buffer index))
                         (setq start index)
                         (loop
-                          (when (= index (+ map-len start))
+                          (when (>= index (+ map-len start))
                             (assert key-data)
                             (setf (gethash key-data (car cell)) val-data)
                             (return))
@@ -1292,7 +1292,7 @@ Parameters:
                      (decode-uint32 ,vbuf ,vidx))
                    (setq start ,vidx)
                    (loop
-                     (when (= ,vidx (+ map-len start))
+                     (when (>= ,vidx (+ map-len start))
                        (setf (gethash key-data ,dest) val-data)
                        (return))
                      (multiple-value-setq (map-tag ,vidx)

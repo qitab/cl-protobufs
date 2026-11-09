@@ -243,3 +243,16 @@
       (assert-true (proto-equal test2 (round-trip test2)))
       (assert-true (proto-equal test3 (round-trip test3)))
       (assert-true (proto-equal test4 (round-trip test4))))))
+
+(deftest map-entry-overshoot-test (map-suite)
+  (let ((bytes (make-array 7 :element-type '(unsigned-byte 8)
+                             :initial-contents '(#x0a #x04 #x08 #x80 #x01 #x10 #x2a))))
+    (unwind-protect
+         (progn
+           (clear-serialization-functions)
+           (let ((res (deserialize-from-bytes 'map-all bytes)))
+             (assert-eql (values 42 t) (map-all.intmap-gethash 128 res)))
+           (create-serialization-functions)
+           (let ((res (deserialize-from-bytes 'map-all bytes)))
+             (assert-eql (values 42 t) (map-all.intmap-gethash 128 res))))
+      (clear-serialization-functions))))
