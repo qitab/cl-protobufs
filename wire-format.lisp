@@ -674,8 +674,11 @@
         (decode-uint32 buffer index)
       (declare (type (unsigned-byte 32) len)
                (type fixnum idx))
+      (when (> len (i- (length buffer) idx))
+        (protobuf-error "Packed field length ~D exceeds remaining buffer length ~D"
+                        len (i- (length buffer) idx)))
       (let ((end (i+ idx len)))
-        (declare (type (unsigned-byte 32) end))
+        (declare (type array-index end))
         (with-collectors ((values collect-value))
           (loop
             (when (>= idx end)
@@ -729,8 +732,11 @@
                (decode-uint32 ,buffer ,index)
              (declare (type (unsigned-byte 32) len)
                       (type fixnum idx))
+             (when (> len (i- (length ,buffer) idx))
+               (protobuf-error "Packed field length ~D exceeds remaining buffer length ~D"
+                               len (i- (length ,buffer) idx)))
              (let ((end (i+ idx len)))
-               (declare (type (unsigned-byte 32) end))
+               (declare (type array-index end))
                (with-collectors ((values collect-value))
                  (loop
                    (when (>= idx end)
@@ -801,8 +807,11 @@
         (decode-uint32 buffer index)
       (declare (type (unsigned-byte 32) len)
                (type fixnum idx))
+      (when (> len (i- (length buffer) idx))
+        (protobuf-error "Packed enum length ~D exceeds remaining buffer length ~D"
+                        len (i- (length buffer) idx)))
       (let ((end (i+ idx len)))
-        (declare (type (unsigned-byte 32) end))
+        (declare (type array-index end))
         (with-collectors ((names collect-name))
           (loop
             (when (>= idx end)

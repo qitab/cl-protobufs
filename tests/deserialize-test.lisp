@@ -149,3 +149,40 @@ Parameters
            (assert-condition proto:protobuf-error
                (proto:deserialize-from-bytes 'skipped-bytes-v1 oversized-string)))
       (eval '(pi:make-deserializer skipped-bytes-v1)))))
+
+(pi:define-enum oversized-test-enum ()
+  (:zero :index 0)
+  (:one :index 1))
+
+(pi:define-message oversized-test-message ()
+  (sub :index 1 :type pb:message :kind :message
+       :label (:optional) :field-presence :explicit
+       :json-name "sub")
+  (subs :index 2 :type pb:message :kind :message
+        :label (:repeated :list) :field-presence :implicit
+        :json-name "subs")
+  (packed-ints :index 3 :type proto:int32 :kind :scalar
+               :label (:repeated :list) :field-presence :implicit
+               :packed t :json-name "packedInts")
+  (packed-enums :index 4 :type oversized-test-enum :kind :enum
+                :label (:repeated :list) :field-presence :implicit
+                :packed t :json-name "packedEnums"))
+
+(deftest test-oversized-submessage-and-packed-length-error (deserialize-suite)
+  (let ((payloads
+          (loop for tag in '(#x0A #x12 #x1A #x22)
+                collect (make-array 5 :element-type '(unsigned-byte 8)
+                                      :initial-contents (list tag #xFF #xFF #xFF #x7F)))))
+    (unwind-protect
+         (dolist (optimized '(nil t))
+           (when optimized
+             (eval '(pi:make-deserializer pb:message))
+             (eval '(pi:make-deserializer oversized-test-message)))
+           (dolist (payload payloads)
+             (assert-condition proto:protobuf-error
+                 (proto:deserialize-from-bytes 'oversized-test-message payload))))
+      #-sbcl (setf (get 'pb:message :deserialize) nil
+                   (get 'oversized-test-message :deserialize) nil)
+      #+sbcl (progn
+               (fmakunbound '(:protobuf :deserialize pb:message))
+               (fmakunbound '(:protobuf :deserialize oversized-test-message))))))

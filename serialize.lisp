@@ -757,6 +757,10 @@ Parameters:
                              end))
                    (multiple-value-bind (embedded-msg-len start)
                        (decode-uint32 buffer index)
+                     (when (> embedded-msg-len (i- (length buffer) start))
+                       (protobuf-error
+                        "Sub-message length ~D exceeds remaining buffer length ~D"
+                        embedded-msg-len (i- (length buffer) start)))
                      (let* ((end (+ start embedded-msg-len))
                             (obj
                              (cond (lazy-p
@@ -1167,6 +1171,10 @@ Parameters:
                            tag1))
                  (values `(multiple-value-bind (payload-len payload-start)
                               (decode-uint32 ,vbuf ,vidx)
+                            (when (> payload-len (i- (length ,vbuf) payload-start))
+                              (protobuf-error
+                               "Sub-message length ~D exceeds remaining buffer length ~D"
+                               payload-len (i- (length ,vbuf) payload-start)))
                             ;; This index points *after* the sub-message,
                             ;; but incrementing it now serves to computes the LIMIT
                             ;; for the recursive call. And we don't need
@@ -1260,6 +1268,10 @@ Parameters:
                    (values
                     `(multiple-value-bind (payload-len payload-start)
                          (decode-uint32 ,vbuf ,vidx)
+                       (when (> payload-len (i- (length ,vbuf) payload-start))
+                         (protobuf-error
+                          "Sub-message length ~D exceeds remaining buffer length ~D"
+                          payload-len (i- (length ,vbuf) payload-start)))
                        (setq ,vidx (+ payload-start payload-len))
                        ;; If this field is declared lazy, then don't deserialize.
                        ;; Instead, create a new message with %%BYTES field set to
