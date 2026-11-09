@@ -1113,6 +1113,9 @@
       (decode-uint32 buffer index)
     (declare (type (unsigned-byte 32) len)
              (type fixnum idx))
+    (when (> len (i- (length buffer) idx))
+      (protobuf-error "String length ~D exceeds remaining buffer length ~D"
+                      len (i- (length buffer) idx)))
     (values #+sbcl
             (let ((str (make-array len :element-type 'base-char)))
               (do ((src-idx (i+ idx len -1) (1- src-idx))
@@ -1219,6 +1222,9 @@
          (decode-uint32 buffer index)
        (declare (type (unsigned-byte 32) len)
                 (type fixnum idx))
+       (when (> len (i- (length buffer) idx))
+         (protobuf-error "Skipped field length ~D exceeds remaining buffer length ~D"
+                         len (i- (length buffer) idx)))
        (i+ idx len)))
     ((#.$wire-type-32bit)
      (i+ index 4))

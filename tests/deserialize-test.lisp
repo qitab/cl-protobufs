@@ -126,3 +126,26 @@ Parameters
                     :direct-struct-p nil))
              (verify-round-trip))
         (eval '(pi:make-deserializer skipped-bytes-v1))))))
+
+(deftest test-oversized-length-allocation-error (deserialize-suite)
+  (let ((unknown-field-poc
+          (make-array 7 :element-type '(unsigned-byte 8)
+                        :initial-contents '(#xA2 #x06 #xFF #xFF #xFF #xFF #x07)))
+        (oversized-string
+          (make-array 6 :element-type '(unsigned-byte 8)
+                        :initial-contents '(#x2A #xFF #xFF #xFF #xFF #x07))))
+    ;; 1. Optimized (compiled) deserializer for skipped-bytes-v1
+    (assert-condition proto:protobuf-error
+        (proto:deserialize-from-bytes 'skipped-bytes-v1 unknown-field-poc))
+    (assert-condition proto:protobuf-error
+        (proto:deserialize-from-bytes 'skipped-bytes-v1 oversized-string))
+    ;; 2. Reflective deserializer for skipped-bytes-v1
+    (unwind-protect
+         (progn
+           #-sbcl (setf (get 'skipped-bytes-v1 :deserialize) nil)
+           #+sbcl (fmakunbound '(:protobuf :deserialize skipped-bytes-v1))
+           (assert-condition proto:protobuf-error
+               (proto:deserialize-from-bytes 'skipped-bytes-v1 unknown-field-poc))
+           (assert-condition proto:protobuf-error
+               (proto:deserialize-from-bytes 'skipped-bytes-v1 oversized-string)))
+      (eval '(pi:make-deserializer skipped-bytes-v1)))))
