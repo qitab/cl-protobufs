@@ -519,9 +519,11 @@ Paramaters:
     (dolist (entry '((:zero 1)
                      (:one 1)
                      (:large 2)
-                     ;; Undefined enum keyword round-trips its numeric suffix
-                     (:%undefined-999 2)))
-      (destructuring-bind (enum-name expected-val-bytes) entry
+                     (999 2)
+                     ;; Undefined enum keyword serializes its numeric suffix and deserializes to int
+                     (:%undefined-999 2 999)))
+      (destructuring-bind (enum-name expected-val-bytes &optional (expected-decoded enum-name))
+          entry
         (let* ((tag (pi::make-wire-tag pi::$wire-type-varint 4))
                (buf (make-octet-buffer 32))
                (size (pi::serialize-enum enum-name descriptors tag buf))
@@ -534,15 +536,15 @@ Paramaters:
             (multiple-value-bind (decoded-name val-end)
                 (pi::deserialize-enum descriptors bytes tag-end)
               (assert-eql (length bytes) val-end)
-              (assert-eql enum-name decoded-name))))))
-    ;; 2. Unknown enum value on the wire deserializes to :%UNDEFINED-<n>
+              (assert-eql expected-decoded decoded-name))))))
+    ;; 2. Unknown enum value on the wire deserializes to its integer value
     (let* ((buf (make-octet-buffer 32))
            (len (encode-uint32 42 buf))
            (bytes (concatenate-blocks (compactify-blocks buf))))
       (multiple-value-bind (decoded-name end-idx)
           (pi::deserialize-enum descriptors bytes 0)
         (assert-eql len end-idx)
-        (assert-eql :%undefined-42 decoded-name)))
+        (assert-eql 42 decoded-name)))
     ;; 3. Negative enum value on the wire (10-byte sign-extended varint)
     (let* ((neg-descriptors (cons (pi::make-enum-value-descriptor :name :neg-one :value -1)
                                   descriptors))
@@ -555,11 +557,11 @@ Paramaters:
           (pi::deserialize-enum neg-descriptors bytes 0)
         (assert-eql 10 end-idx)
         (assert-eql :neg-one decoded-name))
-      ;; If not in descriptors, negative wire value becomes :%UNDEFINED--1
+      ;; If not in descriptors, negative wire value deserializes to -1
       (multiple-value-bind (decoded-undef end-idx)
           (pi::deserialize-enum descriptors bytes 0)
         (assert-eql 10 end-idx)
-        (assert-eql :%undefined--1 decoded-undef)))
+        (assert-eql -1 decoded-undef)))
     ;; 4. Packed enum size, serialization, and deserialization
     (assert-eql 0 (pi::packed-enum-size '() descriptors))
     (assert-eql 0 (pi::packed-enum-size #() descriptors))
@@ -567,7 +569,7 @@ Paramaters:
       (assert-eql 0 (pi::serialize-packed-enum '() descriptors 5 empty-buf))
       (assert-eql 0 (pi::serialize-packed-enum #() descriptors 5 empty-buf))
       (assert-eql 0 (length (concatenate-blocks (compactify-blocks empty-buf)))))
-    (let* ((names '(:zero :one :large :%undefined-128))
+    (let* ((names '(:zero :one :large 128))
            ;; Byte sizes: :zero (1) + :one (1) + :large (2) + 128 (2) = 6
            (expected-payload-size 6))
       (assert-eql expected-payload-size (pi::packed-enum-size names descriptors))

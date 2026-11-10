@@ -518,7 +518,7 @@ Parameters
 ;;; message-v1, which is missing the `baz = 1` value in the enum it uses. This
 ;;; simulates interaction of a newer version of a proto in which an enum value
 ;;; has been added with an older version. In the old version the unknown enum
-;;; values should be retained as :%undefined-n where n is the numerical value.
+;;; values should be retained as their integer value.
 (deftest test-proto-backwards-compatibility-for-enums (serialization-suite)
   (loop :for optimized :in '(nil t) :do
     (format t "Testing optimized serializers: ~a~%"  optimized)
@@ -535,10 +535,10 @@ Parameters
            (v2-bytes (serialize-to-bytes message-v2))
            (message-v1 (deserialize-from-bytes 'message-v1 v2-bytes)))
       (assert-true message-v1)
-      (assert-eq (message-v1.e message-v1) :%undefined-1)
-      (assert-eq (message-v1.e2 message-v1) :%undefined-1)
-      (assert-equal (message-v1.e3 message-v1) '(:%undefined-1))
-      (assert-equal (message-v1.e4 message-v1) '(:%undefined-1))
+      (assert-eql (message-v1.e message-v1) 1)
+      (assert-eql (message-v1.e2 message-v1) 1)
+      (assert-equal (message-v1.e3 message-v1) '(1))
+      (assert-equal (message-v1.e4 message-v1) '(1))
       (assert-eq (message-v1.e5 message-v1) :default)
       (let* ((reserialized-proto-octets (serialize-to-bytes message-v1))
              (should-be-original-proto

@@ -341,9 +341,11 @@ as well as type. VALUE-DESCRIPTORS is a list of enum-value-descriptor objects."
            ,@(loop for desc in values
                    collect `(,(enum-value-descriptor-name desc)
                              ,(enum-value-descriptor-value desc)))
-           (t (parse-integer (subseq (symbol-name enum)
-                                     +%undefined--length+)
-                             :junk-allowed t))))
+           (t (if (integerp enum)
+                  enum
+                  (parse-integer (subseq (symbol-name enum)
+                                         +%undefined--length+)
+                                 :junk-allowed t)))))
        ,(if (<= range (* sequence-length 2))
             (let ((array (make-array (1+ range) :initial-element nil)))
               (loop for desc in values
@@ -458,6 +460,7 @@ but we want an internal version for the case where we deserialized an unknown
                                         :values value-descriptors)))
         (collect-form `(deftype ,open-type ()
                          '(or (member ,@names)
+                           sfixed32
                            (satisfies keyword-contains-%undefined-int-p))))
         (collect-form `(deftype ,type () '(member ,@names)))
         (collect-form (make-enum-conversion-forms type open-type value-descriptors))
@@ -1499,7 +1502,7 @@ function) then there is no guarantee on the serialize function working properly.
                (cslot (unless alias-for
                         ;; Enum type specifiers might not be loaded.
                         ;; Seems like this could be fixed...
-                        (let ((type (if (eq kind :enum) 'keyword type)))
+                        (let ((type (if (eq kind :enum) '(or keyword sfixed32) type)))
                           (make-field-data
                            :internal-slot-name internal-slot-name
                            :external-slot-name slot

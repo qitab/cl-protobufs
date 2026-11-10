@@ -273,12 +273,12 @@
 (defun-inline find-enum-value (name value-descriptors)
   "Find the enum value corresponding to NAME by searching for it in
    VALUE-DESCRIPTORS."
-  (declare (type keyword name))
-  (let* ((desc (find name value-descriptors :key #'enum-value-descriptor-name)))
+  (declare (type (or keyword sfixed32) name))
+  (let* ((desc (find name value-descriptors :key #'enum-value-descriptor-name :test #'eq)))
     (the sfixed32
-         (if desc
-             (enum-value-descriptor-value desc)
-             (parse-integer (cadr (split-string (symbol-name name))))))))
+         (cond (desc (enum-value-descriptor-value desc))
+               ((integerp name) name)
+               (t (parse-integer (cadr (split-string (symbol-name name)))))))))
 
 
 (defun-inline find-enum-name (value value-descriptors)
@@ -286,10 +286,10 @@
    VALUE-DESCRIPTORS."
   (declare (type sfixed32 value))
   (let* ((desc (find value value-descriptors :key #'enum-value-descriptor-value)))
-    (the keyword
+    (the (or keyword sfixed32)
          (if desc
              (enum-value-descriptor-name desc)
-             (kintern "~a-~a" "%UNDEFINED" value)))))
+             value))))
 
 (defun serialize-enum (name value-descriptors tag buffer)
   "Serializes the protobuf enum value corresponding to NAME (a keyword symbol)
@@ -791,7 +791,7 @@
     (multiple-value-bind (val idx)
         (decode-int32 buffer index)
       (let ((name (find-enum-name val value-descriptors)))
-        (values (the keyword name) idx)))))
+        (values (the (or keyword sfixed32) name) idx)))))
 
 (defun deserialize-packed-enum (value-descriptors buffer index)
   "Deserializes the next packed enum value given in VALUE-DESCRIPTORS.
