@@ -390,11 +390,12 @@ return T as a second value."
                       (eq (peek-char nil stream nil) #\[))
                  (progn
                    (read-char stream)
-                   (skip-whitespace-comments-and-chars stream :chars #\,)
+                   (skip-whitespace-comments-and-chars stream :chars '(#\,))
                    (let ((element-list (loop until (eq (peek-char nil stream nil) #\])
                                              collect (funcall parse-function)
                                              do
-                                          (skip-whitespace-comments-and-chars stream :chars #\,))))
+                                          (skip-whitespace-comments-and-chars
+                                           stream :chars '(#\,)))))
                      (read-char stream)
                      element-list))
                  (funcall parse-function))))

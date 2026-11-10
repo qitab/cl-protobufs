@@ -37,44 +37,37 @@
               (member ch '(#\_ #\.)))))
 
 (defun-inline ascii-decimal-digit (ch)
-  "If CH is an ASCII decimal digit #\\0..#\\9, return its fixnum value 0..9; else NIL."
+  "If CH is a decimal digit character, return its weight 0..9; else NIL."
   (declare #.*optimize-fast-unsafe*)
-  (when ch
-    (let ((d (i- (char-code ch) #.(char-code #\0))))
-      (when (and (i<= 0 d) (i<= d 9))
-        d))))
+  (and ch (digit-char-p ch 10)))
+
+(defun-inline ascii-octal-digit (ch)
+  "If CH is an octal digit character, return its weight 0..7; else NIL."
+  (declare #.*optimize-fast-unsafe*)
+  (and ch (digit-char-p ch 8)))
 
 (defun-inline ascii-hex-digit (ch)
-  "If CH is an ASCII hex digit 0-9, a-f, A-F, return its fixnum value 0..15; else NIL."
+  "If CH is a hexadecimal digit character, return its weight 0..15; else NIL."
   (declare #.*optimize-fast-unsafe*)
-  (when ch
-    (let ((code (char-code ch)))
-      (declare (type fixnum code))
-      (cond ((and (i<= #.(char-code #\0) code) (i<= code #.(char-code #\9)))
-             (i- code #.(char-code #\0)))
-            ((and (i<= #.(char-code #\a) code) (i<= code #.(char-code #\f)))
-             (i+ 10 (i- code #.(char-code #\a))))
-            ((and (i<= #.(char-code #\A) code) (i<= code #.(char-code #\F)))
-             (i+ 10 (i- code #.(char-code #\A))))
-            (t nil)))))
+  (and ch (digit-char-p ch 16)))
 
 (defvar *parse-comments* t
   "If true, skip # comments when parsing.")
 
 (defun skip-whitespace-comments-and-chars (stream &key chars)
   "Skip all whitespace characters, text-format comments and elements of CHARS
-are coming up in the STREAM."
-  (loop for ch = (peek-char nil stream nil)
-        until (or (null ch)
-                  (and (not (proto-whitespace-char-p ch))
-                       (not (and *parse-comments* (proto-hash-char-p ch)))
-                       (not (if (listp chars)
-                                (member ch chars)
-                                (eql ch chars)))))
-        do
-     (if (and *parse-comments* (proto-hash-char-p ch))
-         (read-line stream nil)
-         (read-char stream nil))))
+are coming up in the STREAM. Returns the next unread character or NIL at EOF."
+  (declare (type list chars))
+  (let ((parse-comments *parse-comments*))
+    (loop for ch = (read-char stream nil)
+          while ch
+          do (cond ((proto-whitespace-char-p ch) nil)
+                   ((and parse-comments (proto-hash-char-p ch))
+                    (read-line stream nil))
+                   ((member ch chars) nil)
+                   (t
+                    (unread-char ch stream)
+                    (return ch))))))
 
 (defun skip-whitespace (stream)
   "Skip all the whitespace characters that are coming up in the stream."
@@ -205,78 +198,192 @@ caret string that visually marks the error position in the line."
   #+sbcl (sb-ext:octets-to-string octets :external-format :utf-8)
   #-sbcl (babel:octets-to-string octets :encoding :utf-8))
 
-(defun parse-string (stream)
-  "Parse the next quoted string in the stream, then skip the following whitespace.
-   The returned value is the string, without the quotation marks."
-  (let ((ch0 (read-char stream nil)))
-    (unless (member ch0 '(#\' #\"))
-      (protobuf-error "Starting string character ~c should be \' or \"." ch0))
-    (let ((result-string
-           (if *escape-non-ascii*
-               (let ((octets (make-array 32 :element-type '(unsigned-byte 8)
-                                            :adjustable t :fill-pointer 0)))
-                 (loop for ch = (read-char stream nil)
-                       until (or (null ch) (char= ch ch0))
-                       do (if (eql ch #\\)
-                              (let ((escaped-ch (unescape-char stream)))
-                                (let ((code (char-code escaped-ch)))
-                                  (if (<= code 255)
-                                      (vector-push-extend code octets)
-                                      (let ((bytes (string-to-utf8-octets (string escaped-ch))))
-                                        (loop for b across bytes
-                                              do (vector-push-extend b octets))))))
-                              (let ((code (char-code ch)))
-                                (if (<= code 127)
-                                    (vector-push-extend code octets)
-                                    (let ((bytes (string-to-utf8-octets (string ch))))
-                                      (loop for b across bytes
-                                            do (vector-push-extend b octets)))))))
-                 (utf8-octets-to-string octets))
-               ;; Fast path when *escape-non-ascii* is NIL (identical to the original loop)
-               (loop for ch = (read-char stream nil)
-                     until (or (null ch) (char= ch ch0))
-                     when (eql ch #\\)
-                       do (setq ch (unescape-char stream))
-                     collect ch into string-chars
-                     finally (return (coerce string-chars 'string))))))
-      (skip-whitespace-comments-and-chars stream)
-      (if (eql (peek-char nil stream nil) ch0)
-          ;; If the next character is a quote character, that means
-          ;; we should go parse another string and concatenate it
-          (strcat result-string (parse-string stream))
-          (#+sbcl sb-int:possibly-base-stringize #-sbcl progn result-string)))))
+(defun-inline emit-utf8-code-point (code add-octet)
+  "Encode Unicode scalar value CODE as 1 to 4 UTF-8 bytes via ADD-OCTET."
+  (declare (type (integer 0 #x10FFFF) code)
+           (type function add-octet))
+  (cond ((<= code #x7F)
+         (funcall add-octet code))
+        ((<= code #x7FF)
+         (funcall add-octet (logior #xC0 (ash code -6)))
+         (funcall add-octet (logior #x80 (logand code #x3F))))
+        ((<= code #xFFFF)
+         (funcall add-octet (logior #xE0 (ash code -12)))
+         (funcall add-octet (logior #x80 (logand (ash code -6) #x3F)))
+         (funcall add-octet (logior #x80 (logand code #x3F))))
+        (t
+         (funcall add-octet (logior #xF0 (ash code -18)))
+         (funcall add-octet (logior #x80 (logand (ash code -12) #x3F)))
+         (funcall add-octet (logior #x80 (logand (ash code -6) #x3F)))
+         (funcall add-octet (logior #x80 (logand code #x3F))))))
 
-(defun unescape-char (stream)
-  "Parse the next \"escaped\" character from the stream."
+(defun-inline emit-code-point-chars (code add-char)
+  "Pass the Lisp character(s) for Unicode scalar value CODE to ADD-CHAR."
+  (declare (type (integer 0 #x10FFFF) code)
+           (type function add-char))
+  ;; UTF-16 Lisps such as ABCL have CHAR-CODE-LIMIT = #x10000.
+  #.(if (>= char-code-limit #x110000)
+        '(funcall add-char (code-char code))
+        '(if (< code char-code-limit)
+             (funcall add-char (code-char code))
+             (let ((offset (- code #x10000)))
+               (funcall add-char (code-char (+ #xD800 (ash offset -10))))
+               (funcall add-char (code-char (+ #xDC00 (logand offset #x3FF))))))))
+
+(defun read-fixed-hex-digits (stream count)
+  "Read COUNT hexadecimal digits from STREAM and return their integer value."
+  (declare (type (integer 1 8) count))
+  (let ((acc 0))
+    (declare (type (unsigned-byte 32) acc))
+    (loop repeat count
+          do (let* ((c (read-char stream nil))
+                    (d (ascii-hex-digit c)))
+               (unless d
+                 (when c
+                   (unread-char c stream))
+                 (protobuf-error "Invalid hexadecimal escape sequence at position ~D"
+                                 (file-position stream)))
+               (setf acc (+ (ash acc 4) d))))
+    acc))
+
+(defun check-unicode-code-point (code stream)
+  "Validate Unicode scalar value CODE from STREAM and return (VALUES CODE T)."
+  (declare (type (unsigned-byte 32) code))
+  (when (or (> code #x10FFFF)
+            (<= #xD800 code #xDFFF))
+    (protobuf-error "Invalid Unicode code point #x~X at position ~D"
+                    code (file-position stream)))
+  (values code t))
+
+(defun unescape-code-point (stream)
+  "Parse the next escaped character or byte from STREAM as (VALUES CODE UNICODE-P)."
   (let ((ch (read-char stream nil)))
     (unless ch
       (protobuf-error "End of stream reached while reading escaped character at position ~D"
                       (file-position stream)))
     (case ch
-      ((#\x)
-       ;; Two hex digits
-       (let* ((d1 (digit-char-p (read-char stream) 16))
-              (d2 (digit-char-p (read-char stream) 16)))
-         (code-char (+ (* d1 16) d2))))
-      ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9)
-       (if (not (digit-char-p (peek-char nil stream nil)))
-         #\null
-         ;; Three octal digits
-         (let* ((d1 (digit-char-p ch 8))
-                (d2 (digit-char-p (read-char stream) 8))
-                (d3 (digit-char-p (read-char stream) 8)))
-           (code-char (+ (* d1 64) (* d2 8) d3)))))
-      ((#\t) #\tab)
-      ((#\n) #\newline)
-      ((#\r) #\return)
-      ((#\f) #\page)
-      ((#\b) #\backspace)
-      ((#\a) #\bell)
-      ((#\e) #\esc)
-      (otherwise ch))))
+      ((#\x #\X)
+       (let* ((c1 (read-char stream nil))
+              (d1 (ascii-hex-digit c1)))
+         (unless d1
+           (when c1
+             (unread-char c1 stream))
+           (protobuf-error "Invalid \\x escape sequence at position ~D"
+                           (file-position stream)))
+         (let* ((c2 (read-char stream nil))
+                (d2 (ascii-hex-digit c2)))
+           (if d2
+               (values (i+ (iash d1 4) d2) nil)
+               (progn
+                 (when c2
+                   (unread-char c2 stream))
+                 (values d1 nil))))))
+      ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7)
+       (let ((val (digit-char-p ch 8))
+             (c2 (read-char stream nil)))
+         (declare (type fixnum val))
+         (let ((d2 (ascii-octal-digit c2)))
+           (if d2
+               (progn
+                 (setf val (i+ (i* val 8) d2))
+                 (let* ((c3 (read-char stream nil))
+                        (d3 (ascii-octal-digit c3)))
+                   (if d3
+                       (setf val (i+ (i* val 8) d3))
+                       (when c3
+                         (unread-char c3 stream)))))
+               (when c2
+                 (unread-char c2 stream))))
+         (when (> val #xFF)
+           (protobuf-error "Octal escape \\~3,'0O exceeds #xFF at position ~D"
+                           val (file-position stream)))
+         (values val nil)))
+      ((#\u)
+       (check-unicode-code-point (read-fixed-hex-digits stream 4) stream))
+      ((#\U)
+       (check-unicode-code-point (read-fixed-hex-digits stream 8) stream))
+      (otherwise
+       (values (char-code (case ch
+                            ((#\t) #\tab)
+                            ((#\n) #\newline)
+                            ((#\r) #\return)
+                            ((#\f) #\page)
+                            ((#\b) #\backspace)
+                            ((#\a) #\bell)
+                            ((#\e) #\esc)
+                            ((#\v) #\Vt)
+                            (otherwise ch)))
+               nil)))))
+
+(defun-inline scan-quoted-segment (stream quote-char on-raw-char on-escaped-code)
+  "Read characters from STREAM until QUOTE-CHAR, calling ON-RAW-CHAR or ON-ESCAPED-CODE."
+  (declare (type function on-raw-char on-escaped-code))
+  (loop for ch = (read-char stream nil)
+        do (unless ch
+             (protobuf-error
+              "Unexpected end of stream while reading string at position ~D"
+              (file-position stream)))
+        until (char= ch quote-char)
+        do (if (char= ch #\\)
+               (multiple-value-bind (code unicode-p)
+                   (unescape-code-point stream)
+                 (funcall on-escaped-code code unicode-p))
+               (funcall on-raw-char ch))))
+
+(defun-inline scan-quoted-string (stream ch0 on-raw-char on-escaped-code)
+  "Scan adjacent quoted literals from STREAM starting at CH0 via ON-RAW-CHAR and ON-ESCAPED-CODE."
+  (declare (type function on-raw-char on-escaped-code))
+  (loop for quote-char = ch0 then (read-char stream)
+        do (scan-quoted-segment stream quote-char on-raw-char on-escaped-code)
+        while (let ((next-ch (skip-whitespace-comments-and-chars stream)))
+                (and *parse-comments*
+                     next-ch
+                     (or (char= next-ch #\") (char= next-ch #\'))))))
+
+(defun parse-string-utf8-octets (stream ch0)
+  "Parse quoted string(s) starting at CH0 on STREAM, decoding raw byte escapes as UTF-8."
+  (let ((octets (make-array 64 :element-type '(unsigned-byte 8)
+                               :adjustable t :fill-pointer 0)))
+    (labels ((add-octet (b)
+               (declare (type (unsigned-byte 8) b))
+               (vector-push-extend b octets)
+               nil)
+             (add-raw (ch)
+               (emit-utf8-code-point (char-code ch) #'add-octet))
+             (add-escaped (code unicode-p)
+               (if (or (<= code #x7F) (and (not unicode-p) (<= code #xFF)))
+                   (add-octet code)
+                   (emit-utf8-code-point code #'add-octet))))
+      (declare (inline add-octet)
+               (dynamic-extent #'add-octet #'add-raw #'add-escaped))
+      (scan-quoted-string stream ch0 #'add-raw #'add-escaped))
+    (#+sbcl sb-int:possibly-base-stringize #-sbcl progn
+            (utf8-octets-to-string octets))))
+
+(defun parse-string (stream)
+  "Parse the next quoted string in STREAM, then skip the following whitespace.
+   The returned value is the string, without the quotation marks."
+  (let ((ch0 (read-char stream nil)))
+    (unless (and ch0 (or (char= ch0 #\") (char= ch0 #\')))
+      (if ch0
+          (protobuf-error "Starting string character ~c should be \' or \"." ch0)
+          (protobuf-error "Unexpected end of stream while expecting string at position ~D"
+                          (file-position stream))))
+    (if *escape-non-ascii*
+        (parse-string-utf8-octets stream ch0)
+        (let ((string-chars nil))
+          (labels ((add-raw (ch)
+                     (push ch string-chars))
+                   (add-escaped (code unicode-p)
+                     (declare (ignore unicode-p))
+                     (emit-code-point-chars code #'add-raw)))
+            (declare (dynamic-extent #'add-raw #'add-escaped))
+            (scan-quoted-string stream ch0 #'add-raw #'add-escaped))
+          (#+sbcl sb-int:possibly-base-stringize #-sbcl progn
+                  (coerce (nreverse string-chars) 'string))))))
 
 (defun escape-char (ch)
-  "The inverse of 'unescape-char', for printing."
+  "Escape character CH for text-format string printing."
   (if (and (standard-char-p ch) (graphic-char-p ch))
     ch
     (case ch

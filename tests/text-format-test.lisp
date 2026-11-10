@@ -810,4 +810,67 @@ int_field: 1")))
       (assert-eql 4294967295000 unsigned-sum)
       (assert-eql 0 unsigned-consed))))
 
+(deftest test-parse-string-escapes-and-concatenation (text-format-suite)
+  ;; Empty strings (single- and double-quoted) and adjacent concatenation across comments/quotes
+  (let ((msg (proto:parse-text-format
+              'test-pb:text-format-test
+              :stream (make-string-input-stream "
+string_field: \"foo\" # comment between adjacent literals
+  'bar' \"\"
+string_fields: ''
+string_fields: \"\"
+string_fields: 'single' 'quoted'"))))
+    (assert-equality #'string= "foobar" (test-pb:string-field msg))
+    (assert-equal '("" "" "singlequoted") (test-pb:string-fields msg)))
+  ;; Standard C/proto escapes, octal (\0, \07, \101), hex (\x41, \X7a, \x7), and Unicode escapes
+  (let* ((grinning #.(if (< #x1F600 char-code-limit)
+                         '(string (code-char #x1F600))
+                         '(coerce (list (code-char #xD83D) (code-char #xDE00)) 'string)))
+         (expected (concatenate 'string
+                                "\"'\\"
+                                (string #\Newline)
+                                (string #\Tab)
+                                (string #\Return)
+                                (string #\Vt)
+                                (string #\Null)
+                                (string (code-char 7))
+                                "AAz"
+                                (string (code-char 7))
+                                "A中"
+                                grinning)))
+    (dolist (escape-flag '(nil t))
+      (let* ((proto:*escape-non-ascii* escape-flag)
+             (msg (proto:parse-text-format
+                   'test-pb:text-format-test
+                   :stream (make-string-input-stream
+                            "string_field: \"\\\"\\'\\\\\\n\\t\\r\\v\\0\\07\\101\\x41\\X7a\\x7\\u0041\\u4e2d\\U0001F600\""))))
+        (assert-equality #'string= expected (test-pb:string-field msg))))
+    ;; Long multi-byte string under *escape-non-ascii* = t exceeding initial octet buffer size
+    (let* ((proto:*escape-non-ascii* t)
+           (chunk (concatenate 'string "é€中" grinning))
+           (expected-long (apply #'concatenate 'string
+                                 (loop repeat 40 collect chunk)))
+           (input-chunk "é\\342\\202\\254\\u4e2d\\U0001F600")
+           (input-body (apply #'concatenate 'string
+                              (loop repeat 40 collect input-chunk)))
+           (msg (proto:parse-text-format
+                 'test-pb:text-format-test
+                 :stream (make-string-input-stream
+                          (concatenate 'string "string_field: \"" input-body "\"")))))
+      (assert-equality #'string= expected-long (test-pb:string-field msg))))
+  ;; Malformed / unterminated string, out-of-range \U / octal, and surrogate code point errors
+  (dolist (bad '("string_field: \"unterminated"
+                 "string_field: \"\\uD83D\""
+                 "string_field: \"\\uDC00\""
+                 "string_field: \"\\uD83D\\uDE00\""
+                 "string_field: \"\\uD83D\\u0041\""
+                 "string_field: \"\\UFFFFFFFF\""
+                 "string_field: \"\\400\""
+                 "string_field: \"\\xZZ\""))
+    (assert-condition proto:protobuf-error
+        (proto:parse-text-format
+         'test-pb:text-format-test
+         :stream (make-string-input-stream bad)))))
+
+
 
