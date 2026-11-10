@@ -49,14 +49,27 @@ Parameters
       (assert-true (proto:proto-equal msg-new msg)))))
 
 (deftest test-parse-bad-symbols-format (symbol-suite)
-  (dolist (string '( "cl:new-cl-symbol" ":foo:bar" "foo:bar:baz" "q\"uote" "q\'uote" "s\\lash"))
-    (let ((text-format (format nil "TextFormatTest { symbol_field: ~S }" string)))
-      (multiple-value-bind (result condition)
-          (ignore-errors
-           (proto:parse-text-format 'test-pb:text-format-test
-                                    :stream (make-string-input-stream text-format)))
-        (declare (ignore result))
-        (assert-true condition)))))
+  (let ((bad-strings '("cl:new-cl-symbol" "nonexistent-package:foo"
+                       "cl-user:nonexistent-symbol-xyz" ":nonexistent-keyword-xyz"
+                       ":foo:bar" "foo:bar:baz" "q\"uote" "q\'uote" "s\\lash")))
+    (dolist (string bad-strings)
+      (let ((text-format (format nil "TextFormatTest { symbol_field: ~S }" string)))
+        (multiple-value-bind (result condition)
+            (ignore-errors
+             (proto:parse-text-format 'test-pb:text-format-test
+                                      :stream (make-string-input-stream text-format)))
+          (declare (ignore result))
+          (assert-true condition))))
+    (dolist (string bad-strings)
+      (let ((buf (make-array (1+ (length string)) :element-type '(unsigned-byte 8))))
+        (setf (aref buf 0) (length string))
+        (loop for i from 0 below (length string)
+              do (setf (aref buf (1+ i)) (char-code (char string i))))
+        (assert-condition proto:protobuf-error
+            (cl-protobufs.implementation::deserialize-scalar 'cl:symbol buf 0)))))
+  (assert-false (find-package "NONEXISTENT-PACKAGE"))
+  (assert-false (find-symbol "NONEXISTENT-SYMBOL-XYZ" "CL-USER"))
+  (assert-false (find-symbol "NONEXISTENT-KEYWORD-XYZ" "KEYWORD")))
 
 (deftest test-uninterned-symbol (symbol-suite)
   (let* ((textproto "symbol_field2: '#:foo'")

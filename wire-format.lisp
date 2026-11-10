@@ -624,7 +624,7 @@
        ;; to the data buffer.
        (multiple-value-bind (val idx)
            (decode-string buffer index)
-         (values (make-lisp-symbol val) idx)))
+         (values (make-lisp-symbol val t) idx)))
       ((date time datetime timestamp)
        (decode-uint64 buffer index)))))
 

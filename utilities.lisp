@@ -260,7 +260,7 @@ Uses a fixnum when SIZE fits in a fixnum, otherwise a simple-bit-vector."
                  (symbol-name symbol))))))
 
 (defun make-lisp-symbol (input-string &optional check-bad-chars)
-  "Intern the symbol described by INPUT-STRING. If INPUT-STRING is
+  "Find the symbol described by INPUT-STRING. If INPUT-STRING is
    \"nil\" or \"t\" then return nil or t. If string has no colon
    return a keyword symbol.
    Otherwise, STRING should be of the form 'package:string' and the symbol
@@ -291,9 +291,14 @@ Uses a fixnum when SIZE fits in a fixnum, otherwise a simple-bit-vector."
          (if (string= package-name "#")
              (make-symbol symbol-name)
              (let ((package (or (find-package package-name)
-                                (make-package package-name :use ()))))
-               ;; Discard 2nd value from intern so that this function returns only 1 value.
-               (values (intern symbol-name package)))))))))
+                                (protobuf-error "Unknown package ~S in symbol ~S"
+                                                package-name input-string))))
+               (multiple-value-bind (symbol status)
+                   (find-symbol symbol-name package)
+                 (unless status
+                   (protobuf-error "Unknown symbol ~S in package ~S"
+                                   symbol-name package-name))
+                 symbol))))))))
 
 (defun qualified-symbol-name (symbol)
   "Return a string representing SYMBOL qualified with its package name."
