@@ -15,9 +15,6 @@ TO DO
   'proto-type' should always be the name from the Lisp side
 [  All 'define-xxx' macros should have, as their first argument,		]
 [    a type (not a "name")							]
-[  In .proto files, there should be an 'option lisp_name="pkg:name"'		]
-[    which can be used to override the 'proto->class-name' default		]
-[    for messages and enums							]
 
 - Refactor 'field-descriptor' so the names are clearer:
   - Lose the existing 'proto-type' slot,
@@ -26,7 +23,6 @@ TO DO
   - 'proto-name' will hold the Protobufs name of the field type
       (this used to hold the Protobufs name of the field)
 [  - &key name should give the Protobufs name for the field			]
-[  - 'option lisp_name="pkg:name"' should give the Lisp name for the slot	]
 
 - Refactor 'define-message' and 'define-extend' to avoid so much
   duplicated code
@@ -104,9 +100,6 @@ TO DO
 [  The "name" ones are for the Protobufs side					]
 [  The "types" ones are for the Lisp side; we look up on "type" only		]
 [  In the Lisp, the RPC types can be either 'type' or '(type :name <name>)'	]
-[  In .proto files, there should be an 'option lisp_name="pkg:name"'		]
-[   which can be used to override the 'proto->class-name' default		]
-[   for the name of the RPC function						]
 
 [- Finishing eliminating 'protobuf' argument from the API			]
 [  - Lose it in 'serialize-object-to-stream' and 'deserialize-object-from-stream']

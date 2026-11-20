@@ -125,43 +125,38 @@ Parameters:
            (message-with-forward-reference
             (find-message-with-string schema "MessageWithForwardReference"))
            (foo (find-by-name "foo" (proto-fields message-with-forward-reference)))
-           ;; (bar (find-by-name "bar" (proto-fields message-with-forward-reference)))
+           (bar (find-by-name "bar" (proto-fields message-with-forward-reference)))
            (service-with-forward-reference
             (find-service-descriptor
              'cl-protobufs.protobuf-forward-reference-unittest:service-with-forward-reference))
            (bloop (find-by-name "Bloop" (proto-methods service-with-forward-reference)))
            (beep (find-by-name "Beep" (proto-methods service-with-forward-reference))))
       (assert-equal
-          'cl-protobufs.protobuf-forward-reference-unittest::msg-w-overridden-lisp-class
+          'cl-protobufs.protobuf-forward-reference-unittest:message-with-overridden-lisp-class
           (proto-class foo))
-      ;; Note this broken because 'lisp_name' cannot be used for enums.
-      ;; (assert-true (equal 'cl-protobufs.protobuf-forward-reference-unittest::
-      ;;                 ENUM-W-OVERRIDDEN-LISP-CLASS (proto-class bar)))
-      (assert-true
-       (equal
-        'cl-protobufs.protobuf-forward-reference-unittest::MSG-W-OVERRIDDEN-LISP-CLASS
-
-        (proto-input-type bloop)))
-      (assert-true
-       (equal
-        'cl-protobufs.protobuf-forward-reference-unittest::MESSAGE-WITH-FORWARD-REFERENCE
-        (proto-output-type bloop)))
-      (assert-true
-       (equal
-        'cl-protobufs.protobuf-forward-reference-unittest::MESSAGE-WITH-FORWARD-REFERENCE
-        (proto-input-type beep)))
-      (assert-true
-       (equal
-        'cl-protobufs.protobuf-forward-reference-unittest::MSG-W-OVERRIDDEN-LISP-CLASS
-        (proto-output-type beep)))))
+      (assert-equal
+          'cl-protobufs.protobuf-forward-reference-unittest:enum-with-overridden-lisp-class
+          (proto-class bar))
+      (assert-equal
+          'cl-protobufs.protobuf-forward-reference-unittest:message-with-overridden-lisp-class
+          (proto-input-type bloop))
+      (assert-equal
+          'cl-protobufs.protobuf-forward-reference-unittest:message-with-forward-reference
+          (proto-output-type bloop))
+      (assert-equal
+          'cl-protobufs.protobuf-forward-reference-unittest:message-with-forward-reference
+          (proto-input-type beep))
+      (assert-equal
+          'cl-protobufs.protobuf-forward-reference-unittest:message-with-overridden-lisp-class
+          (proto-output-type beep))))
   (let* ((orig
-          (cl-protobufs.protobuf-forward-reference-unittest::make-message-with-forward-reference))
+          (cl-protobufs.protobuf-forward-reference-unittest:make-message-with-forward-reference))
          (foo
-          (cl-protobufs.protobuf-forward-reference-unittest::make-msg-w-overridden-lisp-class)))
+          (cl-protobufs.protobuf-forward-reference-unittest:make-message-with-overridden-lisp-class)))
 
-    (setf (cl-protobufs.protobuf-forward-reference-unittest::foo orig) foo
-          (cl-protobufs.protobuf-forward-reference-unittest::bar orig) :baa
-          (cl-protobufs.protobuf-forward-reference-unittest::baz foo) 123)
+    (setf (cl-protobufs.protobuf-forward-reference-unittest:foo orig) foo
+          (cl-protobufs.protobuf-forward-reference-unittest:bar orig) :baa
+          (cl-protobufs.protobuf-forward-reference-unittest:baz foo) 123)
 
     (let* ((bytes
             (serialize-to-bytes
@@ -170,8 +165,8 @@ Parameters:
            (new
             (deserialize-from-bytes
              'cl-protobufs.protobuf-forward-reference-unittest:message-with-forward-reference bytes)))
-      (assert-true (typep (cl-protobufs.protobuf-forward-reference-unittest::foo new)
-                     'cl-protobufs.protobuf-forward-reference-unittest::msg-w-overridden-lisp-class))
-      (assert-true (equal 123 (cl-protobufs.protobuf-forward-reference-unittest:baz
-                          (cl-protobufs.protobuf-forward-reference-unittest:foo new))))
-    (assert-true (equal :baa (cl-protobufs.protobuf-forward-reference-unittest:bar new))))))
+      (assert-true (typep (cl-protobufs.protobuf-forward-reference-unittest:foo new)
+                          'cl-protobufs.protobuf-forward-reference-unittest:message-with-overridden-lisp-class))
+      (assert-equal 123 (cl-protobufs.protobuf-forward-reference-unittest:baz
+                         (cl-protobufs.protobuf-forward-reference-unittest:foo new)))
+      (assert-equal :baa (cl-protobufs.protobuf-forward-reference-unittest:bar new)))))

@@ -17,9 +17,7 @@
 #include <absl/strings/str_join.h>
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
-#include "proto2-descriptor-extensions.pb.h"
 #include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/extension_set.h>
 
 // Copied from ABSL.
 #if defined(__clang__) && defined(__has_warning)
@@ -165,18 +163,12 @@ const std::string QualifiedEnumLispName(const EnumDescriptor* descriptor,
 }
 
 const std::string MessageLispName(const Descriptor* descriptor) {
-  if (descriptor->options().HasExtension(lisp_name)) {
-    // Set it in lower case as the symbol name reads better.
-    return NonDestructiveStrToLower(
-        descriptor->options().GetExtension(lisp_name));
+  const std::string lisp_name = ToLispName(descriptor->name());
+  const Descriptor* parent = descriptor->containing_type();
+  if (parent) {
+    return MessageLispName(parent) + "." + lisp_name;
   } else {
-    const std::string lisp_name = ToLispName(descriptor->name());
-    const Descriptor* parent = descriptor->containing_type();
-    if (parent) {
-      return MessageLispName(parent) + "." + lisp_name;
-    } else {
-      return lisp_name;
-    }
+    return lisp_name;
   }
 }
 

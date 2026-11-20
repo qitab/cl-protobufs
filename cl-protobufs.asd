@@ -190,12 +190,10 @@ and functionality for working with them."
    (:module "lisp-reference-test"
     :serial t
     :pathname ""
-    :depends-on ("descriptor-extensions")
     :components ((:protobuf-source-file "package_test2")
                  (:protobuf-source-file "package_test1"
                   :depends-on ("package_test2"))
-                 (:protobuf-source-file "forward_reference"
-                  :proto-search-path ("../" "../google/protobuf/"))
+                 (:protobuf-source-file "forward_reference")
                  (:file "lisp-reference-test")))
 
    (:module "nested-extend-test"

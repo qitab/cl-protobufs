@@ -6,8 +6,6 @@
 
 syntax = "proto2";
 
-import "proto2-descriptor-extensions.proto"; // descriptor extension
-
 package protobuf_forward_reference_unittest;
 
 message MessageWithForwardReference {
@@ -21,12 +19,9 @@ service ServiceWithForwardReference {
 }
 
 message MessageWithOverriddenLispClass {
-  option (lisp_name) = "MSG-W-OVERRIDDEN-LISP-CLASS";
   required int32 baz = 1;
 }
 
 enum EnumWithOverriddenLispClass {
-  // lisp_name does not work for enums.
-  // option (lisp_name) = "ENUM-W-OVERRIDDEN-LISP-CLASS";
   BAA = 1;
 }

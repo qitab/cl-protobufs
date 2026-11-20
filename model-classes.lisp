@@ -240,7 +240,7 @@ message-descriptor.")
 
 
 ;; We accept and store any option, but only act on a few: default, packed,
-;; optimize_for, lisp_name, lisp_alias
+;; optimize_for, lisp_alias
 (defstruct (option-descriptor
              (:include descriptor)
              (:constructor %make-option-descriptor)

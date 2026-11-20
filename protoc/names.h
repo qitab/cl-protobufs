@@ -32,7 +32,6 @@ const std::string EnumLispName(const EnumDescriptor* descriptor);
 const std::string ToLispEnumValue(std::string_view name);
 
 // Provides a name for the Message described by the descriptor.
-// Uses lisp_name extension.
 const std::string MessageLispName(const Descriptor* descriptor);
 
 // Fully qualified versions of above.
