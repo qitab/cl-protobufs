@@ -1250,7 +1250,7 @@ function) then there is no guarantee on the serialize function working properly.
                           *current-file-descriptor*)))
     (make-qualified-name parent-desc name)))
 
-(defmacro define-message (type (&key name alias-for options)
+(defmacro define-message (type (&key name options)
                           &body fields &environment env)
   "Define a new protobuf message type.
 
@@ -1259,11 +1259,6 @@ function) then there is no guarantee on the serialize function working properly.
    NAME - Optional symbol used to override the defaultly generated protobuf message name.
      This is supplied automatically by protoc-gen-cl-pb when TYPE cannot be accurately
      converted back to a camelCase name.
-   ALIAS-FOR - If supplied, no Lisp struct is defined. Instead, the message is used
-     as an alias for a class that already exists. This feature is intended to be
-     used to define messages that will be serialized from existing Lisp classes;
-     unless you get the slot names or readers exactly right for each field,
-     trying to (de)serialize into a Lisp object won't work.
    OPTIONS - A set of keyword/value pairs, both of which are strings.
    FIELDS - Either field specs of the form (name :index n :type t ...) or
      define-{message,enum,oneof,map} forms. See process-field for more info."
@@ -1274,7 +1269,6 @@ function) then there is no guarantee on the serialize function working properly.
                                   :class type
                                   :name  name
                                   :qualified-name (message-qualified-name type name)
-                                  :alias-for alias-for
                                   :options (remove-options options "default" "packed")))
          (field-offset 0)
          (bool-count (count-if #'non-repeated-bool-field fields))
@@ -1323,7 +1317,6 @@ function) then there is no guarantee on the serialize function working properly.
            ;; message and a field with :kind :group.
            (multiple-value-bind (field-desc slot idx offset-p)
                (process-field field :parent-desc msg-desc
-                                    :alias-for alias-for
                                     :field-offset field-offset
                                     :bool-index (when (non-repeated-bool-field field)
                                                   (incf bool-index)))
@@ -1352,19 +1345,8 @@ function) then there is no guarantee on the serialize function working properly.
 
       (when (plusp field-offset)
         (collect-slot (make-bit-field-slot '%%is-set field-offset)))
-      (if alias-for
-          ;; If we've got an alias, define a type that is the subtype of the Lisp class so that
-          ;; typep and subtypep work.  Unless alias-for is a type which is not yet defined (as is
-          ;; usually the case), in which case just define a vacuous type for the message.
-          (unless (or (eq type alias-for) (find-class type nil))
-            (let* ((alias-class (find-class alias-for nil))
-                   (alias-type (or (and alias-class (class-name alias-class))
-                                   t)))
-              (collect-type-form `(deftype ,type () ',alias-type))
-              (collect-form `(record-protobuf-object ',alias-for ,msg-desc :message))))
-          ;; If no alias, define the class now
-          (collect-type-form
-           (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs)))
+      (collect-type-form
+       (make-structure-class-forms type slots non-lazy-fields lazy-fields oneofs))
       ;; Register it by the full symbol name.
       (collect-form `(record-protobuf-object ',type ,msg-desc :message))
       `(progn ,@type-forms ,@forms))))
@@ -1376,13 +1358,11 @@ function) then there is no guarantee on the serialize function working properly.
          (options (loop for (key val) on options by #'cddr
                         collect (make-option (if (symbolp key) (slot-name->proto key) key) val)))
          (message (find-message-descriptor type)) ; should pass :error-p t here instead
-         (alias-for (and message (proto-alias-for message)))
          (extends (and message
                        (make-message-descriptor
                         :class  (proto-class message)
                         :name   (proto-name message)
                         :qualified-name (proto-qualified-name message)
-                        :alias-for alias-for
                         :fields   (copy-list (proto-fields message))
                         :oneofs   (copy-list (proto-oneofs message))
                         :extensions (copy-list (proto-extensions message))
@@ -1405,7 +1385,7 @@ function) then there is no guarantee on the serialize function working properly.
                              '(define-enum define-message define-extend define-extension)))
                 () "The body of ~S can only contain field and group definitions" 'define-extend)
         (multiple-value-bind (field-desc slot idx)
-            (process-field field :parent-desc extends :alias-for alias-for)
+            (process-field field :parent-desc extends)
           (assert (index-within-extensions-p idx message) ()
                   "The index ~D is not in range for extending ~S"
                   idx (proto-class message))
@@ -1462,7 +1442,7 @@ function) then there is no guarantee on the serialize function working properly.
                    (i<= index (proto-extension-to ext))))
           extensions)))
 
-(defun process-field (field &key parent-desc alias-for field-offset bool-index)
+(defun process-field (field &key parent-desc field-offset bool-index)
   "Process one field descriptor within 'define-message' or 'define-extend'.
    Returns a field-descriptor object, a defstruct slot form, the field number,
    and a boolean indicating whether FIELD has an offset.
@@ -1479,7 +1459,6 @@ function) then there is no guarantee on the serialize function working properly.
      :label - One of (:repeated :vector), (:repeated :list), (:optional), (:required).
      :kind - One of :enum :map :scalar :group :message :extends
    PARENT-DESC: The enclosing message-descriptor.
-   ALIAS-FOR is to determine if this is an alias for a difference field.
    FIELD-OFFSET is an internal concept of the index of a field
      in a proto-message.
    BOOL-INDEX: nil if this is not a simple (non-repeated) boolean field.
@@ -1499,37 +1478,36 @@ function) then there is no guarantee on the serialize function working properly.
                             (not (eq label :repeated))
                             field-offset))
                (default (if default-p default $empty-default))
-               (cslot (unless alias-for
-                        ;; Enum type specifiers might not be loaded.
-                        ;; Seems like this could be fixed...
-                        (let ((type (if (eq kind :enum) '(or keyword sfixed32) type)))
-                          (make-field-data
-                           :internal-slot-name internal-slot-name
-                           :external-slot-name slot
-                           :type
-                           (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
-                                  `(vector-of ,type))
-                                 ((and (eq label :repeated) (eq repeated-storage-type :list))
-                                  `(list-of ,type))
-                                 ((member kind '(:message :group))
-                                  `(or null ,type))
-                                 (t `,type))
-                           :accessor slot
-                           :initarg (kintern (symbol-name slot))
-                           :container (when (eq label :repeated) repeated-storage-type)
-                           :kind kind
-                           :initform
-                           (cond ((eq label :repeated)
-                                  ;; Repeated fields get a container for their elements
-                                  (if (eq repeated-storage-type :vector)
-                                      `(make-array 5 :fill-pointer 0 :adjustable t)
-                                      nil))
-                                 ((and (not default-p)
-                                       (eq label :optional)
-                                       ;; Use unbound for booleans only
-                                       (not (eq type 'boolean)))
-                                  nil)
-                                 (default-p `,default))))))
+               (cslot ;; Enum type specifiers might not be loaded.
+                      ;; Seems like this could be fixed...
+                      (let ((type (if (eq kind :enum) '(or keyword sfixed32) type)))
+                        (make-field-data
+                         :internal-slot-name internal-slot-name
+                         :external-slot-name slot
+                         :type
+                         (cond ((and (eq label :repeated) (eq repeated-storage-type :vector))
+                                `(vector-of ,type))
+                               ((and (eq label :repeated) (eq repeated-storage-type :list))
+                                `(list-of ,type))
+                               ((member kind '(:message :group))
+                                `(or null ,type))
+                               (t `,type))
+                         :accessor slot
+                         :initarg (kintern (symbol-name slot))
+                         :container (when (eq label :repeated) repeated-storage-type)
+                         :kind kind
+                         :initform
+                         (cond ((eq label :repeated)
+                                ;; Repeated fields get a container for their elements
+                                (if (eq repeated-storage-type :vector)
+                                    `(make-array 5 :fill-pointer 0 :adjustable t)
+                                    nil))
+                               ((and (not default-p)
+                                     (eq label :optional)
+                                     ;; Use unbound for booleans only
+                                     (not (eq type 'boolean)))
+                                nil)
+                               (default-p `,default)))))
                (field (make-field-descriptor
                        :name (or name (slot-name->proto slot))
                        :type (if (eq kind :enum) (enum-open-type type) type)

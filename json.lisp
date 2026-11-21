@@ -238,9 +238,7 @@ Parameters:
 is true, then skip fields which are not defined in MSG-DESC. Otherwise, throw an error. If
 SPLICED-P is true, then do not attempt to parse an opening bracket."
   (declare (type message-descriptor msg-desc))
-  (let ((object (funcall (pi::get-constructor-name
-                          (or (pi::proto-alias-for msg-desc)
-                              (proto-class msg-desc)))))
+  (let ((object (funcall (pi::get-constructor-name (proto-class msg-desc))))
         ;; Repeated slot names, tracks which slots need to be nreversed.
         (rslots ()))
     (when (special-json-p (proto-class msg-desc))

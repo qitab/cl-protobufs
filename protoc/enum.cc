@@ -8,11 +8,12 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <absl/strings/str_cat.h>
-#include "proto2-descriptor-extensions.pb.h"
 #include "literals.h"
 #include "names.h"
+#include <google/protobuf/descriptor.h>
 #include <google/protobuf/io/printer.h>
 #include <google/protobuf/json_enumvalue_options.pb.h>
 
@@ -54,7 +55,6 @@ void EnumGenerator::Generate(io::Printer* printer) {
     printer->Annotate("name", descriptor_);
   }
   // More options here.
-  // Note(czak): skipped lisp_alias as it is a MessageOptions extension.
   printer->Print(")");
   printer->Outdent();
 

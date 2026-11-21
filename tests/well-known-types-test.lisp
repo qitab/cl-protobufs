@@ -7,8 +7,7 @@
 (defpackage #:cl-protobufs.test.well-known-types
   (:use #:cl
         #:clunit)
-  (:local-nicknames (#:alias-pb #:cl-protobufs.alias-test)
-                    (#:google-pb #:cl-protobufs.google.protobuf)
+  (:local-nicknames (#:google-pb #:cl-protobufs.google.protobuf)
                     (#:unittest-pb #:cl-protobufs.protobuf-unittest)
                     (#:wkt #:cl-protobufs.well-known-types))
   (:export :run))
@@ -30,9 +29,10 @@ Parameters
          (ret (wkt:unpack-any any)))
     (assert-true (cl-protobufs:proto-equal protocol ret :exact t))
     (assert-equal "http://fish.com/protobuf_unittest.TestProtocol" (google-pb:any.type-url any)))
-  (let* ((msg (alias-pb:make-outer-message :message (alias-pb:make-message :i 1)))
+  (let* ((msg (unittest-pb:make-test1-proto
+               :o-a 1 :u-msg (unittest-pb:make-test1-msg :foo 1)))
          (any (wkt:pack-any msg))
          (ret (wkt:unpack-any any)))
     (assert-true (cl-protobufs:proto-equal msg ret :exact t))
     (assert-equal
-        "type.googleapis.com/alias_test.OuterMessage" (google-pb:any.type-url any))))
+        "type.googleapis.com/protobuf_unittest.Test1Proto" (google-pb:any.type-url any))))

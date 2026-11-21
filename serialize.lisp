@@ -370,9 +370,7 @@ Parameters:
 ;; The default method uses metadata from the message descriptor.
 (defmethod %deserialize ((msg-desc message-descriptor) buffer start end
                          &optional (end-tag 0))
-  (let* ((class-name
-          (or (proto-alias-for msg-desc) (proto-class msg-desc)))
-         (class (find-class class-name)))
+  (let ((class (find-class (proto-class msg-desc))))
     (deserialize-structure-object
      msg-desc buffer start end end-tag class)))
 
@@ -1035,7 +1033,7 @@ Parameters:
     to mutate directly."
   (let* (non-repeated-slot
          repeated-slot
-         (lisp-type (or (proto-alias-for message) (proto-class message)))
+         (lisp-type (proto-class message))
          (class (proto-class field))
          (kind (proto-kind field))
          (index (proto-index field))
@@ -1346,7 +1344,7 @@ Parameters:
   MISSING-VALUE: The value to set a field to if not found while deserializing.
   SKIP-FIELDS: Fields to skip while deserializing.
   INCLUDE-FIELDS: Fields to include while deserializing.
-  DIRECT-STRUCT-P: When true (the default for non-aliased structure-class messages
+  DIRECT-STRUCT-P: When true (the default for structure-class messages
     without a custom CONSTRUCTOR), allocate the struct at the start of the
     deserializer and mutate slots directly."
   (let* ((vbuf (gensym "BUFFER"))
@@ -1355,12 +1353,11 @@ Parameters:
          (vendtag (gensym "ENDTAG"))
          (skipped-bytes-tuple (gensym "SKIPPED-BYTES-TUPLE"))
          (old-index (gensym "OLD-INDEX"))
-         (lisp-type (or (proto-alias-for message) (proto-class message)))
+         (lisp-type (proto-class message))
          (lisp-class (find-class lisp-type nil))
          (direct-struct-p (if direct-struct-p-supplied-p
                               direct-struct-p
                               (and (null constructor)
-                                   (null (proto-alias-for message))
                                    (typep lisp-class 'structure-class))))
          (vstruct (when direct-struct-p (gensym "STRUCT")))
          (hidden-constructor (when direct-struct-p
@@ -1553,7 +1550,7 @@ Parameters:
    serialization bytes to return when deserializing.  Useful for passing an
    object through without ever needing to deserialize it."
   (let* ((desc (find-message-descriptor type :error-p t))
-         (message-name (or (proto-alias-for desc) (proto-class desc)))
+         (message-name (proto-class desc))
          (object (funcall (get-constructor-name message-name))))
     (setf (proto-%%bytes object) buffer)
     object))

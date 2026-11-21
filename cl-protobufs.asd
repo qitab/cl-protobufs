@@ -155,13 +155,6 @@ and functionality for working with them."
                   :depends-on ("descriptor")
                   :proto-search-path ("../google/protobuf/"))))
 
-   (:module "lisp-alias"
-    :serial t
-    :pathname ""
-    :depends-on ("descriptor-extensions")
-    :components ((:protobuf-source-file "lisp-alias"
-                  :proto-search-path ("../" "../google/protobuf/"))))
-
    ;; Google's own protocol buffers and protobuf definitions tests
    (:module "google-tests-proto"
     :serial t
@@ -219,7 +212,7 @@ and functionality for working with them."
    (:module "deserialize-test"
     :serial t
     :pathname ""
-    :depends-on ("lisp-alias")
+    :depends-on ("object-level-test")
     :components ((:file "deserialize-test")))
 
    (:module "enum-mapping-test"
@@ -269,12 +262,6 @@ and functionality for working with them."
     :pathname ""
     :components ((:protobuf-source-file "lazy")
                  (:file "lazy-test")))
-
-   (:module "lisp-alias-test"
-    :serial t
-    :pathname ""
-    :depends-on ("lisp-alias")
-    :components ((:file "lisp-alias-test")))
 
    (:module "float-test"
     :serial t
@@ -326,6 +313,7 @@ and functionality for working with them."
    (:module "well-known-types-test"
     :serial t
     :pathname ""
+    :depends-on ("brown-test")
     :components ((:file "well-known-types-test")))
 
    (:module "google-test"

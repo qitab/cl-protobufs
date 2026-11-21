@@ -240,7 +240,7 @@ message-descriptor.")
 
 
 ;; We accept and store any option, but only act on a few: default, packed,
-;; optimize_for, lisp_alias
+;; optimize_for.
 (defstruct (option-descriptor
              (:include descriptor)
              (:constructor %make-option-descriptor)
@@ -320,8 +320,6 @@ Parameters:
              (:constructor %make-message-descriptor)
              (:conc-name proto-))
   "Describes a protobuf message."
-  ;; Use this if you want to make this message descriptor an alias for an existing Lisp type.
-  (alias-for nil :type (or null symbol))
   ;; All fields for this message, including local ones and extended ones.
   ;; This does NOT include fields that are inside of a oneof. These field descriptors can
   ;; be accessed via the FIELDS slot in each oneof-descriptor stored in the ONEOFS slot.
@@ -340,8 +338,6 @@ Parameters:
   (message-type :message :type (member :message :extends)))
 
 (defun make-message-descriptor (&key class name qualified-name options
-                                     (alias-for nil alias-for-p)
-                                     (alias nil)
                                      fields oneofs field-vect
                                      extended-fields extensions
                                      (message-type :message))
@@ -351,8 +347,6 @@ Parameters:
   NAME: Message name.
   QUALIFIED-NAME: Qualified name.
   OPTIONS: Message options.
-  ALIAS: Message alias (deprecated alias for ALIAS-FOR).
-  ALIAS-FOR: Message alias target.
   FIELDS: Message fields.
   ONEOFS: Oneof definitions.
   FIELD-VECT: Vector of fields.
@@ -364,7 +358,6 @@ Parameters:
    :name name
    :qualified-name (or qualified-name "")
    :options (or options ())
-   :alias-for (if alias-for-p alias-for alias)
    :fields (or fields ())
    :oneofs (or oneofs ())
    :field-vect field-vect
@@ -378,9 +371,8 @@ Parameters:
 (defmethod print-object ((msg-desc message-descriptor) stream)
   (if *print-escape*
     (print-unreadable-object (msg-desc stream :type t :identity t)
-      (format stream "~S~@[ (alias for ~S)~]~@[ (group~*)~]~@[ (extended~*)~]"
+      (format stream "~S~@[ (group~*)~]~@[ (extended~*)~]"
               (proto-class msg-desc)
-              (proto-alias-for msg-desc)
               (eq (proto-message-type msg-desc) :group)
               (eq (proto-message-type msg-desc) :extends)))
     (format stream "~S" (proto-class msg-desc))))
