@@ -16,12 +16,8 @@ enum LispContainer {
   VECTOR = 1;
 }
 
-extend google.protobuf.MessageOptions {
-  // Note this is only for Messages.
-  // Cannot specify for other declarations like enums.
-  // Reserved extension numbers: 195802 (lisp_name), 195805 (lisp_class).
-  optional string lisp_alias = 195803;
-}
+// Retired google.protobuf.MessageOptions extension numbers:
+//   195802 (lisp_name), 195803 (lisp_alias), 195805 (lisp_class).
 
 extend google.protobuf.FieldOptions {
   optional string lisp_type = 195804;

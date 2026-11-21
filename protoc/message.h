@@ -9,7 +9,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -31,9 +30,6 @@ class MessageGenerator {
 
   // Add symbols to be exported.
   void AddExports(std::vector<std::string>* exports);
-
-  // Add packages from Lisp type aliases to the set.
-  void AddPackages(std::set<std::string>* packages);
 
  private:
   const Descriptor* descriptor_;

@@ -7,7 +7,7 @@
 (defpackage #:cl-protobufs.test.deserialize
   (:use #:cl
         #:clunit)
-  (:local-nicknames (#:pb #:cl-protobufs.alias-test)
+  (:local-nicknames (#:pb #:cl-protobufs.serialization-test)
                     (#:pi #:cl-protobufs.implementation)
                     (#:proto #:cl-protobufs))
   (:export :run))
@@ -27,11 +27,11 @@ Parameters
 
 
 (deftest test-make-message-with-bytes (deserialize-suite)
-  (let* ((msg (pb:make-message :i 100))
+  (let* ((msg (pb:make-inner :i 100))
          (msg-bytes (proto:serialize-to-bytes msg)))
     ;; make a new msg using msg's proto serialization bytes
-    (let* ((msg-clone (proto:make-message-with-bytes 'pb:message msg-bytes)))
-      (assert-false (pb:message.has-i msg-clone))
+    (let* ((msg-clone (proto:make-message-with-bytes 'pb:inner msg-bytes)))
+      (assert-false (pb:inner.has-i msg-clone))
       (assert-equalp msg-bytes (proto:serialize-to-bytes msg-clone))
       ;; modify msg-clone
       (setf (pb:i msg-clone) 1000)
@@ -39,15 +39,15 @@ Parameters
       (assert-equalp msg-bytes (proto:serialize-to-bytes msg-clone))
       ;; sanity check: the bytes should not be equal if we actually serialize a message with
       ;; different content
-      (let* ((new-msg-bytes (pb:make-message :i 1000)))
+      (let* ((new-msg-bytes (pb:make-inner :i 1000)))
         (assert-true (not (equal msg-bytes new-msg-bytes)))))))
 
 (deftest bytes-in-embedded-obj (deserialize-suite)
-  (let* ((msg (pb:make-message :i 100))
+  (let* ((msg (pb:make-inner :i 100))
          (msg-bytes (proto:serialize-to-bytes msg))
-         (msg-clone (proto:make-message-with-bytes 'pb:message msg-bytes))
-         (outer-with-native (pb:make-outer-message :message msg))
-         (outer-with-clone (pb:make-outer-message :message msg-clone))
+         (msg-clone (proto:make-message-with-bytes 'pb:inner msg-bytes))
+         (outer-with-native (pb:make-outer :simple msg))
+         (outer-with-clone (pb:make-outer :simple msg-clone))
          (outer-with-native-bytes (proto:serialize-to-bytes outer-with-native))
          (outer-with-clone-bytes (proto:serialize-to-bytes outer-with-clone)))
     (assert-equalp outer-with-native-bytes outer-with-clone-bytes outer-with-native-bytes)))
@@ -155,10 +155,10 @@ Parameters
   (:one :index 1))
 
 (pi:define-message oversized-test-message ()
-  (sub :index 1 :type pb:message :kind :message
+  (sub :index 1 :type pb:inner :kind :message
        :label (:optional) :field-presence :explicit
        :json-name "sub")
-  (subs :index 2 :type pb:message :kind :message
+  (subs :index 2 :type pb:inner :kind :message
         :label (:repeated :list) :field-presence :implicit
         :json-name "subs")
   (packed-ints :index 3 :type proto:int32 :kind :scalar
@@ -176,13 +176,13 @@ Parameters
     (unwind-protect
          (dolist (optimized '(nil t))
            (when optimized
-             (eval '(pi:make-deserializer pb:message))
+             (eval '(pi:make-deserializer pb:inner))
              (eval '(pi:make-deserializer oversized-test-message)))
            (dolist (payload payloads)
              (assert-condition proto:protobuf-error
                  (proto:deserialize-from-bytes 'oversized-test-message payload))))
-      #-sbcl (setf (get 'pb:message :deserialize) nil
+      #-sbcl (setf (get 'pb:inner :deserialize) nil
                    (get 'oversized-test-message :deserialize) nil)
       #+sbcl (progn
-               (fmakunbound '(:protobuf :deserialize pb:message))
+               (fmakunbound '(:protobuf :deserialize pb:inner))
                (fmakunbound '(:protobuf :deserialize oversized-test-message))))))

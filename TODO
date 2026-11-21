@@ -86,13 +86,6 @@ TO DO
 [  All 'define-xxx' macros should have '&key name' which gives the Protobufs	]
 [   name, which can be used to override the 'class-name->proto' default		]
 
-[- 'deserialize-object' uses the alias when it calls 'make-instance',		]
-[    or if there is no alias, 'proto-type'					]
-
-[- 'serialize-object' and 'object-size' never use the alias;			]
-[    instead all the "dispatching" should be done of off 'proto-type',		]
-[  Ditto, 'print-text-format'							]
-
 [- The "name" of a protobuf should be the camel-cased file name			]
 [  The "type" of a protobuf should just be the file name as a keyword symbol	]
 
