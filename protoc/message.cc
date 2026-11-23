@@ -6,21 +6,18 @@
 
 #include "message.h"
 
-#include <stddef.h>
-
 #include <algorithm>
 #include <memory>
-#include <set>
+#include <string>
 #include <unordered_set>
+#include <vector>
 
-#include <absl/strings/ascii.h>
 #include <absl/strings/str_cat.h>
-#include "proto2-descriptor-extensions.pb.h"
 #include "enum.h"
 #include "field.h"
 #include "names.h"
+#include <google/protobuf/descriptor.h>
 #include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/extension_set.h>
 #include <google/protobuf/io/printer.h>
 
 namespace google {
@@ -71,14 +68,6 @@ void MessageGenerator::GenerateSource(io::Printer* printer,
   if (CamelIsSpitting(descriptor_->name())) {
     printer->Print("\n :name \"$name$\"", "name", descriptor_->name());
     printer->Annotate("name", descriptor_->name());
-  }
-  if (descriptor_->options().HasExtension(lisp_alias)) {
-    // The symbol most likely doesn't exist yet.  Use double-colon to create
-    // the symbol if doesn't exist yet.
-    const std::string& lasn =
-        ToLispAliasSymbolName(descriptor_->options().GetExtension(lisp_alias));
-    printer->Print("\n :alias-for $for$", "for", lasn);
-    printer->Annotate("for", lasn);
   }
   // END message options.
   printer->Print(")");
@@ -182,19 +171,6 @@ void MessageGenerator::AddExports(std::vector<std::string>* exports) {
   }
   for (int i = 0; i < descriptor_->extension_count(); ++i) {
     exports->push_back(FieldLispName(descriptor_->extension(i)));
-  }
-}
-
-void MessageGenerator::AddPackages(std::set<std::string>* packages) {
-  if (descriptor_->options().HasExtension(lisp_alias)) {
-    const std::string alias = descriptor_->options().GetExtension(lisp_alias);
-    const size_t colon = alias.find(':');
-    if (colon != std::string::npos && colon > 0) {
-      packages->insert(absl::AsciiStrToUpper(alias.substr(0, colon)));
-    }
-  }
-  for (int i = 0; i < descriptor_->nested_type_count(); ++i) {
-    nested_[i]->AddPackages(packages);
   }
 }
 

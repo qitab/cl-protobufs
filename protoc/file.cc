@@ -15,7 +15,7 @@
 #include <vector>
 
 #include <absl/container/flat_hash_set.h>
-#include "proto2-descriptor-extensions.pb.h"
+#include <absl/strings/str_cat.h>
 #include "enum.h"
 #include "field.h"
 #include "message.h"
@@ -89,10 +89,6 @@ void FileGenerator::GenerateSource(io::Printer* printer) {
     if (file_->service_count() > 0) {
       packages.insert(lisp_package_name_ + "-RPC");
     }
-  }
-
-  for (int i = 0; i < file_->message_type_count(); ++i) {
-    messages_[i]->AddPackages(&packages);
   }
 
   printer->Print("\n#+sbcl\n"

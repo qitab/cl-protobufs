@@ -51,8 +51,6 @@ const std::string ToCamelCase(std::string_view name);
 // True if the conversion to Lisp name and back differs from original.
 bool CamelIsSpitting(std::string_view name);
 
-const std::string ToLispAliasSymbolName(std::string_view symbol_name);
-
 }  // namespace cl_protobufs
 }  // namespace protobuf
 }  // namespace google

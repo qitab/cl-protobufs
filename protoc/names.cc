@@ -14,9 +14,7 @@
 #include <string_view>
 
 #include <absl/strings/ascii.h>
-#include <absl/strings/str_join.h>
 #include <absl/strings/str_replace.h>
-#include <absl/strings/str_split.h>
 #include <google/protobuf/descriptor.pb.h>
 
 // Copied from ABSL.
@@ -215,11 +213,6 @@ const std::string ToCamelCase(std::string_view name) {
 
 bool CamelIsSpitting(std::string_view name) {
   return ToCamelCase(ToLispName(name)) != name;
-}
-
-const std::string ToLispAliasSymbolName(std::string_view symbol_name) {
-  auto splitter = absl::StrSplit(symbol_name, ":", absl::SkipWhitespace());
-  return NonDestructiveStrToLower(absl::StrJoin(splitter, "::"));
 }
 
 }  // namespace cl_protobufs
