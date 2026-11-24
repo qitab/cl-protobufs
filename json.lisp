@@ -164,12 +164,7 @@ Parameters:
     ((boolean)
      (format stream "~A" (if value "true" "false")))
     ((byte-vector)
-     (format stream "\"~A\"" (cl-base64:usb8-array-to-base64-string value)))
-    ((keyword)
-     (format stream "\"~A\"" value))
-    ((symbol)
-     (let ((*package* (find-package "COMMON-LISP")))
-       (format stream "\"~S\"" value)))))
+     (format stream "\"~A\"" (cl-base64:usb8-array-to-base64-string value)))))
 
 (defun print-enum-to-json (value type stream numeric-enums-p)
   "Print an enum VALUE of type TYPE to STREAM. If NUMERIC-ENUMS-P, then print the enums value

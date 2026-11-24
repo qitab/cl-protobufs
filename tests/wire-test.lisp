@@ -335,12 +335,7 @@ Paramaters:
                   (pi::sfixed64 ,pi::$wire-type-64bit)
                   (double-float ,pi::$wire-type-64bit)
                   (string ,pi::$wire-type-string)
-                  (pi::byte-vector ,pi::$wire-type-string)
-                  (symbol ,pi::$wire-type-string)
-                  (pi::date ,pi::$wire-type-64bit)
-                  (time ,pi::$wire-type-64bit)
-                  (pi::datetime ,pi::$wire-type-64bit)
-                  (pi::timestamp ,pi::$wire-type-64bit)))
+                  (pi::byte-vector ,pi::$wire-type-string)))
     (destructuring-bind (type expected-wire-type) spec
       (assert-eql (pi::make-wire-tag expected-wire-type 3)
                   (funcall #'pi::make-tag type 3))))
@@ -411,14 +406,7 @@ Paramaters:
     (verify-scalar 'pi::byte-vector
                    (make-array 5 :element-type '(unsigned-byte 8)
                                  :initial-contents '(0 1 127 128 255))
-                   15)
-    ;; Symbols (t, nil, keyword, package-qualified symbol)
-    (dolist (sym '(t nil :test-keyword cl:car))
-      (verify-scalar 'symbol sym 16))
-    ;; Homegrown scalar types: date, time, datetime, timestamp
-    (dolist (type '(pi::date time pi::datetime pi::timestamp))
-      (verify-scalar type 0 17)
-      (verify-scalar type 1700000000 17)))
+                   15))
   ;; Also exercise the serialize-scalar and deserialize-scalar compiler-macros
   (let* ((buf (make-octet-buffer 128))
          (sint32-val -50)
@@ -433,9 +421,8 @@ Paramaters:
          (n8 (pi::serialize-scalar t 'boolean (pi::make-tag 'boolean 8) buf))
          (n9 (pi::serialize-scalar 2.5f0 'float (pi::make-tag 'float 9) buf))
          (n10 (pi::serialize-scalar -2.5d0 'double-float (pi::make-tag 'double-float 10) buf))
-         (n11 (pi::serialize-scalar :foo 'symbol (pi::make-tag 'symbol 11) buf))
          (bytes (concatenate-blocks (compactify-blocks buf))))
-    (assert-eql (length bytes) (+ n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11))))
+    (assert-eql (length bytes) (+ n1 n2 n3 n4 n5 n6 n7 n8 n9 n10))))
 
 (deftest test-packed-size-and-serialize-packed (wire-format-suite)
   ;; Empty list or vector produces size 0 and writes 0 bytes

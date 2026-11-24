@@ -24,67 +24,63 @@ namespace cl_protobufs {
 namespace {
 const std::string FieldLispType(const FieldDescriptor* field) {
   std::string type;
-  if (field->options().HasExtension(lisp_type)) {
-    type = field->options().GetExtension(lisp_type);
-  } else {
-    switch (field->type()) {
-      case FieldDescriptor::TYPE_DOUBLE:
-        type = "cl:double-float";
-        break;
-      case FieldDescriptor::TYPE_FLOAT:
-        type = "cl:float";
-        break;
-      case FieldDescriptor::TYPE_INT64:
-        type = "cl-protobufs:int64";
-        break;
-      case FieldDescriptor::TYPE_UINT64:
-        type = "cl-protobufs:uint64";
-        break;
-      case FieldDescriptor::TYPE_INT32:
-        type = "cl-protobufs:int32";
-        break;
-      case FieldDescriptor::TYPE_FIXED64:
-        type = "cl-protobufs:fixed64";
-        break;
-      case FieldDescriptor::TYPE_FIXED32:
-        type = "cl-protobufs:fixed32";
-        break;
-      case FieldDescriptor::TYPE_BOOL:
-        type = "cl:boolean";
-        break;
-      case FieldDescriptor::TYPE_STRING:
-        type = "cl:string";
-        break;
-      case FieldDescriptor::TYPE_GROUP:
-      case FieldDescriptor::TYPE_MESSAGE:
-        type = QualifiedMessageLispName(field->message_type(), field->file());
-        break;
-      case FieldDescriptor::TYPE_BYTES:
-        type = "cl-protobufs:byte-vector";
-        break;
-      case FieldDescriptor::TYPE_UINT32:
-        type = "cl-protobufs:uint32";
-        break;
-      case FieldDescriptor::TYPE_ENUM:
-        type = QualifiedEnumLispName(field->enum_type(), field->file());
-        break;
-      case FieldDescriptor::TYPE_SFIXED32:
-        type = "cl-protobufs:sfixed32";
-        break;
-      case FieldDescriptor::TYPE_SFIXED64:
-        type = "cl-protobufs:sfixed64";
-        break;
-      case FieldDescriptor::TYPE_SINT32:
-        type = "cl-protobufs:sint32";
-        break;
-      case FieldDescriptor::TYPE_SINT64:
-        type = "cl-protobufs:sint64";
-        break;
-      default:
-        ABSL_LOG(FATAL) << "Unsupported FileDescriptorType: "
-                        << field->DebugString();
-        break;
-    }
+  switch (field->type()) {
+    case FieldDescriptor::TYPE_DOUBLE:
+      type = "cl:double-float";
+      break;
+    case FieldDescriptor::TYPE_FLOAT:
+      type = "cl:float";
+      break;
+    case FieldDescriptor::TYPE_INT64:
+      type = "cl-protobufs:int64";
+      break;
+    case FieldDescriptor::TYPE_UINT64:
+      type = "cl-protobufs:uint64";
+      break;
+    case FieldDescriptor::TYPE_INT32:
+      type = "cl-protobufs:int32";
+      break;
+    case FieldDescriptor::TYPE_FIXED64:
+      type = "cl-protobufs:fixed64";
+      break;
+    case FieldDescriptor::TYPE_FIXED32:
+      type = "cl-protobufs:fixed32";
+      break;
+    case FieldDescriptor::TYPE_BOOL:
+      type = "cl:boolean";
+      break;
+    case FieldDescriptor::TYPE_STRING:
+      type = "cl:string";
+      break;
+    case FieldDescriptor::TYPE_GROUP:
+    case FieldDescriptor::TYPE_MESSAGE:
+      type = QualifiedMessageLispName(field->message_type(), field->file());
+      break;
+    case FieldDescriptor::TYPE_BYTES:
+      type = "cl-protobufs:byte-vector";
+      break;
+    case FieldDescriptor::TYPE_UINT32:
+      type = "cl-protobufs:uint32";
+      break;
+    case FieldDescriptor::TYPE_ENUM:
+      type = QualifiedEnumLispName(field->enum_type(), field->file());
+      break;
+    case FieldDescriptor::TYPE_SFIXED32:
+      type = "cl-protobufs:sfixed32";
+      break;
+    case FieldDescriptor::TYPE_SFIXED64:
+      type = "cl-protobufs:sfixed64";
+      break;
+    case FieldDescriptor::TYPE_SINT32:
+      type = "cl-protobufs:sint32";
+      break;
+    case FieldDescriptor::TYPE_SINT64:
+      type = "cl-protobufs:sint64";
+      break;
+    default:
+      ABSL_LOG(FATAL) << "Unsupported FileDescriptorType: "
+                      << field->DebugString();
+      break;
   }
   return type;
 }

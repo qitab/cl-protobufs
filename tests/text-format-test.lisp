@@ -38,14 +38,7 @@ two_level_nesting {
 }
 map_field { key: 1 value: 'one' }
 map_field { key: 2 value: 'two' }
-oneof_int_field: 5
-symbol_field: 'abc'
-symbol_field: ':def'
-symbol_field: 'cl-protobufs.test.text-format:ghi'
-symbol_field: 't'
-symbol_field: 'nil'
-symbol_field: ':t'
-symbol_field: ':nil'")
+oneof_int_field: 5")
 
 (defparameter *double-nested-message*
   (list
@@ -76,14 +69,7 @@ one_level_nesting {
     (assert-true (string= (test-pb:text-format-test.map-field-gethash 1 msg) "one"))
     (assert-true (string= (test-pb:text-format-test.map-field-gethash 2 msg) "two"))
     (assert-true (test-pb:text-format-test.has-map-field msg))
-    (assert-eql 5 (test-pb:oneof-int-field msg))
-    (assert-eq :ABC (test-pb:nth-symbol-field 0 msg))
-    (assert-eq :DEF (test-pb:nth-symbol-field 1 msg))
-    (assert-eq 'GHI (test-pb:nth-symbol-field 2 msg))
-    (assert-eq t (test-pb:nth-symbol-field 3 msg))
-    (assert-eq nil (test-pb:nth-symbol-field 4 msg))
-    (assert-eq :t (test-pb:nth-symbol-field 5 msg))
-    (assert-eq :nil (test-pb:nth-symbol-field 6 msg))))
+    (assert-eql 5 (test-pb:oneof-int-field msg))))
 
 (deftest test-parse-message-field (text-format-suite)
   (let ((msg (proto:parse-text-format
@@ -335,16 +321,14 @@ int_vals: [2, 3]
 int_vals: 4
 string_fields: ['pika', 'chu']
 string_fields: 'let'
-string_fields: '#litten'
-symbol_field: ['nil']")))
+string_fields: '#litten'")))
         (test-message (test-pb:make-text-format-test
                        :string-fields '("row" "pika" "chu" "let" "#litten")
                        :repeated-message
                        (list (test-pb:make-text-format-test.nested-message1 :int-field 1)
                              (test-pb:make-text-format-test.nested-message1 :int-field 2)
                              (test-pb:make-text-format-test.nested-message1 :int-field 3))
-                       :int-vals '(1 2 3 4)
-                       :symbol-field '(nil))))
+                       :int-vals '(1 2 3 4))))
     (assert-true (proto:proto-equal msg test-message :exact t))))
 
 (deftest test-unquoted-string (text-format-suite)
@@ -393,10 +377,9 @@ int_vals: [2, 3]
 int_vals: 4
 string_fields: ['pika', 'chu']
 string_fields: 'let'
-string_fields: '#litten'
-symbol_field: ['nil']"))))
+string_fields: '#litten'"))))
 
-    (assert-equalp "#<TEXT-FORMAT-TEST string_fields: \"row\" string_fields: \"pika\" string_fields: \"chu\" string_fields: \"let\" string_fields: \"#litten\" int_vals: 1 int_vals: 2 int_vals: 3 int_vals: 4 symbol_field: \"NIL\" repeated_message { int_field: 1 } repeated_message { int_field: 2 } repeated_message { int_field: 3 } >"
+    (assert-equalp "#<TEXT-FORMAT-TEST string_fields: \"row\" string_fields: \"pika\" string_fields: \"chu\" string_fields: \"let\" string_fields: \"#litten\" int_vals: 1 int_vals: 2 int_vals: 3 int_vals: 4 repeated_message { int_field: 1 } repeated_message { int_field: 2 } repeated_message { int_field: 3 } >"
         (format nil "~A" msg))))
 
 ;; Test print-text-format

@@ -41,10 +41,7 @@
                       ((string byte-vector) $wire-type-string)
                       ((boolean) $wire-type-varint)
                       ((float) $wire-type-32bit)
-                      ((double-float) $wire-type-64bit)
-                      ;; A few of our homegrown types
-                      ((symbol) $wire-type-string)
-                      ((date time datetime timestamp) $wire-type-64bit))))
+                      ((double-float) $wire-type-64bit))))
       (declare (type (unsigned-byte 3) tag-bits))
       (make-wire-tag tag-bits index))))
 
@@ -61,10 +58,7 @@
                        ((string byte-vector) $wire-type-string)
                        ((boolean) $wire-type-varint)
                        ((float) $wire-type-32bit)
-                       ((double-float) $wire-type-64bit)
-                       ;; A few of our homegrown types
-                       ((symbol) $wire-type-string)
-                       ((date time datetime timestamp) $wire-type-64bit))))
+                       ((double-float) $wire-type-64bit))))
            `(ilogior ,type (iash ,index 3))))
         (t form)))
 
@@ -145,14 +139,7 @@
        (byte-vector    (encode-octets val buffer))
        (boolean        (encode-uint32 (if val 1 0) buffer))
        (float          (encode-single val buffer))
-       (double-float   (encode-double val buffer))
-       ;; A few of our homegrown types
-       (symbol
-        ;; XXX: This implementation is bad. Should write one uint32 for the sum of
-        ;; lengths of package-name and symbol-name plus 1, then the tokens.
-        (encode-string (lisp-symbol-string val) buffer))
-       ((date time datetime timestamp)
-        (encode-int64 val buffer))))))
+       (double-float   (encode-double val buffer))))))
 
 (defun get-scalar-encoder-form (type val buffer)
   "Returns a form that encodes a value VAL with type TYPE to buffer BUFFER."
@@ -616,17 +603,7 @@
                     (decode-uint32 buffer index)
                   (values (if (i= val 0) nil t) idx)))
       (float    (decode-single buffer index))
-      (double-float (decode-double buffer index))
-      ;; A few of our homegrown types
-      ((symbol)
-       ;; Note that this is consy, avoid it if possible
-       ;; XXX: This needn't cons. Just make strings displaced
-       ;; to the data buffer.
-       (multiple-value-bind (val idx)
-           (decode-string buffer index)
-         (values (make-lisp-symbol val t) idx)))
-      ((date time datetime timestamp)
-       (decode-uint64 buffer index)))))
+      (double-float (decode-double buffer index)))))
 
 (define-compiler-macro deserialize-scalar (&whole form type buffer index)
   (let ((decoder

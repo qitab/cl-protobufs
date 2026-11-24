@@ -244,62 +244,6 @@ Uses a fixnum when SIZE fits in a fixnum, otherwise a simple-bit-vector."
            (simple-bit-vector
             (fill ,store 0)))))))
 
-(defun lisp-symbol-string (symbol)
-  "Returns the string used as the wire format for SYMBOL."
-  (case symbol
-    ((t) "T")
-    ((nil) "NIL")
-    (:t ":T")
-    (:nil ":NIL")
-    (otherwise
-     (if (keywordp symbol)
-         (symbol-name symbol)
-         (format nil "~A:~A"
-                 (let ((package (symbol-package symbol)))
-                   (if package (package-name package) "#"))
-                 (symbol-name symbol))))))
-
-(defun make-lisp-symbol (input-string &optional check-bad-chars)
-  "Find the symbol described by INPUT-STRING. If INPUT-STRING is
-   \"nil\" or \"t\" then return nil or t. If string has no colon
-   return a keyword symbol.
-   Otherwise, STRING should be of the form 'package:string' and the symbol
-   PACKAGE::STRING is returned.
-   If CHECK-BAD-CHARS is specified, disallow strings with more than one colon
-   or strings that have certain other bad characters."
-  (let ((string (string-upcase input-string)))
-    (cond
-      ((string= string "T") T)
-      ((string= string "NIL") NIL)
-      (t
-       (when check-bad-chars
-         (let* ((bad-chars `(#\' #\\ #\"))
-                (bad-char (find-if #'(lambda (x) (member x bad-chars)) string)))
-           (when bad-char
-             (protobuf-error "Invalid symbol character ~S in ~S" bad-char input-string))))
-       (let ((pos (position #\: string))
-             symbol-name
-             package-name)
-         (if pos
-             (setq symbol-name (subseq string (1+ pos))
-                   package-name (if (= pos 0) "KEYWORD" (subseq string 0 pos)))
-             (setq symbol-name string
-                   package-name "KEYWORD"))
-         (when (and check-bad-chars
-                    (find #\: symbol-name))
-           (protobuf-error "Invalid symbol character ~S in ~S" #\: input-string))
-         (if (string= package-name "#")
-             (make-symbol symbol-name)
-             (let ((package (or (find-package package-name)
-                                (protobuf-error "Unknown package ~S in symbol ~S"
-                                                package-name input-string))))
-               (multiple-value-bind (symbol status)
-                   (find-symbol symbol-name package)
-                 (unless status
-                   (protobuf-error "Unknown symbol ~S in package ~S"
-                                   symbol-name package-name))
-                 symbol))))))))
-
 (defun qualified-symbol-name (symbol)
   "Return a string representing SYMBOL qualified with its package name."
   (let* ((*package* (find-package :keyword)))
@@ -654,15 +598,12 @@ Parameters:
 
 (defun scalarp (type)
   "Returns true if the given protobuf type TYPE is a scalar type. Scalar
-   types are defined by the protobuf documentation. The cl-protobufs specific
-   type `symbol' is included as a scalar type, as it is treated as a synonym
-   to the `string' type. This is because symbols are transmitted as strings,
-   which are scalars, and then converted based on the lisp_type of the field.
+   types are defined by the protobuf documentation.
 
    https://developers.google.com/protocol-buffers/docs/proto#scalar "
   (member type '(double-float float int32 int64 uint32 uint64 sint32
                  sint32 sint64 fixed32 fixed64 sfixed32 sfixed64
-                 boolean string byte-vector symbol)))
+                 boolean string byte-vector)))
 
 (defun packed-type-p (type)
   "Returns true if the given protobuf TYPE can use a packed field."

@@ -18,9 +18,10 @@ enum LispContainer {
 
 // Retired google.protobuf.MessageOptions extension numbers:
 //   195802 (lisp_name), 195803 (lisp_alias), 195805 (lisp_class).
+// Retired google.protobuf.FieldOptions extension numbers:
+//   195804 (lisp_type).
 
 extend google.protobuf.FieldOptions {
-  optional string lisp_type = 195804;
   optional string lisp_slot = 195806;
   // Only meaningful for repeated fields.
   // Allow use vector-of instead of list-of.

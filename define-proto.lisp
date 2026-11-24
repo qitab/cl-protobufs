@@ -1067,10 +1067,6 @@ function) then there is no guarantee on the serialize function working properly.
   (setf (gethash 'boolean defaults) nil)
   (setf (gethash 'string defaults) "")
   (setf (gethash 'byte-vector defaults) '(make-byte-vector 0 :adjustable t))
-
-  ;; Home grown types
-  (setf (gethash 'cl:keyword defaults) :default-keyword)
-  (setf (gethash 'cl:symbol defaults) nil)
   defaults))
 
 (defun get-default-form (type default container kind)

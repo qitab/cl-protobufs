@@ -129,7 +129,7 @@ Parameters:
   PRINT-LENGTH: Limit the number of elements in a repeated field to print.
   PRINT-LEVEL: Limit the recursion depth in nested messages."
 ;; If VALUE is NIL and the type is not boolean, there is nothing to do.
-  (unless (or value (eq type 'boolean) (eq type 'symbol))
+  (unless (or value (eq type 'boolean))
     (return-from %print-field nil))
   (let (desc)
     (cond
@@ -194,7 +194,7 @@ Parameters:
             the end.
           - If indent is nil, then do not indent and
             do not write a newline."
-  (when (or val (eq type 'boolean) (eq type 'symbol))
+  (when (or val (eq type 'boolean))
     (when indent
       (format stream "~V,0T" indent))
     (when name
@@ -209,12 +209,7 @@ Parameters:
       ((boolean)
        (format stream "~A" (if val "true" "false")))
       ((float double-float)
-       (print-double-or-float val stream))
-      ;; A few of our homegrown types
-      ((symbol)
-       (format stream "\"~A\"" (lisp-symbol-string val)))
-      ((date time datetime timestamp)
-       (format stream "~D" val)))
+       (print-double-or-float val stream)))
     (if indent
         (format stream "~%")
         (format stream " "))))
@@ -371,7 +366,6 @@ return T as a second value."
                ((float) (parse-float stream))
                ((double-float) (parse-double stream))
                ((string) (parse-string stream))
-               ((symbol) (make-lisp-symbol (parse-string stream) t))
                ((boolean) (let ((token (parse-token stream)))
                             (cond ((string= token "true") t)
                                   ((string= token "false") nil)

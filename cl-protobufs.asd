@@ -285,9 +285,7 @@ and functionality for working with them."
    (:module "text-format-test"
     :serial t
     :pathname ""
-    :depends-on ("descriptor-extensions")
-    :components ((:protobuf-source-file "text-format"
-                  :proto-search-path ("../" "../google/protobuf/"))
+    :components ((:protobuf-source-file "text-format")
                  (:file "text-format-test")))
 
    (:module "json-test"
