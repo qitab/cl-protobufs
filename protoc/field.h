@@ -18,7 +18,6 @@ namespace protobuf {
 namespace cl_protobufs {
 
 // Returns the short Lisp slot name for a message field.
-// Uses the lisp_slot extension if given.
 const std::string FieldLispName(const FieldDescriptor* field);
 
 void GenerateField(io::Printer* printer, const FieldDescriptor* field);
