@@ -9,6 +9,8 @@
         #:clunit
         #:cl-protobufs.repeated-proto
         #:cl-protobufs)
+  (:local-nicknames (#:json #:cl-protobufs.json)
+                    (#:pi #:cl-protobufs.implementation))
   (:export :run))
 
 (in-package #:cl-protobufs.test.vector)
@@ -312,3 +314,63 @@ repeated_proto {
 "
         (with-output-to-string (s)
           (print-text-format outer-proto :stream s)))))
+
+(defun assert-fill-pointer-vector (expected vec)
+  "Assert that VEC is an adjustable fill-pointer vector with the elements of EXPECTED."
+  (assert-true (adjustable-array-p vec))
+  (assert-true (array-has-fill-pointer-p vec))
+  (assert-equalp (coerce expected 'vector) vec))
+
+(defun make-vector-test-proto ()
+  "Make a REPEATED-PROTO with unpacked and packed :vector fields set."
+  (let ((proto (make-repeated-proto)))
+    (dolist (i '(1 -2 3))
+      (push-repeated-int32 i proto)
+      (push-packed-int32s i proto))
+    (dolist (b '(nil t nil))
+      (push-repeated-bool b proto)
+      (push-packed-bools b proto))
+    proto))
+
+(defun check-vector-test-proto (proto)
+  "Check that PROTO matches MAKE-VECTOR-TEST-PROTO and its vectors can still grow."
+  (assert-fill-pointer-vector '(1 -2 3) (repeated-proto.repeated-int32 proto))
+  (assert-fill-pointer-vector '(1 -2 3) (repeated-proto.packed-int32s proto))
+  (assert-fill-pointer-vector '(nil t nil) (repeated-proto.repeated-bool proto))
+  (assert-fill-pointer-vector '(nil t nil) (repeated-proto.packed-bools proto))
+  (assert-eql 4 (push-repeated-int32 4 proto)))
+
+(deftest test-vector-binary-roundtrip (vector-suite)
+  (let* ((proto (make-vector-test-proto))
+         (bytes (serialize-to-bytes proto)))
+    (check-vector-test-proto (deserialize-from-bytes 'repeated-proto bytes))
+    ;; Compiled serializer and deserializer.
+    (eval '(pi:make-serializer repeated-proto))
+    (eval '(pi:make-deserializer repeated-proto))
+    (assert-equalp bytes (serialize-to-bytes proto))
+    (check-vector-test-proto (deserialize-from-bytes 'repeated-proto bytes))))
+
+(deftest test-vector-text-format-roundtrip (vector-suite)
+  (let ((text (with-output-to-string (s)
+                (print-text-format (make-vector-test-proto) :stream s))))
+    (check-vector-test-proto
+     (with-input-from-string (s text)
+       (parse-text-format 'repeated-proto :stream s))))
+  (let ((proto (with-input-from-string
+                   (s "repeated_int32: [] repeated_int32: [1, -2] repeated_int32: 3
+                       repeated_bool: [false, true, false]")
+                 (parse-text-format 'repeated-proto :stream s))))
+    (assert-fill-pointer-vector '(1 -2 3) (repeated-proto.repeated-int32 proto))
+    (assert-fill-pointer-vector '(nil t nil) (repeated-proto.repeated-bool proto))))
+
+(deftest test-vector-json-roundtrip (vector-suite)
+  (let ((text (with-output-to-string (s)
+                (json:print-json (make-vector-test-proto) :stream s))))
+    (check-vector-test-proto
+     (with-input-from-string (s text)
+       (json:parse-json 'repeated-proto :stream s))))
+  (let ((proto (with-input-from-string
+                   (s "{\"repeatedInt32\": [], \"repeatedBool\": [false, true]}")
+                 (json:parse-json 'repeated-proto :stream s))))
+    (assert-fill-pointer-vector '() (repeated-proto.repeated-int32 proto))
+    (assert-fill-pointer-vector '(nil t) (repeated-proto.repeated-bool proto))))

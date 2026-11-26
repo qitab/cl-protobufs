@@ -539,3 +539,58 @@ generates the optimized (de)serializers for MSG's type."
                          (lambda ()
                            (pi::make-serializer sparse-enum-holder)
                            (pi::make-deserializer sparse-enum-holder)))))
+
+(pi:define-message vector-timing-holder ()
+  (int-values :index 1 :type cl-protobufs:int64 :kind :scalar
+              :label (:repeated :vector) :packed nil :field-presence :implicit
+              :json-name "intValues"))
+
+(pi:define-message packed-vector-timing-holder ()
+  (int-values :index 1 :type cl-protobufs:int64 :kind :scalar
+              :label (:repeated :vector) :packed t :field-presence :implicit
+              :json-name "intValues"))
+
+(defun run-vector-benchmarks (label msg make-optimized)
+  "Time reflective, then optimized, serialization of the vector-holding MSG.
+LABEL names the benchmark variant. MAKE-OPTIMIZED generates the optimized
+(de)serializers for MSG's type."
+  (let ((type (type-of msg)))
+    (flet ((run-pair (mode)
+             (run-timed-section (format nil "BM_Vector_~A_Serialize_~A" label mode)
+                                (format nil "~A Vector Serialization ~A" label mode)
+                                10000
+               (serialize-to-bytes msg type))
+             (let ((buffer (serialize-to-bytes msg type)))
+               (assert-true (proto-equal msg (deserialize-from-bytes type buffer) :exact t))
+               (run-timed-section (format nil "BM_Vector_~A_Deserialize_~A" label mode)
+                                  (format nil "~A Vector Deserialization ~A" label mode)
+                                  10000
+                 (deserialize-from-bytes type buffer)))))
+      (run-pair "Reflective")
+      (funcall make-optimized)
+      (run-pair "Optimized")
+      (clear-serialization-functions type))))
+
+(deftest vector-serialization-times (timing-suite)
+  (let ((one-msg (make-vector-timing-holder))
+        (many-msg (make-vector-timing-holder))
+        (packed-msg (make-packed-vector-timing-holder)))
+    (vector-timing-holder.push-int-values 42 one-msg)
+    (loop for i below 64 do
+      (vector-timing-holder.push-int-values i many-msg)
+      (packed-vector-timing-holder.push-int-values i packed-msg))
+    (run-vector-benchmarks "1Elem"
+                           one-msg
+                           (lambda ()
+                             (pi::make-serializer vector-timing-holder)
+                             (pi::make-deserializer vector-timing-holder)))
+    (run-vector-benchmarks "64Elem"
+                           many-msg
+                           (lambda ()
+                             (pi::make-serializer vector-timing-holder)
+                             (pi::make-deserializer vector-timing-holder)))
+    (run-vector-benchmarks "Packed64Elem"
+                           packed-msg
+                           (lambda ()
+                             (pi::make-serializer packed-vector-timing-holder)
+                             (pi::make-deserializer packed-vector-timing-holder)))))

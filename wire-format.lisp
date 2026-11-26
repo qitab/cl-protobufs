@@ -216,10 +216,6 @@
       (cond (vectorp
              (assert (vectorp values))
              (loop for x across values
-                   ;; This is a work-around for a bug in a client library that
-                   ;; starts with 'Q' and should eventually be removed. The
-                   ;; caller should be supplying a sequence of numeric scalars.
-                   while x
                    do (iincf sum (funcall encoder x buffer))))
             (t
              (assert (listp values))
@@ -237,11 +233,10 @@
 ;; name?
 (define-compiler-macro serialize-packed (&whole form values type index buffer
                                          &optional (vectorp nil vectorp-supplied-p))
-  (if vectorp-supplied-p
-      (let ((encode (or (get-scalar-encoder-form type 'val buffer)
-                        (error 'unknown-type
-                               :format-control "No scalar encoder for ~S"
-                               :format-arguments (list type)))))
+  (let ((encode (and vectorp-supplied-p
+                     (typep vectorp 'boolean)
+                     (get-scalar-encoder-form type 'val buffer))))
+    (if encode
         ;; FIXME: probably should have ONCE-ONLY for BUFFER
         ;; [Same goes for a lot of the compiler macros]
         `(locally (declare #.$optimize-serialization)
@@ -254,8 +249,8 @@
                  (declare (fixnum sum))
                  (,(if vectorp 'dovector 'dolist) (val ,values) (iincf sum ,encode))
                  (assert (= sum payload-len))
-                 (i+ tag-len prefix-len payload-len)))))
-      form))
+                 (i+ tag-len prefix-len payload-len))))
+        form)))
 
 (defun-inline find-enum-value (name value-descriptors)
   "Find the enum value corresponding to NAME by searching for it in

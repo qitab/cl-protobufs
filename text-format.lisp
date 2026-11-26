@@ -317,7 +317,7 @@ returns the parsed object."
                  (format nil "Unknown field ~S, while parsing message of type ~A"
                          name  msg-desc)
                  (format nil "Unable to find next field for message of type ~A" msg-desc)))
-            (multiple-value-bind (val error-p)
+            (multiple-value-bind (val error-p list-p)
                 (parse-field type :stream stream :repeated-p repeated-p)
               (cond
                 (error-p
@@ -326,18 +326,15 @@ returns the parsed object."
                  ;; If slot is NIL, then this field doesn't exist in the message
                  ;; so we skip it.
                  (when slot
-                   (pushnew slot rslots)
-                   ;; Brief note on val: VAL should be a list.
-                   ;; In the case of repeated symbol slot, we may have
-                   ;; symbol: nil
-                   ;; in which case we want the symbol nil, which happens to
-                   ;; also be a list...  since for a repeated field foo
-                   ;; foo:  # no value defined for foo
-                   ;; is invalid, we aren't going to have collisions.
-                   (if (and (listp val) val)
-                       (dolist (el val)
-                         (push el (proto-slot-value object slot)))
-                       (push val (proto-slot-value object slot)))))
+                   (let ((elements (if list-p val (list val))))
+                     (if (eq (proto-container field) :vector)
+                         (let ((vec (proto-slot-value object slot)))
+                           (dolist (el elements)
+                             (vector-push-extend el vec)))
+                         (progn
+                           (pushnew slot rslots)
+                           (dolist (el elements)
+                             (push el (proto-slot-value object slot))))))))
                 ((eq (proto-kind field) :map)
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
@@ -350,7 +347,8 @@ returns the parsed object."
   "Parse data of type TYPE from STREAM. This function returns
 the object parsed. We need to know if hte field is REPEATED-P.
 If the parsing fails, the function will
-return T as a second value."
+return T as a second value. A bracketed list of repeated values is
+returned as a list with T as a third value."
   (let ((desc (or (find-message-descriptor type)
                   (find-enum-descriptor type)
                   (find-map-descriptor type))))
@@ -389,7 +387,7 @@ return T as a second value."
                                           (skip-whitespace-comments-and-chars
                                            stream :chars '(#\,)))))
                      (read-char stream)
-                     element-list))
+                     (values element-list nil t)))
                  (funcall parse-function))))
 
       (cond ((scalarp type)

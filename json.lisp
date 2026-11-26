@@ -266,16 +266,19 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
                  (setf null-p t))
                 ((eq (proto-label field) :repeated)
                  (pi::expect-char stream #\[)
-                 (loop
-                   (multiple-value-bind (data err)
-                       (parse-value-from-json type :stream stream
-                                                   :ignore-unknown-fields-p ignore-unknown-fields-p)
-                     (if err
-                         (setf error-p t)
-                         (push data val)))
-                   (if (eql (peek-char nil stream nil) #\,)
-                       (pi::expect-char stream #\,)
-                       (return)))
+                 (unless (eql (peek-char nil stream nil) #\])
+                   (loop
+                     (multiple-value-bind (data err)
+                         (parse-value-from-json
+                          type :stream stream :ignore-unknown-fields-p ignore-unknown-fields-p)
+                       (cond (err (setf error-p t))
+                             ((not (eq (pi::proto-container field) :vector))
+                              (push data val))
+                             (slot
+                              (vector-push-extend data (proto-slot-value object slot)))))
+                     (if (eql (peek-char nil stream nil) #\,)
+                         (pi::expect-char stream #\,)
+                         (return))))
                  (pi::expect-char stream #\]))
                 (t (multiple-value-setq (val error-p)
                      (parse-value-from-json type
@@ -290,6 +293,8 @@ SPLICED-P is true, then do not attempt to parse an opening bracket."
                  (dolist (pair val)
                    (setf (gethash (car pair) (proto-slot-value object slot))
                          (cdr pair))))
+                ;; :vector elements were already appended above.
+                ((eq (pi::proto-container field) :vector))
                 (t
                  (when slot
                    (setf (proto-slot-value object slot) val)

@@ -181,7 +181,7 @@ Parameters:
     (cond ((and packed-p (packed-type-p type))
            ;; Handle scalar types. proto-packed-p of enum types returns nil,
            ;; so packed enum fields are handled below.
-           (serialize-packed value type field-num buffer))
+           (serialize-packed value type field-num buffer (vectorp value)))
           ((scalarp type)
            (let ((tag (make-tag type field-num))
                  (size 0))
@@ -593,7 +593,12 @@ Parameters:
                (let ((data (nreverse (second cell))))
                  (setf (second cell)
                        (if (eq :vector (proto-container field))
-                           (coerce data 'vector) data))))
+                           (make-array (length data)
+                                       :element-type (or (proto-type field) t)
+                                       :adjustable t
+                                       :fill-pointer (length data)
+                                       :initial-contents data)
+                           data))))
              (cond ((eq (proto-kind field) :extends)
                     ;; If an extension we'll have to set it manually later...
                     (push `(,(proto-external-field-name field) ,(second cell))
@@ -1324,6 +1329,17 @@ Parameters:
         (intern (subseq (symbol-name slot-value) 1)))))
 
 
+(defun repeated-vector-form (field list-form)
+  "Return a form that makes an adjustable fill-pointer vector for FIELD holding
+   the elements of LIST-FORM."
+  (with-gensyms (data)
+    `(let ((,data ,list-form))
+       (make-array (length ,data)
+                   :element-type ',(or (proto-type field) t)
+                   :adjustable t
+                   :fill-pointer (length ,data)
+                   :initial-contents ,data))))
+
 (defmacro make-deserializer (message-name)
   "Create the deserializer for a message.
 Parameters:
@@ -1355,6 +1371,7 @@ Parameters:
          (old-index (gensym "OLD-INDEX"))
          (lisp-type (proto-class message))
          (lisp-class (find-class lisp-type nil))
+         (constructor-supplied-p (and constructor t))
          (direct-struct-p (if direct-struct-p-supplied-p
                               direct-struct-p
                               (and (null constructor)
@@ -1472,7 +1489,8 @@ Parameters:
                                         = (proto-slot-function-name
                                            lisp-type (proto-external-field-name field) :get)
                                       for conversion = (if (eq :vector (proto-container field))
-                                                           `(coerce (nreverse ,temp) 'vector)
+                                                           (repeated-vector-form
+                                                            field `(nreverse ,temp))
                                                            `(nreverse ,temp))
                                       collect `(when ,temp
                                                  (setf (,accessor ,vstruct) ,conversion)))
@@ -1480,7 +1498,8 @@ Parameters:
                                       for temp in extended-rtemps
                                       for field-name = (proto-external-field-name field)
                                       for conversion = (if (eq :vector (proto-container field))
-                                                           `(coerce (nreverse ,temp) 'vector)
+                                                           (repeated-vector-form
+                                                            field `(nreverse ,temp))
                                                            `(nreverse ,temp))
                                       collect `(when ,temp
                                                  (setf (,field-name ,vstruct) ,conversion)))
@@ -1507,9 +1526,14 @@ Parameters:
                                              for temp in rtemps
                                              for mtemp = (slot-value-to-slot-name-symbol temp)
                                              for conversion
-                                               = (if (eq :vector (proto-container field))
-                                                     `(coerce (nreverse ,temp) 'vector)
-                                                     `(nreverse ,temp))
+                                               = (cond ((not (eq :vector (proto-container field)))
+                                                        `(nreverse ,temp))
+                                                       ;; Custom constructors get a simple-vector.
+                                                       (constructor-supplied-p
+                                                        `(coerce (nreverse ,temp) 'vector))
+                                                       (t
+                                                        (repeated-vector-form
+                                                         field `(nreverse ,temp))))
                                              nconc `(,(intern (string mtemp) :keyword)
                                                      ,(if missing-value
                                                           `(if ,temp
@@ -1521,7 +1545,8 @@ Parameters:
                                          for temp in extended-rtemps
                                          for field-name = (proto-external-field-name field)
                                          for conversion = (if (eq :vector (proto-container field))
-                                                              `(coerce (nreverse ,temp) 'vector)
+                                                              (repeated-vector-form
+                                                               field `(nreverse ,temp))
                                                               `(nreverse ,temp))
                                          collect `(when ,temp
                                                     (setf (,field-name struct) ,conversion)))

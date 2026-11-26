@@ -20,6 +20,8 @@ message RepeatedProto {
   repeated   double repeated_double   = 12 [(lisp_container) = VECTOR];
   repeated     bool repeated_bool     = 13 [(lisp_container) = VECTOR];
   repeated   string repeated_string   = 14 [(lisp_container) = VECTOR];
+  repeated int32 packed_int32s = 15 [(lisp_container) = VECTOR, packed = true];
+  repeated bool packed_bools = 16 [(lisp_container) = VECTOR, packed = true];
 }
 
 
