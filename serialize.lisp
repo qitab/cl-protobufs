@@ -591,10 +591,11 @@ Parameters:
              (rplaca cell initargs)
              (when (eq (proto-label field) :repeated)
                (let ((data (nreverse (second cell))))
+                 (declare (type list data))
                  (setf (second cell)
                        (if (eq :vector (proto-container field))
                            (make-array (length data)
-                                       :element-type (or (proto-type field) t)
+                                       :element-type (pick-vector-element-type (proto-type field))
                                        :adjustable t
                                        :fill-pointer (length data)
                                        :initial-contents data)
@@ -1048,19 +1049,29 @@ Parameters:
                    (fintern (string (proto-internal-field-name field)))))
          (oneof-offset (proto-oneof-offset field)))
     (cond ((eq (proto-label field) :repeated)
-           (setf repeated-slot (list field temp))
-           (multiple-value-bind (deserializer tag list?)
-               (generate-repeated-field-deserializer
-                class kind index lazy-p vbuf vidx temp)
-             (if deserializer
-                 (if list?
-                     (return-from generate-field-deserializer
-                       (values tag deserializer
-                               non-repeated-slot repeated-slot))
-                     (return-from generate-field-deserializer
-                       (values (list tag) (list deserializer)
-                               non-repeated-slot repeated-slot)))
-                 (unknown-field-type class field message))))
+           (let ((direct-vector-p (and vstruct
+                                       (eq (proto-container field) :vector)
+                                       (not (eq kind :extends)))))
+             (unless direct-vector-p
+               (setf repeated-slot (list field temp)))
+             (multiple-value-bind (deserializer tag list?)
+                 (generate-repeated-field-deserializer
+                  class kind index lazy-p vbuf vidx
+                  (if direct-vector-p
+                      (let ((*package* (symbol-package lisp-type)))
+                        `(,(fintern "~A-~A" lisp-type (proto-internal-field-name field))
+                          ,vstruct))
+                      temp)
+                  :direct-vector-p direct-vector-p)
+               (if deserializer
+                   (if list?
+                       (return-from generate-field-deserializer
+                         (values tag deserializer
+                                 non-repeated-slot repeated-slot))
+                       (return-from generate-field-deserializer
+                         (values (list tag) (list deserializer)
+                                 non-repeated-slot repeated-slot)))
+                   (unknown-field-type class field message)))))
           ;; Non-repeated (including oneof and map) field with direct struct mutation.
           (vstruct
            (let ((accessor (if (eq kind :extends)
@@ -1117,7 +1128,7 @@ Parameters:
                  (unknown-field-type class field message)))))))
 
 (defun generate-repeated-field-deserializer
-    (class kind index lazy-p vbuf vidx dest)
+    (class kind index lazy-p vbuf vidx dest &key direct-vector-p)
   "Returns three values: The first is a (list of) s-expressions that deserializes the
 specified object to dest and updates vidx to the new index. The second is (list of)
 tag(s) of this field. The third is true if and only if lists are being returned.
@@ -1129,14 +1140,24 @@ Parameters:
   LAZY-P: True if and only if the field is lazy.
   VBUF: The buffer to read from.
   VIDX: The index of the buffer to read from & to update.
-  DEST: The symbol name for the destination of deserialized data."
+  DEST: The symbol or accessor form for the destination of deserialized data.
+  DIRECT-VECTOR-P: When true, DEST evaluates to a pre-allocated adjustable
+    fill-pointer vector to append to directly."
   (let ((msg (and class
                   (not (scalarp class))
                   (or (find-message-descriptor class)
                       (find-enum-descriptor class)
-                      (find-map-descriptor class)))))
+                      (find-map-descriptor class))))
+        (elem-type (pick-vector-element-type class)))
     (flet ((call-deserializer (msg vbuf start end &optional (end-tag 0))
-             (call-pseudo-method :deserialize msg vbuf start end end-tag)))
+             (call-pseudo-method :deserialize msg vbuf start end end-tag))
+           (emit-push (val-form)
+             (if direct-vector-p
+                 (with-gensyms (vec)
+                   `(let ((,vec ,dest))
+                      (declare (type (vector ,elem-type) ,vec))
+                      (vector-push-extend ,val-form ,vec)))
+                 `(push ,val-form ,dest))))
       (cond ((scalarp class)
              (let* ((tag (make-tag class index))
                     (packed-tag (when (packed-type-p class)
@@ -1144,18 +1165,18 @@ Parameters:
                     (non-packed-form `(multiple-value-bind (val next-index)
                                           (deserialize-scalar ',class ,vbuf ,vidx)
                                         (setq ,vidx next-index)
-                                        (push val ,dest)))
-                    (packed-form `(multiple-value-bind (x idx)
-                                      (deserialize-packed ',class ,vbuf ,vidx)
-                                    (setq ,vidx idx)
-                                    ;; The reason for nreversing here is that a field that
-                                    ;; is repeated+packed may be transmitted as several
-                                    ;; runs of packed values interleaved with other fields,
-                                    ;; and it might even be possible to send an occurrence
-                                    ;; of the field as non-packed, but I'm not sure.
-                                    ;; The final NREVERSE is going to put everything right.
-                                    ;; Not efficient, but probably not a huge loss.
-                                    (setq ,dest (nreconc x ,dest)))))
+                                        ,(emit-push 'val)))
+                    (packed-form (if direct-vector-p
+                                     `(setq ,vidx
+                                            (deserialize-packed-into-vector
+                                             ',class ,vbuf ,vidx ,dest))
+                                     `(multiple-value-bind (x idx)
+                                          (deserialize-packed ',class ,vbuf ,vidx)
+                                        (setq ,vidx idx)
+                                        ;; Packed runs and unpacked elements may be interleaved on
+                                        ;; the wire; DEST accumulates elements in reverse order so
+                                        ;; the final NREVERSE restores wire order.
+                                        (setq ,dest (nreconc x ,dest))))))
                (if packed-tag
                    (values
                     (list non-packed-form packed-form)
@@ -1170,7 +1191,7 @@ Parameters:
                                 ,(call-deserializer
                                   msg vbuf vidx (- array-dimension-limit 2) tag2)
                               (setq ,vidx end)
-                              (push obj ,dest))
+                              ,(emit-push 'obj))
                            tag1))
                  (values `(multiple-value-bind (payload-len payload-start)
                               (decode-uint32 ,vbuf ,vidx)
@@ -1187,11 +1208,9 @@ Parameters:
                                  ;; If this field is declared lazy, then don't deserialize.
                                  ;; Instead, create a new message with %%BYTES field set to
                                  ;; the bytes on the wire.
-                                 `(push (make-message-with-bytes
-                                         ',class (subseq ,vbuf payload-start ,vidx))
-                                        ,dest)
-                                 `(push ,(call-deserializer msg vbuf 'payload-start vidx)
-                                        ,dest)))
+                                 (emit-push `(make-message-with-bytes
+                                              ',class (subseq ,vbuf payload-start ,vidx)))
+                                 (emit-push (call-deserializer msg vbuf 'payload-start vidx))))
                          (make-wire-tag $wire-type-string index))))
             ((typep msg 'enum-descriptor)
              (let* ((tag (make-wire-tag $wire-type-varint index))
@@ -1200,20 +1219,21 @@ Parameters:
                                           (deserialize-enum
                                            '(,@(enum-descriptor-values msg)) ,vbuf ,vidx)
                                         (setq ,vidx idx)
-                                        (push x ,dest)))
-                    (packed-form `(multiple-value-bind (x idx)
-                                      (deserialize-packed-enum
-                                       '(,@(enum-descriptor-values msg))
-                                       ,vbuf ,vidx)
-                                    (setq ,vidx idx)
-                                    ;; The reason for nreversing here is that a field that
-                                    ;; is repeated+packed may be transmitted as several
-                                    ;; runs of packed values interleaved with other fields,
-                                    ;; and it might even be possible to send an occurrence
-                                    ;; of the field as non-packed, but I'm not sure.
-                                    ;; The final NREVERSE is going to put everything right.
-                                    ;; Not efficient, but probably not a huge loss.
-                                    (setq ,dest (nreconc x ,dest)))))
+                                        ,(emit-push 'x)))
+                    (packed-form (if direct-vector-p
+                                     `(setq ,vidx
+                                            (deserialize-packed-enum-into-vector
+                                             '(,@(enum-descriptor-values msg))
+                                             ,vbuf ,vidx ,dest))
+                                     `(multiple-value-bind (x idx)
+                                          (deserialize-packed-enum
+                                           '(,@(enum-descriptor-values msg))
+                                           ,vbuf ,vidx)
+                                        (setq ,vidx idx)
+                                        ;; Packed runs and unpacked elements may be interleaved on
+                                        ;; the wire; DEST accumulates elements in reverse order so
+                                        ;; the final NREVERSE restores wire order.
+                                        (setq ,dest (nreconc x ,dest))))))
                (values (list non-packed-form packed-form)
                        (list tag packed-tag)
                        t)))))))
@@ -1335,7 +1355,7 @@ Parameters:
   (with-gensyms (data)
     `(let ((,data ,list-form))
        (make-array (length ,data)
-                   :element-type ',(or (proto-type field) t)
+                   :element-type ',(pick-vector-element-type (proto-type field))
                    :adjustable t
                    :fill-pointer (length ,data)
                    :initial-contents ,data))))

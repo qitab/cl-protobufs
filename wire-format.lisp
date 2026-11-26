@@ -793,6 +793,94 @@
               (collect-name (find-enum-name val value-descriptors))
               (setq idx nidx))))))))
 
+(defun deserialize-packed-into-vector (type buffer index dest)
+  "Deserialize packed scalars of TYPE from BUFFER at INDEX, appending to DEST.
+   Returns the new index into BUFFER."
+  (declare (type (simple-array (unsigned-byte 8) (*)) buffer)
+           (type array-index index)
+           (type vector dest))
+  (locally (declare #.$optimize-serialization)
+    (multiple-value-bind (len idx)
+        (decode-uint32 buffer index)
+      (declare (type (unsigned-byte 32) len)
+               (type fixnum idx))
+      (when (> len (i- (length buffer) idx))
+        (protobuf-error "Packed field length ~D exceeds remaining buffer length ~D"
+                        len (i- (length buffer) idx)))
+      (let ((end (i+ idx len)))
+        (declare (type array-index end))
+        (macrolet ((read-loop (elem-type decode-form &optional count-shift)
+                     `(let ((vec dest))
+                        (declare (type (vector ,elem-type) vec))
+                        ,@(if count-shift
+                              (let ((elem-bytes (ash 1 (- count-shift))))
+                                `((unless (zerop (logand len ,(1- elem-bytes)))
+                                    (protobuf-error
+                                     "Packed fixed-width field length ~D is not a multiple of ~D"
+                                     len ,elem-bytes))
+                                  (let ((needed (i+ (fill-pointer vec)
+                                                    (ash len ,count-shift))))
+                                    (when (> needed (array-total-size vec))
+                                      (adjust-array vec needed)))))
+                              `((when (and (plusp len) (logbitp 7 (aref buffer (i- end 1))))
+                                  (protobuf-error "Truncated varint in packed field"))))
+                        (loop
+                          (when (>= idx end)
+                            (return-from deserialize-packed-into-vector idx))
+                          (multiple-value-bind (val nidx) ,decode-form
+                            (vector-push-extend val vec)
+                            (setq idx nidx))))))
+          (ecase type
+            (int32 (read-loop (signed-byte 32) (decode-int32 buffer idx)))
+            (int64 (read-loop (signed-byte 64) (decode-int64 buffer idx)))
+            (uint32 (read-loop (unsigned-byte 32) (decode-uint32 buffer idx)))
+            (uint64 (read-loop (unsigned-byte 64) (decode-uint64 buffer idx)))
+            (sint32 (read-loop (signed-byte 32)
+                               (multiple-value-bind (val nidx)
+                                   (decode-uint32 buffer idx)
+                                 (values (zig-zag-decode32 val) nidx))))
+            (sint64 (read-loop (signed-byte 64)
+                               (multiple-value-bind (val nidx)
+                                   (decode-uint64 buffer idx)
+                                 (values (zig-zag-decode64 val) nidx))))
+            (fixed32 (read-loop (unsigned-byte 32) (decode-fixed32 buffer idx) -2))
+            (sfixed32 (read-loop (signed-byte 32) (decode-sfixed32 buffer idx) -2))
+            (fixed64 (read-loop (unsigned-byte 64) (decode-fixed64 buffer idx) -3))
+            (sfixed64 (read-loop (signed-byte 64) (decode-sfixed64 buffer idx) -3))
+            (boolean (read-loop t
+                                (multiple-value-bind (val nidx)
+                                    (decode-uint32 buffer idx)
+                                  (values (if (i= val 0) nil t) nidx))))
+            (float (read-loop t (decode-single buffer idx) -2))
+            (double-float (read-loop double-float (decode-double buffer idx) -3))))))))
+
+(defun deserialize-packed-enum-into-vector (value-descriptors buffer index dest)
+  "Deserialize packed enum values given in VALUE-DESCRIPTORS from BUFFER at INDEX,
+   appending to DEST. Returns the new index into BUFFER."
+  (declare (type list value-descriptors)
+           (type (simple-array (unsigned-byte 8) (*)) buffer)
+           (type array-index index)
+           (type (vector t) dest))
+  (locally (declare #.$optimize-serialization)
+    (multiple-value-bind (len idx)
+        (decode-uint32 buffer index)
+      (declare (type (unsigned-byte 32) len)
+               (type fixnum idx))
+      (when (> len (i- (length buffer) idx))
+        (protobuf-error "Packed enum length ~D exceeds remaining buffer length ~D"
+                        len (i- (length buffer) idx)))
+      (let ((end (i+ idx len)))
+        (declare (type array-index end))
+        (when (and (plusp len) (logbitp 7 (aref buffer (i- end 1))))
+          (protobuf-error "Truncated varint in packed enum field"))
+        (loop
+          (when (>= idx end)
+            (return-from deserialize-packed-enum-into-vector idx))
+          (multiple-value-bind (val nidx)
+              (decode-int32 buffer idx)
+            (vector-push-extend (find-enum-name val value-descriptors) dest)
+            (setq idx nidx)))))))
+
 (defun packed-size (values type &optional vectorp)
   "Returns the size in bytes that the packed object will take when serialized.
    Watch out, this function turns off most type checking."

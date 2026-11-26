@@ -425,6 +425,18 @@ Arguments:
 (deftype sfixed32 () '(signed-byte 32))
 (deftype sfixed64 () '(signed-byte 64))
 
+(defun-inline pick-vector-element-type (type)
+  "Return a constant array element-type specifier for a repeated :vector field
+   of proto element TYPE, avoiding undefined forward-referenced message types."
+  (case type
+    ((int32 sfixed32 sint32) '(signed-byte 32))
+    ((uint32 fixed32) '(unsigned-byte 32))
+    ((int64 sfixed64 sint64) '(signed-byte 64))
+    ((uint64 fixed64) '(unsigned-byte 64))
+    (single-float 'single-float)
+    (double-float 'double-float)
+    (otherwise 't)))
+
 (defun fixed-width-integer-type-p (type)
   "Check whether TYPE can be serialized in a fixed number of bits."
   (member type '(fixed32 fixed64 sfixed32 sfixed64)))

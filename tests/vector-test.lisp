@@ -338,17 +338,40 @@ repeated_proto {
   (assert-fill-pointer-vector '(1 -2 3) (repeated-proto.packed-int32s proto))
   (assert-fill-pointer-vector '(nil t nil) (repeated-proto.repeated-bool proto))
   (assert-fill-pointer-vector '(nil t nil) (repeated-proto.packed-bools proto))
+  (assert-equal (upgraded-array-element-type '(signed-byte 32))
+                (array-element-type (repeated-proto.repeated-int32 proto)))
+  (assert-equal (upgraded-array-element-type '(signed-byte 32))
+                (array-element-type (repeated-proto.packed-int32s proto)))
   (assert-eql 4 (push-repeated-int32 4 proto)))
 
 (deftest test-vector-binary-roundtrip (vector-suite)
   (let* ((proto (make-vector-test-proto))
-         (bytes (serialize-to-bytes proto)))
-    (check-vector-test-proto (deserialize-from-bytes 'repeated-proto bytes))
-    ;; Compiled serializer and deserializer.
-    (eval '(pi:make-serializer repeated-proto))
-    (eval '(pi:make-deserializer repeated-proto))
-    (assert-equalp bytes (serialize-to-bytes proto))
-    (check-vector-test-proto (deserialize-from-bytes 'repeated-proto bytes))))
+         (bytes (serialize-to-bytes proto))
+         ;; Field 15 (packed_int32s) interleaved as unpacked (120), packed (122), unpacked (120).
+         (interleaved (make-array 8 :element-type '(unsigned-byte 8)
+                                    :initial-contents '(120 1 122 2 2 3 120 4)))
+         (outer (make-outer-proto)))
+    (push-repeated-proto (make-vector-test-proto) outer)
+    (let ((outer-bytes (serialize-to-bytes outer)))
+      (check-vector-test-proto (deserialize-from-bytes 'repeated-proto bytes))
+      (assert-fill-pointer-vector
+       '(1 2 3 4)
+       (repeated-proto.packed-int32s
+        (deserialize-from-bytes 'repeated-proto interleaved)))
+      ;; Compiled serializer and deserializer.
+      (eval '(pi:make-serializer repeated-proto))
+      (eval '(pi:make-deserializer repeated-proto))
+      (eval '(pi:make-serializer outer-proto))
+      (eval '(pi:make-deserializer outer-proto))
+      (assert-equalp bytes (serialize-to-bytes proto))
+      (check-vector-test-proto (deserialize-from-bytes 'repeated-proto bytes))
+      (assert-fill-pointer-vector
+       '(1 2 3 4)
+       (repeated-proto.packed-int32s
+        (deserialize-from-bytes 'repeated-proto interleaved)))
+      (let ((decoded-outer (deserialize-from-bytes 'outer-proto outer-bytes)))
+        (assert-eql 1 (length-of-repeated-proto decoded-outer))
+        (check-vector-test-proto (nth-repeated-proto 0 decoded-outer))))))
 
 (deftest test-vector-text-format-roundtrip (vector-suite)
   (let ((text (with-output-to-string (s)
@@ -374,3 +397,21 @@ repeated_proto {
                  (json:parse-json 'repeated-proto :stream s))))
     (assert-fill-pointer-vector '() (repeated-proto.repeated-int32 proto))
     (assert-fill-pointer-vector '(nil t) (repeated-proto.repeated-bool proto))))
+
+(deftest test-malformed-packed-vector-bounds (vector-suite)
+  (eval '(pi:make-deserializer repeated-proto))
+  ;; Field 15 (packed_int32s, tag 122): length 2, trailing byte #x80 has continuation bit set.
+  (let ((truncated-varint (make-array 4 :element-type '(unsigned-byte 8)
+                                        :initial-contents '(122 2 1 #x80)))
+        ;; Field 17 (packed_fixed32s, tag 138 = #x8a #x01): length 3 is not a multiple of 4.
+        (truncated-fixed32 (make-array 6 :element-type '(unsigned-byte 8)
+                                         :initial-contents '(#x8a #x01 3 1 2 3)))
+        (truncated-enum (make-array 3 :element-type '(unsigned-byte 8)
+                                      :initial-contents '(2 1 #x80)))
+        (enum-dest (make-array 0 :adjustable t :fill-pointer 0)))
+    (assert-condition protobuf-error
+      (deserialize-from-bytes 'repeated-proto truncated-varint))
+    (assert-condition protobuf-error
+      (deserialize-from-bytes 'repeated-proto truncated-fixed32))
+    (assert-condition protobuf-error
+      (pi::deserialize-packed-enum-into-vector nil truncated-enum 0 enum-dest))))

@@ -1010,12 +1010,18 @@ function) then there is no guarantee on the serialize function working properly.
                                           ;; its %%bytes field.
                                           (%deserialize ',(proto-class field) ,bytes nil nil)
                                           ,field-element))))
-                             (setf (,hidden-accessor-name ,obj)
-                                   ,(if vectorp
-                                        `(map 'vector #',maybe-deserialize
-                                              (the vector ,field-obj))
-                                        `(mapcar #',maybe-deserialize ,field-obj))))))))))
-        ,@(make-common-forms-for-structure-class proto-type public-slot-name slot-name field)))))
+                             ,(if vectorp
+                                  (with-gensyms (vec idx)
+                                    `(let ((,vec (the vector ,field-obj)))
+                                       (dotimes (,idx (length ,vec))
+                                         (setf (aref ,vec ,idx)
+                                               (,maybe-deserialize (aref ,vec ,idx))))
+                                       ,vec))
+                                  `(setf (,hidden-accessor-name ,obj)
+                                         (mapcar #',maybe-deserialize ,field-obj))))))))))
+        ,@(make-common-forms-for-structure-class proto-type public-slot-name slot-name field)
+        ,@(when (proto-container field)
+            (make-repeated-field-accessors proto-type field))))))
 
 (defun make-structure-class-forms-non-lazy (proto-type field public-slot-name)
   "Makes forms for the non-lazy fields of a proto message.
@@ -1084,7 +1090,7 @@ function) then there is no guarantee on the serialize function working properly.
         ((not (member default (list $empty-default nil)))
          default)
         ((eq container :vector)
-         `(make-array 0 :element-type ',type
+         `(make-array 0 :element-type ',(pick-vector-element-type type)
                         :adjustable t
                         :fill-pointer 0))
         ((eq container :list) nil)
@@ -1496,7 +1502,10 @@ function) then there is no guarantee on the serialize function working properly.
                          (cond ((eq label :repeated)
                                 ;; Repeated fields get a container for their elements
                                 (if (eq repeated-storage-type :vector)
-                                    `(make-array 5 :fill-pointer 0 :adjustable t)
+                                    `(make-array 0 :element-type
+                                                 ',(pick-vector-element-type type)
+                                                 :adjustable t
+                                                 :fill-pointer 0)
                                     nil))
                                ((and (not default-p)
                                      (eq label :optional)

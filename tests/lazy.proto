@@ -8,6 +8,8 @@ syntax = "proto2";
 
 package third_party.lisp.cl_protobufs.tests;
 
+import "proto2-descriptor-extensions.proto"; // descriptor extension
+
 message Inner {
   optional int32 value = 1;
 }
@@ -40,4 +42,6 @@ message OneofLazy {
 
 message RepeatedLazy {
   repeated Inner inners = 1 [lazy = true];
+  repeated Inner vector_inners = 2 [(lisp_container) = VECTOR, lazy = true];
 }
+
