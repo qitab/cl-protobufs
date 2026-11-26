@@ -260,7 +260,9 @@ and functionality for working with them."
    (:module "lazy-test"
     :serial t
     :pathname ""
-    :components ((:protobuf-source-file "lazy")
+    :depends-on ("descriptor-extensions")
+    :components ((:protobuf-source-file "lazy"
+                  :proto-search-path ("../" "../google/protobuf/"))
                  (:file "lazy-test")))
 
    (:module "float-test"
