@@ -16,6 +16,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter $optimize-buffering *optimize-fast-unsafe*)) ; NOLINT
 
+#+sbcl (declaim (optimize (sb-c::insert-array-bounds-checks 1)))
+
 (deftype array-index ()
   #+sbcl 'sb-int:index
   #-sbcl `(integer 0 ,(1- array-total-size-limit)))
@@ -183,26 +185,11 @@
   (or (>= (- (buffer-block-capacity buffer) (buffer-index buffer)) n)
       (%buffer-ensure-space buffer n)))
 
-;; A SERIALIZED-PROTOBUF is the result of serializing in the one-pass algorithm
-;; and then squashing out any of the gaps that were left by allocating length
-;; prefixes in their largest possible size but not using all bytes.
-;;
-(defstruct (serialized-protobuf
-             (:constructor make-serialized-protobuf
-                           (blocks total-length final-block-length)))
-  blocks
-  total-length
-  final-block-length)
-(defmethod print-object ((self serialized-protobuf) stream)
-  (declare (stream stream))
-  (print-unreadable-object (self stream :type t)
-    (format stream "~D byte~:P" (serialized-protobuf-total-length self))))
-
 (declaim (ftype (function (t t) (values t &optional))
-                word-out octet-out)
+                word-out %octet-out-slow octet-out)
          (inline word-out))
 
-;; Define OCTET-OUT and WORD-OUT on the respective buffer types.
+;; Define %OCTET-OUT-SLOW and WORD-OUT on the respective buffer types.
 (macrolet
     ((define-emitter (name buffer-type element-type)
        `(defun ,name (buffer val)
@@ -231,7 +218,15 @@
             (setf (aref block index) val
                   (buffer-index buffer) (1+ index))))))
   (define-emitter word-out word-buffer (unsigned-byte 32))
-  (define-emitter octet-out octet-buffer octet-type))
+  (define-emitter %octet-out-slow octet-buffer octet-type))
+
+(defun-inline octet-out (buffer val)
+  (declare (octet-buffer buffer) (octet-type val) #.$optimize-buffering)
+  (let ((block (octet-buffer-block buffer))
+        (index (buffer-index buffer)))
+    (if (i< index (length block))
+        (setf (aref block index) val (buffer-index buffer) (i+ index 1))
+        (%octet-out-slow buffer val))))
 
 (defun %fast-octet-out (buffer val)
   (let ((block (advance-block buffer)))
@@ -285,30 +280,25 @@
 ;; WITH-{mumble}-ITERATOR macros. Each time ITER is invoked, the next
 ;; buffer element will be returned, or NIL if no more remain.
 (defmacro with-word-buffer-iterator ((iterator-name word-buffer) &body body)
-  (with-gensyms (buffer block more-blocks input-pointer input-limit)
-  `(let* ((,buffer, word-buffer)
-          (,block ,(coerce #() 'word-buffer-block-type))
-          ;; if the current block's index is 0, then no blocks were used at all
-          (,more-blocks (unless (zerop (buffer-index ,buffer))
-                          (buffer-chain ,buffer)))
-          (,input-pointer 0)
-          (,input-limit 0))
-     (declare (word-buffer-block-type ,block)
-              (array-index ,input-pointer ,input-limit))
-     (macrolet
-         ((,iterator-name ()
-            `(locally
-                 (declare (optimize (safety 0)))
-               (when (or (i< ,',input-pointer ,',input-limit)
-                         (when ,',more-blocks
-                           (setq ,',block (pop ,',more-blocks)
-                                 ,',input-limit
-                                 (if ,',more-blocks
-                                     (length ,',block)
-                                     (buffer-index ,',buffer))
-                                 ,',input-pointer 0)))
-                 (aref ,',block (prog1 ,',input-pointer (incf ,',input-pointer)))))))
-       ,@body))))
+  (with-gensyms (buffer block cell last-cell ptr limit)
+    `(let* ((,buffer ,word-buffer)
+            (,block ,(coerce #() 'word-buffer-block-type))
+            (,last-cell (buffer-next ,buffer))
+            (,cell (buffer-chain ,buffer))
+            (,ptr 0) (,limit 0))
+       (declare (word-buffer-block-type ,block) (array-index ,ptr ,limit))
+       (macrolet
+           ((,iterator-name ()
+              `(locally (declare (optimize (safety 0)))
+                 (loop (when (i< ,',ptr ,',limit)
+                         (return (aref ,',block (prog1 ,',ptr (incf ,',ptr)))))
+                       (unless ,',cell (return nil))
+                       (let ((endp (eq ,',cell ,',last-cell)))
+                         (setq ,',block (car ,',cell)
+                               ,',limit (if endp (buffer-index ,',buffer) (length ,',block))
+                               ,',cell (unless endp (cdr ,',cell))
+                               ,',ptr 0))))))
+         ,@body))))
 
 ;; Put blank space into an octet buffer so that later we can go back and
 ;; patch a length-prefix in.
@@ -426,157 +416,116 @@
                                        ,',pointer-block ,',pointer-index)))
          ,@body))))
 
-;; A simple wrapper on REPLACE. This function is used only in one place.
-;; It shouldn't be needed, but small copies using REPLACE are slower than a loop.
-;; It turns out that a foreign call to memmove would be faster for 80 bytes or more.
+;; Copy COUNT octets from SOURCE starting at SOURCE-INDEX into DESTINATION
+;; starting at DESTINATION-INDEX. Used by COMPACTIFY-BLOCKS (where SOURCE and
+;; DESTINATION may be the same array with DESTINATION-INDEX < SOURCE-INDEX) and
+;; CONCATENATE-BLOCKS.
 (defun-inline fast-replace (destination destination-index
                             source source-index count)
-  (declare (array-index destination-index count)
+  (declare (array-index destination-index source-index count)
            ((simple-array octet-type 1) destination source))
-  (let ((limit (the array-index (+ destination-index count))))
-    (if (< count 40)
-        (loop (setf (aref destination destination-index) (aref source source-index))
-              (incf source-index)
-              (when (eql (incf destination-index) limit) (return)))
-        (replace destination source
-                 :start1 destination-index :end1 limit
-                 :start2 source-index))))
-
-(defvar **empty-word-buffer** (make-word-buffer 0))
+  #+sbcl
+  (sb-kernel:%byte-blt source source-index destination destination-index count)
+  #-sbcl
+  (replace destination source
+           :start1 destination-index :end1 (the array-index (+ destination-index count))
+           :start2 source-index))
 
 ;; Given an octet-buffer BUFFER, squeeze out any octets which "do not exist" in
 ;; the virtual octet sequence so they no also longer exist in the physical sequence.
 ;; After this operation, BUFFER will be ready for direct consumption, such as
 ;; by a client or a compression algorithm or file storage.
 (defun compactify-blocks (buffer)
-  (declare #.$optimize-buffering)
-  ;; OUTPUT and INPUT refer to the same block chain, namely the blocks
-  ;; that currently exist in BUFFER.
-  (let* ((input-block-chain (buffer-chain buffer))
-         (output-block-chain input-block-chain)
-         ;; Output blocks are not popped off the chain until
-         ;; advancing beyond the current block. This way the tail
-         ;; can be smashed to NIL when reaching the end of input.
-         (output-block (car output-block-chain))
-         (output-index 0)
-         ;; Setting INPUT-BLOCK now is only for type-correctness of the
-         ;; initial value. It will be set again immediately before reading
-         (input-block (car input-block-chain))
-         (input-index 0) ; block-relative index
-         (input-position 0) ; absolute
-         (deletion-point 0)
-         (deletion-length 0))
-    (declare ((simple-array octet-type 1) output-block input-block)
-             (array-index output-index input-index input-position))
-    ;; Drop any pre-allocated but unused block in the input chain.
-    (when (cdr (buffer-next buffer))
-      (assert (eq (buffer-block buffer) (car (buffer-next buffer))))
-      (rplacd (buffer-next buffer) nil))
-
-    ;; The reason for deferring this POP 'til after the preceding "drop"
-    ;; is that if there were exactly two input blocks, one used and one not
-    ;; used at all, INPUT-BLOCK-CHAIN should become NIL.
-    (setq input-block (pop input-block-chain))
-    (with-word-buffer-iterator
-       (deletion-point-getter (octet-buffer-backpatches buffer))
-     (labels
-            ((find-next-deletion-point ()
-               ;; If the deletion point is one at which no bytes should be deleted -
-               ;; probably impossible as it means a submessage length took >21 bits
-               ;; (= 4 bytes) to encode - skip until finding somewhere to delete,
-               ;; or else finding that there are no further deletion points.
-               (let ((word (deletion-point-getter)))
-                 (if (not word)
-                     (setq deletion-point most-positive-fixnum deletion-length 0)
-                     (let ((n-bytes (logand (the fixnum word) #b11)))
-                       (if (zerop n-bytes)
-                           (find-next-deletion-point)
-                           (setq deletion-point (ash word -2)
-                                 deletion-length n-bytes))))))
-             (next-output-block ()
-               (setq output-block-chain (cdr output-block-chain)
-                     output-block (car output-block-chain)
+  (declare (octet-buffer buffer) #.$optimize-buffering)
+  (let ((backpatches (octet-buffer-backpatches buffer)))
+    (when (zerop (octet-buffer-n-gap-bytes buffer))
+      (reset-buffer-chain backpatches (buffer-chain backpatches))
+      (return-from compactify-blocks buffer))
+    ;; OUTPUT and INPUT walk BUFFER's active block chain up to LAST-INPUT-CELL,
+    ;; leaving any trailing pre-allocated blocks intact for future reuse.
+    (let* ((last-input-cell (buffer-next buffer))
+           (input-cell (buffer-chain buffer))
+           (at-input-end-p (eq input-cell last-input-cell))
+           (output-cell input-cell)
+           (output-block (car output-cell))
+           (input-block output-block)
+           (output-index 0) (output-abs-start 0)
+           (input-index 0) (input-position 0)
+           (deletion-point 0) (deletion-length 0)
+           (block-length (if at-input-end-p (buffer-index buffer) (length input-block))))
+      (declare ((simple-array octet-type 1) output-block input-block)
+               (array-index output-index output-abs-start input-index
+                            input-position block-length))
+      (with-word-buffer-iterator (deletion-point-getter backpatches)
+        (labels
+            ((next-output-block ()
+               (incf output-abs-start (length output-block))
+               (setq output-cell (cdr output-cell)
+                     output-block (car output-cell)
                      output-index 0)
                (length output-block))
+             (advance-input-block ()
+               (setq input-cell (cdr input-cell)
+                     at-input-end-p (eq input-cell last-input-cell)
+                     input-block (car input-cell)
+                     block-length (if at-input-end-p (buffer-index buffer) (length input-block))
+                     input-index 0))
              (copy-to-output (count)
-               (declare ((and fixnum unsigned-byte) count))
-               (when (zerop count)
-                 (return-from copy-to-output))
-               (let ((space-available (- (length output-block) output-index)))
-                 (declare (array-index count space-available))
-                 ;; See if the output needs to be advanced to the next block.
-                 (when (zerop space-available)
-                   (setq space-available (next-output-block)))
-                 ;; Avoid copying until the earlist point at which bytes need to move.
-                 ;; This rapidly skips over blocks that contain only fixed-length data
-                 ;; provided they are the first blocks in the serialized output.
-                 ;; Not likely, but happens.
-                 (when (and (eq output-block input-block)
-                            (eql output-index input-index))
-                   (incf output-index count)
-                   (incf input-index count)
-                   (return-from copy-to-output))
-                 ;; A chunk of input can span more than one block of output due to
-                 ;; variable-length blocks.
-                 (loop
-                    (let ((stride (min count space-available)))
-                      ;; COUNT and SPACE-AVAILABLE are both positive,
-                      ;; so this will copy at least one octet.
-                      (fast-replace output-block output-index
-                                    input-block input-index stride)
-                      (incf output-index stride)
-                      (incf input-index stride)
-                      (if (eql (decf count stride) 0) (return)))
-                    (when (zerop (setq space-available
-                                       (- (length output-block) output-index)))
-                      (setq space-available (next-output-block))))))
-             (compute-input-block-length ()
-               ;; Only the final block is possibly shorter than its allocated length.
-               ;; The others are as long as allocated, each larger than its predecessor.
-               (if input-block-chain
-                   (length input-block)
-                   (buffer-index buffer))))
-      (declare (inline next-output-block compute-input-block-length))
-      (prog ((block-length (compute-input-block-length))
-             (total-deletion-count 0))
-        (declare (array-index block-length total-deletion-count))
-        tippytop
-        (find-next-deletion-point)
-        top
-        (let* ((remaining-length (- block-length input-index))
-               (n-bytes-to-copy
-                (min remaining-length (- deletion-point input-position))))
-          (copy-to-output n-bytes-to-copy)
-          (incf input-position n-bytes-to-copy)) ; absolute
-        (when (eql input-index block-length)
-          (unless input-block-chain
-            (rplacd output-block-chain nil) ; terminate the list
-            ;; Free the unnecessary word-buffer blocks. Also makes additional calls
-            ;; to COMPACTIFY on this buffer do nothing, which seems reasonable.
-            (setf (octet-buffer-backpatches buffer) **empty-word-buffer**)
-            (return (make-serialized-protobuf
-                     (buffer-chain buffer)
-                     (- input-position total-deletion-count)
-                     output-index)))
-          (setq input-block (pop input-block-chain)
-                block-length (compute-input-block-length)
-                input-index 0)
-          (go top))
-        ;; now we must be at a deletion point
-        (unless (and (= input-position deletion-point) (plusp deletion-length))
-          (protobuf-error "Octet buffer compaction bug"))
-        (let ((remaining-length (- block-length input-index)))
-          (if (>= remaining-length deletion-length)
-              (incf input-index deletion-length) ; easy case
-              ;; Skip remainder of this block and start of one more. Deleted ranges
-              ;; never span more than 2 blocks since deletion-length <= 3
-              ;; and blocks are much larger than 3 octets.
-              (setq input-block (pop input-block-chain)
-                    block-length (compute-input-block-length)
-                    input-index (- deletion-length remaining-length))))
-        (incf input-position deletion-length)
-        (incf total-deletion-count deletion-length)
-        (go tippytop))))))
+               (declare (array-index count))
+               (when (plusp count)
+                 (let ((space (- (length output-block) output-index)))
+                   (declare (array-index space))
+                   (when (zerop space) (setq space (next-output-block)))
+                   (cond ((and (eq output-block input-block) (eql output-index input-index))
+                          (incf output-index count)
+                          (incf input-index count))
+                         (t
+                          (loop (let ((stride (min count space)))
+                                  (fast-replace output-block output-index
+                                                input-block input-index stride)
+                                  (incf output-index stride)
+                                  (incf input-index stride)
+                                  (when (zerop (decf count stride)) (return)))
+                                (when (zerop (setq space (- (length output-block) output-index)))
+                                  (setq space (next-output-block))))))))))
+          (declare (inline next-output-block advance-input-block))
+          (prog ()
+            tippytop
+            (loop for word = (deletion-point-getter)
+                  unless word
+                    do (setq deletion-point most-positive-fixnum deletion-length 0) (return)
+                  do (let ((n (logand (the fixnum word) #b11)))
+                       (when (plusp n)
+                         (setq deletion-point (ash word -2) deletion-length n)
+                         (return))))
+            top
+            (let ((n-copy (min (- block-length input-index)
+                               (- deletion-point input-position))))
+              (copy-to-output n-copy)
+              (incf input-position n-copy))
+            (when (eql input-index block-length)
+              (when at-input-end-p
+                (setf (buffer-next buffer) output-cell
+                      (buffer-block buffer) output-block
+                      (buffer-index buffer) output-index
+                      (buffer-%block-absolute-start buffer) output-abs-start
+                      (octet-buffer-n-gap-bytes buffer) 0)
+                (reset-buffer-chain backpatches (buffer-chain backpatches))
+                (return buffer))
+              (advance-input-block)
+              (go top))
+            (unless (and (= input-position deletion-point) (plusp deletion-length))
+              (protobuf-error "Octet buffer compaction bug"))
+            (loop with to-skip of-type array-index = deletion-length
+                  for avail = (- block-length input-index)
+                  when (>= avail to-skip)
+                    do (incf input-index to-skip) (return)
+                  do (decf to-skip avail)
+                     (when at-input-end-p
+                       (protobuf-error "Octet buffer compaction bug"))
+                     (advance-input-block))
+            (incf input-position deletion-length)
+            (go tippytop)))))))
 
 (defun reset-buffer-chain (buffer chain)
   "Make BUFFER have CHAIN as its list of octet arrays"
@@ -595,107 +544,88 @@
 (defun force-to-stream (buffer)
   "Write the octets currently in BUFFER to its target stream,
 and rewind BUFFER so that it is empty."
-  ;; Before COMPACTIFY-BLOCKS messes up the chain, copy it.
-  ;; Then compactify and copy to the target stream.
-  (let ((chain (copy-list (buffer-chain buffer)))
-        (backpatch-chain (buffer-chain (octet-buffer-backpatches buffer)))
-        (stream (the stream (octet-buffer-target buffer))))
+  (let ((stream (the stream (octet-buffer-target buffer)))
+        (backpatches (octet-buffer-backpatches buffer)))
     (flet ((out-block (block length)
              (write-sequence block stream :start 0 :end length)))
       (declare (dynamic-extent #'out-block))
       (call-with-each-block #'out-block (compactify-blocks buffer)))
-    (reset-buffer-chain buffer chain)
-    (setf (octet-buffer-n-gap-bytes buffer) 0)
-    ;; Heuristically resize the backpatch buffer, trying to avoid subsequent expansion
-    ;; Ideally we would do this only only on the *next* attempted use of the buffer,
-    ;; but that's not as easy as just sizing up now, even if no further write will occur.
-    ;; The worst-case is when the backpatch buffer is never needed again,
-    ;; but was nonetheless resized to be larger. But that's probably not common.
-    (let ((backpatches (octet-buffer-backpatches buffer)))
-      (reset-buffer-chain
-       backpatches
-       (if (cdr backpatch-chain)
-           (list (new-block backpatches
-                            (loop for block in backpatch-chain
-                                  sum (length block))))
-           backpatch-chain)))))
+    (reset-buffer-chain buffer (buffer-chain buffer))
+    ;; Coalesce multi-block backpatch chains to avoid repeated expansion.
+    (let ((bp-chain (buffer-chain backpatches)))
+      (when (cdr bp-chain)
+        (reset-buffer-chain
+         backpatches
+         (list (new-block backpatches (loop for block in bp-chain sum (length block)))))))))
 
-;; Given either a SERIALIZED-PROTOBUF or a BUFFER, return the concatenation
-;; of all BLOCKS.  You probably don't want to do this on an uncompacted BUFFER.
-;; That usually makes no sense in any scenario other than debugging.
+;; Return a single octet vector concatenating the active blocks of BUFFER.
+;; If BUFFER used length placeholders, COMPACTIFY-BLOCKS must be called first.
 (defun concatenate-blocks (buffer)
-  (multiple-value-bind (total-length blocks)
-      (etypecase buffer
-        (serialized-protobuf
-         (values (serialized-protobuf-total-length buffer)
-                 (serialized-protobuf-blocks buffer)))
-        (buffer
-         (values (loop for (block . rest) on (buffer-chain buffer)
-                       sum (if rest (length (the (simple-array * 1) block))
-                               (buffer-index buffer))
-                       fixnum)
-                 (buffer-chain buffer))))
-    (declare (array-index total-length))
-    (let ((result (make-array total-length :element-type 'octet-type))
-          (index 0))
-      (declare (array-index index))
-      (dolist (block blocks result)
-        (replace result (the (simple-array octet-type 1) block) :start1 index)
-        (incf index (length (the (simple-array * 1) block)))))))
+  (declare (octet-buffer buffer) #.$optimize-buffering)
+  (let* ((total-length (buffer-absolute-position buffer))
+         (result (make-array total-length :element-type 'octet-type))
+         (last-cell (buffer-next buffer))
+         (index 0))
+    (declare (array-index total-length index))
+    (loop for cell on (buffer-chain buffer)
+          for endp = (eq cell last-cell)
+          for block of-type (simple-array octet-type 1) = (car cell)
+          for len of-type array-index = (if endp (buffer-index buffer) (length block))
+          when (plusp len) do (fast-replace result index block 0 len) (incf index len)
+          until endp)
+    result))
 
-;; Given a BUFFER or a SERIALIZED-PROTOBUF, call FUNCTION once with each
-;; block, passing it also the effective length of the block.
+;; Given a BUFFER, call FUNCTION once with each active non-empty block,
+;; passing it also the effective length of the block.
 (defun call-with-each-block (function buffer)
-  (declare (function function) #.$optimize-buffering)
-  (etypecase buffer
-    (serialized-protobuf
-     (let ((blocks (serialized-protobuf-blocks buffer)))
-       (loop
-         (let ((block (car blocks)))
-           (funcall function block
-                    (if (cdr blocks)
-                        (length (the (simple-array * 1) block))
-                        (serialized-protobuf-final-block-length buffer))))
-         (pop blocks)
-         (if (null blocks) (return)))))
-    (buffer
-     (let ((blocks (buffer-chain buffer)))
-       (loop
-         (let ((block (car blocks)))
-           (funcall function block
-                    (if (cdr blocks)
-                        (length (the (simple-array * 1) block))
-                        (buffer-index buffer))))
-         (pop blocks)
-         (if (null blocks) (return)))))))
+  (declare (function function) (buffer buffer) #.$optimize-buffering)
+  (loop with last-cell = (buffer-next buffer)
+        for cell on (buffer-chain buffer)
+        for endp = (eq cell last-cell)
+        for block = (car cell)
+        for len of-type array-index = (if endp
+                                          (buffer-index buffer)
+                                          (length (the (simple-array * 1) block)))
+        when (plusp len) do (funcall function block len)
+        until endp))
 
 ;;;
 
 #+sbcl
 (declaim (sb-ext:maybe-inline encode-uint32))
-(macrolet ((define-varint-encoder (name reserve-bytes lisp-type
-                                        &optional (expr 'input))
+(macrolet ((define-varint-encoder (name reserve-bytes lisp-type &optional (expr 'input))
+             (let ((max-bytes (or reserve-bytes 5)))
                `(progn
                   (declaim (ftype (function (,lisp-type buffer)
-                                            (values (integer 1 ,(or reserve-bytes 5)) &optional))
+                                            (values (integer 1 ,max-bytes) &optional))
                                   ,name))
                   (defun ,name (input buffer &aux (val ,expr))
                     (declare (type ,lisp-type input)
                              (type (unsigned-byte ,(second lisp-type)) val))
                     ;; The locally declare gives us optimizations inside the locally
                     ;; but leaves the typechecking in the function.
-                    (locally
-                        (declare #.$optimize-buffering)
-                      ,@(when reserve-bytes
-                          `((buffer-ensure-space buffer ,reserve-bytes)))
-                      (let ((n 0))
-                        (declare (fixnum n))
-                        (loop (let ((bits (ldb (byte 7 0) val)))
-                                (setq val (ash val -7))
-                                (fast-octet-out buffer
-                                                (ilogior bits (if (i= val 0) 0 128)))
-                                (iincf n))
-                              (when (eql val 0) (return n)))))))))
+                    (locally (declare (octet-buffer buffer) #.$optimize-buffering)
+                      (if ,(if reserve-bytes
+                               `(buffer-ensure-space buffer ,reserve-bytes)
+                               `(i<= (i+ (buffer-index buffer) 5)
+                                     (buffer-block-capacity buffer)))
+                          (let* ((block (octet-buffer-block buffer))
+                                 (start (buffer-index buffer))
+                                 (idx start))
+                            (declare (array-index start idx))
+                            (loop (when (< val 128)
+                                    (setf (aref block idx) val
+                                          (buffer-index buffer) (i+ idx 1))
+                                    (return (the (integer 1 ,max-bytes) (i+ (i- idx start) 1))))
+                                  (setf (aref block idx) (logior #x80 (logand val #x7f))
+                                        idx (i+ idx 1)
+                                        val (ash val -7))))
+                          (loop with n of-type fixnum = 0
+                                for bits = (ldb (byte 7 0) val)
+                                do (setq val (ash val -7))
+                                   (fast-octet-out buffer (ilogior bits (if (i= val 0) 0 128)))
+                                   (iincf n)
+                                when (eql val 0) do (return n)))))))))
 
   (define-varint-encoder encode-uint32 5 (unsigned-byte 32))
   (define-varint-encoder encode-uint64 10 (unsigned-byte 64))
@@ -712,6 +642,25 @@ and rewind BUFFER so that it is empty."
   ;; FAST-ENCODE simply omits the call to ENSURE-SPACE and might not be worth keeping
   (define-varint-encoder fast-encode-uint32 nil (unsigned-byte 32)))
 
+(defun %octet-out2-slow (buffer first second)
+  (declare (octet-buffer buffer) (octet-type first second) #.$optimize-buffering)
+  (%octet-out-slow buffer first)
+  (octet-out buffer second))
+
+;; For encoding an object tag + wire-type, we can compile-time convert ENCODE-UINT32
+;; into a few OCTET-OUT calls. I'll only do this for 1 and 2-octet writes though,
+;; which is enough for field-indices up to (2^14)-1.
+(defun-inline octet-out2 (buffer first second)
+  (declare (octet-buffer buffer) (octet-type first second) #.$optimize-buffering)
+  (let* ((block (octet-buffer-block buffer))
+         (index (buffer-index buffer))
+         (idx1 (i+ index 1)))
+    (if (i< idx1 (length block))
+        (setf (aref block index) first
+              (aref block idx1) second
+              (buffer-index buffer) (i+ index 2))
+        (%octet-out2-slow buffer first second))))
+
 (define-compiler-macro encode-uint32 (&whole form val buffer)
   (let (encoded-length)
     (if (and (typep val 'fixnum) (i<= (setq encoded-length (length32 val)) 2))
@@ -722,13 +671,6 @@ and rewind BUFFER so that it is empty."
             (2 `(progn (octet-out2 ,buffer ,(logior #x80 low7) ,(ldb (byte 7 7) val))
                        2))))
         form)))
-
-;; For encoding an object tag + wire-type, we can compile-time convert ENCODE-UINT32
-;; into a few OCTET-OUT calls. I'll only do this for 1 and 2-octet writes though,
-;; which is enough for field-indices up to (2^14)-1.
-(defun octet-out2 (buffer first second)
-  (octet-out buffer first)
-  (octet-out buffer second))
 
 ;;;
 
