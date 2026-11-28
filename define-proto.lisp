@@ -1556,6 +1556,8 @@ function) then there is no guarantee on the serialize function working properly.
   "Assert that SYMBOL is not NIL, otherwise signal an error."
   `(assert ,symbol () (format nil "~a is not bound to an RPC function." ',symbol)))
 
+(#+sbcl sb-ext:defglobal #-sbcl defvar *use-client-side-generic-functions* nil)
+
 (defmacro define-service (type (&key name options source-location) &body method-specs)
   "Define a service named TYPE and a generic function for each method.
    NAME can be used to override the defaultly generated service name.
@@ -1663,20 +1665,18 @@ function) then there is no guarantee on the serialize function working properly.
               ;; or calling the callback with the response as an argument (if asynchronous).
               ;; It will also deserialize the response so that the client code sees the
               ;; response as an application object.
-              (collect-form
-               `(defgeneric ,client-fn (,vchannel ,vrequest
-                                        &key ,vcallback ,vresponse ,vtimeout ,vmetadata)
-                  #+(or ccl)
-                  (declare (values ,output-type))
-                  (:method (,vchannel ,vrequest
-                            &key ,vcallback ,vresponse ,vtimeout ,vmetadata)
-                    (declare (ignorable ,vchannel ,vcallback ,vresponse
-                                        ,vtimeout ,vmetadata))
-                    (assert-rpc-function-defined *rpc-call-function*)
-                    (funcall *rpc-call-function* ,vchannel ',method ,vrequest ,vresponse
-                             :callback ,vcallback
-                             :timeout ,vtimeout
-                             :metadata ,vmetadata))))
+              (let ((ll `(,vchannel ,vrequest &key ,vcallback ,vresponse
+                                    ,vtimeout ,vmetadata))
+                    (body
+                     `((assert-rpc-function-defined *rpc-call-function*)
+                       (funcall *rpc-call-function* ,vchannel ',method ,vrequest ,vresponse
+                                :callback ,vcallback :timeout ,vtimeout :metadata ,vmetadata))))
+                (collect-form
+                 (if *use-client-side-generic-functions*
+                     `(defgeneric ,client-fn ,ll
+                        #+(or ccl) (declare (values ,output-type))
+                        (:method ,ll ,@body))
+                     `(defun ,client-fn ,ll ,@body))))
               (when (or input-streaming output-streaming)
                 (let ((start-call
                        (intern (nstring-upcase (format nil "~A/START" function))
